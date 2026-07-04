@@ -1,0 +1,95 @@
+---
+parent: sim
+prefix: SIM-KIT
+---
+
+# Kittens
+
+## Context and Design Philosophy
+
+Kittens are the heart of the game and the reason the cozy invariants exist. This leaf owns the population lifecycle (arrival, wandering off, returning), kitten identity (names), job assignment mechanics, and the happiness/mood computation. It exposes exactly two values to the economy leaf — effective workers per job and the mood multiplier — and consumes housing capacity, catnip stock, and unlock flags.
+
+Every kitten is an individual with a name, and the roster is append-only: **a kitten, once arrived, is never removed**. Hard times move kittens to the neighbor's yard; good times bring them home. The player should feel that the clowder is theirs, permanently.
+
+## Kitten Identity
+
+```rust
+pub struct Kitten {
+    pub name: String,          // drawn from the name pool, unique in this save
+    pub job: Option<JobId>,    // None = loafing
+    pub location: Location,    // Home | NeighborsYard
+    pub arrived_day: u64,
+    pub job_seq: Option<u64>,  // stamp from the state's monotone counter at assignment
+    pub away_seq: Option<u64>, // stamp at departure; cleared on return
+}
+```
+
+The two `_seq` stamps come from the engine's `next_seq` counter and exist to make ordering rules implementable from stored state alone: "most recently assigned" = highest `job_seq`; "first out, first back" = lowest `away_seq`. Arrival order alone cannot reconstruct either across multiple famine episodes.
+
+**Name pool** (content table, ~40 entries): Biscuit, Mochi, Pixel, Waffles, Miso, Clementine, Tofu, Pepper, Marmalade, Noodle, Pretzel, Juniper, Bean, Dumpling, Ziggy, Olive, Paprika, Maple, Sprocket, Turnip, Gnocchi, Butterscotch, Fig, Pancake, Nimbus, Tangerine, Pickles, Comet, Bramble, Cricket, Fennel, Sesame, Plum, Wasabi, Doodle, Crumpet, Nutmeg, Socks, Clover, Captain Whiskers. Names are drawn without replacement via RNG; when the pool exhausts, reuse begins with Roman-numeral suffixes (Biscuit II) — the clowder can outgrow the pool.
+
+## Arrival
+
+Checked once per day (engine day boundary), when there is at least one free housing slot **and** catnip stock ≥ 50:
+
+- Base chance 15%, +5% per full 100 catnip in stock, capped at 60%; one idea then adds +15% *on top of the cap* (effective maximum 75% — the idea's bonus is always real).
+- **Pity counter:** after 4 consecutive failed eligible checks, the next eligible check succeeds automatically. Ineligible days (no free slot, or stock < 50) *pause* the counter — they neither extend nor reset it. Dry streaks are frustration, not drama.
+- On success: a kitten joins (Home, loafing), gets a name, resets the pity counter, and emits `KittenArrived`.
+
+At most one kitten arrives per day. Housing capacity = sum of structure housing effects (economy leaf). **Every rostered kitten holds a slot, Home or Away** — a wandered-off kitten's cushion is kept warm for its return, so a return can never find the house full and an arrival can never displace an absentee. Free slots = capacity − roster size.
+
+## Jobs
+
+Assignment is by count, targeted at individuals: `AssignJob(job)` puts the **most recently arrived** idle Home kitten into the job (newest kittens are keenest) and stamps its `job_seq`; `UnassignJob(job)` returns the **most recently assigned Home** worker (highest `job_seq` among Home holders) to loafing. If the job's only holders are Away, `UnassignJob` returns `NoWorkersAssigned` — they aren't here to reassign. Deterministic selection, and events name the kitten (`{name} became a Gardener`) — identity makes assignment delightful rather than bureaucratic.
+
+Effective workers per job = count of Home kittens holding that job. Away kittens keep their job title but don't count (they're not here).
+
+## Happiness (Mood)
+
+Recomputed each tick (derived, never stored):
+
+```
+happiness = 100%
+          − 3% × max(0, home_kittens − 5)        (crowding, felt past the 5th kitten)
+          + 5% × scratching_posts
+          + 1% × min(loafers, 5)                  (a loafing cat improves any room)
+          + 10% if the biscuit-making idea is researched
+```
+
+Floor at 25%, no upper cap. The **mood multiplier** applied to job production is `happiness / 100`, ×0.25 while the clowder is Grumpy (below). Structures are never mood-affected.
+
+Mood tiers for event/reporting purposes: **Blissful** (≥120), **Content** (≥90), **Restless** (≥60), **Fussy** (<60), and **Grumpy** — a famine override that outranks the happiness tiers while active. `KittenMood` events fire on tier transitions only (entering/leaving Grumpy is a transition).
+
+## Famine and the Neighbor's Yard (starvation, replaced)
+
+When consumption falls short (demand exceeds stock — the economy leaf's *shortfall*), kittens simply don't finish their meal — nothing extra is deducted, nobody is harmed — and the clowder is **Grumpy**: job production ×0.25 (they nap through their shifts). A tick whose stock exactly covers demand is *not* a shortfall — ending the day with a licked-clean bowl is thrift, not famine.
+
+- **Famine clock:** at each day close, if the day ended in shortfall (stock 0 and demand unmet at the previous tick's end), `famine_days` increments and `recovery_days` resets. On the day close where `famine_days` reaches 3 — and each famine day-close after — one Home kitten wanders to the neighbor's yard (`KittenWanderedOff`), most recent arrival first (the newest bonds are loosest); its `away_seq` is stamped. Wanderers keep their name and job title, stop eating and working.
+- **Recovery clock:** at each day close without shortfall, `recovery_days` increments and `famine_days` resets. While `recovery_days ≥ 1`, one away kitten returns per day close (`KittenReturned`), **first out, first back** (lowest `away_seq` — the ones who left earliest missed home the most); the stamp clears on return. A return resets neither clock; returns continue daily while recovery holds.
+- The two clocks are mutually exclusive by construction — every day close increments exactly one and resets the other — so wandering pauses the moment any day ends with food.
+
+The wander threshold (3 days ≈ 7.5 real seconds per day of famine at live speed) means brief oversights cost only mood; sustained neglect costs presence, temporarily, reversibly. No state in this system can delete a kitten (cozy invariant).
+
+## Decisions & Alternatives
+
+| Decision | Chosen | Alternatives Considered | Rationale |
+|----------|--------|------------------------|-----------|
+| Roster is append-only | Location enum, never deletion | Removing starved/departed kittens | The mechanical form of Tenet 1; also keeps names stable for the player's attachment |
+| Assignment semantics | Count-based commands resolved to named individuals (LIFO) | Per-kitten assignment UI, anonymous worker pools | Anonymous pools discard identity (the game's heart); per-kitten micro-management fights the idle tenet; LIFO is deterministic and narratable |
+| Arrival pity counter | Guaranteed success after 4 eligible misses | Pure probability, deterministic schedule | Pure RNG produces cruel droughts; fixed schedules feel mechanical; pity keeps surprise with bounded frustration |
+| Crowding penalty | −3%/kitten past the 5th, floor 25% | Hard population cap, no penalty | Soft pressure toward housing/happiness investment without ever forbidding growth |
+| Away kittens don't eat | Suspended entirely while away | Eating from neighbor's stock, half-rate | The neighbor feeds them (it's that kind of neighborhood); simplest rule that reads warmly |
+
+## Open Questions & Future Decisions
+
+### Resolved
+1. ✅ Whether wandered kittens can wander *while some are already away*: yes, one per famine day, until none remain Home — the invariant work happens in returns, not in preventing departures.
+
+### Deferred
+1. Kitten skills/experience per job — roadmap (sim sub-HLD).
+2. Whether crowding should ease with a later structure — decide with the housing tier of the crafting segment.
+
+## References
+
+- Parent: `../sim-design.md` (ownership boundaries: this leaf → workers + mood; economy → yields)
+- Housing capacity and catnip stock read from `../economy/` state; arrival-rate idea flag from `../curiosity/`
