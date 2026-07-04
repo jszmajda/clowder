@@ -56,6 +56,7 @@ pub fn tick(state: &mut GameState) -> Vec<Event>;
 `tick()` and `apply()` return `Vec<Event>` — typed data, no prose:
 
 - `KittenArrived { name }`, `KittenWanderedOff { name }`, `KittenReturned { name }`
+- `JobAssigned { name, job }`, `JobUnassigned { name, job }` — assignment names the kitten (kittens leaf: identity makes assignment delightful)
 - `SeasonChanged { season }`, `NewYear { year }`
 - `StructureBuilt { id, count }`, `IdeaResearched { id }`
 - `ZoomiesStarted { until_tick }`, `ZoomiesEnded`

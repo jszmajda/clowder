@@ -71,7 +71,7 @@ Season modifier applies to **Catnip Patch production only** (gardeners work the 
 
 Each kitten **at home** eats 0.085 catnip/tick (0.34/s). Away kittens neither eat nor work. Consumption is not mood-modified — grumpy kittens still get fed when food exists.
 
-Consumption is **pooled**: total demand = rate × home kittens, deducted as one sum. When stock < demand, the stock goes to zero and the tick is marked a **shortfall** (the engine's mood phase turns shortfall into Grumpiness). There is no per-kitten hunger state — the clowder shares, and shortfall is a collective mood, not an individual injury.
+Consumption is **pooled**: total demand = rate × home kittens, deducted as one sum. When stock < demand, the stock goes to zero and the tick is marked a **shortfall** (the engine's mood phase turns shortfall into Grumpiness). There is no per-kitten hunger state — the clowder shares, and shortfall is a collective mood, not an individual injury. All zero-versus-nonzero stock comparisons in the sim (shortfall detection, the return gate) use the same 1e-9 dust guard as affordability — float residue is never load-bearing.
 
 Balance anchors (design targets, verified by tests): one patch in summer feeds ~1.5 kittens; a gardener feeds ~1.75 (0.6/s produced vs 0.34/s eaten at full mood); in winter an unaided patch feeds ~0.37 kittens — hence the pantry-stocking rhythm.
 
