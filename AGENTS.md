@@ -11,7 +11,7 @@ Project instructions for coding agents working in this repository. The file is n
 - `docs/high-level-design.md` — the HLD: game vision, architecture, tenets
 - `docs/intent/` — design tree: one folder per component, each holding its `{node}-design.md` and `{node}-specs.md`
 - `crates/clowder-core/` — deterministic, headless simulation library (game rules, tick, content tables, save/load)
-- `crates/clowder-tui/` — ratatui binary: screens, input mapping, truecolor theme
+- `crates/clowder-tui/` — ratatui binary: screens, input mapping, truecolor theme (next segment; not yet built)
 
 The two-crate split is load-bearing: `clowder-core` never touches the terminal, and all game-balance tests run headless via `cargo test -p clowder-core`.
 

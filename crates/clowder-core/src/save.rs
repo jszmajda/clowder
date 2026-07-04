@@ -1,8 +1,12 @@
-use crate::state::GameState;
+use crate::events::Event;
+use crate::state::{GameState, ResourceId};
 use serde::{Deserialize, Serialize};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 pub const SAVE_VERSION: u32 = 1;
+const CATCHUP_CAP_SECONDS: u64 = 365 * 86_400;
+const TICKS_PER_SECOND: u64 = crate::content::TICKS_PER_SECOND;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SaveFile {
@@ -45,30 +49,114 @@ pub struct LoadedGame {
 }
 
 /// Serialize a save to pretty JSON with a caller-supplied timestamp.
-// @spec SAVE-001
-pub fn save_string(_state: &GameState, _saved_at_unix: u64) -> String {
-    todo!()
+// @spec SAVE-001, SAVE-011
+pub fn save_string(state: &GameState, saved_at_unix: u64) -> String {
+    let file = SaveFile { save_version: SAVE_VERSION, saved_at_unix, state: state.clone() };
+    serde_json::to_string_pretty(&file).expect("GameState serialization is infallible")
 }
 
 /// Atomic write: temp file in the same directory, fsync, rename.
 // @spec SAVE-003
-pub fn write_save(_path: &Path, _state: &GameState, _saved_at_unix: u64) -> std::io::Result<()> {
-    todo!()
+pub fn write_save(path: &Path, state: &GameState, saved_at_unix: u64) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
+    let tmp = PathBuf::from(tmp);
+    let mut file = std::fs::File::create(&tmp)?;
+    file.write_all(save_string(state, saved_at_unix).as_bytes())?;
+    file.sync_all()?; // without this, a power loss after rename could keep an empty "new" file
+    drop(file);
+    std::fs::rename(&tmp, path)
 }
 
 /// Parse a save and replay offline time through the standard tick().
-// @spec SAVE-006
-pub fn load_string(_s: &str, _now_unix: u64) -> Result<LoadedGame, LoadError> {
-    todo!()
+// @spec SAVE-002, SAVE-005, SAVE-006, SAVE-007
+pub fn load_string(s: &str, now_unix: u64) -> Result<LoadedGame, LoadError> {
+    // Version-check on the loose parse first: a newer save may contain
+    // variants this binary can't deserialize, and that must read as TooNew,
+    // not Corrupt.
+    let value: serde_json::Value =
+        serde_json::from_str(s).map_err(|e| LoadError::Corrupt { detail: e.to_string() })?;
+    let found = value
+        .get("save_version")
+        .and_then(|v| v.as_u64())
+        .ok_or_else(|| LoadError::Corrupt { detail: "missing save_version".into() })? as u32;
+    if found > SAVE_VERSION {
+        return Err(LoadError::TooNew { found });
+    }
+    let file: SaveFile = serde_json::from_value(value)
+        .map_err(|e| LoadError::Corrupt { detail: e.to_string() })?;
+    let mut state = file.state;
+
+    // Normalize hand-edited numerics: physics, not errors. (Counters were
+    // already clamped by their wide deserializers.)
+    for r in ResourceId::ALL {
+        let cap = state.cap(r);
+        if state.resources[r.ix()] > cap {
+            state.resources[r.ix()] = cap;
+        }
+        if !state.resources[r.ix()].is_finite() || state.resources[r.ix()] < 0.0 {
+            state.resources[r.ix()] = 0.0;
+        }
+    }
+
+    // Offline catch-up: same tick(), fast-forwarded. A backwards clock is
+    // zero ticks, an absurd clock is capped and flagged.
+    let raw_elapsed = now_unix.saturating_sub(file.saved_at_unix);
+    let truncated = raw_elapsed > CATCHUP_CAP_SECONDS;
+    let elapsed = raw_elapsed.min(CATCHUP_CAP_SECONDS);
+    let before = state.resources;
+    let mut report = OfflineReport {
+        elapsed_seconds: elapsed,
+        truncated,
+        ..OfflineReport::default()
+    };
+    for _ in 0..elapsed * TICKS_PER_SECOND {
+        for event in state.tick() {
+            fold_event(&mut report, event);
+        }
+    }
+    for r in ResourceId::ALL {
+        report.resource_deltas[r.ix()] = state.resources[r.ix()] - before[r.ix()];
+    }
+    Ok(LoadedGame { state, report })
+}
+
+fn fold_event(report: &mut OfflineReport, event: Event) {
+    match event {
+        Event::KittenArrived { name } => bump(&mut report.arrived, &name),
+        Event::KittenWanderedOff { name } => bump(&mut report.wandered, &name),
+        Event::KittenReturned { name } => bump(&mut report.returned, &name),
+        Event::SeasonChanged { .. } => report.seasons_passed += 1,
+        _ => {}
+    }
+}
+
+fn bump(list: &mut Vec<(String, u32)>, name: &str) {
+    if let Some(entry) = list.iter_mut().find(|(n, _)| n == name) {
+        entry.1 += 1;
+    } else {
+        list.push((name.to_string(), 1));
+    }
 }
 
 // @spec SAVE-004
-pub fn read_save(_path: &Path, _now_unix: u64) -> Result<LoadedGame, LoadError> {
-    todo!()
+pub fn read_save(path: &Path, now_unix: u64) -> Result<LoadedGame, LoadError> {
+    let contents = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(LoadError::NotFound),
+        Err(e) => return Err(LoadError::Corrupt { detail: e.to_string() }),
+    };
+    load_string(&contents, now_unix)
 }
 
 /// Platform data dir + clowder/save.json.
 // @spec SAVE-012
 pub fn default_save_path() -> Option<PathBuf> {
-    todo!()
+    directories::ProjectDirs::from("", "", "clowder")
+        .map(|dirs| dirs.data_dir().join("save.json"))
 }

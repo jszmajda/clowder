@@ -273,14 +273,19 @@ fn day_clocks_are_mutually_exclusive_and_read_the_shortfall_flag() {
     assert_eq!((s.famine_days, s.recovery_days), (0, 1), "a fed day resets famine");
 
     // The clocks read the persisted shortfall flag, not a fresh stock reading:
-    // a hand-made state that is grumpy with a full pantry still counts famine.
+    // a state that closes its day grumpy with a full pantry still counts famine.
     let mut odd = GameState::new(20);
     adopt(&mut odd, 1);
     give(&mut odd, ResourceId::Catnip, 100.0);
-    odd.grumpy = true;
     let saved_stock = odd.stock(ResourceId::Catnip);
-    run_ticks(&mut odd, 10); // one day; first close sees grumpy=true
-    assert!(odd.famine_days >= 1, "day close consumed the flag, not the stock");
+    run_ticks(&mut odd, 9); // stop one tick short of the day boundary
+    odd.grumpy = true; // hand-set: "this day ended in shortfall"
+    run_ticks(&mut odd, 1); // the boundary tick's day close consumes the flag
+    assert_eq!(
+        (odd.famine_days, odd.recovery_days),
+        (1, 0),
+        "day close consumed the flag, not the stock"
+    );
     assert!(odd.stock(ResourceId::Catnip) < saved_stock, "the pantry was open the whole time");
 }
 

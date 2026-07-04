@@ -196,6 +196,7 @@ fn twig_collector_yield() {
     adopt(&mut s, 1);
     s.apply(Command::AssignJob(JobId::TwigCollector)).unwrap();
     s.ticks += 1;
+    s.zoomies_until = 0; // isolate the base yield from any adoption-day zoomies
     give(&mut s, ResourceId::Catnip, 10.0);
     run_ticks(&mut s, 1);
     assert!((s.stock(ResourceId::Twigs) - 0.03).abs() < 1e-9);
@@ -210,6 +211,7 @@ fn groomer_is_idea_gated_and_yields_fluff() {
     s.ideas.insert(IdeaId::GroomedToPurrfection);
     s.apply(Command::AssignJob(JobId::Groomer)).unwrap();
     s.ticks += 1;
+    s.zoomies_until = 0; // isolate the base yield from any adoption-day zoomies
     give(&mut s, ResourceId::Catnip, 10.0);
     run_ticks(&mut s, 1);
     assert!((s.stock(ResourceId::Fluff) - 0.02).abs() < 1e-9);
@@ -224,6 +226,7 @@ fn observer_requires_a_box_and_yields_curiosity() {
     grant(&mut s, StructureId::CardboardBox, 1);
     s.apply(Command::AssignJob(JobId::Observer)).unwrap();
     s.ticks += 1;
+    s.zoomies_until = 0; // isolate the base yield from any adoption-day zoomies
     give(&mut s, ResourceId::Catnip, 10.0);
     run_ticks(&mut s, 1);
     assert!((s.stock(ResourceId::Curiosity) - (0.025 + 0.005)).abs() < 1e-9);
