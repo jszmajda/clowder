@@ -29,5 +29,6 @@
 ## Famine & the Neighbor's Yard
 
 - [ ] **SIM-KIT-015**: At each day close, the system shall update exactly one famine clock: a day that ended in shortfall increments famine_days and resets recovery_days; a day that did not increments recovery_days and resets famine_days (both saturating).
-- [ ] **SIM-KIT-016**: At each day close where famine_days is at least 3 (including the close where it reaches 3), the system shall move the most recently arrived Home kitten to NeighborsYard, stamp its away_seq, and emit a KittenWanderedOff event; the kitten keeps its name and job title.
-- [ ] **SIM-KIT-017**: At each day close where recovery_days is at least 1 and any kitten is at NeighborsYard, the system shall return the kitten with the lowest away_seq to Home, clear its away_seq, and emit a KittenReturned event.
+- [ ] **SIM-KIT-016**: At each day close where famine_days is at least 3 (including the close where it reaches 3), the system shall move the most recently arrived Home kitten to NeighborsYard, stamp its away_seq, and emit a KittenWanderedOff event — unless it is the only kitten at Home: the last Home kitten never wanders.
+- [ ] **SIM-KIT-017**: At each day close where recovery_days is at least 1, catnip stock is above zero, and any kitten is at NeighborsYard, the system shall return the kitten with the lowest away_seq (an absent stamp sorting lowest) to Home, clear its away_seq, and emit a KittenReturned event.
+- [ ] **SIM-KIT-018**: The system shall update the famine and recovery clocks from the engine's persisted shortfall flag (the Grumpy bit as it stood at the end of the previous tick), not from a fresh reading of the stock.

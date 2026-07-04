@@ -25,9 +25,10 @@
 
 ## Zoomies
 
-- [ ] **SIM-ENG-011**: While zoomies are inactive, at each day close the system shall start zoomies with 4% probability, setting the active window and emitting ZoomiesStarted.
-- [ ] **SIM-ENG-012**: While zoomies are active (ticks < zoomies_until), the system shall multiply job production by 1.25 — or by 1.5 whenever the zoomies-enhancing idea (SIM-CUR) is researched — with the window lasting 120 ticks, or 240 ticks where that idea was already researched when the zoomies started (magnitude is live; duration is fixed at start).
-- [ ] **SIM-ENG-013**: On the first tick at or past zoomies expiry, the system shall reset the zoomies window to inactive and emit ZoomiesEnded.
+- [ ] **SIM-ENG-011**: While zoomies are inactive, on each day-boundary tick during the random-events phase (after production), the system shall start zoomies with 4% probability, setting the active window and emitting ZoomiesStarted; zoomies may restart on the same tick their previous window expired.
+- [ ] **SIM-ENG-012**: While zoomies are active, the system shall multiply job production by 1.25 — or by 1.5 whenever the zoomies-enhancing idea (SIM-CUR) is researched — for exactly 120 boosted production ticks, or 240 where that idea was already researched when the zoomies started (magnitude is live; duration is fixed at start); zoomies stack multiplicatively with the mood multiplier, including while Grumpy.
+- [ ] **SIM-ENG-013**: During each tick's random-events phase, if the zoomies window has expired, the system shall reset it to inactive and emit ZoomiesEnded before rolling any new zoomies start.
+- [ ] **SIM-ENG-018**: On a day-boundary tick, the system shall consume RNG draws in the fixed order: arrival roll (no draw when pity forces success or the check is ineligible), zoomies start roll, flavor roll, flavor template draw, flavor kitten draw — later draws occurring only when their preceding roll fired.
 
 ## Initial State & Derived Queries
 
@@ -36,4 +37,4 @@
 
 ## Flavor Events
 
-- [ ] **SIM-ENG-014**: At each day close, the system shall emit a flavor event with 8% probability, selecting uniformly among eligible templates (needs-kitten templates are eligible only while at least one kitten is Home) and drawing a random Home kitten when the template requires one; flavor events shall have no mechanical effect on game state.
+- [ ] **SIM-ENG-014**: On each day-boundary tick during the random-events phase, the system shall emit a flavor event with 8% probability, selecting uniformly among eligible templates (needs-kitten templates are eligible only while at least one kitten is Home) and drawing a random Home kitten when the template requires one; flavor events shall have no mechanical effect on game state.

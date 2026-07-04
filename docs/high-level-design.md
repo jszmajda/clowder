@@ -45,7 +45,7 @@ People who live in a terminal — developers who keep a tmux session running for
 
 1. **Ten minutes to the first kitten.** A new player reaches their first kitten within ten minutes without reading documentation.
 2. **Headless sim.** The full game-rules test suite runs without a terminal via `cargo test -p clowder-core`.
-3. **Absence-proof.** A save can be closed for a week and reopened with no loss and no punishment — only accrued progress.
+3. **Absence-proof.** A save can be closed for a week and reopened with nothing lost: the sim ran exactly the rules it would have run attended, so absence is never worse than presence. Hard times show up as moods and absences that reverse on feeding, never as losses.
 4. **tmux-native.** The game is fully playable inside a stock tmux session using only keys tmux does not intercept.
 5. **Weeks of depth.** Interlocking systems (jobs, research, seasons, ceremonies, expeditions, prestige) keep unlocking across weeks of casual play.
 

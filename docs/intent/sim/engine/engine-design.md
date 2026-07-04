@@ -21,7 +21,7 @@ One serde-serializable struct, the single source of truth:
 - `ideas` — completed idea set, stored as a sorted set for deterministic iteration.
 - `pity: u8` — consecutive failed *eligible* arrival checks (kittens leaf semantics); saturating.
 - `famine_days` / `recovery_days: u8` — famine and recovery clocks (kittens leaf semantics); saturating — only threshold crossings matter, so saturation is harmless.
-- `grumpy: bool` — set each tick by the mood phase (consumption shortfall occurred); read by the next production phase.
+- `grumpy: bool` — set each tick by the mood phase (consumption shortfall occurred); read by the next production phase, and by the next day close as the "did the day end in shortfall" bit for the famine/recovery clocks.
 - `next_seq: u64` — monotone counter stamping kitten job assignments and departures (kittens leaf ordering semantics).
 - `zoomies_until: u64` — tick until which zoomies are active (active while `ticks < zoomies_until`); 0 when inactive.
 
@@ -64,14 +64,14 @@ pub fn tick(state: &mut GameState) -> Vec<Event>;
 
 ## Random Events
 
-Drawn in pipeline phase 5, at day boundaries, from the state RNG:
+Drawn in pipeline phase 5, at day boundaries, from the state RNG. The complete RNG draw schedule on a boundary tick is fixed: arrival roll (phase 1d — skipped entirely, no draw, when pity forces the arrival or the check is ineligible) → zoomies expiry check (no draw; per-tick, `ticks ≥ zoomies_until`) → zoomies start roll → flavor roll → flavor template draw → flavor kitten draw (the last two only when the preceding roll fired). Zoomies may restart on the same boundary tick they expired (expiry is checked first), and may start or run while the clowder is Grumpy — the multipliers stack (0.25 × zoomies), which is intended: zoomies shorten famines, and taking them away from a grumpy clowder would be anti-cozy.
 
-- **Zoomies:** while inactive, daily chance 4% (expected roughly once per 25 game-days — about once a season); sets `zoomies_until = ticks + duration` and emits `ZoomiesStarted`. The multiplier applies while `ticks < zoomies_until`; on the first tick past expiry, phase 5 resets the field to 0 and emits `ZoomiesEnded`. Base: ×1.25 for 120 ticks (30 s); the relevant idea raises this to ×1.5 for 240 ticks. **Magnitude is live, duration is fixed at start** — researching the idea mid-zoomies upgrades the multiplier immediately but never rewrites `zoomies_until` (the player only ever gains).
+- **Zoomies:** while inactive, daily chance 4% (expected roughly once per 25 game-days — about once a season); sets `zoomies_until = ticks + duration + 1` and emits `ZoomiesStarted`. The `+1` is deliberate: the start happens in phase 5 *after* that tick's production, so the window must extend one past the arithmetic end for exactly `duration` production ticks to be boosted — the stated duration is never quietly one short. The multiplier applies while `ticks < zoomies_until`; when phase 5 finds `ticks ≥ zoomies_until`, it resets the field to 0 and emits `ZoomiesEnded`. Base: ×1.25 for 120 ticks (30 s); the relevant idea raises this to ×1.5 for 240 ticks. **Magnitude is live, duration is fixed at start** — researching the idea mid-zoomies upgrades the multiplier immediately but never rewrites `zoomies_until` (the player only ever gains).
 - **Flavor:** daily chance 8%. Templates are typed *ambient* or *needs-kitten*; the draw selects uniformly among currently eligible templates (needs-kitten templates are eligible only while at least one kitten is Home), then draws a kitten if the template wants one. Zero mechanical effect by construction.
 
 ## Determinism Contract
 
-Same seed + same command sequence applied at the same tick counts ⇒ bit-identical serialized state. Enforced by: single RNG, fixed pipeline order, sorted iteration for all collections that feed RNG draws or ordered effects, no float operations whose order varies (accumulate flows in a fixed resource order), commands applied only between ticks.
+Same seed + same command sequence applied at the same tick counts ⇒ bit-identical serialized state. Enforced by: single RNG, fixed pipeline order, the boundary-tick RNG draw schedule above, no float operations whose order varies (accumulate flows in a fixed resource order), commands applied only between ticks, and **canonical serialization order for every GameState collection** — resources and structures as enum-indexed arrays (or BTreeMaps), the roster as an append-ordered Vec, ideas as a sorted set. "Bit-identical" is tested on serialized bytes; an unordered map anywhere in GameState would falsify it.
 
 ## Decisions & Alternatives
 

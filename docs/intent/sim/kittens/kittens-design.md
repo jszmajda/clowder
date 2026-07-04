@@ -26,7 +26,7 @@ pub struct Kitten {
 
 The two `_seq` stamps come from the engine's `next_seq` counter and exist to make ordering rules implementable from stored state alone: "most recently assigned" = highest `job_seq`; "first out, first back" = lowest `away_seq`. Arrival order alone cannot reconstruct either across multiple famine episodes.
 
-**Name pool** (content table, ~40 entries): Biscuit, Mochi, Pixel, Waffles, Miso, Clementine, Tofu, Pepper, Marmalade, Noodle, Pretzel, Juniper, Bean, Dumpling, Ziggy, Olive, Paprika, Maple, Sprocket, Turnip, Gnocchi, Butterscotch, Fig, Pancake, Nimbus, Tangerine, Pickles, Comet, Bramble, Cricket, Fennel, Sesame, Plum, Wasabi, Doodle, Crumpet, Nutmeg, Socks, Clover, Captain Whiskers. Names are drawn without replacement via RNG; when the pool exhausts, reuse begins with Roman-numeral suffixes (Biscuit II) — the clowder can outgrow the pool.
+**Name pool** (content table, ~40 entries): Biscuit, Mochi, Pixel, Waffles, Miso, Clementine, Tofu, Pepper, Marmalade, Noodle, Pretzel, Juniper, Bean, Dumpling, Ziggy, Olive, Paprika, Maple, Sprocket, Turnip, Gnocchi, Butterscotch, Fig, Pancake, Nimbus, Tangerine, Pickles, Comet, Bramble, Cricket, Fennel, Sesame, Plum, Wasabi, Doodle, Crumpet, Nutmeg, Socks, Clover, Captain Whiskers. Names are drawn without replacement via RNG; when the pool exhausts, reuse begins with Roman-numeral suffixes (Biscuit II) — the clowder can outgrow the pool. The remaining pool is *derived from the roster*, never stored: the current cycle is the smallest suffix count at which some base name is unused, and the draw is a uniform RNG index over the remaining names in content-table order, each cycle drawn without replacement in turn.
 
 ## Arrival
 
@@ -64,8 +64,8 @@ Mood tiers for event/reporting purposes: **Blissful** (≥120), **Content** (≥
 
 When consumption falls short (demand exceeds stock — the economy leaf's *shortfall*), kittens simply don't finish their meal — nothing extra is deducted, nobody is harmed — and the clowder is **Grumpy**: job production ×0.25 (they nap through their shifts). A tick whose stock exactly covers demand is *not* a shortfall — ending the day with a licked-clean bowl is thrift, not famine.
 
-- **Famine clock:** at each day close, if the day ended in shortfall (stock 0 and demand unmet at the previous tick's end), `famine_days` increments and `recovery_days` resets. On the day close where `famine_days` reaches 3 — and each famine day-close after — one Home kitten wanders to the neighbor's yard (`KittenWanderedOff`), most recent arrival first (the newest bonds are loosest); its `away_seq` is stamped. Wanderers keep their name and job title, stop eating and working.
-- **Recovery clock:** at each day close without shortfall, `recovery_days` increments and `famine_days` resets. While `recovery_days ≥ 1`, one away kitten returns per day close (`KittenReturned`), **first out, first back** (lowest `away_seq` — the ones who left earliest missed home the most); the stamp clears on return. A return resets neither clock; returns continue daily while recovery holds.
+- **Famine clock:** at each day close, if the day ended in shortfall (the engine's persisted Grumpy flag at the boundary), `famine_days` increments and `recovery_days` resets. On the day close where `famine_days` reaches 3 — and each famine day-close after — one Home kitten wanders to the neighbor's yard (`KittenWanderedOff`), most recent arrival first (the newest bonds are loosest); its `away_seq` is stamped. Wanderers keep their name and job title, stop eating and working. **The last Home kitten never wanders** — someone has to mind the sunbeam. The meadow is never empty, the player always has a face to come back to, and consumption never reaches zero during an absence (which would make an abandoned pantry read as "recovery").
+- **Recovery clock:** at each day close without shortfall, `recovery_days` increments and `famine_days` resets. While `recovery_days ≥ 1` **and the day closed with catnip in stock**, one away kitten returns per day close (`KittenReturned`), **first out, first back** (lowest `away_seq`, an absent stamp sorting lowest — the ones who left earliest missed home the most); the stamp clears on return. Kittens come back when the pantry has actually refilled, not merely when nobody went hungry. A return resets neither clock; returns continue daily while recovery holds.
 - The two clocks are mutually exclusive by construction — every day close increments exactly one and resets the other — so wandering pauses the moment any day ends with food.
 
 The wander threshold (3 days ≈ 7.5 real seconds per day of famine at live speed) means brief oversights cost only mood; sustained neglect costs presence, temporarily, reversibly. No state in this system can delete a kitten (cozy invariant).
@@ -83,7 +83,7 @@ The wander threshold (3 days ≈ 7.5 real seconds per day of famine at live spee
 ## Open Questions & Future Decisions
 
 ### Resolved
-1. ✅ Whether wandered kittens can wander *while some are already away*: yes, one per famine day, until none remain Home — the invariant work happens in returns, not in preventing departures.
+1. ✅ Whether wandered kittens can wander *while some are already away*: yes, one per famine day — but never the last Home kitten. A floor of one keeps the meadow warm, keeps absence legible ("a few may wander," per the HLD), and keeps consumption nonzero so an abandoned pantry can never masquerade as recovery.
 
 ### Deferred
 1. Kitten skills/experience per job — roadmap (sim sub-HLD).

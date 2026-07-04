@@ -20,7 +20,7 @@ Balance philosophy: the early game is hand-fed (manual gathering), the mid game 
 | **Fluff** | soft material (grooming) | 25 | +10 per Cat Tree (fluff-storage nooks) |
 | **Curiosity** | idea currency | 0 | +50 per Cardboard Box |
 
-Curiosity's base cap of 0 is the gate: nothing accrues until the first Cardboard Box exists. Stocks are `f64`, clamped to caps in the engine's clamp phase. Spends require the full amount (no debt), with an epsilon-tolerant affordability check (`stock + 1e-9 ≥ cost`) so float drift can never make a purchase the display calls affordable get rejected; deductions floor at zero. Without the Cat Tree's fluff extension, escalating fluff costs would eventually outgrow the static base cap and leave later copies permanently unbuyable — cap extensions must keep every listed structure's next copy reachable.
+Curiosity's base cap of 0 is the gate: nothing accrues until the first Cardboard Box exists. Stocks are `f64`, clamped to caps in the engine's clamp phase. Spends require the full amount (no debt), with an epsilon-tolerant affordability check (`stock + 1e-9 ≥ cost`) so float drift can never make a purchase the display calls affordable get rejected; deductions floor at zero. Without the Cat Tree's fluff extension, escalating fluff costs would quickly outgrow the static base cap and leave later copies permanently unbuyable — cap extensions must keep every structure's first 20 copies reachable. Far beyond that horizon (copies ~24+ of self-capping chains), exponential costs outrun linear cap growth by design: the late game plateaus softly rather than walling, and the roadmap's deeper systems arrive before any player grinds there.
 
 ## Manual Actions
 
