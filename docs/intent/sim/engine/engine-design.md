@@ -25,7 +25,9 @@ One serde-serializable struct, the single source of truth:
 - `next_seq: u64` — monotone counter stamping kitten job assignments and departures (kittens leaf ordering semantics).
 - `zoomies_until: u64` — tick until which zoomies are active (active while `ticks < zoomies_until`); 0 when inactive.
 
-Derived values (happiness, effective rates, season) are computed, never stored — stored state is minimal so saves can't go internally inconsistent.
+Derived values (happiness, effective rates, season) are computed, never stored — stored state is minimal so saves can't go internally inconsistent. A queryable next-season forecast is exposed once the relevant idea is researched (until then the query returns nothing).
+
+A new game (`GameState::new(seed)`) is an empty meadow: zero stocks, no structures, no kittens, no ideas, tick 0. The seed comes from the caller — the shell picks it (typically from the OS clock, which is allowed *outside* the sim); everything after the seed is deterministic.
 
 ## Calendar
 

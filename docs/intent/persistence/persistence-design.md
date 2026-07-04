@@ -38,7 +38,7 @@ On load, the caller supplies `now_unix`:
 1. `elapsed = max(0, now_unix − saved_at_unix)` — a backwards clock yields zero ticks, never a regressed state.
 2. `elapsed` is capped at 365 days — beyond that, accrual stops representing "time you were away" and starts representing clock damage.
 3. `ticks_to_replay = elapsed × 4` (engine tick rate), replayed through the standard `tick()` in a loop.
-4. Events from the replay are folded into an **`OfflineReport`**: elapsed span (plus a `truncated` flag when the 365-day cap bit), per-resource *net* deltas, kittens arrived/wandered/returned as *gross* name lists (a kitten that left and came home appears in both — that's the drama the player missed), ideas completed, seasons passed — the shell renders this as the "while you were away" screen. Full per-tick event streams are not retained (a week is ~2.4M ticks).
+4. Events from the replay are folded into an **`OfflineReport`**: elapsed span (plus a `truncated` flag when the 365-day cap bit), per-resource *net* deltas, kittens arrived/wandered/returned as *gross* name lists (a kitten that left and came home appears in both — that's the drama the player missed), and seasons passed — the shell renders this as the "while you were away" screen. Commands cannot occur during replay, so builds and research never appear in the report. Full per-tick event streams are not retained (a week is ~2.4M ticks).
 
 Catch-up performance is a design constraint: replaying 30 days must feel like loading a game, not compiling one (spec'd as a bound in release mode). The tick function stays allocation-light on the hot path for this reason.
 
