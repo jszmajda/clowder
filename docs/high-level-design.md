@@ -37,6 +37,8 @@ All game-balance and progression logic is testable headless, without a terminal,
 
 Time away is first-class play. Offline progress is computed by the same `tick()` function that drives live play — the game fast-forwards through the elapsed ticks on load, so there is one simulation and no shadow math. Nothing accrues *worse* while away than it would have accrued attended (active play adds opportunities, never obligations).
 
+The player may adjust a **game-speed multiplier** (default 1× — a deliberately slow, months-long burn). Speed is part of the saved game state and applies identically to attended and away time: turning the speed up never makes sitting at the terminal better than walking away, so the knob cannot break the invariant.
+
 ## Target Users
 
 People who live in a terminal — developers who keep a tmux session running for days and want one pane that is quietly alive. They glance at the game between compiles, press a few keys, and go back to work. The primary user is the author; the design still assumes a fresh player can sit down cold.
@@ -47,7 +49,7 @@ People who live in a terminal — developers who keep a tmux session running for
 2. **Headless sim.** The full game-rules test suite runs without a terminal via `cargo test -p clowder-core`.
 3. **Absence-proof.** A save can be closed for a week and reopened with nothing lost: the sim ran exactly the rules it would have run attended, so absence is never worse than presence. Hard times show up as moods and absences that reverse on feeding, never as losses.
 4. **tmux-native.** The game is fully playable inside a stock tmux session using only keys tmux does not intercept.
-5. **Weeks of depth.** Interlocking systems (jobs, research, seasons, ceremonies, expeditions, prestige) keep unlocking across weeks of casual play.
+5. **Kittens-Game-scale depth.** Interlocking systems — crafting chains, a deep research tree, jobs and skills, ceremonies, expeditions, trade with neighbor colonies, a prestige loop with a permanent unlock shop, and a cosmic late-game arc — keep unlocking across months of casual play, with each subsystem feeding multipliers into the others rather than standing alone.
 
 ## Non-Goals
 
@@ -94,9 +96,9 @@ flowchart LR
 
 Major components, each a candidate leaf LLD in `docs/intent/` as work reaches it:
 
-- **Simulation** (`clowder-core`): resources and their flows, structures, kitten population and jobs, mood/grumpiness, research, seasons, ceremonies, expeditions, prestige. Likely to promote into a sub-HLD as systems accumulate.
-- **Persistence** (`clowder-core`): versioned save format, save location, offline catch-up on load.
-- **TUI shell** (`clowder-tui`): screen layout and navigation, input mapping, theme, render/tick loop, autosave cadence.
+- **Simulation** (`clowder-core`): a sub-HLD (`docs/intent/sim/`) whose leaves cover the material economy (resources, structures, crafting, energy), kitten society (population, jobs, skills, moods), the research tree, ceremonies, the mystic economy, trade with neighbor colonies, expeditions, prestige, adventures, and the cosmic and dreamtime late-game arcs. All systems feed one deterministic tick pipeline and one typed effect-resolution stack.
+- **Persistence** (`clowder-core`): versioned save format with forward migrations, save location, offline catch-up on load.
+- **TUI shell** (`clowder-tui`): screen layout and navigation, input mapping, theme, render/tick loop, autosave cadence, speed control surface.
 
 ## Key Design Decisions
 
@@ -106,6 +108,7 @@ Major components, each a candidate leaf LLD in `docs/intent/` as work reaches it
 4. **Truecolor-only theme.** The palette is designed once, in 24-bit color, for terminals that support it. Alternative — adaptive 256-color fallback — doubles the design and test surface for terminals the target user doesn't use.
 5. **tmux-first keyboard model.** All bindings are plain printable keys, Tab, and arrows. No Ctrl chords (Ctrl-B is the tmux prefix; other Ctrl keys collide with terminal conventions — only Ctrl-C is honored, as emergency quit), no Alt/Meta (ambiguous Esc-prefix encoding under tmux `escape-time`), no function keys (terminfo variance). Single-key mnemonics per screen, with a persistent hint bar so bindings are discoverable without a manual.
 6. **Human-readable versioned saves.** Saves serialize via serde to a human-readable format carrying a schema version, in the platform data directory. Alternative — compact binary — saves bytes nobody is counting and costs debuggability and hand-rescue of a broken save.
+7. **Speed as saved state, not a UI setting.** The game-speed multiplier lives in the game state and scales offline catch-up identically to live play. Alternative — a shell-side playback setting — would make attended fast-play strictly better than absence, quietly breaking the idle-respect tenet.
 
 ## Success Metrics
 

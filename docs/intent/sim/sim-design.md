@@ -9,81 +9,173 @@ prefix: SIM
 
 ## Context and Design Philosophy
 
-The simulation is the whole game: every rule, number, name, and event lives in `clowder-core`, headless and deterministic. The TUI is a window onto it. This sub-HLD holds what its child leaves share — the tick pipeline, the determinism contract, the cozy invariants, and the ownership boundaries between leaves — and owns no EARS of its own.
+The simulation is the whole game: every rule, number, name, and event lives in `clowder-core`, headless and deterministic. The TUI is a window onto it. This sub-HLD holds what its child leaves share — the tick pipeline, the determinism contract, the cozy invariants, the effect-resolution architecture, the currency-tier taxonomy, and the ownership boundaries between leaves — and owns no EARS of its own.
 
-Three properties are load-bearing across every child:
+Clowder targets **Kittens-Game-scale depth**: a dozen interlocking subsystems, each feeding a multiplier layer into a shared production stack, paced by storage-cap gating over months of slow-burn play. The mechanical skeleton is adapted from Kittens Game's actual source (its curve shapes, stack order, and gating patterns), with clowder's own names, numbers, and — everywhere the original is grim — a cozy inversion.
 
-1. **Determinism.** Given the same RNG seed and the same command sequence applied at the same tick counts, the simulation reaches an identical state. All randomness flows through one serializable RNG owned by the game state; nothing reads the wall clock inside the sim. This is what makes offline catch-up honest (same `tick()`, fast-forwarded) and balance tests reproducible.
+## Load-Bearing Properties
+
+1. **Determinism.** Same RNG seed + same command sequence at the same tick counts ⇒ bit-identical serialized state. One serializable PCG-32 in state; no wall clocks inside the sim; fixed pipeline order; canonical serialization order for every collection; fixed RNG draw schedules. Every stochastic system must have a deterministic replay path (offline catch-up runs the same `tick()`).
 2. **The cozy invariants** (HLD Tenet 1, made mechanical):
-   - No kitten is ever removed from the roster. Absence is a *location*, never a deletion.
-   - No structure is ever destroyed against the player's will.
-   - No resource stock is ever reduced as a penalty. Stocks fall only through consumption, player-chosen spending, and storage-overflow trimming (clamping to caps is physics, not punishment).
-   - Every negative pressure is a *multiplier on gains* (moods, seasons), never a confiscation.
-3. **Events, not prose.** The sim reports what happened each tick as typed events; presentation (wording, color, layout) belongs to the shell. Flavor text templates live in core content tables (they are game content), but *when to show, where, and how* is the shell's.
+   - No kitten is ever removed from the roster. Absence is a *location*; the Great Meadow Move archives generations into the Family Album — archived, never deleted.
+   - No structure is destroyed against the player's will.
+   - No stock falls except by consumption, player-chosen spending, storage-overflow trimming, or player-accepted conversion. Systems that in the inspiration *destroy* things instead *relocate, suspend, or hide* them, reversibly (see § Cozy Inversions).
+   - Every negative pressure is a multiplier on gains — moods, seasons, mess, energy deficits — never a confiscation.
+3. **Whimsy with clarity** (Tenet 3): every flavor-named entity carries a plain mechanical description in its content definition; the shell always has truth to show one keypress away.
 
-## Time Model
+## Cozy Inversions (normative for all leaves)
 
-| Unit | Definition | Real time |
+| Grim original (Kittens Game) | Clowder's version |
+|---|---|
+| Starvation kills kittens | Shortfall → Grumpy naps; sustained famine → kittens visit the neighbor's yard, return on recovery; the last Home kitten never leaves |
+| Sacrificing unicorns for tears | **Unicorn Parades**: unicorns march off in glittering procession; rainbows arrive in gratitude |
+| Sacrificing alicorns; corruption breeding necrocorns | **Prisms** occasionally drift into the clowder's shared dreams (**dreaming**), becoming **dreamcorns** — asleep elsewhere, not gone |
+| Black Liquid Sorrow (condensed suffering) | **Jars of Purrs** — condensed collective contentment, capped and precious |
+| Pacts consuming necrocorns; Fracture destroys pacts, alicorns, and all skills permanently | **Promises** to the Night Court keep dreamcorns drowsy as upkeep; a neglected Promise **goes quiet** (suspends, keeps its slot) and wakes when upkeep resumes — nothing shatters |
+| AI apocalypse destroys resources yearly; sale locked | The **Yarn Computer** above a cleverness threshold starts *batting resources under the couch* — a visible hidden stash, fully recovered when its enthusiasm is channeled (research) or its level lowered |
+| Reset: kittens die/are abandoned; resources wiped | **The Great Meadow Move**: the clowder's kittens become honored **Elders of the old meadow**, archived by generation in the **Family Album**; **Traveling Baskets** carry chosen kittens along; the Memory Chest carries a fraction of resources |
+| Pollution penalties | **Mess**: industry scatters clutter; too much slows catnip growth and makes arrivals shy — tidying (structures, rotas) reverses it; never a loss, only a slowdown |
+| Hostile races; failed trades | **Shy colonies**: a failed trade means the caravan found them napping (goods spent, a courtesy gift sometimes returned); standing improves with Pen Pals |
+
+## Time Model & Speed
+
+| Unit | Definition | Real time at speed 1× |
 |---|---|---|
 | Tick | atomic sim step | 250 ms (4 ticks/s) |
 | Day | 10 ticks | 2.5 s |
 | Season | 25 days | 62.5 s |
-| Year | 4 seasons | ~4.2 min |
+| Year | 4 seasons (100 days) | ~4.2 min |
 
-All internal rates are per-tick. The shell decides when ticks happen (live timer or catch-up fast-forward); the sim never sleeps or measures time.
+`speed: f64` lives in `GameState` (canonical, persisted), default 1.0, clamped to [0.25, 8]. The shell drives `4 × speed` ticks per real second; offline catch-up replays `elapsed_seconds × 4 × speed` ticks. Because speed scales attended and away time identically, it can never make presence beat absence (HLD decision 7). Nothing inside `tick()` reads `speed`.
 
-## Tick Pipeline
+## The Production Stack (normative order)
 
-`tick()` runs phases in this fixed order. Order is normative — several behaviors (e.g., "eat before mood update") depend on it:
+Per-tick resource flow resolves in fixed multiplier layers, adapted from the inspiration's stack. Layers 4–8 apply only to **material** resources produced by *kitten jobs and autoproduction converters*; structure base production takes layers marked ☆. Transient currencies (§ Currency Tiers) skip every global layer.
 
-1. **Calendar & daily processing** — increment the tick counter. A tick is a *day-boundary tick* when the increment crosses into a new day (`day(t) > day(t−1)`, day = ticks/10). On a boundary tick, before any production: **(a) day close** — update the famine/recovery clocks from the previous tick's shortfall status (the persisted Grumpy flag: economy marks shortfall in phase 3, the mood phase stores it in phase 4, the next day close consumes it — that chain is the ownership rule); **(b) returns** — away kittens come home; **(c) wanders** — famine departures; **(d) arrival check**. Returns precede arrivals so a homecoming kitten is never displaced by a newcomer, and precede wanders vacuously (the clocks make the two mutually exclusive). Season/year boundary events emit here. No events fire at game start (`ticks = 0` is mid-day-0; the first boundary is tick 10).
-2. **Production** — structures produce; employed kittens produce (mood-multiplied); apply season modifiers.
-3. **Consumption** — kittens at home eat catnip (pooled deduction; the economy leaf defines shortfall handling).
-4. **Mood & famine flag** — recompute happiness; set or clear the Grumpy state based on whether consumption fell short this tick.
-5. **Random events** — zoomies expiry/start and flavor events, drawn from the state RNG at day boundaries.
-6. **Clamp** — trim stocks to their storage caps. (Production may transiently exceed caps between phases 2 and 6; consumption eating from that transient is intended and player-favoring.)
+1. **Base rate** — content-table flat rates × count (structures ☆) or × effective workers (jobs).
+2. **Per-source ratio** — additive `+X%` effect keys targeting that source (tool ladders, per-building boosts) ☆.
+3. **Season/weather** — seasonal modifier where the source is marked seasonal ☆ (catnip patches; weather adds ±0.15 to the seasonal band from year 4).
+4. **Mood** — happiness multiplier × Grumpy ×0.25 (jobs only).
+5. **Zoomies** — ×1.25/×1.5 while active (jobs only).
+6. **Global production ratios** — Dynamo Wheel (+2%/active, amplified by Cogworks), Star Basin (+5%/active).
+7. **Elder Wisdom** — +1%/point, LimitedDR-capped at +200% (× Nine Lives tradition ratio); Passed-Down Wisdom adds a second capped pool.
+8. **The Long Sun** — ceremonies' devotion bonus: `LDR(UDR(devotion, 1000)/100, cap)`, cap 10 base, extendable by Enlightenment-tier content.
+9. **Mess & energy** — mess level multiplies catnip growth down (floor ×0.25) and slows arrivals; an energy deficit multiplies layers 6–8's *effects* by `produced/consumed` floored at 0.25. Surplus energy is separately rewarded where content says so (e.g., Moonlight Stage).
 
-Commands are applied *between* ticks, never during one. All per-day counters use saturating arithmetic — only threshold crossings carry meaning, so saturation is harmless and overflow is impossible.
+**Diminishing-return primitives** (shared, engine-owned): `limited_dr(v, limit)` — linear to 75% of limit, asymptotic after; `unlimited_dr(v, stripe)` — sqrt-shaped unbounded. Any stacking bonus MUST pass through one of these before it can run away; a leaf introducing an unbounded raw sum is a design bug.
 
-## Child Leaves and Ownership Boundaries
+## Effect Resolution Architecture
+
+All modifiers flow through one **typed effect-key system** owned by the engine leaf:
+
+```rust
+enum Effect {
+    ResourceRatio(ResourceId),        // +% on a resource's base production
+    StructureRatio(StructureId),      // +% on one structure's output
+    JobRatio(JobId),                  // +% on one job's yield
+    MaxCap(ResourceId),               // flat cap extension
+    MaxCapRatio(ResourceId),          // % cap extension
+    GlobalProductionRatio,            // layer 6
+    CraftRatio,                       // craft output bonus
+    CraftRatioFor(CraftId),           // per-recipe bonus
+    HappinessPoints, UnhappinessRatio,
+    TradeRatio, StandingRatio,
+    PriceRatioDelta(StructureId), GlobalPriceRatioDelta,
+    EnergyProduction, EnergyConsumptionRatio,
+    ArrivalChanceBonus, KittenGrowthRatio,
+    // … extended per wave; every variant is compiler-checked and greppable
+}
+```
+
+Sources of effect values: structures (× count), refinements, ideas, house rules, rites, arch upgrades, traditions, colony standing, adventure rewards, the Elder's trait. The engine exposes `effects(state, key) -> f64` summing all sources in a fixed order; leaves own *which* keys their content emits and *where* each key is consumed. Rejected alternatives are recorded in Decisions & Alternatives.
+
+## Storage-Cap Gating (pacing philosophy)
+
+Prices grow exponentially (`base × ratio^owned`, ceil per component); caps grow linearly via discrete structures and refinements. The real progression question is always "what raises my cap" — this is the master pacing valve, adopted deliberately. Cap-extension classes are targeted (barn-analog vs shed-analog cover different resource sets; specific structures extend specific caps) so each storage tier re-orders priorities. At least one structure inverts the flow (production scaled by a *cap*) to make storage an input. Price-ratio bands are a tuning vocabulary: ~1.10 (want many) → 1.12–1.15 (default) → 1.18–1.25 (global-multiplier structures) → 1.5–1.75 (deliberate walls) → ~2.0+ (housing, population pressure).
+
+## Converters & Energy
+
+**Converters** (structures consuming X/tick to produce Y/tick) starve gracefully: all inputs and outputs scale by the worst-supplied input's fraction — chains degrade proportionally, never flap. Engine owns the throttling primitive.
+
+**Energy** is a late-game soft constraint: producers and consumers are content-table effects; deficit multiplies global-multiplier layers by `prod/cons` floored at 0.25 (never a shutdown); surplus feeds designated bonuses. Active/built split: production effects count *active* copies, storage effects count *built* — toggling is a real decision.
+
+## Tick Pipeline (extended)
+
+1. **Calendar & daily processing** — tick counter; on day boundaries, in order: day-close clock update (from the persisted shortfall flag), returns, wanders, arrival check, **jamboree countdown, colony/whale visit clocks, dream drift, Promise upkeep, yearly hooks on year boundaries** (wisdom trickle, automation-jam reset, Yarn Computer check). No events at game start.
+2. **Production** — structures ☆ then jobs, via the production stack; then **converters** (throttled); then **Tinkerer background crafts**.
+3. **Consumption** — kittens eat catnip (pooled); **luxuries drain per kitten**; converter fuel already handled in 2.
+4. **Mood & flags** — happiness recompute; Grumpy flag; **mess recompute**.
+5. **Random events** — zoomies expiry/start, flavor, **windfalls, sky events (observable), unicorn rifts, prism descents, colony arrivals** — all at day boundaries in a fixed draw schedule.
+6. **Clamp** — trim stocks to caps.
+
+Commands apply only between ticks. Saturating arithmetic on all day counters.
+
+## Currency Tiers
+
+| Tier | Members (leaf that owns definitions) | Properties |
+|---|---|---|
+| Raw materials (capped) | catnip, twigs, pebbles, buttons, embers, shinies, dew, moonstone, stardust, hushfelt (economy) | full production stack; caps from structures |
+| Transient currencies (capped) | pep, curiosity, charm, warmth, skymaps (economy defines stocks; ceremonies/cosmic consume) | exempt from global multipliers (layers 6–8); each earned by its own subsystem |
+| Luxuries (uncapped, draining) | feathers, bells, mint (economy; expeditions/colonies supply) | per-kitten drain; each distinct stocked luxury = +10 happiness points |
+| Crafted goods (uncapped) | wands, tiles, badges, brass, cogs, moonsteel, lattices, pavers, quills, stories, anthologies, schemes, cairns, kites, balloons, moonmilk, dreamweave, cometsilk (economy) | made via crafting with craft-ratio bonus; gate currencies for research bands |
+| Mystic chain | unicorns, rainbows, prisms, starshards, echoes, dreamcorns, jars of purrs (mystic) | sink-chain with upgradeable exchange rates and event faucets |
+| Legacy (persist across Moves) | Elder Wisdom, Warm Memories, Passed-Down Wisdom, serenity (prestige/ceremonies) | prestige currencies at different timescales |
+| Dreamtime | reverie, starshards (shared with mystic), stirred dreams (dreamtime) | earned in déjà-vu days / skips |
+
+## Child Leaves and Ownership
 
 | Leaf | Prefix | Owns |
 |---|---|---|
-| `engine/` | `SIM-ENG` | `GameState`, command API, tick pipeline & calendar, RNG & determinism, event types, random-event scheduling |
-| `economy/` | `SIM-ECO` | Resource kinds, stocks, caps; structures (definitions, costs, ramps, effects); manual actions; all resource-flow math |
-| `kittens/` | `SIM-KIT` | Population lifecycle (arrival, away, return), names, job assignment, happiness/mood computation |
-| `curiosity/` | `SIM-CUR` | The idea tree: definitions, costs, prerequisites, unlock effects |
+| `engine/` | `SIM-ENG` | GameState, command API, tick pipeline, calendar, RNG, determinism, event vocabulary, effect-key system + DR primitives, converter throttling, unlock/visibility queries, speed, random-event scheduling |
+| `economy/` | `SIM-ECO` | Facets: `RES` (all stocks/caps/tiers), `BLD` (structures, staged rebuilds, price ramps), `CRAFT` (recipes, craft bonus, manual + Tinkerer crafting), `NRG` (energy), `MESS` (mess) — one leaf; promotion to sub-HLD deliberately deferred (see Decisions) |
+| `kittens/` | `SIM-KIT` | Population lifecycle, names, jobs & assignment, happiness (incl. luxury bonus), skills/XP/ranks, the Elder + traits, jamborees, famine/return |
+| `curiosity/` | `SIM-CUR` | Ideas tree (research bands + gate-crafts), Refinements (tool/storage/automation ladders), House Rules (mutually exclusive policies) |
+| `expeditions/` | `SIM-EXP` | Pouncing squads: pep costs, Irwin-Hall yield rolls, luxury/unicorn/shiny outcomes |
+| `ceremonies/` | `SIM-SUN` | warmth → Basking → devotion → Sunrise Reverie → serenity; the Long Sun bonus; Sunbeam Rites ladder; Enlightenment tiers; Dream Cartography (echo-priced) |
+| `mystic/` | `SIM-UNI` | Unicorns, Parades, Rainbow Arch ladder, prisms, starshard/echo refining, dreaming & dreamcorns, Promises, Jars of Purrs |
+| `colonies/` | `SIM-TRADE` | Eight neighbor colonies, standing/shyness, Pen Pals, Scout Picnics, seasonal trade rates, kite scaling, Star Whales |
+| `prestige/` | `SIM-MOVE` | The Great Meadow Move, Elder Wisdom (+shop: Traditions incl. Nine Lives ladder), Warm Memories, Passed-Down Wisdom, Family Album, Traveling Baskets, Memory Chest |
+| `adventures/` | `SIM-ADV` | Opt-in variant runs with LDR-capped permanent rewards |
+| `cosmic/` | `SIM-SKY` | Expedition sites beyond the meadow, missions, site structures, outdoor production channel, skymap economy |
+| `dreamtime/` | `SIM-DREAM` | Starshard skips, stirred dreams & dissipation, Dream Loom, the Deep Nap, déjà-vu days & reverie, the Distant Dawn |
+| `persistence` (sibling segment, not under sim) | `SAVE` | Format v2, migrations (v1→v2), catch-up × speed, Family Album persistence |
 
-Cross-leaf contracts (the boundary, stated once here, referenced by the leaves):
+Cross-leaf contract style is unchanged: leaves expose pure per-phase functions and effect-key contributions; the engine sequences; nobody reaches into another leaf's state.
 
-- **kittens → economy:** the kittens leaf exposes *effective workers per job* and the *mood multiplier*; the economy leaf turns those into resource deltas. Kittens decide who works; economy decides what work yields.
-- **curiosity → economy/kittens:** ideas set unlock flags and modifiers (structure availability, job availability, rate/penalty adjustments); the other leaves consume flags, never reach into the tree.
-- **engine → all:** the engine owns sequencing and randomness; leaves expose pure per-phase functions the pipeline calls in order.
+## Build Waves (execution roadmap)
 
-## Roadmap (later passes, not in the current arrow)
+Each wave walks LLD → EARS → edge audit → tests → code for its segments, keeping all prior specs green:
 
-Designed direction for future segments, recorded so the current leaves don't foreclose them: the Great Meadow Move (prestige with elder wisdom), Sunbeam Ceremonies (devotion/Warmth economy), Pouncing expeditions (active-play bursts), Unicorn Parades (late-game conversion loop), kitten job skills, crafting chains, trade with other animal colonies, weather variance within seasons. Each arrives as a new leaf (or a promotion) under this sub-HLD when its turn comes.
-
-**The Great Meadow Move is first in line** once the TUI segment ships: prestige unlocks are a stated delight-priority for the player-owner, and the prestige design must reconcile with the cozy invariants (the whole clowder moves *together* — a reset never takes a kitten, a name, or an earned idea's dignity away). The save format's migration hook (persistence segment) is the planned landing path for the meta-progression state it will add.
+1. **Engine** — effect system, DR primitives, speed, unlock queries, converter throttle, save v2 + v1 migration.
+2. **Economy** — full RES/BLD/CRAFT/NRG/MESS content.
+3. **Society** — kittens skills/Elder/jamborees/luxuries; expeditions; curiosity tree + refinements + house rules.
+4. **Wonder** — ceremonies, mystic, colonies.
+5. **Legacy** — prestige (the delight-priority segment), adventures.
+6. **Cosmic** — cosmic sites, dreamtime.
+7. **Integration** — cross-wave audit, balance property tests, coherence verification.
 
 ## Decisions & Alternatives
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
-| Tick length | 250 ms (4 ticks/s) | 200 ms (Kittens Game), 1 s | Lively counters without burning CPU in a TUI; a week away ≈ 2.4M ticks, still fast-forwardable in seconds |
-| Randomness | Single serializable PCG-style RNG in `GameState` | `rand::StdRng`, per-system RNGs | `StdRng` isn't stable across crate versions for serde round-trips; one hand-rolled 30-line generator is deterministic, serializable, dependency-free |
-| Sim/shell time boundary | Shell drives ticks; sim never reads clocks | Sim-internal timer thread | Determinism and testability; catch-up is just a loop |
-| Negative pressure shape | Multipliers on gains only | Stock confiscation, entity loss | Mechanical form of Tenet 1 (cozy over grim) — enforceable as an invariant test |
-| Event reporting | Typed event enum returned from `tick()`/commands | Callbacks, observer pattern, string log in core | Pure data out of a pure function; shell composes presentation; tests assert on events directly |
+| Effect plumbing at depth | Typed effect-key enum + fixed resolution stack | (a) Hand-coded per-system math (v1 shape); (b) string-keyed dynamic effects (inspiration's shape) | Hand-coding ~40 structures × ~150 refinements is unmaintainable; string keys lose the compiler. Typed keys keep grep + exhaustiveness checks and make every new modifier a compile-checked variant |
+| Economy leaf shape | One leaf with RES/BLD/CRAFT/NRG/MESS facets | Promote economy to a sub-HLD with child leaves | The facets are categories of one intent (the material economy); promotion would force a spec-ID re-parent across tests and code mid-expansion for zero behavioral change. Revisit after the expansion lands |
+| Speed | Persisted `GameState.speed`, scales catch-up | Shell-side playback rate | Idle-respect: attended fast-play must not beat absence (HLD decision 7) |
+| Balance source | Adopt the inspiration's *curve shapes and stack order*, not its numbers | Copy numbers verbatim; invent everything fresh | Its numbers assume its pacing and its harsher survival loop; its shapes (exponential price vs linear caps, DR-capped multiplier layers, rotating gate currencies) are the proven depth skeleton |
+| DR discipline | Every stacking bonus passes limited/unlimited DR | Raw additive stacking | The inspiration's demonstrated guard against runaway multiplier growth |
+| Grim-mechanic handling | Structural inversion per § Cozy Inversions, preserving the mechanical role | Omit the systems; keep them grim | Omission loses depth (these systems ARE the mid/late game); keeping them grim violates Tenet 1. Inversion keeps the math and changes the story |
+| Risk mechanics | Keep risk, redesign failure as suspension/hiding (Promises go quiet; Yarn Computer stashes) | No downsides anywhere | Depth needs tension; Tenet 1 bans loss, not consequence. Suspension is consequence with a road back |
 
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. Whether flavor-event *frequency* should adapt to session length (delight without spam) — tune after first play.
-2. Whether the roadmap systems arrive as new leaves or promote `economy/` into deeper nodes — decide per system when reached.
+1. Whether economy promotes to a sub-HLD after the expansion (revisit at integration wave).
+2. Whether adventures unlock via a Tradition (inspiration's pattern) or are visible from first Move — decide in the Legacy wave against Tenet 3.
+3. Flavor-event pool growth per wave — each wave should add templates; tune frequency at integration.
 
 ## References
 
-- Parent: `docs/high-level-design.md` (tenets, workspace split, time-at-the-boundary decision)
-- Children: `engine/`, `economy/`, `kittens/`, `curiosity/`
-- Sibling segment: `docs/intent/persistence/` (save format, offline catch-up policy)
+- Parent: `docs/high-level-design.md` (tenets, speed decision, depth goal)
+- Children: leaves per § Child Leaves table
+- Sibling segment: `docs/intent/persistence/`
+- Mechanical inspiration: Kittens Game source (github.com/nuclear-unicorn/kittensgame), digested 2026-07-05; curve primitives `limitedDR`/`unlimitedDR`, production stack order, storage-cap gating, price-ratio bands, converter throttling, three-currency prestige
