@@ -7,7 +7,33 @@ prefix: SIM-ENG
 
 ## Context and Design Philosophy
 
-The engine is the spine of `clowder-core`: it owns the canonical `GameState`, the command API the shell calls, the tick pipeline that sequences every other leaf's phase functions, the calendar, the RNG, and the typed event vocabulary. Everything here is pure and deterministic — no IO, no clocks, no threads.
+The engine is the spine of `clowder-core`: it owns the canonical `GameState`, the command API the shell calls, the tick pipeline that sequences every other leaf's phase functions, the calendar, the RNG, the typed event vocabulary, and — at depth — the shared mechanics every content leaf builds on: the effect-key resolution system, the diminishing-returns primitives, converter throttling, unlock/visibility queries, and the game-speed field. Everything here is pure and deterministic — no IO, no clocks, no threads. The engine owns *machinery*; leaves own *content and values*.
+
+## Effect-Key System
+
+All modifiers in the game flow through one typed effect vocabulary (sub-HLD § Effect Resolution Architecture). The engine owns:
+
+- `enum Effect` — compiler-checked variant per modifier kind (`ResourceRatio(ResourceId)`, `JobRatio(JobId)`, `MaxCap(ResourceId)`, `GlobalProductionRatio`, `CraftRatio`, …). Variants are added per wave; adding one is a source-level change that exhaustiveness-checks every consumer.
+- `effects(state, key) -> f64` — sums contributions in a fixed source order: structures (× owned/active count as the key demands) → refinements → ideas → house rules → rites → arch upgrades → traditions → colony standing → adventure rewards → the Elder's trait. Fixed order keeps float accumulation deterministic.
+- **DR primitives**: `limited_dr(v, limit)` (linear to 75% of limit, asymptotic above) and `unlimited_dr(v, stripe)` (`(sqrt(1 + 8v/stripe) − 1)/2`). Consumers of stacking sums apply one of these per the sub-HLD's DR discipline.
+
+The production stack (sub-HLD § The Production Stack) is engine code: leaves declare rates and effect contributions; the engine computes per-tick flows in the normative layer order, exempting transient currencies from global layers.
+
+## Converter Throttling
+
+`throttle(inputs: &[(ResourceId, f64)], state) -> f64` returns the worst-supplied input's satisfaction fraction (0..=1); converter phase functions scale all their inputs and outputs by it. Chains degrade proportionally and never flap. A converter at fraction 0 is simply idle — never an error.
+
+## Unlocks & Visibility
+
+Content items (structures, ideas, refinements, house rules, rites, colonies, sites) share one availability model, engine-owned:
+
+- An item **reveals** the first time its gate is satisfied and (for cost-revealed items like structures) every cost component has reached the reveal fraction of its current price (default 30%, content-tunable). Revelation is sticky: revealed ids live in a persisted `revealed` set in `GameState`, the scan runs at the end of the clamp phase, and each new revelation emits a `Revealed` event — the "something new is possible" moment.
+- `Availability::{Hidden, Teased, Available}` — *Hidden*: not yet revealed; *Teased*: revealed but not currently affordable/unlockable; *Available*: revealed and actionable now. The shell renders Teased items dimmed; presentation is entirely the shell's.
+- Purchase-time gating stays the command layer's job (`Locked` per error precedence); Availability is advisory for display.
+
+## Game Speed
+
+`speed: f64` in `GameState`, default 1.0, clamped [0.25, 8] on set and on load. A `SetSpeed(f64)` command (always legal, clamps silently, emits `SpeedChanged`) mutates it. Nothing in `tick()` reads it: the shell drives `4 × speed` ticks/second and persistence replays `elapsed × 4 × speed` — speed changes *how many* ticks happen per wall-second, never what a tick does.
 
 ## GameState
 
@@ -78,6 +104,9 @@ Same seed + same command sequence applied at the same tick counts ⇒ bit-identi
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
+| Effect summation order | Fixed source-class order (structures→refinements→ideas→rules→rites→arches→traditions→standing→adventures→trait) | Arbitrary/iteration order | Float addition isn't associative; a fixed order is what makes bit-identical determinism survive content growth |
+| Speed placement | `GameState.speed`, read only at the boundary (shell cadence, catch-up), never inside `tick()` | Speed as a tick()-internal multiplier on rates | Rate-multiplying would change what a tick *means*, breaking replay equivalence between live and catch-up play and every balance test |
+| Availability model | Engine-owned Hidden/Teased/Available advisory queries | Per-leaf ad-hoc visibility; shell-side inference | One reveal model keeps the "silhouette teaser" pacing consistent across all content kinds, and the shell out of the rules business |
 | Calendar storage | Derived from `ticks` | Stored day/season fields advanced by tick | Derived can't drift or double-advance during catch-up |
 | Command atomicity | All-or-nothing, error enum | Partial application, panics | Shell can render precise "why not" hints; sim state can't half-change |
 | RNG | PCG-32, hand-rolled, serialized with state | `rand` crate StdRng, reseeding on load | Stable serde round-trip across versions; ~30 lines; reseeding on load would break catch-up determinism |

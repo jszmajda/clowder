@@ -57,6 +57,22 @@ impl GameState {
             }
         }
 
+        // Reveal scan: sticky, ordered, event-emitting. @spec SIM-ENG-023
+        for s in StructureId::ALL {
+            let id = crate::state::ContentId::Structure(s);
+            if !self.revealed.contains(&id) && self.reveal_condition_met(id) {
+                self.revealed.insert(id);
+                events.push(Event::Revealed { id });
+            }
+        }
+        for i in crate::state::IdeaId::ALL {
+            let id = crate::state::ContentId::Idea(i);
+            if !self.revealed.contains(&id) && self.reveal_condition_met(id) {
+                self.revealed.insert(id);
+                events.push(Event::Revealed { id });
+            }
+        }
+
         events
     }
 

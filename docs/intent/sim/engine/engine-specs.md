@@ -32,8 +32,17 @@
 
 ## Initial State & Derived Queries
 
-- [x] **SIM-ENG-016**: When a new game starts, the system shall initialize an empty meadow — zero stocks, no structures, no kittens, no researched ideas, tick 0 — with the RNG seeded from a caller-supplied seed.
+- [x] **SIM-ENG-016**: When a new game starts, the system shall initialize an empty meadow — zero stocks, no structures, no kittens, no researched ideas, tick 0, game speed 1.0 — with the RNG seeded from a caller-supplied seed.
 - [x] **SIM-ENG-017**: Where the season-forecast idea (SIM-CUR) is researched, the system shall expose the upcoming season as a queryable derived value.
+
+## Effect System & Shared Mechanics
+
+- [x] **SIM-ENG-019**: The system shall resolve every modifier through the typed effect-key system, summing contributions per key in the fixed source-class order (structures, refinements, ideas, house rules, rites, arch upgrades, traditions, colony standing, adventure rewards, Elder trait) so identical states yield bit-identical sums.
+- [x] **SIM-ENG-020**: The system shall provide the shared diminishing-returns primitives — limited_dr(v, limit): linear to 75% of limit and asymptotic to limit above it, never reaching limit; unlimited_dr(v, stripe) = (sqrt(1 + 8v/stripe) − 1)/2 — both monotonically increasing.
+- [ ] **SIM-ENG-021**: The system shall compute per-tick production in the normative layer order (base rate; per-source ratios; season/weather; mood; zoomies; global production ratios; Elder Wisdom capped pool; the Long Sun bonus; mess and energy-deficit multipliers), and transient currencies (pep, curiosity, charm, warmth, skymaps) shall skip the global layers entirely.
+- [x] **SIM-ENG-022**: The system shall throttle every converter by its worst-supplied input's satisfaction fraction, scaling all of that converter's inputs and outputs by the same fraction; a fully starved converter idles without error or event spam.
+- [x] **SIM-ENG-023**: The system shall reveal a content item permanently (persisted, emitting a Revealed event) the first time its gate is satisfied and every cost component reaches the reveal fraction (default 30%) of its current price, and shall expose advisory availability — Hidden (unrevealed), Teased (revealed, not actionable), Available (revealed, actionable) — without changing command-layer gating.
+- [x] **SIM-ENG-024**: When SetSpeed is applied, the system shall clamp the value to [0.25, 8], store it in game state, and emit a SpeedChanged event; no tick-internal rule shall read the speed (speed only changes how many ticks the boundary drives).
 
 ## Flavor Events
 

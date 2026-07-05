@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-pub const SAVE_VERSION: u32 = 1;
+/// v2: depth expansion — adds speed, revealed set, and each wave's state
+/// blocks. Older versions load via serde defaults (the fields' new-game
+/// values), verified against committed fixtures. @spec SAVE-013
+pub const SAVE_VERSION: u32 = 2;
 const CATCHUP_CAP_SECONDS: u64 = 365 * 86_400;
 const TICKS_PER_SECOND: u64 = crate::content::TICKS_PER_SECOND;
 
@@ -94,6 +97,10 @@ pub fn load_string(s: &str, now_unix: u64) -> Result<LoadedGame, LoadError> {
 
     // Normalize hand-edited numerics: physics, not errors. (Counters were
     // already clamped by their wide deserializers.)
+    if !state.speed.is_finite() {
+        state.speed = 1.0;
+    }
+    state.speed = state.speed.clamp(crate::state::SPEED_MIN, crate::state::SPEED_MAX);
     for r in ResourceId::ALL {
         let cap = state.cap(r);
         if state.resources[r.ix()] > cap {
@@ -104,18 +111,20 @@ pub fn load_string(s: &str, now_unix: u64) -> Result<LoadedGame, LoadError> {
         }
     }
 
-    // Offline catch-up: same tick(), fast-forwarded. A backwards clock is
-    // zero ticks, an absurd clock is capped and flagged.
+    // Offline catch-up: same tick(), fast-forwarded at the save's own game
+    // speed — away time accrues exactly as attended time would have. A
+    // backwards clock is zero ticks, an absurd clock is capped and flagged.
     let raw_elapsed = now_unix.saturating_sub(file.saved_at_unix);
     let truncated = raw_elapsed > CATCHUP_CAP_SECONDS;
     let elapsed = raw_elapsed.min(CATCHUP_CAP_SECONDS);
+    let ticks_to_replay = ((elapsed * TICKS_PER_SECOND) as f64 * state.speed).round() as u64;
     let before = state.resources;
     let mut report = OfflineReport {
         elapsed_seconds: elapsed,
         truncated,
         ..OfflineReport::default()
     };
-    for _ in 0..elapsed * TICKS_PER_SECOND {
+    for _ in 0..ticks_to_replay {
         for event in state.tick() {
             fold_event(&mut report, event);
         }

@@ -10,9 +10,11 @@
 - [x] **SAVE-011**: The system shall persist only canonical state; derived values (happiness, rates, season) are recomputed after load, and event history is not persisted.
 - [x] **SAVE-012**: Every persistence IO function shall take an explicit file path, with the default path helper resolving to the platform data directory + clowder/save.json.
 
+- [x] **SAVE-013**: When loading a save whose save_version is older than the current version, the system shall migrate it forward one version at a time — added fields receive their new-game defaults and existing state is preserved exactly — verified against a committed fixture file of each prior version.
+
 ## Offline Catch-up
 
-- [x] **SAVE-006**: When loading with a caller-supplied now_unix, the system shall compute elapsed = max(0, now_unix − saved_at_unix), cap it at 365 days, and replay elapsed × 4 ticks through the standard tick() function (the same code path as live play).
+- [x] **SAVE-006**: When loading with a caller-supplied now_unix, the system shall compute elapsed = max(0, now_unix − saved_at_unix), cap it at 365 days, and replay elapsed × 4 × speed ticks (speed = the save's persisted game-speed) through the standard tick() function (the same code path as live play).
 - [x] **SAVE-007**: If now_unix is earlier than saved_at_unix (a backwards clock), then the system shall load the save unchanged with zero ticks replayed, never regressing or refusing the state.
 - [x] **SAVE-008**: The system shall fold catch-up replay events into an OfflineReport containing the elapsed span, a truncated flag when the 365-day cap applied, per-resource net deltas, gross name lists of kittens arrived/wandered/returned aggregated with counts per name (a kitten may appear in more than one list, and more than once per list), and seasons passed. (Commands cannot occur during replay, so the report never contains builds or research.)
 - [x] **SAVE-009**: Replaying 30 days of offline time shall complete in under 5 seconds in a release build.

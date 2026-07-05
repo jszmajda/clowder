@@ -14,6 +14,10 @@ pub const DAYS_PER_YEAR: u64 = 100;
 // @spec SIM-ECO-001
 pub const BASE_CAPS: [f64; 4] = [200.0, 50.0, 25.0, 0.0];
 
+/// Fraction of each cost component that must be held for a content item to
+/// reveal (become visible as a silhouette). @spec SIM-ENG-023
+pub const REVEAL_FRACTION: f64 = 0.30;
+
 // ---- Manual actions ----
 pub const GATHER_YIELD: f64 = 1.0;
 pub const FORAGE_COST: f64 = 10.0;

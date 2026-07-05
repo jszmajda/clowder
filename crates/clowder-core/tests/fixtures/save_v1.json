@@ -1,0 +1,51 @@
+{
+  "save_version": 1,
+  "saved_at_unix": 1751700000,
+  "state": {
+    "ticks": 45,
+    "rng": {
+      "state": 13939447130423926183,
+      "inc": 2885390081777926815
+    },
+    "resources": [
+      127.90187499999998,
+      10.0,
+      0.0,
+      0.22500000000000012
+    ],
+    "structures": [
+      1,
+      2,
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    "kittens": [
+      {
+        "name": "Plum",
+        "job": null,
+        "location": "Home",
+        "arrived_day": 1,
+        "job_seq": null,
+        "away_seq": null
+      },
+      {
+        "name": "Juniper",
+        "job": "Gardener",
+        "location": "Home",
+        "arrived_day": 2,
+        "job_seq": 0,
+        "away_seq": null
+      }
+    ],
+    "ideas": [],
+    "pity": 0,
+    "famine_days": 0,
+    "recovery_days": 4,
+    "grumpy": false,
+    "next_seq": 1,
+    "zoomies_until": 141
+  }
+}

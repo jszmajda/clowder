@@ -21,7 +21,7 @@ JSON via serde, pretty-printed (hand-rescuable with a text editor and `jq`):
 }
 ```
 
-- `save_version` — integer schema version. Loading a *newer* version than the binary knows fails with a clear error (never guess forward). Loading an *older* version walks migrations (v1: none exist; the hook is the point).
+- `save_version` — integer schema version, currently **2**. Loading a *newer* version than the binary knows fails with a clear error (never guess forward). Loading an *older* version walks migrations in sequence. **v1 → v2**: fields added by the depth expansion (speed, and each wave's new state blocks) receive their new-game defaults; a v1 save loads into a valid v2 state with its meadow exactly as it was. Migration fidelity is tested against a committed v1 fixture file.
 - `saved_at_unix` — wall-clock seconds at save, supplied by the caller; the basis for catch-up.
 - Default location: the platform data directory (`directories` crate) + `clowder/save.json`; every IO function takes an explicit path so tests and the shell can redirect.
 
@@ -37,7 +37,7 @@ On load, the caller supplies `now_unix`:
 
 1. `elapsed = max(0, now_unix − saved_at_unix)` — a backwards clock yields zero ticks, never a regressed state.
 2. `elapsed` is capped at 365 days — beyond that, accrual stops representing "time you were away" and starts representing clock damage.
-3. `ticks_to_replay = elapsed × 4` (engine tick rate), replayed through the standard `tick()` in a loop.
+3. `ticks_to_replay = elapsed × 4 × speed` (engine tick rate × the save's persisted game speed — away time accrues at exactly the rate attended time would have), replayed through the standard `tick()` in a loop.
 4. Events from the replay are folded into an **`OfflineReport`**: elapsed span (plus a `truncated` flag when the 365-day cap bit), per-resource *net* deltas, kittens arrived/wandered/returned as *gross* name lists aggregated with counts (a kitten that left and came home appears in both, possibly several times over a long famine — that's the drama the player missed, told without spam), and seasons passed — the shell renders this as the "while you were away" screen. Commands cannot occur during replay, so builds and research never appear in the report. Full per-tick event streams are not retained (a week is ~2.4M ticks).
 
 Catch-up performance is a design constraint: replaying 30 days must feel like loading a game, not compiling one (spec'd as a bound in release mode). The tick function stays allocation-light on the hot path for this reason.

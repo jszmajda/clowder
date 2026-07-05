@@ -29,7 +29,7 @@ fn saves_are_versioned_pretty_json() {
     let json = save_string(&s, 123_456);
     assert!(json.contains('\n'), "pretty-printed for hand-rescue");
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-    assert_eq!(v["save_version"], 1);
+    assert_eq!(v["save_version"], SAVE_VERSION);
     assert_eq!(v["saved_at_unix"], 123_456);
     assert!(v["state"].is_object());
 }
@@ -221,4 +221,33 @@ fn the_default_path_is_the_platform_data_dir() {
     let path = default_save_path().expect("platform data dir resolves");
     let tail: PathBuf = path.iter().rev().take(2).collect::<Vec<_>>().into_iter().rev().collect();
     assert_eq!(tail, PathBuf::from("clowder/save.json"));
+}
+
+// ---- Depth Wave 1 ----
+
+// @spec SAVE-013
+#[test]
+fn v1_saves_migrate_forward_losslessly() {
+    let fixture = include_str!("fixtures/save_v1.json");
+    let loaded = load_string(fixture, 1_751_700_000).expect("v1 fixture loads");
+    let s = &loaded.state;
+    assert_eq!(s.ticks, 45, "old meadow preserved exactly");
+    assert_eq!(s.kittens.len(), 2);
+    assert_eq!(s.structures[StructureId::CatnipPatch.ix()], 1);
+    assert_eq!(s.speed, 1.0, "new fields get new-game defaults");
+    // Re-saving stamps the current version.
+    let resaved = save_string(s, 1_751_700_000);
+    let v: serde_json::Value = serde_json::from_str(&resaved).unwrap();
+    assert_eq!(v["save_version"], 2);
+}
+
+// @spec SAVE-006
+#[test]
+fn catch_up_scales_with_persisted_game_speed() {
+    let mut s = GameState::new(40);
+    grant(&mut s, StructureId::CatnipPatch, 2);
+    s.apply(Command::SetSpeed(2.0)).unwrap();
+    let json = save_string(&s, 10_000);
+    let loaded = load_string(&json, 10_060).unwrap(); // 60s away at 2×
+    assert_eq!(loaded.state.ticks, s.ticks + 60 * 4 * 2);
 }

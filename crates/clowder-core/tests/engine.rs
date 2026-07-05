@@ -375,3 +375,104 @@ fn season_forecast_requires_the_idea() {
     s.ticks = 990; // day 99, Winter
     assert_eq!(s.season_forecast(), Some(Season::Spring));
 }
+
+// ---- Depth Wave 1 ----
+
+// @spec SIM-ENG-020
+#[test]
+fn diminishing_returns_primitives() {
+    // limited_dr: identity in the linear region, asymptotic above, never reaches.
+    assert!((limited_dr(0.5, 1.0) - 0.5).abs() < 1e-12);
+    assert!((limited_dr(0.75, 1.0) - 0.75).abs() < 1e-12);
+    assert!(limited_dr(2.0, 1.0) > 0.75 && limited_dr(2.0, 1.0) < 1.0);
+    assert!(limited_dr(1000.0, 1.0) < 1.0);
+    assert!(limited_dr(3.0, 1.0) < limited_dr(4.0, 1.0), "monotone");
+
+    // unlimited_dr known points at stripe 1: f(1)=1, f(3)=2, f(6)=3.
+    assert!((unlimited_dr(0.0, 1.0) - 0.0).abs() < 1e-12);
+    assert!((unlimited_dr(1.0, 1.0) - 1.0).abs() < 1e-12);
+    assert!((unlimited_dr(3.0, 1.0) - 2.0).abs() < 1e-12);
+    assert!((unlimited_dr(6.0, 1.0) - 3.0).abs() < 1e-12);
+}
+
+// @spec SIM-ENG-019
+#[test]
+fn effect_sums_are_deterministic_and_source_complete() {
+    let mut s = GameState::new(30);
+    grant(&mut s, StructureId::Pantry, 2);
+    grant(&mut s, StructureId::CardboardBox, 3);
+    assert!((s.effect(Effect::MaxCap(ResourceId::Catnip)) - 500.0).abs() < 1e-9);
+    assert!((s.effect(Effect::MaxCap(ResourceId::Curiosity)) - 150.0).abs() < 1e-9);
+    // cap() is effects-backed: base + summed extensions.
+    assert!((s.cap(ResourceId::Catnip) - 700.0).abs() < 1e-9);
+    let a = s.effect(Effect::MaxCap(ResourceId::Catnip));
+    let b = s.effect(Effect::MaxCap(ResourceId::Catnip));
+    assert_eq!(a.to_bits(), b.to_bits(), "bit-identical resummation");
+}
+
+// @spec SIM-ENG-022
+#[test]
+fn converter_throttle_scales_by_worst_input() {
+    let mut s = GameState::new(31);
+    give(&mut s, ResourceId::Catnip, 50.0);
+    give(&mut s, ResourceId::Twigs, 1.0);
+    // Demands: 10 catnip (plenty) and 4 twigs (only 25% supplied) → 0.25.
+    let f = s.throttle_fraction(&[(ResourceId::Catnip, 10.0), (ResourceId::Twigs, 4.0)]);
+    assert!((f - 0.25).abs() < 1e-9);
+    // Fully starved input → 0.0, and that's a quiet idle, not an error.
+    give(&mut s, ResourceId::Twigs, 0.0);
+    let f = s.throttle_fraction(&[(ResourceId::Twigs, 4.0)]);
+    assert_eq!(f, 0.0);
+    // Fully supplied → 1.0.
+    let f = s.throttle_fraction(&[(ResourceId::Catnip, 10.0)]);
+    assert_eq!(f, 1.0);
+}
+
+// @spec SIM-ENG-023
+#[test]
+fn content_reveals_stick_and_availability_advises() {
+    let mut s = GameState::new(32);
+    // A fresh meadow has never seen 30% of a patch's price.
+    assert_eq!(s.availability(ContentId::Structure(StructureId::CatnipPatch)), Availability::Hidden);
+    // Gather up to the reveal fraction (30% of 10 = 3 catnip).
+    for _ in 0..3 {
+        s.apply(Command::GatherCatnip).unwrap();
+    }
+    let events = run_ticks(&mut s, 1);
+    assert!(events.contains(&Event::Revealed { id: ContentId::Structure(StructureId::CatnipPatch) }));
+    assert_eq!(s.availability(ContentId::Structure(StructureId::CatnipPatch)), Availability::Teased);
+    for _ in 0..8 {
+        s.apply(Command::GatherCatnip).unwrap();
+    }
+    assert_eq!(s.availability(ContentId::Structure(StructureId::CatnipPatch)), Availability::Available);
+    // Sticky: spending back below the fraction keeps it revealed.
+    s.apply(Command::Build(StructureId::CatnipPatch)).unwrap();
+    give(&mut s, ResourceId::Catnip, 0.0);
+    assert_ne!(s.availability(ContentId::Structure(StructureId::CatnipPatch)), Availability::Hidden);
+    // Idea-gated structures stay Hidden until their idea exists.
+    assert_eq!(s.availability(ContentId::Structure(StructureId::Pantry)), Availability::Hidden);
+}
+
+// @spec SIM-ENG-024
+#[test]
+fn speed_is_clamped_state_that_never_touches_tick_rules() {
+    let mut s = GameState::new(33);
+    assert_eq!(s.speed, 1.0);
+    let events = s.apply(Command::SetSpeed(3.0)).unwrap();
+    assert!(events.contains(&Event::SpeedChanged { speed: 3.0 }));
+    assert_eq!(s.speed, 3.0);
+    s.apply(Command::SetSpeed(99.0)).unwrap();
+    assert_eq!(s.speed, 8.0, "clamped high");
+    s.apply(Command::SetSpeed(0.001)).unwrap();
+    assert_eq!(s.speed, 0.25, "clamped low");
+
+    // Two worlds differing only in speed tick identically.
+    let mut slow = GameState::new(34);
+    let mut fast = GameState::new(34);
+    fast.apply(Command::SetSpeed(8.0)).unwrap();
+    let ev_slow = run_ticks(&mut slow, 200);
+    let ev_fast = run_ticks(&mut fast, 200);
+    assert_eq!(ev_slow, ev_fast, "speed changes cadence at the boundary, never tick behavior");
+    fast.speed = slow.speed; // the single permitted difference
+    assert_eq!(save_string(&slow, 0), save_string(&fast, 0));
+}

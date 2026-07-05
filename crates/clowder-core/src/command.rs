@@ -11,6 +11,7 @@ pub enum Command {
     AssignJob(JobId),
     UnassignJob(JobId),
     ResearchIdea(IdeaId),
+    SetSpeed(f64),
 }
 
 /// Why a command was rejected. Listed in precedence order: when several
@@ -39,7 +40,20 @@ impl GameState {
             Command::AssignJob(j) => self.assign(j),
             Command::UnassignJob(j) => self.unassign(j),
             Command::ResearchIdea(i) => self.research(i),
+            Command::SetSpeed(v) => self.set_speed(v),
         }
+    }
+
+    /// Always legal; clamps silently. Speed is boundary cadence, not a rule.
+    // @spec SIM-ENG-024
+    fn set_speed(&mut self, v: f64) -> Result<Vec<Event>, CommandError> {
+        let clamped = if v.is_finite() {
+            v.clamp(crate::state::SPEED_MIN, crate::state::SPEED_MAX)
+        } else {
+            1.0
+        };
+        self.speed = clamped;
+        Ok(vec![Event::SpeedChanged { speed: clamped }])
     }
 
     // @spec SIM-ECO-004, SIM-ECO-006

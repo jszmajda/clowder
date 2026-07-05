@@ -1,4 +1,4 @@
-use crate::state::{IdeaId, JobId, MoodTier, Season, StructureId};
+use crate::state::{ContentId, IdeaId, JobId, MoodTier, Season, StructureId};
 use serde::{Deserialize, Serialize};
 
 /// Typed simulation occurrences returned by `tick()` and command application.
@@ -21,4 +21,8 @@ pub enum Event {
     /// Index into `content::FLAVOR_TEMPLATES`, plus the featured kitten when
     /// the template wants one. No mechanical effect by construction.
     Flavor { template: usize, kitten: Option<String> },
+    /// A content item became permanently visible. @spec SIM-ENG-023
+    Revealed { id: ContentId },
+    // @spec SIM-ENG-024
+    SpeedChanged { speed: f64 },
 }

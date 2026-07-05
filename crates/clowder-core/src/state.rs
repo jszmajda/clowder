@@ -23,7 +23,7 @@ impl ResourceId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum StructureId {
     CatnipPatch,
     CozyCushion,
@@ -120,6 +120,22 @@ pub enum MoodTier {
     Grumpy,
 }
 
+/// One id space across every kind of revealable content.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum ContentId {
+    Structure(StructureId),
+    Idea(IdeaId),
+}
+
+/// Advisory display state; command gating is unaffected.
+// @spec SIM-ENG-023
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Availability {
+    Hidden,
+    Teased,
+    Available,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Kitten {
     pub name: String,
@@ -162,7 +178,21 @@ pub struct GameState {
     pub grumpy: bool,
     pub next_seq: u64,
     pub zoomies_until: u64,
+    /// Game-speed multiplier, [0.25, 8]. Read only at the boundary (shell
+    /// cadence, offline catch-up) — never inside tick(). @spec SIM-ENG-024
+    #[serde(default = "default_speed")]
+    pub speed: f64,
+    /// Permanently revealed content ids. @spec SIM-ENG-023
+    #[serde(default)]
+    pub revealed: BTreeSet<ContentId>,
 }
+
+fn default_speed() -> f64 {
+    1.0
+}
+
+pub(crate) const SPEED_MIN: f64 = 0.25;
+pub(crate) const SPEED_MAX: f64 = 8.0;
 
 /// Dust guard for zero-vs-nonzero and affordability comparisons; float
 /// residue is never load-bearing.
@@ -186,6 +216,8 @@ impl GameState {
             grumpy: false,
             next_seq: 0,
             zoomies_until: 0,
+            speed: 1.0,
+            revealed: BTreeSet::new(),
         }
     }
 
@@ -217,18 +249,10 @@ impl GameState {
 
     // ---- Derived economy queries ----
 
-    /// Storage cap for a resource, including structure extensions.
+    /// Storage cap for a resource: base plus every cap-extension effect.
     // @spec SIM-ECO-001, SIM-ECO-002
     pub fn cap(&self, r: ResourceId) -> f64 {
-        let mut cap = content::BASE_CAPS[r.ix()];
-        for s in StructureId::ALL {
-            if let Some((cr, amount)) = content::structure_def(s).cap_bonus {
-                if cr == r {
-                    cap += amount * self.structures[s.ix()] as f64;
-                }
-            }
-        }
-        cap
+        content::BASE_CAPS[r.ix()] + self.effect(crate::effects::Effect::MaxCap(r))
     }
 
     pub fn stock(&self, r: ResourceId) -> f64 {
@@ -313,16 +337,9 @@ impl GameState {
             .filter(|k| k.location == Location::Home && k.job.is_none())
             .count() as f64;
         let crowding = home.saturating_sub(content::CROWDING_FREE) as f64;
-        let posts = self.structures[StructureId::ScratchingPost.ix()] as f64;
-        let biscuits = if self.ideas.contains(&IdeaId::BiscuitMaking) {
-            content::BISCUIT_POINTS
-        } else {
-            0.0
-        };
         let h = 100.0 - content::CROWDING_POINTS * crowding
-            + content::POST_POINTS * posts
             + (content::LOAFER_POINTS * loafers).min(content::LOAFER_POINTS_MAX)
-            + biscuits;
+            + self.effect(crate::effects::Effect::HappinessPoints);
         h.max(content::HAPPINESS_FLOOR)
     }
 
@@ -368,6 +385,47 @@ impl GameState {
 
     pub fn zoomies_active(&self) -> bool {
         self.ticks < self.zoomies_until
+    }
+
+    /// Advisory display state for a content item. Reveals are sticky
+    /// (scanned at the end of each tick's clamp phase).
+    // @spec SIM-ENG-023
+    pub fn availability(&self, id: ContentId) -> Availability {
+        if !self.revealed.contains(&id) {
+            return Availability::Hidden;
+        }
+        let actionable = match id {
+            ContentId::Structure(s) => {
+                self.structure_unlocked(s)
+                    && self
+                        .next_cost(s)
+                        .iter()
+                        .all(|(r, amount)| self.stock(*r) + EPSILON >= *amount)
+            }
+            ContentId::Idea(i) => {
+                self.idea_unlocked(i)
+                    && !self.ideas.contains(&i)
+                    && self.stock(ResourceId::Curiosity) + EPSILON >= content::idea_def(i).cost
+            }
+        };
+        if actionable {
+            Availability::Available
+        } else {
+            Availability::Teased
+        }
+    }
+
+    /// Would this item reveal right now? (Sticky insertion happens in tick.)
+    pub(crate) fn reveal_condition_met(&self, id: ContentId) -> bool {
+        match id {
+            ContentId::Structure(s) => {
+                self.structure_unlocked(s)
+                    && self.next_cost(s).iter().all(|(r, amount)| {
+                        self.stock(*r) + EPSILON >= content::REVEAL_FRACTION * amount
+                    })
+            }
+            ContentId::Idea(i) => self.idea_unlocked(i),
+        }
     }
 }
 

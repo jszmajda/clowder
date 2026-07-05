@@ -6,6 +6,7 @@
 
 pub mod content;
 mod command;
+mod effects;
 mod events;
 mod rng;
 mod save;
@@ -13,10 +14,14 @@ mod state;
 mod tick;
 
 pub use command::{Command, CommandError};
+pub use effects::{limited_dr, unlimited_dr, Effect};
 pub use events::Event;
 pub use rng::Pcg32;
 pub use save::{
     default_save_path, load_string, read_save, save_string, write_save, LoadError, LoadedGame,
     OfflineReport, SAVE_VERSION,
 };
-pub use state::{GameState, IdeaId, JobId, Kitten, Location, MoodTier, ResourceId, Season, StructureId};
+pub use state::{
+    Availability, ContentId, GameState, IdeaId, JobId, Kitten, Location, MoodTier, ResourceId,
+    Season, StructureId,
+};
