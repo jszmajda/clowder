@@ -159,7 +159,9 @@ Mutually exclusive pairs, charm-priced (`AdoptRule`), each permanently blocking 
 | 4/5 | 4000 charm | **Sharing Circle**: luxury drain −25% | **Personal Stashes**: all caps +10% |
 | 6/7 | 15000 charm | **Loud Purring**: charm production +20% | **Quiet Contemplation**: warmth production +20% |
 
-Adopting a rule whose sibling is adopted rejects with Locked. Rules are effect-key sources like everything else.
+Adopting a rule whose sibling is adopted rejects with Locked. Rules are effect-key sources like everything else. Personal Stashes composes as cap = (base + flat extensions) × (1 + cap-ratio effects): infinite caps stay infinite, and a zero cap stays zero — the Cardboard-Box gate does not open by percentage.
+
+Refinement material costs may tease one band ahead of their gate idea (Pebble Combs wants more pebbles than the gate band can store) — reachability is property-tested at gate band + 1.
 
 ## Effect Plumbing
 

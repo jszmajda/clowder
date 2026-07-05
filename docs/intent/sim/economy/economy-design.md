@@ -181,6 +181,7 @@ StorageFull rejection when the yield resource is at cap (unchanged rule).
 - Reachability (SIM-ECO-024): structures gated in bands 0–2 keep their first 20 copies within achievable caps; band 3+ structures keep their first 5 copies (first copy for band 4) — the plateau bites later the deeper the tier. **Declared walls are exempt from their band's horizon and use the 5-copy rule instead**: the Tea House (ratio 1.5) and the Treat Bakery are deliberate few-copy structures, in the sub-HLD's price-band vocabulary. The Yarn Computer is a **declared monument** (first-copy horizon): one is a project, a second is a lifestyle, and curiosity storage is not obliged to keep up. Hushfelt's cap extender is owed by the cosmic leaf and exempt until it lands.
 - Every craft's inputs are producible before or at the band where the craft unlocks (no dead recipes) — **except the expedition/colony faucets** (feathers, bells, mint, shinies, unicorns), owed by the society and wonder waves and exempted from this wave's property test with an explicit list.
 - Global-layer exemption: a Dynamo Wheel never changes pep/charm/warmth/curiosity/skymap/luxury/mystic income.
+- Pounce-vs-bakery: with fewer than 10 Pouncers, an unthrottled Treat Bakery out-drinks pep income — the shinies input throttles it first in practice; the tension is intended (see Decisions).
 - Energy floor: no deficit can push layers 6–8 below ×0.25.
 
 ## Decisions & Alternatives
@@ -193,6 +194,7 @@ StorageFull rejection when the yield resource is at cap (unchanged rule).
 | Moonstone gating | Pre-Kiln moonstone only via trade (wave 4) | Native early source | The inspiration's titanium pattern: trade opens the metal tier early for those who invest in it, the Kiln arrives later |
 | Gate crafts | stories/anthologies/schemes cost stocked curiosity | Direct curiosity prices only | Makes curiosity *storage* the research gate — the self-reinforcing infrastructure loop that gives the mid-game its shape |
 | Cleverness as a resource | Ordinary transient resource | Hidden non-resource accumulator | Keeps Yarn Computer state visible, serializable, and normalizable like everything else |
+| Treat Bakery pep draw vs pounce budget | Contention by design (the inspiration's mint pattern) | Pep-reserve floor; auto-toggling | Choosing between passive luxury income and active expedition bursts is a real decision; structure on/off toggling is an integration-wave obligation that will hand the player the lever |
 
 ## Open Questions & Future Decisions
 

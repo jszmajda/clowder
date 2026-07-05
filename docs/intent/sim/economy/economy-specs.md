@@ -50,7 +50,7 @@ Job yields are per effective worker (SIM-KIT: Home kittens holding the job) per 
 ## Depth: Resources & Tiers (RES facet)
 
 - [x] **SIM-ECO-025**: The system shall assign every resource the tier from the RES table, and transient, luxury, mystic, and dreamtime resources shall skip production-stack layers 6–8 (global production, Elder Wisdom, the Long Sun) entirely.
-- [x] **SIM-ECO-026**: While kittens are Home, the system shall drain stocked luxuries per Home kitten per tick (feathers 0.001, bells 0.0007, mint 0.0001, scaled by 1 + luxury-demand effects), flooring at zero; an empty luxury never triggers shortfall or Grumpiness — its happiness bonus simply lapses.
+- [ ] **SIM-ECO-026**: While kittens are Home, the system shall drain stocked luxuries per Home kitten per tick (feathers 0.001, bells 0.0007, mint 0.0001, scaled by max(0, 1 + luxury-demand effects — Gift Stands −0.04 each, an active jamboree +0.2)), flooring at zero; an empty luxury never triggers shortfall or Grumpiness — its happiness bonus simply lapses.
 - [x] **SIM-ECO-027**: When the Rummage action is applied after its granting idea is researched, the system shall add 0.5 pebbles, subject to the StorageFull rule; before that idea it shall reject with Locked.
 
 ## Depth: Structures (BLD facet)
@@ -79,5 +79,5 @@ Job yields are per effective worker (SIM-KIT: Home kittens holding the job) per 
 - [x] **SIM-ECO-040**: The system shall define the Rummager job yielding 0.02 pebbles/tick per effective worker, assignable after its granting idea (SIM-CUR) is researched.
 - [x] **SIM-ECO-041**: The system shall define the Pouncer job yielding 0.06 pep/tick per effective worker, assignable after the expedition-surface idea (SIM-CUR) is researched.
 - [x] **SIM-ECO-042**: The system shall define the Sunwarden job yielding 0.0015 warmth/tick per effective worker, assignable after the ceremonies-surface idea (SIM-CUR) is researched.
-- [ ] **SIM-ECO-043**: The system shall let Tinkerers be assigned to recipes (one Tinkerer seat per Toy Workshop; AssignTinkerer/UnassignTinkerer commands): each assigned Tinkerer continuously crafts its recipe at 0.0017 batches/tick × (1 + tinkerer-speed effects), drawing inputs through the engine throttle and producing craft-ratio-boosted output — a starved recipe idles quietly.
+- [ ] **SIM-ECO-043**: AssignTinkerer(recipe) shall bind the most recently arrived unbound Home Tinkerer to an unlocked recipe (Locked if the recipe isn't; NoIdleKittens if no unbound Home Tinkerer exists; NoSeats if bindings would exceed Toy Workshop count); UnassignTinkerer(recipe) unbinds the highest-job_seq bound holder (NoWorkersAssigned if none). Each bound Home Tinkerer crafts its recipe at 0.0017 batches/tick × (1 + tinkerer-speed effects) × its rank-tier effectiveness (SIM-KIT-026), drawing inputs through the engine throttle for craft-ratio-boosted output; an Away Tinkerer's recipe idles and its binding persists.
 - [ ] **SIM-ECO-044**: The system shall extend the pep cap by housing: +25 per Cozy Cushion, +25 per Window Perch, +75 per Cat Tree, per the BLD table.

@@ -59,7 +59,7 @@ Effective workers per job = count of Home kittens holding that job. Away kittens
 
 ## Jamborees
 
-`HostJamboree` spends 800 pep + 1500 charm + 40 quills and sets a 100-day (one game year) jamboree: +30 happiness points × (1 + jamboree-ratio effects), arrival chance × (2 + jamboree-arrival effects), luxury drain ×1.2 (celebrations consume). One jamboree at a time (no stacking until the relevant Tradition); hosting while one runs extends nothing and is rejected as AlreadyResearched? No — rejected with Locked (not currently hostable). Ends silently; the shell may celebrate.
+Jamborees unlock in band 1 but their charm bill (1500) is deliberately a band-2 project — the idea researches early and the ambition teases (the silhouette philosophy, applied to a command). `HostJamboree` spends 800 pep + 1500 charm + 40 quills and sets a 100-day (one game year) jamboree: +30 happiness points × (1 + jamboree-ratio effects), arrival chance × (2 + jamboree-arrival effects), luxury drain ×1.2 (celebrations consume). One jamboree at a time (no stacking until the relevant Tradition); hosting while one runs is rejected with Locked (the shell's hint should read "already celebrating"). Ends silently; the shell may celebrate.
 
 ## Happiness (Mood)
 
@@ -99,6 +99,7 @@ The wander threshold (3 days ≈ 7.5 real seconds per day of famine at live spee
 | Arrival pity counter | Guaranteed success after 4 eligible misses | Pure probability, deterministic schedule | Pure RNG produces cruel droughts; fixed schedules feel mechanical; pity keeps surprise with bounded frustration |
 | Crowding penalty | −3%/kitten past the 5th, floor 25% | Hard population cap, no penalty | Soft pressure toward housing/happiness investment without ever forbidding growth |
 | Away kittens don't eat | Suspended entirely while away | Eating from neighbor's stock, half-rate | The neighbor feeds them (it's that kind of neighborhood); simplest rule that reads warmly |
+| Skill decay is cozy-compatible | Gentle 0.001/tick on non-current skills only, floor 0, removable by a refinement | No decay; harsh decay | Specialization needs a cost to be a choice; the cost is a slowdown with a purchasable off-switch, and KIT-027 carves it out of the confiscation ban explicitly |
 
 ## Open Questions & Future Decisions
 
