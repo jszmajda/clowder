@@ -23,7 +23,7 @@
 - [x] **SIM-ECO-012**: The system shall define the Twig Pile: base cost 50 catnip + 10 twigs, ratio 1.15, adding 40 twig cap; buildable only after its unlocking idea (SIM-CUR) is researched.
 - [x] **SIM-ECO-013**: The system shall define the Scratching Post: base cost 15 twigs + 5 fluff, ratio 1.15, adding 5 happiness percentage points each (consumed by SIM-KIT); buildable only after its unlocking idea (SIM-CUR) is researched.
 - [x] **SIM-ECO-014**: The system shall define the Cat Tree: base cost 30 twigs + 10 fluff, ratio 1.15, housing 3 kittens and adding 10 fluff cap; buildable only after its unlocking idea (SIM-CUR) is researched.
-- [ ] **SIM-ECO-024**: The system shall keep each structure's first 20 copies reachable: every *capped-resource* cost component of copies 1–20 shall fit within the maximum cap achievable with cap-extending structures at ≤ 20 copies each (uncapped crafted-goods components are exempt — they accumulate). Beyond that horizon, exponential costs outrunning linear caps is an intentional late-game plateau.
+- [ ] **SIM-ECO-024**: The system shall keep each structure reachable over its banded horizon — bands 0–2: first 20 copies; band 3 and declared walls (Tea House, Treat Bakery): first 5 copies; band 4 and declared monuments (Yarn Computer): first copy — where every *capped-resource* cost component fits within the maximum cap achievable with cap-extending structures at ≤ 20 copies each plus the Porch kite ratchet (uncapped components and hushfelt exempt). Beyond each horizon, exponential costs outrunning linear caps is an intentional plateau.
 
 ## Job Yields
 

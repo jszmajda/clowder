@@ -94,8 +94,8 @@ Cost of copy k+1 = `ceil(base × ratio^k)` per component. Reveal fraction 30% un
 | 19 | Toy Workshop | 250 buttons, 12 pavers, 18 moonstone | 1.15 | craft ratio +5%/bld; +1 Tinkerer seat; energy −2; mess 2 (Tidy rota flips to −2) | Toymaking |
 | 20 | Gift Stand | 400 twigs, 150 pebbles, 8 shinies | 1.15 | trade ratio +1.5%/bld; luxury demand −4%/bld | GiftEconomy |
 | 21 | Story Circle | 160 twigs, 900 pebbles, 3 quills | 1.15 | crowding relief 0.048/bld (pooled with Stages, LDR cap 0.9 — kittens leaf consumes); +0.005 charm/t; +40 charm cap | OralTradition |
-| 22 | Sun Room | 1600 pebbles, 200 charm, 200 quills | 1.15 | +0.04 charm/t; +0.004 warmth/t; +75 warmth cap | SunSalutations |
-| 23 | Sunbeam Altar | 40 shinies, 20 tiles, 12 badges, 8 stories | 1.15 | +0.08 charm/t; +120 warmth cap; hosts Rites (ceremonies leaf) | SolarDevotion |
+| 22 | Sun Room | 1600 pebbles, 200 charm, 200 quills | 1.15 | +0.04 charm/t; +0.004 warmth/t; +75 warmth cap; +60 charm cap (a sunny room invites conversation) | SunSalutations |
+| 23 | Sunbeam Altar | 40 shinies, 20 tiles, 12 badges, 8 stories | 1.15 | +0.08 charm/t; +120 warmth cap; +100 charm cap; hosts Rites (ceremonies leaf) | SolarDevotion |
 | 24 | Treat Bakery | 4000 pebbles, 150 shinies, 150 badges | 1.15 | converter −0.004 shinies −0.6 pep → feathers ×1.25·mpr, bells ×0.3·mpr where mpr = pep_cap × 0.007/100 | TreatAlchemy |
 | 25 | Tea House | 800 twigs, 600 charm, 4 mint, 300 quills | 1.5 | jamboree ratio +1%/bld; jamboree arrival +0.1%/bld | TeaCeremonies |
 | 26 | Dew Collector | 40 brass, 20 cogs, 20 lattices | 1.15 | +0.02 dew/t; +1200 dew cap | DewHarvest |
@@ -176,7 +176,7 @@ StorageFull rejection when the yield resource is at cap (unchanged rule).
 ## Balance Anchors (tests enforce)
 
 - One patch in summer feeds ~1.5 kittens; a gardener ~1.75 (unchanged).
-- Reachability (SIM-ECO-024): structures gated in bands 0–2 keep their first 20 copies within achievable caps; band 3+ structures keep their first 5 copies (first copy for band 4) — the plateau bites later the deeper the tier. Hushfelt's cap extender is owed by the cosmic leaf and exempt until it lands.
+- Reachability (SIM-ECO-024): structures gated in bands 0–2 keep their first 20 copies within achievable caps; band 3+ structures keep their first 5 copies (first copy for band 4) — the plateau bites later the deeper the tier. **Declared walls are exempt from their band's horizon and use the 5-copy rule instead**: the Tea House (ratio 1.5) and the Treat Bakery are deliberate few-copy structures, in the sub-HLD's price-band vocabulary. The Yarn Computer is a **declared monument** (first-copy horizon): one is a project, a second is a lifestyle, and curiosity storage is not obliged to keep up. Hushfelt's cap extender is owed by the cosmic leaf and exempt until it lands.
 - Every craft's inputs are producible before or at the band where the craft unlocks (no dead recipes) — **except the expedition/colony faucets** (feathers, bells, mint, shinies, unicorns), owed by the society and wonder waves and exempted from this wave's property test with an explicit list.
 - Global-layer exemption: a Dynamo Wheel never changes pep/charm/warmth/curiosity/skymap/luxury/mystic income.
 - Energy floor: no deficit can push layers 6–8 below ×0.25.
