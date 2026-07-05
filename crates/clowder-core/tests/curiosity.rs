@@ -70,25 +70,27 @@ fn ideas_are_forever() {
 // @spec SIM-CUR-005
 #[test]
 fn the_idea_tree_matches_the_design_table() {
-    let costs: Vec<f64> = IdeaId::ALL.iter().map(|i| content::idea_def(*i).cost).collect();
+    // The founding nine keep their tabled costs and prerequisites; the rest
+    // of the 57-idea banded tree is pinned by tests/economy_depth.rs.
+    let costs: Vec<f64> =
+        IdeaId::ALL[..9].iter().map(|i| content::idea_def(*i).cost).collect();
     assert_eq!(costs, vec![15.0, 25.0, 40.0, 60.0, 80.0, 120.0, 150.0, 200.0, 250.0]);
 
     use IdeaId::*;
-    let prereqs: Vec<Option<IdeaId>> = IdeaId::ALL.iter().map(|i| content::idea_def(*i).prereq).collect();
-    assert_eq!(
-        prereqs,
-        vec![
-            None,
-            None,
-            Some(PantryOrganization),
-            Some(ScratchingArts),
-            Some(PantryOrganization),
-            Some(GroomedToPurrfection),
-            Some(TwigArchitecture),
-            Some(BiscuitMaking),
-            Some(SeasonalAwareness),
-        ]
-    );
+    let prereqs: Vec<&[IdeaId]> =
+        IdeaId::ALL[..9].iter().map(|i| content::idea_def(*i).prereqs).collect();
+    let expected: Vec<&[IdeaId]> = vec![
+        &[],
+        &[],
+        &[PantryOrganization],
+        &[ScratchingArts],
+        &[PantryOrganization],
+        &[GroomedToPurrfection],
+        &[TwigArchitecture],
+        &[BiscuitMaking],
+        &[SeasonalAwareness],
+    ];
+    assert_eq!(prereqs, expected);
     for i in IdeaId::ALL {
         assert!(!content::idea_def(i).name.is_empty());
         assert!(!content::idea_def(i).blurb.is_empty(), "whimsy with clarity: every idea explains itself");

@@ -8,8 +8,8 @@ use common::*;
 fn new_game_is_an_empty_meadow() {
     let s = GameState::new(7);
     assert_eq!(s.ticks, 0);
-    assert_eq!(s.resources, [0.0; 4]);
-    assert_eq!(s.structures, [0; 7]);
+    assert_eq!(s.resources, [0.0; 46]);
+    assert_eq!(s.structures, [0; 38]);
     assert!(s.kittens.is_empty());
     assert!(s.ideas.is_empty());
     assert_eq!((s.pity, s.famine_days, s.recovery_days), (0, 0, 0));
@@ -316,7 +316,7 @@ fn flavor_events_are_pure_delight() {
     // same seed but no flavor consumption can't be constructed externally, so
     // assert the observable: resources stayed exactly zero (no production
     // exists in this world) despite hundreds of events.
-    assert_eq!(s.resources, [0.0; 4]);
+    assert_eq!(s.resources, [0.0; 46]);
 }
 
 // @spec SIM-ENG-002, SIM-ENG-018

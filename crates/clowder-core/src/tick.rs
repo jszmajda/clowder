@@ -29,16 +29,19 @@ impl GameState {
             self.day_close(&mut events);
         }
 
-        // ---- Phase 2: production ----
-        self.produce();
+        // ---- Phase 2: production (structures, jobs, converters) ----
+        let mess_accrual = self.produce();
 
-        // ---- Phase 3: consumption ----
+        // ---- Phase 3: consumption (food, then luxury drain) ----
         // @spec SIM-ECO-020, SIM-ECO-021
         let shortfall = self.consume();
 
-        // ---- Phase 4: mood & famine flag ----
+        // ---- Phase 4: mood, famine flag & mess recompute ----
         // @spec SIM-KIT-013
         self.grumpy = shortfall;
+        // @spec SIM-ECO-037
+        self.mess =
+            (self.mess + mess_accrual - content::MESS_DISSIPATION * self.mess).max(0.0);
         let tier_after = self.mood_tier();
         if tier_after != tier_before {
             // @spec SIM-ENG-010
@@ -49,8 +52,19 @@ impl GameState {
         self.random_events(day > prev_day, &mut events);
 
         // ---- Phase 6: clamp ----
+        // The kite high-water ratchets before caps are read, so a fresh haul
+        // widens the Porch the same tick. @spec SIM-ECO-031
+        let kites = self.resources[ResourceId::Kites.ix()];
+        if kites > self.kites_high_water {
+            self.kites_high_water = kites;
+        }
         // @spec SIM-ECO-003
         for r in ResourceId::ALL {
+            // Fast path: cap extensions are never negative, so a stock at or
+            // under its base cap can't need trimming.
+            if self.resources[r.ix()] <= content::BASE_CAPS[r.ix()] {
+                continue;
+            }
             let cap = self.cap(r);
             if self.resources[r.ix()] > cap {
                 self.resources[r.ix()] = cap;
@@ -65,11 +79,16 @@ impl GameState {
                 events.push(Event::Revealed { id });
             }
         }
-        for i in crate::state::IdeaId::ALL {
-            let id = crate::state::ContentId::Idea(i);
-            if !self.revealed.contains(&id) && self.reveal_condition_met(id) {
-                self.revealed.insert(id);
-                events.push(Event::Revealed { id });
+        // The curiosity gate is one check for the whole tree, hoisted out of
+        // the loop (idea reveal = idea_unlocked = gate + prerequisites).
+        let curiosity_open = self.cap(ResourceId::Curiosity) > 0.0;
+        if curiosity_open {
+            for i in crate::state::IdeaId::ALL {
+                let id = crate::state::ContentId::Idea(i);
+                if !self.revealed.contains(&id) && self.idea_prereqs_met(i) {
+                    self.revealed.insert(id);
+                    events.push(Event::Revealed { id });
+                }
             }
         }
 
@@ -157,30 +176,50 @@ impl GameState {
         }
     }
 
-    /// Structures first (season-modified where marked, never mood-modified),
-    /// then jobs (mood- and zoomies-modified), accumulating in fixed enum
-    /// order so float results are deterministic.
-    // @spec SIM-ECO-023
-    fn produce(&mut self) {
+    /// Phase 2: structures, then jobs, then converters, accumulating in fixed
+    /// enum order so float results are deterministic. Implements the
+    /// production stack's normative layer order — structures take only the ☆
+    /// layers (base, per-source ratio, season); jobs additionally take mood,
+    /// zoomies, and — material tier only — the global layers, dimmed by any
+    /// energy deficit; mess multiplies catnip growth last. Returns the tick's
+    /// mess accrual (applied in phase 4).
+    // @spec SIM-ENG-021, SIM-ECO-023, SIM-ECO-025, SIM-ECO-032, SIM-ECO-036
+    fn produce(&mut self) -> f64 {
         let season = self.season();
         let winter_eased = self.ideas.contains(&IdeaId::SeasonalAwareness);
+        // Layer-6 inputs, frozen at phase start (before converters draw fuel).
+        // Layers 7–8 (Elder Wisdom, the Long Sun) are ×1.0 until their waves.
+        let deficit = self.energy_deficit_ratio();
+        let global_mult = 1.0 + self.effect(crate::effects::Effect::GlobalProductionRatio) * deficit;
+        let surplus = self.energy_surplus_ratio();
+        let mess_catnip = self.mess_catnip_factor();
+
+        // ---- Structures (☆ layers only) ----
         for s in StructureId::ALL {
             let count = self.structures[s.ix()];
             if count == 0 {
                 continue;
             }
             let def = content::structure_def(s);
-            if let Some((r, amount)) = def.production {
-                let modifier = if def.seasonal {
+            for (r, amount) in def.productions {
+                let mut flow = amount * count as f64;
+                flow *= 1.0 + self.effect(crate::effects::Effect::ResourceRatio(*r));
+                if def.seasonal {
                     // @spec SIM-ECO-019
-                    content::season_patch_modifier(season, winter_eased)
-                } else {
-                    1.0
-                };
-                self.resources[r.ix()] += amount * count as f64 * modifier;
+                    flow *= content::season_patch_modifier(season, winter_eased);
+                }
+                if def.surplus_scaled {
+                    flow *= surplus;
+                }
+                if *r == ResourceId::Catnip {
+                    // @spec SIM-ECO-038
+                    flow *= mess_catnip;
+                }
+                self.resources[r.ix()] += flow;
             }
         }
 
+        // ---- Jobs ----
         // @spec SIM-ENG-012
         let zoomies = if self.zoomies_active() {
             if self.ideas.contains(&IdeaId::ZoomieChanneling) {
@@ -197,13 +236,75 @@ impl GameState {
             if workers == 0 {
                 continue;
             }
-            let (r, per_worker) = content::job_def(j).yield_per_tick;
-            self.resources[r.ix()] += per_worker * workers as f64 * mood * zoomies;
+            let Some((r, per_worker)) = content::job_def(j).yield_per_tick else {
+                continue; // the Tinkerer crafts in the background — later wave
+            };
+            let mut flow = per_worker * workers as f64;
+            flow *= 1.0 + self.effect(crate::effects::Effect::ResourceRatio(r));
+            flow *= mood * zoomies;
+            if content::tier(r) == content::Tier::Raw {
+                flow *= global_mult;
+            }
+            if r == ResourceId::Catnip {
+                flow *= mess_catnip;
+            }
+            self.resources[r.ix()] += flow;
         }
+
+        // ---- Converters (throttled), accruing mess as they run ----
+        self.run_converters()
     }
 
-    /// Pooled consumption; returns whether this tick was a shortfall.
-    // @spec SIM-ECO-020, SIM-ECO-021
+    /// Run every converter through the engine throttle and total the tick's
+    /// mess: converters dirty in proportion to their throughput, everything
+    /// else per active copy.
+    // @spec SIM-ECO-029, SIM-ECO-037
+    fn run_converters(&mut self) -> f64 {
+        let mut mess_accrual = 0.0;
+        for s in StructureId::ALL {
+            let count = self.structures[s.ix()];
+            if count == 0 {
+                continue;
+            }
+            let def = content::structure_def(s);
+            let Some(converter) = def.converter else {
+                mess_accrual += def.mess * count as f64;
+                continue;
+            };
+            let demands: Vec<(ResourceId, f64)> = converter
+                .inputs
+                .iter()
+                .map(|(r, d)| (*r, d * count as f64))
+                .collect();
+            let fraction = self.throttle_fraction(&demands);
+            mess_accrual += def.mess * count as f64 * fraction;
+            if fraction <= 0.0 {
+                continue; // a starved converter idles quietly
+            }
+            for (r, demand) in &demands {
+                let ix = r.ix();
+                self.resources[ix] = (self.resources[ix] - demand * fraction).max(0.0);
+            }
+            for (r, out) in converter.outputs {
+                self.resources[r.ix()] += out * count as f64 * fraction;
+            }
+            // The Treat Bakery's outputs ride the pep *cap* (mpr), not a
+            // recipe table. @spec SIM-ECO-030
+            if s == StructureId::TreatBakery {
+                let mpr = self.cap(ResourceId::Pep) * content::BAKERY_MPR_PER_PEP_CAP;
+                self.resources[ResourceId::Feathers.ix()] +=
+                    content::BAKERY_FEATHERS_MPR * mpr * count as f64 * fraction;
+                self.resources[ResourceId::Bells.ix()] +=
+                    content::BAKERY_BELLS_MPR * mpr * count as f64 * fraction;
+            }
+        }
+        mess_accrual
+    }
+
+    /// Pooled consumption; returns whether this tick was a shortfall. Food
+    /// first, then the luxury drain — which floors at zero and never
+    /// shortfalls: an empty shelf just drops its happiness bonus.
+    // @spec SIM-ECO-020, SIM-ECO-021, SIM-ECO-026
     fn consume(&mut self) -> bool {
         let home = self.kittens.iter().filter(|k| k.location == Location::Home).count();
         if home == 0 {
@@ -212,13 +313,27 @@ impl GameState {
         let demand = content::KITTEN_APPETITE * home as f64;
         let ix = ResourceId::Catnip.ix();
         let stock = self.resources[ix];
-        if demand > stock + EPSILON {
+        let shortfall = if demand > stock + EPSILON {
             self.resources[ix] = 0.0;
             true
         } else {
             self.resources[ix] = (stock - demand).max(0.0);
             false
+        };
+
+        // Luxury drain, per Home kitten, eased by demand effects (floor 0).
+        // An empty shelf drains nothing — skip the effect sum entirely.
+        if content::LUXURY_DRAINS.iter().any(|(r, _)| self.resources[r.ix()] > 0.0) {
+            let scale =
+                (1.0 + self.effect(crate::effects::Effect::LuxuryDemandRatio)).max(0.0);
+            for (r, per_kitten) in content::LUXURY_DRAINS {
+                let ix = r.ix();
+                let drain = per_kitten * home as f64 * scale;
+                self.resources[ix] = (self.resources[ix] - drain).max(0.0);
+            }
         }
+
+        shortfall
     }
 
     /// Zoomies expiry (every tick), then — at day boundaries only — the fixed
@@ -272,6 +387,50 @@ impl GameState {
             };
             events.push(Event::Flavor { template, kitten });
         }
+
+        // Sky events — appended AFTER the flavor draws, per the extended
+        // draw schedule (new subsystems never reorder it). @spec SIM-ENG-018
+        self.sky_events(events);
+    }
+
+    /// Day-close sky processing: an expired observation window fades
+    /// silently; then, where Ledges exist and nothing is pending, roll for an
+    /// event and (on a hit) for lucky self-observation.
+    // @spec SIM-ENG-025
+    fn sky_events(&mut self, events: &mut Vec<Event>) {
+        if let Some(expiry) = self.pending_sky_event {
+            if self.ticks >= expiry {
+                self.pending_sky_event = None; // it simply faded
+            }
+        }
+        let ledges = self.structures[StructureId::StargazingLedge.ix()];
+        if ledges == 0 || self.pending_sky_event.is_some() {
+            return; // no draw at all: at most one pending event at a time
+        }
+        if !self.rng.chance(content::SKY_EVENT_CHANCE_PER_LEDGE * ledges as f64) {
+            return;
+        }
+        if self.rng.chance(content::SKY_AUTO_OBSERVE_PER_LEDGE * ledges as f64) {
+            // Someone happened to be looking up.
+            self.grant_sky_observation();
+        } else {
+            // Observable until the end of the next day.
+            self.pending_sky_event = Some((self.day() + 1) * content::TICKS_PER_DAY);
+            events.push(Event::SkyEventVisible);
+        }
+    }
+
+    /// The yields of observing a sky event: curiosity scaled by its
+    /// per-source ratios, plus a skymap, both clamped to their caps.
+    // @spec SIM-ENG-025
+    pub(crate) fn grant_sky_observation(&mut self) {
+        let curiosity = content::SKY_OBSERVE_CURIOSITY
+            * (1.0 + self.effect(crate::effects::Effect::ResourceRatio(ResourceId::Curiosity)));
+        let ix = ResourceId::Curiosity.ix();
+        self.resources[ix] = (self.resources[ix] + curiosity).min(self.cap(ResourceId::Curiosity));
+        let ix = ResourceId::Skymaps.ix();
+        self.resources[ix] =
+            (self.resources[ix] + content::SKY_OBSERVE_SKYMAPS).min(self.cap(ResourceId::Skymaps));
     }
 
     /// Draw a name from the pool without replacement, cycling with Roman

@@ -23,6 +23,8 @@ pub enum Effect {
     CraftRatio,
     /// Flat happiness percentage points.
     HappinessPoints,
+    /// Delta on the per-kitten luxury drain (Gift Stands ease it).
+    LuxuryDemandRatio,
 }
 
 /// Diminishing-returns primitive: linear to 75% of `limit`, asymptotic to
@@ -55,7 +57,8 @@ impl GameState {
     // @spec SIM-ENG-019
     pub fn effect(&self, key: Effect) -> f64 {
         let mut sum = 0.0;
-        // 1. Structures (× owned count).
+        // 1. Structures (× owned count; global/energy terms count actives —
+        // the active set is the built set until toggling lands).
         for s in StructureId::ALL {
             let count = self.structures[s.ix()] as f64;
             if count == 0.0 {
@@ -64,13 +67,44 @@ impl GameState {
             let def = content::structure_def(s);
             match key {
                 Effect::MaxCap(r) => {
-                    if let Some((cr, amount)) = def.cap_bonus {
-                        if cr == r {
-                            sum += amount * count;
+                    for (cr, amount) in def.cap_bonuses {
+                        if *cr == r {
+                            let mut value = amount * count;
+                            // The Porch's caps ratchet on the kite high-water.
+                            // @spec SIM-ECO-031
+                            if s == StructureId::Porch {
+                                value *= 1.0
+                                    + limited_dr(
+                                        content::PORCH_KITE_PER * self.kites_high_water,
+                                        content::PORCH_KITE_DR_LIMIT,
+                                    );
+                            }
+                            sum += value;
                         }
                     }
                 }
                 Effect::HappinessPoints => sum += def.happiness_points * count,
+                Effect::ResourceRatio(r) => {
+                    for (rr, ratio) in def.resource_ratios {
+                        if *rr == r {
+                            sum += ratio * count;
+                        }
+                    }
+                }
+                Effect::CraftRatio => sum += def.craft_ratio * count,
+                Effect::LuxuryDemandRatio => sum += def.luxury_demand * count,
+                // @spec SIM-ECO-032
+                Effect::GlobalProductionRatio => {
+                    let mut value = def.global_ratio * count;
+                    if s == StructureId::DynamoWheel {
+                        // A starved wheel spins down; Cogworks amplify it.
+                        value *= self.dynamo_fuel_fraction()
+                            * (1.0
+                                + content::COGWORKS_DYNAMO_BOOST
+                                    * self.structures[StructureId::Cogworks.ix()] as f64);
+                    }
+                    sum += value;
+                }
                 _ => {}
             }
         }

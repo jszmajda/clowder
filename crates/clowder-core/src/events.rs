@@ -23,6 +23,10 @@ pub enum Event {
     Flavor { template: usize, kitten: Option<String> },
     /// A content item became permanently visible. @spec SIM-ENG-023
     Revealed { id: ContentId },
+    /// Something bright crossed the sky and nobody happened to be looking —
+    /// observable via ObserveSky until the end of the next day.
+    /// @spec SIM-ENG-025
+    SkyEventVisible,
     // @spec SIM-ENG-024
     SpeedChanged { speed: f64 },
 }

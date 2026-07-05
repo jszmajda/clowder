@@ -1,16 +1,23 @@
 use crate::content;
 use crate::events::Event;
-use crate::state::{GameState, IdeaId, JobId, Location, ResourceId, StructureId, EPSILON};
+use crate::state::{CraftId, GameState, IdeaId, JobId, Location, ResourceId, StructureId, EPSILON};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum Command {
     GatherCatnip,
     Forage,
+    /// Idea-gated pebble foraging. @spec SIM-ECO-027
+    Rummage,
     Build(StructureId),
     AssignJob(JobId),
     UnassignJob(JobId),
     ResearchIdea(IdeaId),
+    /// One batch of a recipe. @spec SIM-ECO-033
+    Craft(CraftId),
+    /// Bank a pending sky event's yields before its window closes.
+    /// @spec SIM-ENG-025
+    ObserveSky,
     SetSpeed(f64),
 }
 
@@ -36,10 +43,13 @@ impl GameState {
         match cmd {
             Command::GatherCatnip => self.gather(),
             Command::Forage => self.forage(),
+            Command::Rummage => self.rummage(),
             Command::Build(s) => self.build(s),
             Command::AssignJob(j) => self.assign(j),
             Command::UnassignJob(j) => self.unassign(j),
             Command::ResearchIdea(i) => self.research(i),
+            Command::Craft(c) => self.craft(c),
+            Command::ObserveSky => self.observe_sky(),
             Command::SetSpeed(v) => self.set_speed(v),
         }
     }
@@ -88,6 +98,51 @@ impl GameState {
         let twigs = ResourceId::Twigs.ix();
         self.resources[twigs] = (self.resources[twigs] + content::FORAGE_YIELD).min(twig_cap);
         Ok(Vec::new())
+    }
+
+    /// Rummage the couch: Locked before its idea, then +0.5 pebbles under the
+    /// same StorageFull rule as every manual action.
+    // @spec SIM-ECO-027
+    fn rummage(&mut self) -> Result<Vec<Event>, CommandError> {
+        if !self.ideas.contains(&IdeaId::CouchSpelunking) {
+            return Err(CommandError::Locked);
+        }
+        let cap = self.cap(ResourceId::Pebbles);
+        if self.stock(ResourceId::Pebbles) + EPSILON >= cap {
+            return Err(CommandError::StorageFull);
+        }
+        let ix = ResourceId::Pebbles.ix();
+        self.resources[ix] = (self.resources[ix] + content::RUMMAGE_YIELD).min(cap);
+        Ok(Vec::new())
+    }
+
+    /// One craft batch: all-or-nothing inputs, craft-ratio-boosted output.
+    // @spec SIM-ECO-033
+    fn craft(&mut self, c: CraftId) -> Result<Vec<Event>, CommandError> {
+        if !self.craft_unlocked(c) {
+            return Err(CommandError::Locked);
+        }
+        let def = content::craft_def(c);
+        self.spend(def.inputs)?;
+        let output = content::craft_output(c);
+        let batch = 1.0 * (1.0 + self.effect(crate::effects::Effect::CraftRatio));
+        let ix = output.ix();
+        self.resources[ix] = (self.resources[ix] + batch).min(self.cap(output));
+        Ok(Vec::new())
+    }
+
+    /// Observe a pending, unexpired sky event for its yields; anything else
+    /// (nothing pending, or a faded event) is Locked and a perfect no-op.
+    // @spec SIM-ENG-025
+    fn observe_sky(&mut self) -> Result<Vec<Event>, CommandError> {
+        match self.pending_sky_event {
+            Some(expiry) if self.ticks < expiry => {
+                self.grant_sky_observation();
+                self.pending_sky_event = None;
+                Ok(Vec::new())
+            }
+            _ => Err(CommandError::Locked),
+        }
     }
 
     // @spec SIM-ECO-007
@@ -141,7 +196,9 @@ impl GameState {
         Ok(vec![Event::JobUnassigned { name: kitten.name.clone(), job: j }])
     }
 
-    // @spec SIM-CUR-003, SIM-CUR-006
+    /// Research spends curiosity and any gate-craft components together,
+    /// all-or-nothing.
+    // @spec SIM-CUR-003, SIM-CUR-006, SIM-CUR-007
     fn research(&mut self, i: IdeaId) -> Result<Vec<Event>, CommandError> {
         if !self.idea_unlocked(i) {
             return Err(CommandError::Locked);
@@ -149,8 +206,10 @@ impl GameState {
         if self.ideas.contains(&i) {
             return Err(CommandError::AlreadyResearched);
         }
-        let cost = content::idea_def(i).cost;
-        self.spend(&[(ResourceId::Curiosity, cost)])?;
+        let def = content::idea_def(i);
+        let mut costs = vec![(ResourceId::Curiosity, def.cost)];
+        costs.extend_from_slice(def.gate);
+        self.spend(&costs)?;
         self.ideas.insert(i);
         Ok(vec![Event::IdeaResearched { id: i }])
     }

@@ -33,16 +33,30 @@ pub enum LoadError {
 /// Name lists are gross with per-name counts — a kitten may appear in more
 /// than one list, and more than once per list.
 // @spec SAVE-008
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct OfflineReport {
     pub elapsed_seconds: u64,
     pub truncated: bool,
     /// Net stock change per resource, indexed by `ResourceId::ix()`.
-    pub resource_deltas: [f64; 4],
+    pub resource_deltas: [f64; crate::state::RESOURCE_COUNT],
     pub arrived: Vec<(String, u32)>,
     pub wandered: Vec<(String, u32)>,
     pub returned: Vec<(String, u32)>,
     pub seasons_passed: u32,
+}
+
+impl Default for OfflineReport {
+    fn default() -> Self {
+        OfflineReport {
+            elapsed_seconds: 0,
+            truncated: false,
+            resource_deltas: [0.0; crate::state::RESOURCE_COUNT],
+            arrived: Vec::new(),
+            wandered: Vec::new(),
+            returned: Vec::new(),
+            seasons_passed: 0,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -101,6 +115,12 @@ pub fn load_string(s: &str, now_unix: u64) -> Result<LoadedGame, LoadError> {
         state.speed = 1.0;
     }
     state.speed = state.speed.clamp(crate::state::SPEED_MIN, crate::state::SPEED_MAX);
+    if !state.mess.is_finite() || state.mess < 0.0 {
+        state.mess = 0.0;
+    }
+    if !state.kites_high_water.is_finite() || state.kites_high_water < 0.0 {
+        state.kites_high_water = 0.0;
+    }
     for r in ResourceId::ALL {
         let cap = state.cap(r);
         if state.resources[r.ix()] > cap {
@@ -110,6 +130,9 @@ pub fn load_string(s: &str, now_unix: u64) -> Result<LoadedGame, LoadError> {
             state.resources[r.ix()] = 0.0;
         }
     }
+    // The high-water is a ratchet: it can never sit below the kites in paw.
+    // @spec SIM-ECO-031
+    state.kites_high_water = state.kites_high_water.max(state.stock(ResourceId::Kites));
 
     // Offline catch-up: same tick(), fast-forwarded at the save's own game
     // speed — away time accrues exactly as attended time would have. A

@@ -2,7 +2,8 @@
 //! Content lives in Rust (HLD decision) — the compiler checks refactors and
 //! there is no loader to maintain.
 
-use crate::state::{IdeaId, JobId, ResourceId, Season, StructureId};
+use crate::state::{CraftId, IdeaId, JobId, ResourceId, Season, StructureId};
+use crate::state::{IDEA_COUNT, RESOURCE_COUNT, STRUCTURE_COUNT};
 
 // ---- Time ----
 pub const TICKS_PER_SECOND: u64 = 4;
@@ -11,8 +12,75 @@ pub const DAYS_PER_SEASON: u64 = 25;
 pub const DAYS_PER_YEAR: u64 = 100;
 
 // ---- Resources ----
+
+/// Currency tiers (sub-HLD § Currency Tiers). Raw materials take the full
+/// production stack; every other tier skips the global layers 6–8.
+// @spec SIM-ECO-025
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tier {
+    Raw,
+    Transient,
+    Luxury,
+    Mystic,
+    Dreamtime,
+    Crafted,
+}
+
+// @spec SIM-ECO-025
+pub fn tier(r: ResourceId) -> Tier {
+    use ResourceId::*;
+    match r {
+        Catnip | Twigs | Fluff | Pebbles | Buttons | Embers | Shinies | Dew | Moonstone
+        | Stardust | Hushfelt => Tier::Raw,
+        Curiosity | Pep | Charm | Warmth | Skymaps | Cleverness => Tier::Transient,
+        Feathers | Bells | Mint => Tier::Luxury,
+        Unicorns | Rainbows | Prisms | Starshards | Echoes | Dreamcorns | JarsOfPurrs => {
+            Tier::Mystic
+        }
+        Reverie => Tier::Dreamtime,
+        Wands | Tiles | Badges | Brass | Cogs | Moonsteel | Lattices | Pavers | Quills
+        | Stories | Anthologies | Schemes | Cairns | Kites | Balloons | Moonmilk | Dreamweave
+        | Cometsilk => Tier::Crafted,
+    }
+}
+
+const INF: f64 = f64::INFINITY;
+
+/// Base storage caps in RES-table order; ∞ = uncapped (clamp skips it, and
+/// the value is derived only — never serialized).
 // @spec SIM-ECO-001
-pub const BASE_CAPS: [f64; 4] = [200.0, 50.0, 25.0, 0.0];
+pub const BASE_CAPS: [f64; RESOURCE_COUNT] = [
+    200.0, // catnip
+    50.0,  // twigs
+    25.0,  // fluff
+    0.0,   // curiosity — cap 0 until a Cardboard Box exists
+    60.0,  // pebbles
+    40.0,  // buttons
+    30.0,  // embers
+    15.0,  // shinies
+    0.0,   // dew — cap 0 until Dew Collectors
+    8.0,   // moonstone
+    0.0,   // stardust — cap 0 until Star Basins
+    0.0,   // hushfelt — cap extender owed by the cosmic leaf
+    100.0, // pep
+    80.0,  // charm
+    0.0,   // warmth — cap 0 until Sun Rooms
+    0.0,   // skymaps — cap 0 until Stargazing Ledges
+    INF,   // feathers
+    INF,   // bells
+    INF,   // mint
+    INF,   // unicorns
+    INF,   // rainbows
+    INF,   // prisms
+    INF,   // starshards
+    INF,   // echoes
+    INF,   // dreamcorns
+    0.0,   // jars of purrs — capped by mystic content (wave 4)
+    INF,   // reverie
+    INF, INF, INF, INF, INF, INF, INF, INF, INF, // wands..quills (crafted)
+    INF, INF, INF, INF, INF, INF, INF, INF, INF, // stories..cometsilk (crafted)
+    INF,   // cleverness — the Yarn Computer's wit has no ceiling
+];
 
 /// Fraction of each cost component that must be held for a content item to
 /// reveal (become visible as a silhouette). @spec SIM-ENG-023
@@ -22,6 +90,64 @@ pub const REVEAL_FRACTION: f64 = 0.30;
 pub const GATHER_YIELD: f64 = 1.0;
 pub const FORAGE_COST: f64 = 10.0;
 pub const FORAGE_YIELD: f64 = 1.0;
+/// Rummage: idea-gated pebble foraging. @spec SIM-ECO-027
+pub const RUMMAGE_YIELD: f64 = 0.5;
+
+// ---- Luxuries ----
+// Per-Home-kitten drain rates, scaled by (1 + LuxuryDemandRatio effects).
+// @spec SIM-ECO-026
+pub const LUXURY_DRAINS: [(ResourceId, f64); 3] = [
+    (ResourceId::Feathers, 0.001),
+    (ResourceId::Bells, 0.0007),
+    (ResourceId::Mint, 0.0001),
+];
+
+// ---- Mess ----
+// @spec SIM-ECO-037, SIM-ECO-038
+pub const MESS_DISSIPATION: f64 = 1e-4; // × current mess, per tick
+pub const MESS_LEVEL_UNIT: f64 = 1e4; // level = floor(log10(mess / unit))
+pub const MESS_CATNIP_STEP: f64 = 0.8; // per level step, level 0 up
+pub const MESS_CATNIP_FLOOR: f64 = 0.25;
+pub const MESS_ARRIVAL_FACTOR: f64 = 0.75; // level 1 up
+pub const MESS_HAPPINESS_POINTS: f64 = 5.0; // per level above 1, level 2 up
+
+// ---- Sky events ----
+// @spec SIM-ENG-025
+pub const SKY_EVENT_CHANCE_PER_LEDGE: f64 = 0.002; // per day close
+pub const SKY_AUTO_OBSERVE_PER_LEDGE: f64 = 0.01;
+pub const SKY_OBSERVE_CURIOSITY: f64 = 25.0; // × (1 + curiosity ratios)
+pub const SKY_OBSERVE_SKYMAPS: f64 = 1.0;
+
+// ---- Energy ----
+// @spec SIM-ECO-035
+pub const SUNNING_DECK_WINTER: f64 = 0.75;
+pub const SUNNING_DECK_SUMMER: f64 = 1.25;
+
+pub fn sunning_deck_season_factor(season: Season) -> f64 {
+    match season {
+        Season::Winter => SUNNING_DECK_WINTER,
+        Season::Summer => SUNNING_DECK_SUMMER,
+        _ => 1.0,
+    }
+}
+
+/// Treat Bakery output rate: mpr = pep cap × 0.007 / 100 — storage feeding
+/// production. @spec SIM-ECO-030
+pub const BAKERY_MPR_PER_PEP_CAP: f64 = 0.007 / 100.0;
+pub const BAKERY_FEATHERS_MPR: f64 = 1.25;
+pub const BAKERY_BELLS_MPR: f64 = 0.3;
+
+// ---- Global production layer (stack layer 6) ----
+// @spec SIM-ECO-032
+pub const DYNAMO_GLOBAL_RATIO: f64 = 0.02; // per active wheel, × fuel fraction
+pub const COGWORKS_DYNAMO_BOOST: f64 = 0.15; // × owned Cogworks, on the dynamo term
+pub const STAR_BASIN_GLOBAL_RATIO: f64 = 0.05; // per active basin
+
+// ---- Porch kite ratchet ----
+// Porch caps × (1 + limited_dr(0.01 × kite high-water, limit)).
+// @spec SIM-ECO-031
+pub const PORCH_KITE_PER: f64 = 0.01;
+pub const PORCH_KITE_DR_LIMIT: f64 = 2.25;
 
 // ---- Kittens ----
 pub const KITTEN_APPETITE: f64 = 0.085; // catnip per tick, per Home kitten
@@ -51,101 +177,493 @@ pub const FLAVOR_DAILY_CHANCE: f64 = 0.08;
 
 // ---- Structures ----
 
+/// A converter draws inputs and emits outputs each tick, per active copy,
+/// throttled together by the worst-supplied input. @spec SIM-ECO-029
+#[derive(Debug, Clone, Copy)]
+pub struct Converter {
+    pub inputs: &'static [(ResourceId, f64)],
+    pub outputs: &'static [(ResourceId, f64)],
+}
+
 pub struct StructureDef {
     pub name: &'static str,
     pub base_costs: &'static [(ResourceId, f64)],
     pub ratio: f64,
-    /// (resource, amount per tick per copy); the patch alone is seasonal.
-    pub production: Option<(ResourceId, f64)>,
+    /// Fraction of each cost component held before the silhouette reveals.
+    pub reveal_fraction: f64,
+    /// (resource, amount per tick per copy). Structure production takes only
+    /// the ☆ stack layers: base, per-source ratio, season.
+    pub productions: &'static [(ResourceId, f64)],
+    /// The patch alone is seasonal.
     pub seasonal: bool,
+    /// The Moonlight Stage alone scales by the energy surplus ratio.
+    pub surplus_scaled: bool,
     pub housing: u32,
-    pub cap_bonus: Option<(ResourceId, f64)>,
+    pub cap_bonuses: &'static [(ResourceId, f64)],
     pub happiness_points: f64,
+    /// Pooled crowding relief per copy (kittens leaf consumes, LDR cap 0.9).
+    pub crowding_relief: f64,
+    /// Per-source production ratios: +X% on every flow of that resource.
+    pub resource_ratios: &'static [(ResourceId, f64)],
+    pub craft_ratio: f64,
+    /// Luxury-demand delta per copy (Gift Stands ease the drain).
+    pub luxury_demand: f64,
+    /// Layer-6 contribution per active copy (dynamo term is fuel-scaled and
+    /// Cogworks-amplified in the effect sum).
+    pub global_ratio: f64,
+    pub converter: Option<Converter>,
+    /// Mess per active copy per tick; converters scale by their throttle.
+    pub mess: f64,
+    pub energy_prod: f64,
+    pub energy_cons: f64,
     pub gate: Option<IdeaId>,
 }
+
+/// Baseline for the table: every field its "nothing special" value.
+const BLD: StructureDef = StructureDef {
+    name: "",
+    base_costs: &[],
+    ratio: 1.15,
+    reveal_fraction: REVEAL_FRACTION,
+    productions: &[],
+    seasonal: false,
+    surplus_scaled: false,
+    housing: 0,
+    cap_bonuses: &[],
+    happiness_points: 0.0,
+    crowding_relief: 0.0,
+    resource_ratios: &[],
+    craft_ratio: 0.0,
+    luxury_demand: 0.0,
+    global_ratio: 0.0,
+    converter: None,
+    mess: 0.0,
+    energy_prod: 0.0,
+    energy_cons: 0.0,
+    gate: None,
+};
 
 // @spec SIM-ECO-008, SIM-ECO-009, SIM-ECO-010, SIM-ECO-011, SIM-ECO-012, SIM-ECO-013, SIM-ECO-014
 pub fn structure_def(s: StructureId) -> &'static StructureDef {
     &STRUCTURES[s.ix()]
 }
 
-static STRUCTURES: [StructureDef; 7] = [
+static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
     StructureDef {
         name: "Catnip Patch",
         base_costs: &[(ResourceId::Catnip, 10.0)],
         ratio: 1.12,
-        production: Some((ResourceId::Catnip, 0.125)),
+        productions: &[(ResourceId::Catnip, 0.125)],
         seasonal: true,
-        housing: 0,
-        cap_bonus: None,
-        happiness_points: 0.0,
-        gate: None,
+        ..BLD
     },
     StructureDef {
         name: "Cozy Cushion",
         base_costs: &[(ResourceId::Catnip, 25.0), (ResourceId::Twigs, 5.0)],
-        ratio: 1.15,
-        production: None,
-        seasonal: false,
         housing: 1,
-        cap_bonus: None,
-        happiness_points: 0.0,
-        gate: None,
+        ..BLD
     },
     StructureDef {
         name: "Cardboard Box",
         base_costs: &[(ResourceId::Twigs, 8.0)],
-        ratio: 1.15,
-        production: Some((ResourceId::Curiosity, 0.005)),
-        seasonal: false,
-        housing: 0,
-        cap_bonus: Some((ResourceId::Curiosity, 50.0)),
-        happiness_points: 0.0,
-        gate: None,
+        productions: &[(ResourceId::Curiosity, 0.005)],
+        cap_bonuses: &[(ResourceId::Curiosity, 50.0)],
+        ..BLD
     },
     StructureDef {
         name: "Pantry",
         base_costs: &[(ResourceId::Twigs, 20.0)],
-        ratio: 1.15,
-        production: None,
-        seasonal: false,
-        housing: 0,
-        cap_bonus: Some((ResourceId::Catnip, 250.0)),
-        happiness_points: 0.0,
+        cap_bonuses: &[(ResourceId::Catnip, 250.0)],
         gate: Some(IdeaId::PantryOrganization),
+        ..BLD
     },
     StructureDef {
         name: "Twig Pile",
         base_costs: &[(ResourceId::Catnip, 50.0), (ResourceId::Twigs, 10.0)],
-        ratio: 1.15,
-        production: None,
-        seasonal: false,
-        housing: 0,
-        cap_bonus: Some((ResourceId::Twigs, 40.0)),
-        happiness_points: 0.0,
+        cap_bonuses: &[(ResourceId::Twigs, 40.0)],
         gate: Some(IdeaId::TwigArchitecture),
+        ..BLD
     },
     StructureDef {
         name: "Scratching Post",
         base_costs: &[(ResourceId::Twigs, 15.0), (ResourceId::Fluff, 5.0)],
-        ratio: 1.15,
-        production: None,
-        seasonal: false,
-        housing: 0,
-        cap_bonus: None,
         happiness_points: 5.0,
         gate: Some(IdeaId::ScratchingArts),
+        ..BLD
     },
     StructureDef {
         name: "Cat Tree",
         base_costs: &[(ResourceId::Twigs, 30.0), (ResourceId::Fluff, 10.0)],
-        ratio: 1.15,
-        production: None,
-        seasonal: false,
         housing: 3,
-        cap_bonus: Some((ResourceId::Fluff, 10.0)),
-        happiness_points: 0.0,
+        cap_bonuses: &[(ResourceId::Fluff, 10.0)],
         gate: Some(IdeaId::TwigArchitecture),
+        ..BLD
+    },
+    StructureDef {
+        name: "Window Perch",
+        base_costs: &[(ResourceId::Catnip, 40.0), (ResourceId::Twigs, 8.0)],
+        housing: 1,
+        productions: &[(ResourceId::Curiosity, 0.001)],
+        gate: Some(IdeaId::CozyCarpentry),
+        ..BLD
+    },
+    StructureDef {
+        name: "Herb Garden",
+        base_costs: &[(ResourceId::Pebbles, 60.0)],
+        ratio: 1.12,
+        resource_ratios: &[(ResourceId::Catnip, 0.03)],
+        gate: Some(IdeaId::Horticulture),
+        ..BLD
+    },
+    StructureDef {
+        name: "Couch Mine",
+        base_costs: &[(ResourceId::Twigs, 90.0)],
+        productions: &[(ResourceId::Pebbles, 0.01)],
+        resource_ratios: &[(ResourceId::Pebbles, 0.20)],
+        gate: Some(IdeaId::CouchSpelunking),
+        ..BLD
+    },
+    StructureDef {
+        name: "Gravel Pit",
+        base_costs: &[(ResourceId::Tiles, 80.0), (ResourceId::Brass, 15.0)],
+        productions: &[(ResourceId::Embers, 0.004)],
+        resource_ratios: &[(ResourceId::Pebbles, 0.35)],
+        mess: 0.25,
+        gate: Some(IdeaId::Excavation),
+        ..BLD
+    },
+    StructureDef {
+        name: "Hearth",
+        base_costs: &[(ResourceId::Pebbles, 45.0), (ResourceId::Twigs, 25.0)],
+        converter: Some(Converter {
+            inputs: &[(ResourceId::Twigs, 0.05), (ResourceId::Pebbles, 0.10)],
+            outputs: &[(ResourceId::Buttons, 0.02), (ResourceId::Embers, 0.001)],
+        }),
+        happiness_points: 2.0,
+        mess: 0.1,
+        gate: Some(IdeaId::Emberkeeping),
+        ..BLD
+    },
+    StructureDef {
+        name: "Kiln",
+        base_costs: &[
+            (ResourceId::Moonstone, 4.0),
+            (ResourceId::Dew, 150.0),
+            (ResourceId::Brass, 30.0),
+        ],
+        converter: Some(Converter {
+            inputs: &[(ResourceId::Pebbles, 0.5), (ResourceId::Dew, 0.024)],
+            outputs: &[(ResourceId::Buttons, 0.15), (ResourceId::Moonstone, 0.0005)],
+        }),
+        mess: 1.0,
+        gate: Some(IdeaId::CeramicArts),
+        ..BLD
+    },
+    StructureDef {
+        name: "Shed",
+        base_costs: &[(ResourceId::Wands, 2.0), (ResourceId::Tiles, 3.0)],
+        cap_bonuses: &[
+            (ResourceId::Twigs, 150.0),
+            (ResourceId::Pebbles, 200.0),
+            (ResourceId::Buttons, 25.0),
+            (ResourceId::Embers, 30.0),
+            (ResourceId::Moonstone, 10.0),
+            (ResourceId::Shinies, 5.0),
+        ],
+        gate: Some(IdeaId::PackRattery),
+        ..BLD
+    },
+    StructureDef {
+        name: "Porch",
+        base_costs: &[
+            (ResourceId::Tiles, 40.0),
+            (ResourceId::Badges, 60.0),
+            (ResourceId::Lattices, 4.0),
+        ],
+        // All Porch caps ratchet on the kite high-water. @spec SIM-ECO-031
+        cap_bonuses: &[
+            (ResourceId::Catnip, 1000.0),
+            (ResourceId::Twigs, 400.0),
+            (ResourceId::Pebbles, 500.0),
+            (ResourceId::Buttons, 80.0),
+            (ResourceId::Embers, 50.0),
+            (ResourceId::Moonstone, 25.0),
+            (ResourceId::Shinies, 12.0),
+        ],
+        gate: Some(IdeaId::PorchLogistics),
+        ..BLD
+    },
+    StructureDef {
+        name: "Study Nook",
+        base_costs: &[
+            (ResourceId::Twigs, 30.0),
+            (ResourceId::Pebbles, 45.0),
+            (ResourceId::Curiosity, 80.0),
+        ],
+        resource_ratios: &[(ResourceId::Curiosity, 0.20)],
+        cap_bonuses: &[(ResourceId::Curiosity, 200.0)],
+        gate: Some(IdeaId::Notetaking),
+        ..BLD
+    },
+    StructureDef {
+        name: "Stargazing Ledge",
+        base_costs: &[
+            (ResourceId::Buttons, 250.0),
+            (ResourceId::Curiosity, 800.0),
+            (ResourceId::Tiles, 20.0),
+            (ResourceId::Lattices, 40.0),
+        ],
+        ratio: 1.10,
+        resource_ratios: &[(ResourceId::Curiosity, 0.25)],
+        cap_bonuses: &[(ResourceId::Curiosity, 800.0), (ResourceId::Skymaps, 10.0)],
+        gate: Some(IdeaId::SkyCharts),
+        ..BLD
+    },
+    StructureDef {
+        name: "Whisker Lab",
+        base_costs: &[
+            (ResourceId::Curiosity, 1200.0),
+            (ResourceId::Tiles, 60.0),
+            (ResourceId::Brass, 40.0),
+        ],
+        ratio: 1.10,
+        resource_ratios: &[(ResourceId::Curiosity, 0.35)],
+        cap_bonuses: &[(ResourceId::Curiosity, 1200.0)],
+        energy_cons: 1.0,
+        gate: Some(IdeaId::DeepCuriosity),
+        ..BLD
+    },
+    StructureDef {
+        name: "Craft Corner",
+        base_costs: &[(ResourceId::Twigs, 80.0), (ResourceId::Pebbles, 300.0)],
+        reveal_fraction: 0.01, // an early tease: sawdust drifts from a corner
+        craft_ratio: 0.06,
+        gate: Some(IdeaId::Tinkering),
+        ..BLD
+    },
+    StructureDef {
+        name: "Toy Workshop",
+        base_costs: &[
+            (ResourceId::Buttons, 250.0),
+            (ResourceId::Pavers, 12.0),
+            (ResourceId::Moonstone, 18.0),
+        ],
+        craft_ratio: 0.05,
+        energy_cons: 2.0,
+        mess: 2.0, // the Tidy rota flips this — society wave
+        gate: Some(IdeaId::Toymaking),
+        ..BLD
+    },
+    StructureDef {
+        name: "Gift Stand",
+        base_costs: &[
+            (ResourceId::Twigs, 400.0),
+            (ResourceId::Pebbles, 150.0),
+            (ResourceId::Shinies, 8.0),
+        ],
+        // Trade ratio +1.5%/bld lands with the colonies leaf.
+        luxury_demand: -0.04,
+        gate: Some(IdeaId::GiftEconomy),
+        ..BLD
+    },
+    StructureDef {
+        name: "Story Circle",
+        base_costs: &[
+            (ResourceId::Twigs, 160.0),
+            (ResourceId::Pebbles, 900.0),
+            (ResourceId::Quills, 3.0),
+        ],
+        crowding_relief: 0.048,
+        productions: &[(ResourceId::Charm, 0.005)],
+        cap_bonuses: &[(ResourceId::Charm, 40.0)],
+        gate: Some(IdeaId::OralTradition),
+        ..BLD
+    },
+    StructureDef {
+        name: "Sun Room",
+        base_costs: &[
+            (ResourceId::Pebbles, 1600.0),
+            (ResourceId::Charm, 200.0),
+            (ResourceId::Quills, 200.0),
+        ],
+        productions: &[(ResourceId::Charm, 0.04), (ResourceId::Warmth, 0.004)],
+        cap_bonuses: &[(ResourceId::Warmth, 75.0), (ResourceId::Charm, 60.0)],
+        gate: Some(IdeaId::SunSalutations),
+        ..BLD
+    },
+    StructureDef {
+        name: "Sunbeam Altar",
+        base_costs: &[
+            (ResourceId::Shinies, 40.0),
+            (ResourceId::Tiles, 20.0),
+            (ResourceId::Badges, 12.0),
+            (ResourceId::Stories, 8.0),
+        ],
+        productions: &[(ResourceId::Charm, 0.08)],
+        cap_bonuses: &[(ResourceId::Warmth, 120.0), (ResourceId::Charm, 100.0)],
+        gate: Some(IdeaId::SolarDevotion),
+        ..BLD
+    },
+    StructureDef {
+        name: "Treat Bakery",
+        base_costs: &[
+            (ResourceId::Pebbles, 4000.0),
+            (ResourceId::Shinies, 150.0),
+            (ResourceId::Badges, 150.0),
+        ],
+        // Outputs scale with the pep cap (mpr) — see the converter phase.
+        converter: Some(Converter {
+            inputs: &[(ResourceId::Shinies, 0.004), (ResourceId::Pep, 0.6)],
+            outputs: &[], // computed: feathers 1.25·mpr, bells 0.3·mpr
+        }),
+        gate: Some(IdeaId::TreatAlchemy),
+        ..BLD
+    },
+    StructureDef {
+        name: "Tea House",
+        base_costs: &[
+            (ResourceId::Twigs, 800.0),
+            (ResourceId::Charm, 600.0),
+            (ResourceId::Mint, 4.0),
+            (ResourceId::Quills, 300.0),
+        ],
+        ratio: 1.5, // a deliberate wall, in the price-band vocabulary
+        // Jamboree effects land with the kittens leaf's society wave.
+        gate: Some(IdeaId::TeaCeremonies),
+        ..BLD
+    },
+    StructureDef {
+        name: "Dew Collector",
+        base_costs: &[
+            (ResourceId::Brass, 40.0),
+            (ResourceId::Cogs, 20.0),
+            (ResourceId::Lattices, 20.0),
+        ],
+        productions: &[(ResourceId::Dew, 0.02)],
+        cap_bonuses: &[(ResourceId::Dew, 1200.0)],
+        gate: Some(IdeaId::DewHarvest),
+        ..BLD
+    },
+    StructureDef {
+        name: "Cogworks",
+        base_costs: &[(ResourceId::Brass, 50.0), (ResourceId::Cogs, 15.0)],
+        ratio: 1.25,
+        // Amplifies dynamos (COGWORKS_DYNAMO_BOOST); yearly auto-craft is
+        // deferred to the Tinkerer wave (SIM-ECO-039 [D]).
+        energy_prod: 1.0,
+        mess: 0.5,
+        gate: Some(IdeaId::Cogwheels),
+        ..BLD
+    },
+    StructureDef {
+        name: "Dynamo Wheel",
+        base_costs: &[
+            (ResourceId::Cogs, 4.0),
+            (ResourceId::Moonsteel, 8.0),
+            (ResourceId::Schemes, 1.0),
+        ],
+        ratio: 1.25,
+        converter: Some(Converter {
+            inputs: &[(ResourceId::Dew, 0.05)],
+            outputs: &[], // a pure fuel draw: the output is the global layer
+        }),
+        global_ratio: DYNAMO_GLOBAL_RATIO,
+        energy_prod: 5.0, // × fuel fraction
+        mess: 5.0,        // a starved wheel spins down proportionally
+        gate: Some(IdeaId::Dynamos),
+        ..BLD
+    },
+    StructureDef {
+        name: "Sunning Deck",
+        base_costs: &[(ResourceId::Moonstone, 60.0)],
+        energy_prod: 2.0, // winter ×0.75, summer ×1.25
+        gate: Some(IdeaId::SolarBasking),
+        ..BLD
+    },
+    StructureDef {
+        name: "Stream Wheel",
+        base_costs: &[(ResourceId::Moonstone, 120.0), (ResourceId::Pavers, 25.0)],
+        energy_prod: 5.0,
+        gate: Some(IdeaId::Millworks),
+        ..BLD
+    },
+    StructureDef {
+        name: "Star Basin",
+        base_costs: &[
+            (ResourceId::Moonstone, 150.0),
+            (ResourceId::Badges, 1200.0),
+            (ResourceId::Pavers, 12.0),
+            (ResourceId::Schemes, 6.0),
+        ],
+        global_ratio: STAR_BASIN_GLOBAL_RATIO,
+        productions: &[(ResourceId::Stardust, 0.0003)],
+        cap_bonuses: &[(ResourceId::Stardust, 60.0)],
+        energy_prod: 10.0,
+        gate: Some(IdeaId::Starcatching),
+        ..BLD
+    },
+    StructureDef {
+        name: "Prism Spinner",
+        base_costs: &[
+            (ResourceId::Moonstone, 250.0),
+            (ResourceId::Stardust, 6.0),
+            (ResourceId::Pavers, 30.0),
+        ],
+        converter: Some(Converter {
+            inputs: &[(ResourceId::Moonstone, 0.004)],
+            outputs: &[(ResourceId::Stardust, 0.0006)],
+        }),
+        energy_cons: 2.0,
+        gate: Some(IdeaId::PrismCraft),
+        ..BLD
+    },
+    StructureDef {
+        name: "Box Labyrinth",
+        base_costs: &[(ResourceId::Brass, 30.0), (ResourceId::Tiles, 90.0)],
+        cap_bonuses: &[(ResourceId::Curiosity, 1500.0)],
+        energy_cons: 2.0,
+        gate: Some(IdeaId::LabyrinthTheory),
+        ..BLD
+    },
+    StructureDef {
+        name: "Moonlight Stage",
+        base_costs: &[(ResourceId::Buttons, 250.0), (ResourceId::Moonstone, 20.0)],
+        crowding_relief: 0.075,
+        productions: &[(ResourceId::Charm, 0.25)],
+        surplus_scaled: true, // an unpowered stage is dark by design
+        gate: Some(IdeaId::MoonlightArts),
+        ..BLD
+    },
+    StructureDef {
+        name: "Memory Chest",
+        base_costs: &[
+            (ResourceId::Hushfelt, 700.0),
+            (ResourceId::Curiosity, 60000.0),
+            (ResourceId::Starshards, 1.0),
+            (ResourceId::Schemes, 25.0),
+        ],
+        ratio: 1.25,
+        // Move carryover and déjà-vu chance land with the prestige/dreamtime
+        // leaves.
+        energy_cons: 20.0,
+        gate: Some(IdeaId::MemoryWeaving),
+        ..BLD
+    },
+    StructureDef {
+        name: "Yarn Computer",
+        base_costs: &[(ResourceId::Stardust, 30.0), (ResourceId::Curiosity, 60000.0)],
+        productions: &[(ResourceId::Cleverness, 0.02)],
+        energy_cons: 0.0, // special-cased: 2n + n²/2 in total at n copies
+        gate: Some(IdeaId::YarnComputing),
+        ..BLD
+    },
+    StructureDef {
+        name: "Unicorn Meadow",
+        base_costs: &[(ResourceId::Unicorns, 2.0)],
+        ratio: 1.75,
+        productions: &[(ResourceId::Unicorns, 0.001)], // mystic leaf multiplies later
+        gate: Some(IdeaId::UnicornLore),
+        ..BLD
     },
 ];
 
@@ -159,35 +677,58 @@ pub enum JobGate {
 
 pub struct JobDef {
     pub name: &'static str,
-    pub yield_per_tick: (ResourceId, f64),
+    /// Passive per-effective-worker yield; None for the Tinkerer, whose
+    /// background crafting is owed by the kittens leaf's society wave.
+    pub yield_per_tick: Option<(ResourceId, f64)>,
     pub gate: JobGate,
 }
 
 // @spec SIM-ECO-015, SIM-ECO-016, SIM-ECO-017, SIM-ECO-018
+// @spec SIM-ECO-040, SIM-ECO-041, SIM-ECO-042, SIM-ECO-043
 pub fn job_def(j: JobId) -> &'static JobDef {
     &JOBS[j as usize]
 }
 
-static JOBS: [JobDef; 4] = [
+static JOBS: [JobDef; 8] = [
     JobDef {
         name: "Gardener",
-        yield_per_tick: (ResourceId::Catnip, 0.15),
+        yield_per_tick: Some((ResourceId::Catnip, 0.15)),
         gate: JobGate::Always,
     },
     JobDef {
         name: "Twig Collector",
-        yield_per_tick: (ResourceId::Twigs, 0.03),
+        yield_per_tick: Some((ResourceId::Twigs, 0.03)),
         gate: JobGate::Always,
     },
     JobDef {
         name: "Groomer",
-        yield_per_tick: (ResourceId::Fluff, 0.02),
+        yield_per_tick: Some((ResourceId::Fluff, 0.02)),
         gate: JobGate::Idea(IdeaId::GroomedToPurrfection),
     },
     JobDef {
         name: "Observer",
-        yield_per_tick: (ResourceId::Curiosity, 0.025),
+        yield_per_tick: Some((ResourceId::Curiosity, 0.025)),
         gate: JobGate::RequiresBox,
+    },
+    JobDef {
+        name: "Rummager",
+        yield_per_tick: Some((ResourceId::Pebbles, 0.02)),
+        gate: JobGate::Idea(IdeaId::CouchSpelunking),
+    },
+    JobDef {
+        name: "Pouncer",
+        yield_per_tick: Some((ResourceId::Pep, 0.06)),
+        gate: JobGate::Idea(IdeaId::PouncingPractice),
+    },
+    JobDef {
+        name: "Sunwarden",
+        yield_per_tick: Some((ResourceId::Warmth, 0.0015)),
+        gate: JobGate::Idea(IdeaId::SolarDevotion),
+    },
+    JobDef {
+        name: "Tinkerer",
+        yield_per_tick: None,
+        gate: JobGate::Idea(IdeaId::Toymaking),
     },
 ];
 
@@ -214,69 +755,608 @@ pub fn season_patch_modifier(season: Season, winter_eased: bool) -> f64 {
 pub struct IdeaDef {
     pub name: &'static str,
     pub blurb: &'static str,
+    /// Curiosity price.
     pub cost: f64,
-    pub prereq: Option<IdeaId>,
+    /// Gate-craft components spent together with the curiosity, all-or-
+    /// nothing. @spec SIM-CUR-007
+    pub gate: &'static [(ResourceId, f64)],
+    /// ALL prerequisites must be researched. @spec SIM-CUR-008
+    pub prereqs: &'static [IdeaId],
 }
+
+const IDEA: IdeaDef = IdeaDef { name: "", blurb: "", cost: 0.0, gate: &[], prereqs: &[] };
 
 // @spec SIM-CUR-005
 pub fn idea_def(i: IdeaId) -> &'static IdeaDef {
     &IDEAS[i as usize]
 }
 
-static IDEAS: [IdeaDef; 9] = [
+// Every entry ends in `..IDEA` — even the fully specified ones — so adding a
+// field to IdeaDef never forces 57 edits.
+#[allow(clippy::needless_update)]
+static IDEAS: [IdeaDef; IDEA_COUNT] = [
+    // ---- Band 0: curiosity only (the founding nine) ----
     IdeaDef {
         name: "Pantry Organization",
         blurb: "Stack the catnip. Label nothing. Unlocks the Pantry.",
         cost: 15.0,
-        prereq: None,
+        ..IDEA
     },
     IdeaDef {
         name: "The Scratching Arts",
         blurb: "An ancient discipline. Unlocks the Scratching Post.",
         cost: 25.0,
-        prereq: None,
+        ..IDEA
     },
     IdeaDef {
         name: "Groomed to Purrfection",
         blurb: "Mutual grooming, industrialized. Unlocks the Groomer job.",
         cost: 40.0,
-        prereq: Some(IdeaId::PantryOrganization),
+        prereqs: &[IdeaId::PantryOrganization],
+        ..IDEA
     },
     IdeaDef {
         name: "Twig Architecture",
         blurb: "Load-bearing twigs. Unlocks the Cat Tree and Twig Pile.",
         cost: 60.0,
-        prereq: Some(IdeaId::ScratchingArts),
+        prereqs: &[IdeaId::ScratchingArts],
+        ..IDEA
     },
     IdeaDef {
         name: "Selective Hearing",
         blurb: "You call, they consider. Gathering yields double.",
         cost: 80.0,
-        prereq: Some(IdeaId::PantryOrganization),
+        prereqs: &[IdeaId::PantryOrganization],
+        ..IDEA
     },
     IdeaDef {
         name: "Biscuit Making",
         blurb: "Rhythmic paw-kneading raises everyone's spirits. +10% happiness.",
         cost: 120.0,
-        prereq: Some(IdeaId::GroomedToPurrfection),
+        prereqs: &[IdeaId::GroomedToPurrfection],
+        ..IDEA
     },
     IdeaDef {
         name: "Seasonal Awareness",
         blurb: "Thick coats and forward planning. Softer winters, visible forecast.",
         cost: 150.0,
-        prereq: Some(IdeaId::TwigArchitecture),
+        prereqs: &[IdeaId::TwigArchitecture],
+        ..IDEA
     },
     IdeaDef {
         name: "Zoomie Channeling",
         blurb: "Harness the 3 a.m. energy. Zoomies run stronger and longer.",
         cost: 200.0,
-        prereq: Some(IdeaId::BiscuitMaking),
+        prereqs: &[IdeaId::BiscuitMaking],
+        ..IDEA
     },
     IdeaDef {
         name: "Neighborhood Watch",
         blurb: "Word gets around about this place. Kittens arrive more often.",
         cost: 250.0,
-        prereq: Some(IdeaId::SeasonalAwareness),
+        prereqs: &[IdeaId::SeasonalAwareness],
+        ..IDEA
+    },
+    // ---- Band 0, continued ----
+    IdeaDef {
+        name: "Couch Spelunking",
+        blurb: "The cushions hide worlds. Unlocks the Couch Mine, Rummaging, and the Rummager job.",
+        cost: 120.0,
+        prereqs: &[IdeaId::TwigArchitecture],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Horticulture",
+        blurb: "Rows, apparently, help. Unlocks the Herb Garden.",
+        cost: 180.0,
+        prereqs: &[IdeaId::CouchSpelunking],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Emberkeeping",
+        blurb: "A warm glow, carefully tended. Unlocks the Hearth.",
+        cost: 300.0,
+        prereqs: &[IdeaId::CouchSpelunking],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Notetaking",
+        blurb: "Scratches that mean things. Unlocks the Study Nook.",
+        cost: 350.0,
+        prereqs: &[IdeaId::Horticulture],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Cozy Carpentry",
+        blurb: "A sill, but structural. Unlocks the Window Perch.",
+        cost: 400.0,
+        prereqs: &[IdeaId::Emberkeeping],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Tinkering",
+        blurb: "Small paws, small parts. Unlocks the Craft Corner and the wand, tile, lattice, and cairn crafts.",
+        cost: 500.0,
+        prereqs: &[IdeaId::Notetaking],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Pack Rattery",
+        blurb: "Keep everything, beautifully. Unlocks the Shed and the badge craft.",
+        cost: 650.0,
+        prereqs: &[IdeaId::Tinkering],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Unicorn Lore",
+        blurb: "The old stories were load-bearing. Unlocks the Unicorn Meadow.",
+        cost: 750.0,
+        prereqs: &[IdeaId::Notetaking],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Oral Tradition",
+        blurb: "Tales told tail-to-tail. Unlocks the Story Circle, the quill craft, and charm.",
+        cost: 900.0,
+        prereqs: &[IdeaId::Tinkering],
+        ..IDEA
+    },
+    // ---- Band 1: curiosity + stories ----
+    IdeaDef {
+        name: "Gift Economy",
+        blurb: "Generosity, with a stall. Unlocks the Gift Stand and the trade surface.",
+        cost: 1100.0,
+        prereqs: &[IdeaId::OralTradition],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Storycraft",
+        blurb: "Editing, for cats. Unlocks the story craft itself.",
+        cost: 1200.0,
+        prereqs: &[IdeaId::OralTradition],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Sun Salutations",
+        blurb: "Greet the beam; the beam greets back. Unlocks the Sun Room and warmth.",
+        cost: 1500.0,
+        gate: &[(ResourceId::Stories, 5.0)],
+        prereqs: &[IdeaId::Storycraft],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Excavation",
+        blurb: "Dig with intent. Unlocks the Gravel Pit and the brass craft.",
+        cost: 1800.0,
+        gate: &[(ResourceId::Stories, 8.0)],
+        prereqs: &[IdeaId::Storycraft],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Cogwheels",
+        blurb: "Round things that turn other round things. Unlocks the Cogworks and the cog craft.",
+        cost: 2600.0,
+        gate: &[(ResourceId::Stories, 12.0)],
+        prereqs: &[IdeaId::Excavation],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Treat Alchemy",
+        blurb: "Transmute shinies into snacks. Unlocks the Treat Bakery.",
+        cost: 3200.0,
+        gate: &[(ResourceId::Stories, 15.0)],
+        prereqs: &[IdeaId::Excavation],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Tea Ceremonies",
+        blurb: "Steeped in decorum. Unlocks the Tea House and jamborees.",
+        cost: 3800.0,
+        gate: &[(ResourceId::Stories, 20.0)],
+        prereqs: &[IdeaId::SunSalutations],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Solar Devotion",
+        blurb: "Beyond basking lies belief. Unlocks the Sunbeam Altar, the Sunwarden job, and ceremonies.",
+        cost: 4500.0,
+        gate: &[(ResourceId::Stories, 25.0)],
+        prereqs: &[IdeaId::SunSalutations],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Sky Charts",
+        blurb: "The dots connect. Unlocks the Stargazing Ledge, sky events, and skymaps.",
+        cost: 5200.0,
+        gate: &[(ResourceId::Stories, 30.0)],
+        prereqs: &[IdeaId::Cogwheels],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Porch Logistics",
+        blurb: "Everything in its stack. Unlocks the Porch and the kite craft.",
+        cost: 6000.0,
+        gate: &[(ResourceId::Stories, 35.0)],
+        prereqs: &[IdeaId::SkyCharts],
+        ..IDEA
+    },
+    // ---- Band 2: curiosity + anthologies ----
+    IdeaDef {
+        name: "Anthology Binding",
+        blurb: "Stories, stitched into a spine. Unlocks the anthology craft.",
+        cost: 7000.0,
+        gate: &[(ResourceId::Stories, 40.0)],
+        prereqs: &[IdeaId::SkyCharts],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Dew Harvest",
+        blurb: "Morning, bottled. Unlocks the Dew Collector.",
+        cost: 8000.0,
+        gate: &[(ResourceId::Anthologies, 10.0)],
+        prereqs: &[IdeaId::AnthologyBinding],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Toymaking",
+        blurb: "Serious fun, seriously made. Unlocks the Toy Workshop and the Tinkerer job.",
+        cost: 10000.0,
+        gate: &[(ResourceId::Anthologies, 15.0)],
+        prereqs: &[IdeaId::AnthologyBinding],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Ceramic Arts",
+        blurb: "Mud, remembered by fire. Unlocks the Kiln.",
+        cost: 12000.0,
+        gate: &[(ResourceId::Anthologies, 20.0)],
+        prereqs: &[IdeaId::DewHarvest],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Deep Curiosity",
+        blurb: "Ask the question under the question. Unlocks the Whisker Lab.",
+        cost: 14000.0,
+        gate: &[(ResourceId::Anthologies, 25.0)],
+        prereqs: &[IdeaId::Toymaking],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Moonlight Arts",
+        blurb: "The night has an audience. Unlocks the Moonlight Stage.",
+        cost: 16000.0,
+        gate: &[(ResourceId::Anthologies, 30.0)],
+        prereqs: &[IdeaId::Toymaking],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Labyrinth Theory",
+        blurb: "Boxes within boxes, rigorously. Unlocks the Box Labyrinth.",
+        cost: 18000.0,
+        gate: &[(ResourceId::Anthologies, 35.0)],
+        prereqs: &[IdeaId::DeepCuriosity],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Grand Schemes",
+        blurb: "Plans with appendices. Unlocks the scheme craft.",
+        cost: 20000.0,
+        gate: &[(ResourceId::Anthologies, 40.0)],
+        prereqs: &[IdeaId::DeepCuriosity],
+        ..IDEA
+    },
+    // ---- Band 3: curiosity + schemes ----
+    IdeaDef {
+        name: "Dynamos",
+        blurb: "Spin dew into hum. Unlocks the Dynamo Wheel.",
+        cost: 25000.0,
+        gate: &[(ResourceId::Schemes, 8.0)],
+        prereqs: &[IdeaId::GrandSchemes],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Solar Basking",
+        blurb: "Lying down, but productive. Unlocks the Sunning Deck.",
+        cost: 28000.0,
+        gate: &[(ResourceId::Schemes, 10.0)],
+        prereqs: &[IdeaId::GrandSchemes],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Millworks",
+        blurb: "The stream was going that way anyway. Unlocks the Stream Wheel.",
+        cost: 32000.0,
+        gate: &[(ResourceId::Schemes, 12.0)],
+        prereqs: &[IdeaId::SolarBasking],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Moonmetallurgy",
+        blurb: "Alloys by lamplight. Unlocks the moonsteel and paver crafts.",
+        cost: 36000.0,
+        gate: &[(ResourceId::Schemes, 15.0)],
+        prereqs: &[IdeaId::Dynamos],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Starcatching",
+        blurb: "Hold a bowl very still. Unlocks the Star Basin and the cometsilk craft.",
+        cost: 42000.0,
+        gate: &[(ResourceId::Schemes, 20.0)],
+        prereqs: &[IdeaId::Moonmetallurgy],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Prism Craft",
+        blurb: "Bend light until it works. Unlocks the Prism Spinner.",
+        cost: 48000.0,
+        gate: &[(ResourceId::Schemes, 25.0)],
+        prereqs: &[IdeaId::Starcatching],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Balloon Craft",
+        blurb: "Logistics, but up. Unlocks the balloon craft.",
+        cost: 55000.0,
+        gate: &[(ResourceId::Schemes, 30.0)],
+        prereqs: &[IdeaId::Moonmetallurgy],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Yarn Computing",
+        blurb: "The string remembers. Unlocks the Yarn Computer.",
+        cost: 65000.0,
+        gate: &[(ResourceId::Schemes, 40.0)],
+        prereqs: &[IdeaId::Starcatching],
+        ..IDEA
+    },
+    // ---- Band 4: curiosity + mystic currencies (content lands waves 4–6) ----
+    IdeaDef {
+        name: "Parade Routes",
+        blurb: "Glitter needs an itinerary. Unlocks Unicorn Parades.",
+        cost: 30000.0,
+        gate: &[(ResourceId::Schemes, 15.0)],
+        prereqs: &[IdeaId::UnicornLore, IdeaId::GrandSchemes],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Pen Pal Networks",
+        blurb: "Letters between meadows. Unlocks Pen Pals.",
+        cost: 26000.0,
+        gate: &[(ResourceId::Schemes, 10.0)],
+        prereqs: &[IdeaId::GiftEconomy, IdeaId::GrandSchemes],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Scout Picnicking",
+        blurb: "Diplomacy by sandwich. Unlocks Scout Picnics.",
+        cost: 20000.0,
+        gate: &[(ResourceId::Schemes, 5.0)],
+        prereqs: &[IdeaId::GiftEconomy, IdeaId::GrandSchemes],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Dream Tending",
+        blurb: "Someone should water them. Unlocks the dreaming surface.",
+        cost: 90000.0,
+        gate: &[(ResourceId::Starshards, 3.0)],
+        prereqs: &[IdeaId::ParadeRoutes],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Night Court Etiquette",
+        blurb: "Bow, but sleepily. Unlocks Promises.",
+        cost: 150000.0,
+        gate: &[(ResourceId::Echoes, 5.0)],
+        prereqs: &[IdeaId::DreamTending],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Hushfelt Seeking",
+        blurb: "Listen for the softest quiet. Unlocks hushfelt sources.",
+        cost: 80000.0,
+        gate: &[(ResourceId::Echoes, 1.0)],
+        prereqs: &[IdeaId::YarnComputing],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Memory Weaving",
+        blurb: "Keep the good parts on purpose. Unlocks the Memory Chest.",
+        cost: 100000.0,
+        gate: &[(ResourceId::Starshards, 3.0)],
+        prereqs: &[IdeaId::HushfeltSeeking],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Skyward Longing",
+        blurb: "The meadow has an upstairs. Unlocks the cosmic surface and the moonmilk craft.",
+        cost: 90000.0,
+        gate: &[(ResourceId::Echoes, 2.0)],
+        prereqs: &[IdeaId::YarnComputing, IdeaId::PorchLogistics],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Dreamweaving",
+        blurb: "Fabric with a thread count of one nap. Unlocks the dreamweave craft.",
+        cost: 120000.0,
+        gate: &[(ResourceId::Echoes, 5.0)],
+        prereqs: &[IdeaId::MemoryWeaving],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Adventurous Spirit",
+        blurb: "What if, but bravely. Unlocks the adventures surface.",
+        cost: 40000.0,
+        gate: &[(ResourceId::Schemes, 20.0)],
+        prereqs: &[IdeaId::GrandSchemes],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Dream Loomcraft",
+        blurb: "Warp of wonder, weft of rest. Unlocks the Dream Loom.",
+        cost: 200000.0,
+        gate: &[(ResourceId::Starshards, 10.0)],
+        prereqs: &[IdeaId::MemoryWeaving],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Deep Nap Theory",
+        blurb: "Peer-reviewed drowsing. Unlocks the Deep Nap.",
+        cost: 300000.0,
+        gate: &[(ResourceId::Echoes, 10.0)],
+        prereqs: &[IdeaId::DreamLoomcraft],
+        ..IDEA
+    },
+    // ---- Band 0, appended late (ids never reorder) ----
+    IdeaDef {
+        name: "Pouncing Practice",
+        blurb: "Wiggle, then commit. Unlocks expeditions and the Pouncer job.",
+        cost: 200.0,
+        prereqs: &[IdeaId::PantryOrganization],
+        ..IDEA
+    },
+];
+
+// ---- Crafts ----
+
+/// One batch: spend `inputs`, gain 1 × (1 + craft-ratio effects) of the
+/// output. Locked until the granting idea. @spec SIM-ECO-033, SIM-ECO-034
+pub struct CraftDef {
+    pub name: &'static str,
+    pub inputs: &'static [(ResourceId, f64)],
+    pub gate: Option<IdeaId>,
+}
+
+pub fn craft_def(c: CraftId) -> &'static CraftDef {
+    &CRAFTS[c as usize]
+}
+
+/// The crafted resource each recipe outputs (1:1 with the RES table).
+pub fn craft_output(c: CraftId) -> ResourceId {
+    match c {
+        CraftId::Wands => ResourceId::Wands,
+        CraftId::Tiles => ResourceId::Tiles,
+        CraftId::Badges => ResourceId::Badges,
+        CraftId::Brass => ResourceId::Brass,
+        CraftId::Cogs => ResourceId::Cogs,
+        CraftId::Moonsteel => ResourceId::Moonsteel,
+        CraftId::Lattices => ResourceId::Lattices,
+        CraftId::Pavers => ResourceId::Pavers,
+        CraftId::Quills => ResourceId::Quills,
+        CraftId::Stories => ResourceId::Stories,
+        CraftId::Anthologies => ResourceId::Anthologies,
+        CraftId::Schemes => ResourceId::Schemes,
+        CraftId::Cairns => ResourceId::Cairns,
+        CraftId::Kites => ResourceId::Kites,
+        CraftId::Balloons => ResourceId::Balloons,
+        CraftId::Moonmilk => ResourceId::Moonmilk,
+        CraftId::Dreamweave => ResourceId::Dreamweave,
+        CraftId::Cometsilk => ResourceId::Cometsilk,
+    }
+}
+
+static CRAFTS: [CraftDef; 18] = [
+    CraftDef {
+        name: "Wands",
+        inputs: &[(ResourceId::Twigs, 15.0)],
+        gate: Some(IdeaId::Tinkering),
+    },
+    CraftDef {
+        name: "Tiles",
+        inputs: &[(ResourceId::Pebbles, 25.0)],
+        gate: Some(IdeaId::Tinkering),
+    },
+    CraftDef {
+        name: "Badges",
+        inputs: &[(ResourceId::Buttons, 12.0)],
+        gate: Some(IdeaId::PackRattery),
+    },
+    CraftDef {
+        name: "Brass",
+        inputs: &[(ResourceId::Buttons, 10.0), (ResourceId::Embers, 10.0)],
+        gate: Some(IdeaId::Excavation),
+    },
+    CraftDef {
+        name: "Cogs",
+        inputs: &[(ResourceId::Brass, 8.0)],
+        gate: Some(IdeaId::Cogwheels),
+    },
+    CraftDef {
+        name: "Moonsteel",
+        inputs: &[(ResourceId::Moonstone, 1.0), (ResourceId::Brass, 8.0)],
+        gate: Some(IdeaId::Moonmetallurgy),
+    },
+    CraftDef {
+        name: "Lattices",
+        inputs: &[(ResourceId::Wands, 5.0)],
+        gate: Some(IdeaId::Tinkering),
+    },
+    CraftDef {
+        name: "Pavers",
+        inputs: &[(ResourceId::Tiles, 250.0), (ResourceId::Brass, 3.0)],
+        gate: Some(IdeaId::Moonmetallurgy),
+    },
+    CraftDef {
+        name: "Quills",
+        inputs: &[(ResourceId::Feathers, 18.0)],
+        gate: Some(IdeaId::OralTradition),
+    },
+    CraftDef {
+        name: "Stories",
+        inputs: &[(ResourceId::Charm, 40.0), (ResourceId::Quills, 3.0)],
+        gate: Some(IdeaId::Storycraft),
+    },
+    CraftDef {
+        name: "Anthologies",
+        inputs: &[(ResourceId::Curiosity, 1000.0), (ResourceId::Stories, 5.0)],
+        gate: Some(IdeaId::AnthologyBinding),
+    },
+    CraftDef {
+        name: "Schemes",
+        inputs: &[(ResourceId::Curiosity, 2500.0), (ResourceId::Anthologies, 3.0)],
+        gate: Some(IdeaId::GrandSchemes),
+    },
+    CraftDef {
+        name: "Cairns",
+        inputs: &[
+            (ResourceId::Wands, 3.0),
+            (ResourceId::Tiles, 5.0),
+            (ResourceId::Badges, 1.0),
+        ],
+        gate: Some(IdeaId::Tinkering),
+    },
+    CraftDef {
+        name: "Kites",
+        inputs: &[
+            (ResourceId::Skymaps, 3.0),
+            (ResourceId::Badges, 15.0),
+            (ResourceId::Lattices, 10.0),
+        ],
+        gate: Some(IdeaId::PorchLogistics),
+    },
+    CraftDef {
+        name: "Balloons",
+        inputs: &[
+            (ResourceId::Moonsteel, 125.0),
+            (ResourceId::Kites, 20.0),
+            (ResourceId::Schemes, 1.0),
+        ],
+        gate: Some(IdeaId::BalloonCraft),
+    },
+    CraftDef {
+        name: "Moonmilk",
+        inputs: &[(ResourceId::Dew, 750.0)],
+        gate: Some(IdeaId::SkywardLonging),
+    },
+    CraftDef {
+        name: "Dreamweave",
+        inputs: &[(ResourceId::Hushfelt, 100.0), (ResourceId::Moonsteel, 250.0)],
+        gate: Some(IdeaId::Dreamweaving),
+    },
+    CraftDef {
+        name: "Cometsilk",
+        inputs: &[(ResourceId::Stardust, 25.0)],
+        gate: Some(IdeaId::Starcatching),
     },
 ];
 

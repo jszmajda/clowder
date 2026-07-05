@@ -313,35 +313,6 @@ fn structures_never_feel_moods_or_zoomies() {
     assert_eq!(base.stock(ResourceId::Catnip), zoomy.stock(ResourceId::Catnip));
 }
 
-// @spec SIM-ECO-024
-#[test]
-fn first_twenty_copies_of_everything_stay_reachable() {
-    // Max cap for each resource assuming its extender is also built out to 20.
-    let max_cap = |r: ResourceId| -> f64 {
-        let base = content::BASE_CAPS[r.ix()];
-        let bonus: f64 = StructureId::ALL
-            .iter()
-            .filter_map(|s| content::structure_def(*s).cap_bonus)
-            .filter(|(cr, _)| *cr == r)
-            .map(|(_, amt)| amt * 20.0)
-            .sum();
-        base + bonus
-    };
-    for st in StructureId::ALL {
-        let def = content::structure_def(st);
-        for k in 0..20u32 {
-            for (r, base) in def.base_costs {
-                let cost = (base * def.ratio.powi(k as i32)).ceil();
-                assert!(
-                    cost <= max_cap(*r),
-                    "{}: copy {} needs {} {:?}, max cap {}",
-                    def.name,
-                    k + 1,
-                    cost,
-                    r,
-                    max_cap(*r)
-                );
-            }
-        }
-    }
-}
+// SIM-ECO-024's reachability property moved to tests/economy_depth.rs, which
+// enforces the revised *banded* horizons (bands 0–2: 20 copies; band 3 and
+// declared walls: 5; band 4 and monuments: first copy).

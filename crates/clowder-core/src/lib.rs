@@ -22,6 +22,6 @@ pub use save::{
     OfflineReport, SAVE_VERSION,
 };
 pub use state::{
-    Availability, ContentId, GameState, IdeaId, JobId, Kitten, Location, MoodTier, ResourceId,
-    Season, StructureId,
+    Availability, ContentId, CraftId, GameState, IdeaId, JobId, Kitten, Location, MoodTier,
+    ResourceId, Season, StructureId,
 };
