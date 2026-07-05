@@ -50,7 +50,7 @@ Clowder targets **Kittens-Game-scale depth**: a dozen interlocking subsystems, e
 
 ## The Production Stack (normative order)
 
-Per-tick resource flow resolves in fixed multiplier layers, adapted from the inspiration's stack. Layers 4–8 apply only to **material** resources produced by *kitten jobs and autoproduction converters*; structure base production takes layers marked ☆. Transient currencies (§ Currency Tiers) skip every global layer.
+Per-tick resource flow resolves in fixed multiplier layers, adapted from the inspiration's stack. Layers 4–5 (mood, zoomies) apply to **all job outputs regardless of tier**; layers 6–8 apply only to **material-tier** flows. Structure base production takes layers marked ☆. Transient, luxury, mystic, and dreamtime resources skip layers 6–8 (§ Currency Tiers).
 
 1. **Base rate** — content-table flat rates × count (structures ☆) or × effective workers (jobs).
 2. **Per-source ratio** — additive `+X%` effect keys targeting that source (tool ladders, per-building boosts) ☆.
@@ -114,8 +114,8 @@ Commands apply only between ticks. Saturating arithmetic on all day counters.
 
 | Tier | Members (leaf that owns definitions) | Properties |
 |---|---|---|
-| Raw materials (capped) | catnip, twigs, pebbles, buttons, embers, shinies, dew, moonstone, stardust, hushfelt (economy) | full production stack; caps from structures |
-| Transient currencies (capped) | pep, curiosity, charm, warmth, skymaps (economy defines stocks; ceremonies/cosmic consume) | exempt from global multipliers (layers 6–8); each earned by its own subsystem |
+| Raw materials (capped) | catnip, twigs, fluff, pebbles, buttons, embers, shinies, dew, moonstone, stardust, hushfelt (economy) | full production stack; caps from structures |
+| Transient currencies | pep, curiosity, charm, warmth, skymaps (capped); cleverness (uncapped by design — the Yarn Computer's wit has no ceiling) | exempt from global multipliers (layers 6–8); each earned by its own subsystem |
 | Luxuries (uncapped, draining) | feathers, bells, mint (economy; expeditions/colonies supply) | per-kitten drain; each distinct stocked luxury = +10 happiness points |
 | Crafted goods (uncapped) | wands, tiles, badges, brass, cogs, moonsteel, lattices, pavers, quills, stories, anthologies, schemes, cairns, kites, balloons, moonmilk, dreamweave, cometsilk (economy) | made via crafting with craft-ratio bonus; gate currencies for research bands |
 | Mystic chain | unicorns, rainbows, prisms, starshards, echoes, dreamcorns, jars of purrs (mystic) | sink-chain with upgradeable exchange rates and event faucets |

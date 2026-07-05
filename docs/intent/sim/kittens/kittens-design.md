@@ -87,6 +87,7 @@ The wander threshold (3 days ≈ 7.5 real seconds per day of famine at live spee
 
 ### Deferred
 1. Kitten skills/experience per job — roadmap (sim sub-HLD).
+1a. Society-wave happiness obligations from the economy leaf: the +10-points-per-distinct-stocked-luxury term and the crowding-relief term crowding × (1 − limited_dr(0.048·StoryCircles + 0.075·MoonlightStages, 0.9)) enter the happiness formula when this leaf's society wave revises SIM-KIT-011.
 2. Whether crowding should ease with a later structure — decide with the housing tier of the crafting segment.
 
 ## References
