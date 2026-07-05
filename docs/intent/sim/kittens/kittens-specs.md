@@ -21,7 +21,7 @@
 
 ## Happiness & Mood
 
-- [x] **SIM-KIT-011**: The system shall compute happiness each tick (never storing it) as 100% − 3 points per Home kitten beyond the fifth + 5 points per Scratching Post + 1 point per loafing Home kitten (at most 5 such points) + 10 points where the happiness idea (SIM-CUR) is researched, floored at 25% with no upper cap.
+- [ ] **SIM-KIT-011**: The system shall compute happiness each tick (never storing it) as 100% − crowding + happiness-point effects + 1 point per loafing Home kitten (at most 5) + 10 points per distinct stocked luxury + 30 × (1 + jamboree-ratio effects) while a jamboree runs − the economy leaf's mess penalty, floored at 25% with no upper cap — where crowding = 3 points per Home kitten beyond the fifth × (1 − limited_dr(0.048 × Story Circles + 0.075 × Moonlight Stages, 0.9)).
 - [x] **SIM-KIT-012**: The system shall apply a mood multiplier of happiness/100 to job production, further multiplied by 0.25 while the clowder is Grumpy.
 - [x] **SIM-KIT-013**: While the most recent consumption phase was a shortfall (SIM-ECO: pooled demand exceeded stock), the clowder shall be Grumpy; Grumpiness clears on the first tick whose consumption phase was not a shortfall.
 - [x] **SIM-KIT-014**: The system shall classify mood into tiers — Blissful (happiness ≥ 120), Content (≥ 90), Restless (≥ 60), Fussy (< 60) — with Grumpy overriding all tiers while active.
@@ -32,3 +32,15 @@
 - [x] **SIM-KIT-016**: At each day close where famine_days is at least 3 (including the close where it reaches 3), the system shall move the most recently arrived Home kitten to NeighborsYard, stamp its away_seq, and emit a KittenWanderedOff event — unless it is the only kitten at Home: the last Home kitten never wanders.
 - [x] **SIM-KIT-017**: At each day close where recovery_days is at least 1, catnip stock is above zero, and any kitten is at NeighborsYard, the system shall return the kitten with the lowest away_seq (an absent stamp sorting lowest) to Home, clear its away_seq, and emit a KittenReturned event.
 - [x] **SIM-KIT-018**: The system shall update the famine and recovery clocks from the engine's persisted shortfall flag (the Grumpy bit as it stood at the end of the previous tick), not from a fresh reading of the stock.
+
+## Society: Skills, Ranks, the Elder, Jamborees
+
+- [ ] **SIM-KIT-019**: While a kitten is Home and employed, the system shall add 0.01 × (1 + skill-XP effects) skill XP per tick to its current job's skill and the same amount to its lifetime exp pool; every other job's skill shall decay 0.001 per tick (floor 0) unless the decay-removing refinement (SIM-CUR) is owned.
+- [ ] **SIM-KIT-020**: The system shall multiply each kitten's own job yield by its skill tier: +0% below 100 XP, +1.25% at 100, +2.5% at 500, +4.5% at 1200, +7.5% at 2500, +12.5% at 5000, +18.75% at 9000, resolving production per kitten in roster order.
+- [ ] **SIM-KIT-021**: When Promote(kitten) is applied with 500 × 1.75^rank exp in that kitten's pool and 25 × (rank+1) shinies in stock, the system shall spend both and increment the kitten's rank; otherwise it rejects with InsufficientResources.
+- [ ] **SIM-KIT-022**: When AppointElder(kitten) is applied, the system shall make that kitten the Elder (replacing any prior Elder; the game never removes one itself); the Elder's own-job yield is multiplied by max(1, (rank+1)/1.4).
+- [ ] **SIM-KIT-023**: When a kitten arrives, the system shall roll its trait uniformly over the eight traits (one RNG draw, after the name draw in the fixed schedule); a trait's clowder-wide effect applies only while that kitten is the Elder.
+- [ ] **SIM-KIT-024**: The system shall apply Elder trait effects exactly as the kittens design's trait list specifies (Crafty, Brassy, Alchemical, Charming, Bold, Curious, Serene, None), through the effect-key system.
+- [ ] **SIM-KIT-025**: When HostJamboree is applied with 800 pep, 1500 charm, and 40 quills affordable and no jamboree running, the system shall spend them and run a jamboree for 100 days: +30 × (1 + jamboree-ratio effects) happiness points, arrival chance × (2 + jamboree-arrival effects), luxury drain ×1.2; hosting during a jamboree rejects with Locked.
+- [ ] **SIM-KIT-026**: While a Tinkerer's assigned recipe tier exceeds its rank, the system shall reduce that Tinkerer's crafting effectiveness by 15% per tier above rank, floored at 25%.
+- [ ] **SIM-KIT-027**: Skill XP, exp pools, ranks, and traits shall persist in the save and never decrease except by the specified decay and promotion spends (no mechanic confiscates a kitten's learning).

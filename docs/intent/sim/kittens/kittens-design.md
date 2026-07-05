@@ -21,6 +21,10 @@ pub struct Kitten {
     pub arrived_day: u64,
     pub job_seq: Option<u64>,  // stamp from the state's monotone counter at assignment
     pub away_seq: Option<u64>, // stamp at departure; cleared on return
+    pub skills: [f64; 8],      // per-job skill XP, JobId-indexed (serde zero-fills)
+    pub exp: f64,              // lifetime pool, spent on promotions
+    pub rank: u8,              // promoted with exp + shinies
+    pub trait_id: KittenTrait, // rolled at arrival; active only while Elder
 }
 ```
 
@@ -44,16 +48,32 @@ Assignment is by count, targeted at individuals: `AssignJob(job)` puts the **mos
 
 Effective workers per job = count of Home kittens holding that job. Away kittens keep their job title but don't count (they're not here).
 
+
+## Skills, Ranks, and the Elder
+
+**Skills.** A working Home kitten gains 0.01 skill XP/tick in its current job × (1 + skill-XP effects), mirrored into its lifetime `exp` pool; every *other* job's skill decays 0.001/tick (floor 0) — switching jobs means retraining, specialization is rewarded (a refinement later removes the decay). Skill tiers multiply that kitten's own yield: <100 +0%, ≥100 +1.25%, ≥500 +2.5%, ≥1200 +4.5%, ≥2500 +7.5%, ≥5000 +12.5%, ≥9000 +18.75%. Production therefore resolves per kitten, in roster order (determinism).
+
+**Ranks.** `Promote(kitten_index)` spends 500 × 1.75^rank exp (from that kitten's pool) plus 25 × (rank+1) shinies, incrementing `rank`. Rank scales the Elder's leadership and a Tinkerer's ability to work high-tier recipes without penalty (each tier above rank: −15% effectiveness, floor 25%).
+
+**The Elder.** `AppointElder(kitten_index)` names one kitten (replaceable anytime, never removable by the game). The Elder's own-job yield ×(rank+1)/1.4 (min ×1.0), and its birth trait activates clowder-wide: Crafty +5% craft ratio; Brassy +10% metal crafts (badges/brass/cogs/moonsteel); Alchemical +7.5% process crafts (pavers/moonmilk/dreamweave/cometsilk); Charming +3% trade ratio; Bold +0.5 pounce ratio; Curious −5% idea curiosity costs; Serene −9% rite costs; None — nothing (some cats simply are). Traits are rolled uniformly at arrival (one RNG draw after the name draw, appended to the fixed schedule).
+
+## Jamborees
+
+`HostJamboree` spends 800 pep + 1500 charm + 40 quills and sets a 100-day (one game year) jamboree: +30 happiness points × (1 + jamboree-ratio effects), arrival chance × (2 + jamboree-arrival effects), luxury drain ×1.2 (celebrations consume). One jamboree at a time (no stacking until the relevant Tradition); hosting while one runs extends nothing and is rejected as AlreadyResearched? No — rejected with Locked (not currently hostable). Ends silently; the shell may celebrate.
+
 ## Happiness (Mood)
 
 Recomputed each tick (derived, never stored):
 
 ```
 happiness = 100%
-          − 3% × max(0, home_kittens − 5)        (crowding, felt past the 5th kitten)
-          + 5% × scratching_posts
+          − 3% × max(0, home_kittens − 5)
+                × (1 − limited_dr(0.048·StoryCircles + 0.075·MoonlightStages, 0.9))
+          + happiness-point effects (posts, hearths, biscuit idea, altars' rites later)
           + 1% × min(loafers, 5)                  (a loafing cat improves any room)
-          + 10% if the biscuit-making idea is researched
+          + 10% per distinct stocked luxury (feathers, bells, mint — dust guard applies)
+          + 30% × (1 + jamboree ratio) while a jamboree runs
+          − mess penalty (economy leaf, level ≥ 2)
 ```
 
 Floor at 25%, no upper cap. The **mood multiplier** applied to job production is `happiness / 100`, ×0.25 while the clowder is Grumpy (below). Structures are never mood-affected.

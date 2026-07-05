@@ -103,6 +103,64 @@ The DAG must stay acyclic and every idea reachable (property-tested). Refinement
 
 Research is a command (`ResearchIdea`): full-cost spend, all-or-nothing, rejected with `Locked` when prerequisites are missing and `AlreadyResearched` when owned. Completed ideas emit `IdeaResearched` and are permanent — ideas are never lost or disabled (cozy invariant: no confiscation).
 
+
+## Refinements
+
+Purchasable one-time improvements (`BuyRefinement`), priced in curiosity + materials, gated by ideas, each contributing effect-key values. Ladders stack additively on one key — constant small wins with escalating materials. The table is normative (35 refinements); costs are (curiosity, materials):
+
+| # | Refinement | Cost | Gate | Effect |
+|---|---|---|---|---|
+| 0 | Pebble Combs | 100c, 275 pebbles | CouchSpelunking | Gardener +50% |
+| 1 | Button Combs | 200c, 25 buttons | Emberkeeping | Gardener +30% |
+| 2 | Brass Combs | 5000c, 75 brass | Cogwheels | Gardener +50% |
+| 3 | Moonsteel Combs | 38000c, 10 moonsteel | Moonmetallurgy | Gardener +50% |
+| 4 | Pebble Snips | 100c, 500 pebbles | CouchSpelunking | TwigCollector +70% |
+| 5 | Button Shears | 200c, 50 buttons | Emberkeeping | TwigCollector +50% |
+| 6 | Brass Clippers | 20000c, 75 brass | Cogwheels | TwigCollector +50% |
+| 7 | Moonsteel Pruners | 38000c, 10 moonsteel | Moonmetallurgy | TwigCollector +50% |
+| 8 | Deep Pockets | 1000c, 50 buttons | PackRattery | Rummager +50% |
+| 9 | Sorting Claws | 15000c, 25 brass | Excavation | Rummager +50% |
+| 10 | Bolas of Yarn | 1000c, 50 twigs + 250 pebbles | PouncingPractice | pounce ratio +1 |
+| 11 | Pounce Pads | 2000c, 750 buttons | Emberkeeping | pounce ratio +2 |
+| 12 | Whisker Guards | 10000c, 50 brass | Cogwheels | pounce ratio +0.5 |
+| 13 | Moonsteel Mittens | 50000c, 25 moonsteel | Moonmetallurgy | pounce ratio +0.5 |
+| 14 | Deep Shelves | 500c, 1000 twigs + 750 pebbles + 50 buttons | PackRattery | +100 twig cap, +150 pebble cap |
+| 15 | Stacked Crates | 800c, 25 wands + 10 tiles | PackRattery | +100 twig cap, +150 pebble cap, +25 button cap |
+| 16 | Labeled Jars | 60000c, 25 moonstone + 200 brass | Moonmetallurgy | +50 button cap, +30 ember cap, +10 moonstone cap |
+| 17 | Catnip Cellars | 50000c, 125 brass + 5 schemes | Dynamos | Pantries also hold +125 catnip each |
+| 18 | Bigger Baskets | 15000c, 50 badges + 25 brass | Cogwheels | +200 pebble cap, +50 button cap |
+| 19 | Bellows | 5000c, 35 wands + 2000 pebbles | Emberkeeping | Hearth embers +0.002/t |
+| 20 | Ember Beds | 35000c, 5 anthologies | CeramicArts | Hearth embers +0.003/t |
+| 21 | Story Press | 7500c, 45 cogs | Cogwheels | Cogworks +0.005 stories/t each |
+| 22 | Better Bindings | 25000c, 5 anthologies | AnthologyBinding | Stories/Anthologies/Schemes craft +25% |
+| 23 | Field Notes | 250c, 100 pebbles | Notetaking | Observer +30% |
+| 24 | Star Diaries | 20000c, 5 kites | SkyCharts | sky-event chance ×2 |
+| 25 | Patient Eyes | 25000c, 10 kites | SkyCharts | auto-observe chance ×2 |
+| 26 | Tidy-Up Rota | 10000c, 15 stories | Toymaking | Toy Workshop mess 2 → −2 |
+| 27 | Group Lessons | 45000c, 10 anthologies | DeepCuriosity | skill decay removed |
+| 28 | Encouraging Mews | 20000c, 5 anthologies | Toymaking | skill XP +50% |
+| 29 | Nimble Paws | 30000c, 10 cogs + 5 anthologies | Toymaking | Tinkerer speed +100% |
+| 30 | Patient Paws | 75000c, 10 schemes | Dynamos | Tinkerer speed +100% |
+| 31 | Clockwork Paws | 150000c, 25 schemes | YarnComputing | Tinkerer speed +200% |
+| 32 | Warm Welcome Mat | 4000c, 20 stories | TeaCeremonies | arrival chance +5% (inside the cap) |
+| 33 | Thicker Blankets | 8000c, 50 quills | TeaCeremonies | +1 happiness point per Hearth |
+| 34 | Dew Funnels | 30000c, 40 lattices | DewHarvest | Dew Collector +50% |
+
+
+
+## House Rules
+
+Mutually exclusive pairs, charm-priced (`AdoptRule`), each permanently blocking its sibling for the current meadow (a Great Meadow Move clears adopted rules — a new meadow, new habits):
+
+| Pair | Cost | A | B |
+|---|---|---|---|
+| 0/1 | 150 charm | **Early Birds**: catnip production +10% | **Night Owls**: curiosity production +10% |
+| 2/3 | 1500 charm | **Open Meadow**: arrival chance +10% (inside cap) | **Cozy Burrows**: +5 happiness points |
+| 4/5 | 4000 charm | **Sharing Circle**: luxury drain −25% | **Personal Stashes**: all caps +10% |
+| 6/7 | 15000 charm | **Loud Purring**: charm production +20% | **Quiet Contemplation**: warmth production +20% |
+
+Adopting a rule whose sibling is adopted rejects with Locked. Rules are effect-key sources like everything else.
+
 ## Effect Plumbing
 
 Effects are **flags and modifier values exposed by pure lookup** (`ideas.has(IdeaId)` and derived modifier accessors), consumed inside the owning leaf's math. This leaf never mutates other leaves' state; researching an idea changes *lookups*, not stocks or rosters. In v1 every idea touches its own distinct knob, so no composition question arises; if future ideas ever share a knob, the owning leaf's formula must state the composition explicitly at that knob (rates compose multiplicatively, percentage-point bonuses sum) rather than relying on a global rule.

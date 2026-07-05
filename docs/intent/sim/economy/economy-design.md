@@ -73,13 +73,13 @@ Cost of copy k+1 = `ceil(base × ratio^k)` per component. Reveal fraction 30% un
 | # | Structure | Base cost | Ratio | Effects | Gate |
 |---|---|---|---|---|---|
 | 0 | Catnip Patch | 10 catnip | 1.12 | +0.125 catnip/t, seasonal | — |
-| 1 | Cozy Cushion | 25 catnip, 5 twigs | 1.15 | houses 1 | — |
+| 1 | Cozy Cushion | 25 catnip, 5 twigs | 1.15 | houses 1; +25 pep cap | — |
 | 2 | Cardboard Box | 8 twigs | 1.15 | +50 curiosity cap; +0.005 curiosity/t | — |
 | 3 | Pantry | 20 twigs | 1.15 | +250 catnip cap | PantryOrganization |
 | 4 | Twig Pile | 50 catnip, 10 twigs | 1.15 | +40 twig cap | TwigArchitecture |
 | 5 | Scratching Post | 15 twigs, 5 fluff | 1.15 | +5 happiness pts | ScratchingArts |
-| 6 | Cat Tree | 30 twigs, 10 fluff | 1.15 | houses 3; +10 fluff cap | TwigArchitecture |
-| 7 | Window Perch | 40 catnip, 8 twigs | 1.15 | houses 1; +0.001 curiosity/t | CozyCarpentry |
+| 6 | Cat Tree | 30 twigs, 10 fluff | 1.15 | houses 3; +10 fluff cap; +75 pep cap | TwigArchitecture |
+| 7 | Window Perch | 40 catnip, 8 twigs | 1.15 | houses 1; +0.001 curiosity/t; +25 pep cap | CozyCarpentry |
 | 8 | Herb Garden | 60 pebbles | 1.12 | catnip production +3%/bld | Horticulture |
 | 9 | Couch Mine | 90 twigs | 1.15 | +0.01 pebbles/t; pebble production +20%/bld | CouchSpelunking |
 | 10 | Gravel Pit | 80 tiles, 15 brass | 1.15 | pebble production +35%/bld; +0.004 embers/t; mess 0.25 | Excavation |
@@ -137,6 +137,8 @@ No staged rebuilds in this pass: every structure is its own entry (see Decisions
 | Moonmilk | 750 dew |
 | Dreamweave | 100 hushfelt + 250 moonsteel |
 | Cometsilk | 25 stardust |
+
+Each recipe carries a **tier** for Tinkerer work (KIT-026's rank comparison): tier 1 — Wands, Tiles, Badges, Quills, Cairns; tier 2 — Brass, Lattices, Stories; tier 3 — Cogs, Pavers, Anthologies, Kites; tier 4 — Moonsteel, Schemes, Moonmilk; tier 5 — Balloons, Dreamweave, Cometsilk.
 
 Craft unlocks ride the idea tree (a craft is `Locked` until its granting idea). Gate-currency pattern: stories (band 1), anthologies (band 2), schemes (band 3) enter idea costs — since anthologies/schemes cost *stocked curiosity*, curiosity **storage** becomes the real research gate, forcing the Ledge/Lab/Labyrinth loop. Tinkerer background crafting (kittens leaf, wave 3) consumes these same recipes.
 

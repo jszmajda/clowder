@@ -20,3 +20,9 @@
 - [x] **SIM-CUR-007**: When an idea's cost includes a gate craft (stories, anthologies, schemes, starshards, echoes), ResearchIdea shall spend curiosity and the gate components together, all-or-nothing, under the same epsilon-tolerant affordability rule.
 - [x] **SIM-CUR-008**: The idea prerequisite graph shall be acyclic with every idea reachable from the roots (property-tested), and an idea listing multiple prerequisites shall require all of them.
 - [x] **SIM-CUR-009**: The system shall expose idea-granted unlocks (structures, crafts, manual actions, jobs, and subsystem surfaces) as pure lookups consumed by the owning leaves, exactly as the tree tables assign them.
+
+## Depth: Refinements & House Rules
+
+- [ ] **SIM-CUR-010**: The system shall define exactly the refinements of the curiosity design's Refinements table (35, append-only ids), purchasable once each via BuyRefinement with curiosity + material costs spent all-or-nothing, gated by their ideas (Locked before), contributing their tabled effects permanently.
+- [ ] **SIM-CUR-011**: The system shall define the four House Rule pairs per the design table; AdoptRule spends charm all-or-nothing, permanently blocks the sibling rule for the current meadow (Locked), and both adoption and blocking survive save/load.
+- [ ] **SIM-CUR-012**: Refinement and house-rule effects shall flow through the typed effect-key system like every other source, in the engine's fixed source order.
