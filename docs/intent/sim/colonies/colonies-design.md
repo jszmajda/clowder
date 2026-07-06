@@ -38,7 +38,7 @@ Foxes' moonstone (the inspiration's ship-scaled titanium): chance `0.15 + 0.0035
 
 ## Standing & Shyness
 
-`standing = start + Σ standing effects (Pen Pals, Gift Stands, the Charming Elder)`. Below zero (shy): the colony can only warm to neutral, and each caravan has a nap chance proportional to −standing. At zero: neutral, base chances. Above zero (warm): a bonus-trade chance proportional to standing. A nap is never punished beyond the caravan's cost — colonies are shy, not hostile.
+`standing = start + Σ standing effects (Pen Pal levels, and any dedicated per-colony standing effects)`. The Charming Elder and Gift Stands raise the *trade ratio* (yield), not standing — distinct knobs. Below zero (shy): the colony can only warm to neutral, and each caravan has a nap chance proportional to −standing. At zero: neutral, base chances. Above zero (warm): a bonus-trade chance proportional to standing. A nap is never punished beyond the caravan's cost — colonies are shy, not hostile.
 
 ## Pen Pals
 

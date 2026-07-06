@@ -4,12 +4,12 @@
 
 - [ ] **SIM-TRADE-001**: When Trade(colony, count) is applied for a discovered colony with count ≥ 1 and 50 pep + 15 shinies + the colony's buy-resource affordable per caravan, the system shall spend those inputs per caravan and resolve each caravan's outcome; an undiscovered colony rejects with Locked and an unaffordable trade with InsufficientResources.
 - [ ] **SIM-TRADE-002**: For each caravan, the system shall roll success against standing (nap chance proportional to −standing while shy; bonus-trade chance proportional to standing while warm), yielding on success the colony's sell basket × (1 + trade-ratio effects) × (1 + in-season bonus), or on a nap only the caravan's cost with a possible courtesy gift; a bonus outcome yields ×1.25.
-- [ ] **SIM-TRADE-003**: The system shall define exactly the eight colonies of the colonies design's table — start standings, buy resources, and sell baskets with amounts, chances, and best-season bonuses.
+- [ ] **SIM-TRADE-003**: The system shall define exactly the seven tradeable colonies of the colonies design's table — start standings, buy resources, and sell baskets with amounts, chances, and best-season bonuses; the Star Whale (colony 7) reserves a visitor slot only, its basket deferred [D] to the cosmic wave.
 - [ ] **SIM-TRADE-004**: The system shall scale Foxes' moonstone by Kites: chance 0.15 + 0.0035 × Kites, amount (1.5 + 0.03 × Kites) × (1 + fox standing bonus).
 
 ## Standing & Pen Pals
 
-- [ ] **SIM-TRADE-005**: The system shall compute a colony's standing as its start value plus the summed standing effects (Pen Pals, Gift Stands, the Charming Elder); a shy colony (negative standing) shall only ever warm toward neutral and never become an enemy.
+- [ ] **SIM-TRADE-005**: The system shall compute a colony's standing as its start value plus its Pen Pal contribution plus any dedicated per-colony standing effects (the Charming Elder and Gift Stands raise trade ratio, a separate knob); a shy colony (negative standing) shall only ever warm toward neutral and never become an enemy.
 - [ ] **SIM-TRADE-006**: When SendPenPal(colony) is applied with charm base × 1.15^level affordable, the system shall spend the charm and raise the colony's Pen Pal level, adding +1% non-guaranteed success chance per level (soft-capped at +75%) and raising its minimum-level goods; Star Whales accept no Pen Pals.
 
 ## Discovery

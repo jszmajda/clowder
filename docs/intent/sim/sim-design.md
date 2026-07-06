@@ -57,7 +57,7 @@ Per-tick resource flow resolves in fixed multiplier layers, adapted from the ins
 3. **Season/weather** — seasonal modifier where the source is marked seasonal ☆ (catnip patches; weather adds ±0.15 to the seasonal band from year 4).
 4. **Mood** — happiness multiplier × Grumpy ×0.25 (jobs only).
 5. **Zoomies** — ×1.25/×1.5 while active (jobs only).
-6. **Global production ratios** — Dynamo Wheel (+2%/active, amplified by Cogworks), Star Basin (+5%/active).
+6. **Global production ratios** — Dynamo Wheel (+2%/active, amplified by Cogworks), Star Basin (+5%/active). Layers 6–8 apply to **all raw-tier material production** — structures and converters as well as jobs — so the Long Sun and global boosts actually move the late game, whose materials come mostly from structures.
 7. **Elder Wisdom** — +1%/point, LimitedDR-capped at +200% (× Nine Lives tradition ratio); Passed-Down Wisdom adds a second capped pool.
 8. **The Long Sun** — ceremonies' devotion bonus: `LDR(UDR(devotion, 1000)/100, cap)`, cap 10 base, extendable by Enlightenment-tier content.
 9. **Mess & energy** — mess level multiplies catnip growth down (floor ×0.25) and slows arrivals; an energy deficit multiplies layers 6–8's *effects* by `produced/consumed` floored at 0.25. Surplus energy is separately rewarded where content says so (e.g., Moonlight Stage).
@@ -87,7 +87,7 @@ enum Effect {
 }
 ```
 
-Sources of effect values: structures (× count), refinements, ideas, house rules, rites, arch upgrades, traditions, colony standing, adventure rewards, the Elder's trait. The engine exposes `effects(state, key) -> f64` summing all sources in a fixed order; leaves own *which* keys their content emits and *where* each key is consumed. Rejected alternatives are recorded in Decisions & Alternatives.
+Sources of effect values: structures (× count), refinements, ideas, house rules, rites, arch upgrades, traditions, colony standing, adventure rewards, the Elder's trait. The wonder wave adds effect-key variants — `MaxCapRatio(ResourceId)` (per-resource cap %, folded into `cap()` as `(base + MaxCap) × (1 + CapRatio + MaxCapRatio)`), `PrismDescentChance`, `RainbowShowerChance`, `UnicornsRatio`, `StarshardRefine`/`EchoRefine`, `ParadeRatio`, `StandingFor(ColonyId)`, `TradeRatio` (already present), and the per-Altar rite outputs via `StructureOutputAdd` — and new persisted state (devotion, serenity + a monotone peak-devotion, enlightenment_tier, dream_drift, rites-bought/arch-bought sorted sets, Promises with quiet-flags, per-colony pen-pal levels + discovered set). All serde-default, BTree/sorted for determinism, appended to the save (v2 zero-fills). The engine exposes `effects(state, key) -> f64` summing all sources in a fixed order; leaves own *which* keys their content emits and *where* each key is consumed. Rejected alternatives are recorded in Decisions & Alternatives.
 
 ## Storage-Cap Gating (pacing philosophy)
 

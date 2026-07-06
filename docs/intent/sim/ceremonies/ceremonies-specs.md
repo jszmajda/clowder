@@ -12,10 +12,10 @@
 
 ## Rites
 
-- [ ] **SIM-SUN-005**: The system shall define exactly the eleven Sunbeam Rites of the ceremonies design's ladder — warmth+shinies costs, devotion gates, and effects — each unlockable once devotion has ever reached its gate and buyable via BuyRite (Locked before the gate, InsufficientResources when unaffordable).
+- [ ] **SIM-SUN-005**: The system shall define exactly the eleven Sunbeam Rites of the ceremonies design's ladder — warmth+shinies costs, devotion gates, and effects — each unlockable once devotion's persisted high-water has ever reached its gate (so a Reverie that resets live devotion never re-locks a rite) and buyable via BuyRite (Locked before the gate, InsufficientResources when unaffordable).
 - [ ] **SIM-SUN-006**: While the Enlightenment rite is bought, the system shall make rites 0–7 re-buyable with a ×2.5 price ramp per additional copy, their effects stacking; rites 5, 8, 9, and 10 shall remain single-purchase.
 - [ ] **SIM-SUN-007**: The system shall apply every rite's effect through the typed effect-key system, in the engine's fixed source order; no rite effect shall ever be removed or disabled once bought.
 
 ## Enlightenment
 
-- [ ] **SIM-SUN-008**: When Enlighten is applied with enough serenity for the next tier (total_cost(t) = inverse_unlimited_dr(e^t / 10, 0.1)), the system shall spend the serenity cost and increment the enlightenment tier, raising the Long Sun cap and the Reverie conversion square; otherwise it rejects with InsufficientResources.
+- [ ] **SIM-SUN-008**: When Enlighten is applied with enough serenity for the next tier, the system shall spend the marginal cost total_cost(t) − total_cost(t−1) (where total_cost(t) = inverse_unlimited_dr(e^t / 10, 0.1)) and increment the enlightenment tier, raising the Long Sun cap and the Reverie conversion square; otherwise it rejects with InsufficientResources.

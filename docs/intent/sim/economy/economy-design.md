@@ -95,7 +95,7 @@ Cost of copy k+1 = `ceil(base × ratio^k)` per component. Reveal fraction 30% un
 | 20 | Gift Stand | 400 twigs, 150 pebbles, 8 shinies | 1.15 | trade ratio +1.5%/bld; luxury demand −4%/bld | GiftEconomy |
 | 21 | Story Circle | 160 twigs, 900 pebbles, 3 quills | 1.15 | crowding relief 0.048/bld (pooled with Stages, LDR cap 0.9 — kittens leaf consumes); +0.005 charm/t; +40 charm cap | OralTradition |
 | 22 | Sun Room | 1600 pebbles, 200 charm, 200 quills | 1.15 | +0.04 charm/t; +0.004 warmth/t; +75 warmth cap; +60 charm cap (a sunny room invites conversation) | SunSalutations |
-| 23 | Sunbeam Altar | 40 shinies, 20 tiles, 12 badges, 8 stories | 1.15 | +0.08 charm/t; +120 warmth cap; +100 charm cap; hosts Rites (ceremonies leaf) | SolarDevotion |
+| 23 | Sunbeam Altar | 40 shinies, 20 tiles, 12 badges, 8 stories | 1.15 | +0.08 charm/t; +120 warmth cap; +100 charm cap; +100 shinies cap (offerings collect); hosts Rites (ceremonies leaf) | SolarDevotion |
 | 24 | Treat Bakery | 4000 pebbles, 150 shinies, 150 badges | 1.15 | converter −0.004 shinies −0.6 pep → feathers ×1.25·mpr, bells ×0.3·mpr where mpr = pep_cap × 0.007/100 | TreatAlchemy |
 | 25 | Tea House | 800 twigs, 600 charm, 4 mint, 300 quills | 1.5 | jamboree ratio +1%/bld; jamboree arrival +0.1%/bld | TeaCeremonies |
 | 26 | Dew Collector | 40 brass, 20 cogs, 20 lattices | 1.15 | +0.02 dew/t; +1200 dew cap | DewHarvest |
@@ -110,7 +110,7 @@ Cost of copy k+1 = `ceil(base × ratio^k)` per component. Reveal fraction 30% un
 | 35 | Memory Chest | 700 hushfelt, 60000 curiosity, 1 starshard, 25 schemes | 1.25 | Move carryover +1.5%/bld; déjà-vu chance +1%/season; energy −20 | MemoryWeaving |
 | 36 | Yarn Computer | 30 stardust, 60000 curiosity | 1.15 | +0.02 cleverness/t; energy −(2·n + n²/2) total at n copies | YarnComputing |
 | 37 | Unicorn Meadow | 2 unicorns | 1.75 | +0.001 unicorns/t (mystic leaf multiplies) | UnicornLore |
-| 38 | Rainbow Arch | 5000 rainbows, 25 cairns | 1.15 | count is the Parade exchange rate; hosts Arch upgrades; +prism-descent chance (mystic leaf consumes) | ParadeRoutes |
+| 38 | Rainbow Arch | 5000 rainbows, 25 cairns | 1.15 | count is the Parade exchange rate; hosts Arch upgrades; +0.02%/day prism-descent chance each (mystic leaf consumes); first copy granted free with the Parade Routes idea | ParadeRoutes |
 | 39 | Sunstone | 8 moonstone, 50 cairns, 1 echo | 1.15 | Long Sun cap +0.05 per enlightenment tier each (ceremonies leaf consumes); energy −1 | LongSunMasonry |
 
 No staged rebuilds in this pass: every structure is its own entry (see Decisions). Structures 38–39 are cross-leaf: they live in this table (the economy owns the StructureId space, costs, and ramps) but their effects are defined and consumed by the mystic and ceremonies leaves respectively — the same split as the Sunbeam Altar hosting Rites.

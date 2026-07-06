@@ -15,9 +15,9 @@ The mystic leaf is the unicorn economy and everything glittering that follows fr
 |---|---|---|
 | **unicorns** | Unicorn Meadow (economy, +0.001/t × mystic multipliers), Pounces | held for Parades; Meadow production is multiplied by this leaf's `unicornsRatio` effects |
 | **rainbows** | **Parade** (`HoldParade`): 2500 unicorns → rainbows × (Rainbow Arches built) | buy Arch upgrades |
-| **prisms** | rare descents (day-boundary event, chance from Arch tier) | refined into starshards; or drift into dreams |
+| **prisms** | rare descents (day-boundary event; base chance from each Rainbow Arch *structure* plus Arch *upgrades*) | refined into starshards; or drift into dreams |
 | **starshards** | **refine** 25 prisms → 1 starshard × (1 + shard_refine) | dreamtime currency (skips), gate craft for high research |
-| **echoes** | refine 25 starshards → 1 echo × (1 + echo_refine × Cairns) | cryptotheology-analog currency (ceremonies/dreamtime) |
+| **echoes** | refine 25 starshards → 1 echo × (1 + echo-refine effects) | cryptotheology-analog currency (ceremonies/dreamtime) |
 | **dreamcorns** | **dreaming**: while dream-drift is positive, prisms fall asleep into dreamcorns | fuel Promises |
 | **Jars of Purrs** | condense 10000 rainbows → 1 Jar (capped by mystic content) | the condensed-joy currency; a rare cap raiser |
 
@@ -25,11 +25,11 @@ Every conversion is an *offering that returns more than it takes* or a *transfor
 
 ## Rainbow Arches
 
-Arches (economy structure, gated by the Parade Routes idea) are the Parade exchange rate — `rainbows_per_parade = arches_built`. Arch upgrades (`BuyArch`, rainbow + prism priced, ~8):
+Arches (economy structure, gated by the Parade Routes idea) are the Parade exchange rate — `rainbows_per_parade = arches_built`. **Researching Parade Routes grants the first Rainbow Arch free** (the SIM-TRADE-008 precedent), so the first Parade already returns rainbows and the arch's base prism-descent chance seeds the prism supply — the loop bootstraps without a chicken-and-egg. Arch upgrades (`BuyArch`, rainbow + prism priced, ~8):
 
 | # | Arch upgrade | Cost | Effect |
 |---|---|---|---|
-| 0 | Ribbon Arch | 500 rainbows | unicorns +5% |
+| 0 | Ribbon Arch | 500 rainbows | unicorns +5% (the Rainbow Arch *structure* already grants +0.02%/day base prism descent per copy) |
 | 1 | Crystal Arch | 25000 rainbows, 25 prisms | unicorns +10%; +0.05%/day prism descent |
 | 2 | Prism Arch | 50000 rainbows, 50 prisms | unicorns +25%; +0.05%/day rainbow shower (a windfall) |
 | 3 | Sky Arch | 125000 rainbows, 500 prisms | unicorns +50%; +0.00002 prism/t (a steady drift) |

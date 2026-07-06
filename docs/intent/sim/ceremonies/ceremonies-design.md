@@ -44,14 +44,14 @@ One-time purchases (`BuyRite`), warmth + shinies priced, unlocked when *devotion
 | 4 | Stained Sunlight | 500 warmth, 250 shinies | 750 | Altars +0.05 charm/t each |
 | 5 | The Long Sun | 750 warmth, 500 shinies | 1000 | **enables the Long Sun production bonus** |
 | 6 | Grand Basking | 1250 warmth, 750 shinies | 10000 | Altars +charm cap and +charm/t |
-| 7 | Sun Wardens' Oath | 3500 warmth, 3000 shinies | 75000 | Altars +manpower-analog: +pep cap each |
-| 8 | The Reverie | 5000 warmth, 5000 shinies | 100000 | **enables Sunrise Reverie** (devotion → serenity) |
-| 9 | Enlightenment | 7500 warmth, 7500 shinies | 125000 | **enables the Enlightenment tier ladder**; makes rites 0–7 re-buyable (stacking, price ×2.5 each) |
-| 10 | Everwarm Frescoes | 4000 warmth, 5000 shinies, 8000 charm | 200000 | Sun Rooms gain warmth cap = unlimited_dr(frescoes, 1.65) × warm_memories (prestige leaf) |
+| 7 | Sun Wardens' Oath | 3500 warmth, 1500 shinies | 75000 | Altars +manpower-analog: +pep cap each |
+| 8 | The Reverie | 5000 warmth, 1800 shinies | 100000 | **enables Sunrise Reverie** (devotion → serenity) |
+| 9 | Enlightenment | 7500 warmth, 2000 shinies | 125000 | **enables the Enlightenment tier ladder**; makes rites 0–7 re-buyable (stacking, price ×2.5 each) |
+| 10 | Everwarm Frescoes | 4000 warmth, 1800 shinies, 8000 charm | 200000 | Sun Rooms gain warmth cap = unlimited_dr(frescoes, 1.65) × warm_memories (prestige leaf) |
 
 ## Enlightenment Tiers
 
-`Enlighten` spends *serenity* (the inspiration's transcendence ladder): `total_cost(t) = inverse_unlimited_dr(e^t / 10, 0.1)` — brutally exponential. Each tier squares the Reverie conversion (via `(tier+1)²`), raises the Long Sun cap through Sunstone content, and unlocks the Dream Cartography rites (echo-priced, wave 6 seam). Tiers persist across the Move (they're serenity-bought and serenity persists).
+`Enlighten` spends *serenity* (the inspiration's transcendence ladder): reaching tier t has cumulative cost `total_cost(t) = inverse_unlimited_dr(e^t / 10, 0.1)` — brutally exponential — so each Enlighten spends the marginal `total_cost(t) − total_cost(t−1)`. Each tier squares the Reverie conversion (via `(tier+1)²`), raises the Long Sun cap through Sunstone content, and unlocks the Dream Cartography rites (echo-priced, wave 6 seam). Tiers persist across the Move (they're serenity-bought and serenity persists).
 
 ## Cozy Notes
 

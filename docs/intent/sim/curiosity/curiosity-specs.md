@@ -12,13 +12,13 @@
 
 ## The Tree
 
-- [x] **SIM-CUR-005**: The system shall define exactly the ideas of the curiosity design's banded Idea Tree tables (59 ideas, ids append-only, the founding nine unchanged), with the tabled costs, gate-craft components, prerequisites, and unlock targets.
+- [ ] **SIM-CUR-005**: The system shall define exactly the ideas of the curiosity design's banded Idea Tree tables (59 ideas, ids append-only, the founding nine unchanged), with the tabled costs, gate-craft components, prerequisites, and unlock targets.
 - [x] **SIM-CUR-006**: The system shall expose idea effects as pure lookups (researched-flags and derived modifiers) consumed inside the owning leaf's rules; researching an idea shall mutate nothing beyond the curiosity spend and the researched set.
 
 ## Depth: The Banded Tree
 
 - [x] **SIM-CUR-007**: When an idea's cost includes a gate craft (stories, anthologies, schemes, starshards, echoes), ResearchIdea shall spend curiosity and the gate components together, all-or-nothing, under the same epsilon-tolerant affordability rule.
-- [x] **SIM-CUR-008**: The idea prerequisite graph shall be acyclic with every idea reachable from the roots (property-tested), and an idea listing multiple prerequisites shall require all of them.
+- [x] **SIM-CUR-008**: The idea prerequisite graph shall be acyclic with every idea reachable from the roots (property-tested), and an idea listing multiple prerequisites shall require all of them. Mystic gate-craft costs (starshards, echoes) escalate steeply against their faucet rates by design; their absolute reachability is a balance concern verified at the integration wave, not a per-idea property.
 - [x] **SIM-CUR-009**: The system shall expose idea-granted unlocks (structures, crafts, manual actions, jobs, and subsystem surfaces) as pure lookups consumed by the owning leaves, exactly as the tree tables assign them.
 
 ## Depth: Refinements & House Rules
