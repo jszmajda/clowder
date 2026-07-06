@@ -31,6 +31,12 @@ impl GameState {
 
         // ---- Phase 2: production (structures, jobs, converters) ----
         let mess_accrual = self.produce();
+        // ---- Phase 2b: dreaming (mystic drift, per tick) ----
+        // Only Arch upgrades drive drift, so the arch-free hot path skips it.
+        // @spec SIM-UNI-007, SIM-UNI-008
+        if !self.arches_bought.is_empty() {
+            self.dream_step();
+        }
 
         // ---- Phase 3: consumption (food, then luxury drain) ----
         // @spec SIM-ECO-020, SIM-ECO-021
@@ -206,6 +212,26 @@ impl GameState {
         if self.day().is_multiple_of(content::DAYS_PER_YEAR) {
             self.cogworks_autocraft();
         }
+
+        // (f) Promise upkeep: each kept Promise draws 0.0005 dreamcorn/day; one
+        // whose upkeep can't be paid goes quiet (slot held), waking when it can.
+        // @spec SIM-UNI-009, SIM-UNI-010
+        if !self.promises.is_empty() {
+            let corn = ResourceId::Dreamcorns.ix();
+            for i in 0..self.promises.len() {
+                if self.resources[corn] + EPSILON >= content::PROMISE_UPKEEP_DREAMCORN {
+                    self.resources[corn] =
+                        (self.resources[corn] - content::PROMISE_UPKEEP_DREAMCORN).max(0.0);
+                    if self.promises[i].quiet {
+                        self.promises[i].quiet = false;
+                        events.push(Event::PromiseResumed { index: i });
+                    }
+                } else if !self.promises[i].quiet {
+                    self.promises[i].quiet = true;
+                    events.push(Event::PromiseQuieted { index: i });
+                }
+            }
+        }
     }
 
     /// The Cogworks year-close auto-craft: 2% per Cogworks (max 50%) of each
@@ -258,6 +284,18 @@ impl GameState {
         // Layers 7–8 (Elder Wisdom, the Long Sun) are ×1.0 until their waves.
         let (deficit, surplus) = self.energy_ratios();
         let global_mult = 1.0 + self.effect(crate::effects::Effect::GlobalProductionRatio) * deficit;
+        // Layer 8 (the Long Sun) multiplies raw-tier material flows once the rite
+        // is bought; 1.0 otherwise — skip the query when no rites are held.
+        // @spec SIM-ENG-021, SIM-SUN-004
+        let long_sun = if self.rites.is_empty() { 1.0 } else { 1.0 + self.long_sun_bonus() };
+        // The mystic tier's own multiplier on Unicorn Meadow output — NOT a
+        // global layer. Only Unicorn Meadows produce unicorns, so the effect
+        // scan is skipped entirely when none are built. @spec SIM-UNI-002
+        let unicorns_mult = if self.structures[StructureId::UnicornMeadow.ix()] > 0 {
+            1.0 + self.effect(crate::effects::Effect::UnicornsRatio)
+        } else {
+            1.0
+        };
         let mess_catnip = self.mess_catnip_factor();
 
         // ---- Structures (☆ layers only) ----
@@ -278,6 +316,19 @@ impl GameState {
                 }
                 if def.surplus_scaled {
                     flow *= surplus;
+                }
+                // ENG-021 REVISED: the global layers (6+8) now reach raw-tier
+                // STRUCTURE production, not just jobs — except a structure that is
+                // itself a global-production source never amplifies its own
+                // faucet (the Star Basin's stardust). Mystic/transient/luxury
+                // flows skip the global layers; unicorns take their own mystic
+                // multiplier instead. @spec SIM-ENG-021, SIM-SUN-004, SIM-UNI-002
+                if content::tier(*r) == content::Tier::Raw {
+                    if def.global_ratio == 0.0 {
+                        flow *= global_mult * long_sun;
+                    }
+                } else if *r == ResourceId::Unicorns {
+                    flow *= unicorns_mult;
                 }
                 if *r == ResourceId::Catnip {
                     // @spec SIM-ECO-038
@@ -348,7 +399,9 @@ impl GameState {
             flow *= 1.0 + self.effect(crate::effects::Effect::ResourceRatio(r));
             flow *= mood * zoomies;
             if content::tier(r) == content::Tier::Raw {
-                flow *= global_mult;
+                // Layers 6 (global) and 8 (the Long Sun) both reach raw jobs.
+                // @spec SIM-ENG-021, SIM-SUN-004
+                flow *= global_mult * long_sun;
             }
             if r == ResourceId::Catnip {
                 flow *= mess_catnip;
@@ -591,6 +644,52 @@ impl GameState {
         // Sky events — appended AFTER the flavor draws, per the extended
         // draw schedule (new subsystems never reorder it). @spec SIM-ENG-018
         self.sky_events(events);
+
+        // Mystic day-boundary rolls, appended AFTER the sky rolls: a prism
+        // descent, then a rainbow shower. Both draw only when a Rainbow Arch
+        // structure or an Arch upgrade exists (else the chances are 0), keeping
+        // the arch-free hot path free of effect scans.
+        // @spec SIM-UNI-006, SIM-UNI-005
+        if self.structures[StructureId::RainbowArch.ix()] > 0 || !self.arches_bought.is_empty() {
+            let descent = self.effect(crate::effects::Effect::PrismDescentChance);
+            if descent > 0.0 && self.rng.chance(descent) {
+                self.resources[ResourceId::Prisms.ix()] += 1.0;
+                events.push(Event::PrismDescended);
+            }
+            let shower = self.effect(crate::effects::Effect::RainbowShowerChance);
+            if shower > 0.0 && self.rng.chance(shower) {
+                self.resources[ResourceId::Rainbows.ix()] += content::RAINBOW_SHOWER_AMOUNT;
+            }
+        }
+    }
+
+    /// Per-tick dreaming: dream-drift accrues from Memory Arches (throttled
+    /// ×0.25 while any dreamcorn already dreams); at ≥ 1 a prism naps into a
+    /// dreamcorn — never the last prism. A Sky Arch adds a steady prism drift.
+    // @spec SIM-UNI-007, SIM-UNI-008
+    fn dream_step(&mut self) {
+        use crate::state::ArchId;
+        if self.arches_bought.is_empty() {
+            return; // no Sky/Memory Arch: no drift, the common hot-path case
+        }
+        if self.arches_bought.contains(&ArchId::SkyArch) {
+            self.resources[ResourceId::Prisms.ix()] += content::SKY_ARCH_PRISM_DRIFT;
+        }
+        if !self.arches_bought.contains(&ArchId::MemoryArch) {
+            return;
+        }
+        let throttle = if self.stock(ResourceId::Dreamcorns) > EPSILON {
+            content::DREAM_DRIFT_THROTTLE
+        } else {
+            1.0
+        };
+        self.dream_drift += content::DREAM_DRIFT_PER_ARCH * throttle;
+        // A prism must stay awake to keep the dream going (the cozy floor).
+        while self.dream_drift >= 1.0 && self.stock(ResourceId::Prisms) >= 2.0 - EPSILON {
+            self.dream_drift -= 1.0;
+            self.resources[ResourceId::Prisms.ix()] -= 1.0;
+            self.resources[ResourceId::Dreamcorns.ix()] += 1.0;
+        }
     }
 
     /// Day-close sky processing: an expired observation window fades

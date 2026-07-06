@@ -2,7 +2,10 @@
 //! content leaf builds on. The engine owns the machinery; leaves own values.
 
 use crate::content;
-use crate::state::{CraftId, GameState, IdeaId, JobId, KittenTrait, ResourceId, StructureId};
+use crate::state::{
+    ArchId, ColonyId, CraftId, GameState, IdeaId, JobId, KittenTrait, ResourceId, RiteId,
+    StructureId,
+};
 
 /// Compiler-checked modifier vocabulary. Variants are added per content wave;
 /// exhaustiveness checks keep every consumer honest.
@@ -58,6 +61,26 @@ pub enum Effect {
     SkyEventChanceRatio,
     /// Auto-observe chance multiplier delta (Patient Eyes).
     AutoObserveChanceRatio,
+    // ---- Wave 4 (ceremonies / mystic / colonies) ----
+    /// +% cap ratio on one resource (the Shared Sunpuddle rite's altars).
+    /// Joins CapRatio inside cap(). @spec SIM-SUN-005
+    MaxCapRatio(ResourceId),
+    /// Per-day prism-descent probability (Rainbow Arch structures + upgrades).
+    /// @spec SIM-UNI-006
+    PrismDescentChance,
+    /// Per-day rainbow-shower probability (the Prism Arch). @spec SIM-UNI-005
+    RainbowShowerChance,
+    /// +% Unicorn Meadow output, the mystic tier's own multiplier (Arch
+    /// upgrades). @spec SIM-UNI-002
+    UnicornsRatio,
+    /// +refine on the 25 prisms → 1 starshard conversion. @spec SIM-UNI-003
+    StarshardRefine,
+    /// +refine on the 25 starshards → 1 echo conversion. @spec SIM-UNI-003
+    EchoRefine,
+    /// +% on Parade rainbow yield. @spec SIM-UNI-001
+    ParadeRatio,
+    /// Dedicated per-colony standing bonus (dormant baseline). @spec SIM-TRADE-005
+    StandingFor(ColonyId),
 }
 
 /// Diminishing-returns primitive: linear to 75% of `limit`, asymptotic to
@@ -128,6 +151,11 @@ impl GameState {
                 }
                 Effect::CraftRatio => sum += def.craft_ratio * count,
                 Effect::LuxuryDemandRatio => sum += def.luxury_demand * count,
+                // Each Rainbow Arch *structure* seeds the prism supply.
+                // @spec SIM-UNI-006
+                Effect::PrismDescentChance if s == StructureId::RainbowArch => {
+                    sum += content::RAINBOW_ARCH_PRISM_DESCENT * count;
+                }
                 // @spec SIM-ECO-032
                 Effect::GlobalProductionRatio => {
                     let mut value = def.global_ratio * count;
@@ -178,8 +206,35 @@ impl GameState {
                 }
             }
         }
-        // 5–9. Rites, arch upgrades, traditions, colony standing, adventure
-        // rewards — arrive with their waves.
+        // 5. Sunbeam Rites, scaled by their copy count; altar-hosted rites also
+        // scale by the Sunbeam Altar count. The whole section is skipped when no
+        // rite is bought (the common hot path). @spec SIM-SUN-007
+        if !self.rites.is_empty() {
+            let altars = self.structures[StructureId::SunbeamAltar.ix()] as f64;
+            for rite in &self.rites {
+                let n = self.rite_counts[rite.ix()] as f64;
+                if n == 0.0 {
+                    continue;
+                }
+                sum += rite_effect(*rite, key, altars) * n;
+            }
+        }
+        // 6. Rainbow Arch upgrades (bought once each). @spec SIM-UNI-005
+        if !self.arches_bought.is_empty() {
+            for arch in &self.arches_bought {
+                sum += arch_effect(*arch, key);
+            }
+        }
+        // 7–9. Traditions, adventure rewards — arrive with their waves. Colony
+        // standing effects are dormant (StandingFor baseline 0).
+        // Promises: each kept (non-quiet) Promise grants its small global
+        // production effect. @spec SIM-UNI-009
+        if !self.promises.is_empty() {
+            if let Effect::GlobalProductionRatio = key {
+                let kept = self.promises.iter().filter(|p| !p.quiet).count() as f64;
+                sum += content::PROMISE_GLOBAL_RATIO * kept;
+            }
+        }
         // 10. The Elder's birth trait, active only from the chair.
         // @spec SIM-KIT-024
         if let Some(trait_id) = self.elder.and_then(|ix| self.kittens.get(ix)).map(|k| k.trait_id)
@@ -208,6 +263,44 @@ impl GameState {
             fraction = fraction.min((self.stock(*r) / demand).clamp(0.0, 1.0));
         }
         fraction
+    }
+}
+
+/// One Sunbeam Rite's per-copy contribution to one effect key. Altar-hosted
+/// rites scale additionally by `altars`. Golden Hour (rite 2) is not here — it
+/// reshapes the warmth cap directly in `cap()`. @spec SIM-SUN-005, SIM-SUN-007
+fn rite_effect(rite: RiteId, key: Effect, altars: f64) -> f64 {
+    use ResourceId::{Charm, Curiosity, Pep, Warmth};
+    match (rite, key) {
+        (RiteId::MorningStretch, Effect::ResourceRatio(Warmth)) => 0.10,
+        (RiteId::SharedSunpuddle, Effect::MaxCapRatio(Curiosity)) => 0.02 * altars,
+        (RiteId::WarmWelcome, Effect::HappinessPoints) => 0.4 * altars,
+        (RiteId::StainedSunlight, Effect::StructureOutputAdd(StructureId::SunbeamAltar, Charm)) => {
+            0.05
+        }
+        (RiteId::GrandBasking, Effect::MaxCap(Charm)) => 60.0 * altars,
+        (RiteId::GrandBasking, Effect::StructureOutputAdd(StructureId::SunbeamAltar, Charm)) => 0.1,
+        (RiteId::SunWardensOath, Effect::MaxCap(Pep)) => 25.0 * altars,
+        _ => 0.0,
+    }
+}
+
+/// One Rainbow Arch upgrade's contribution to one effect key. @spec SIM-UNI-005
+fn arch_effect(arch: ArchId, key: Effect) -> f64 {
+    use ResourceId::JarsOfPurrs;
+    match (arch, key) {
+        (ArchId::RibbonArch, Effect::UnicornsRatio) => 0.05,
+        (ArchId::CrystalArch, Effect::UnicornsRatio) => 0.10,
+        (ArchId::CrystalArch, Effect::PrismDescentChance) => 0.0005,
+        (ArchId::PrismArch, Effect::UnicornsRatio) => 0.25,
+        (ArchId::PrismArch, Effect::RainbowShowerChance) => 0.0005,
+        (ArchId::SkyArch, Effect::UnicornsRatio) => 0.50,
+        (ArchId::DreamingArch, Effect::UnicornsRatio) => 2.50,
+        (ArchId::DreamingArch, Effect::StarshardRefine) => 0.05,
+        (ArchId::StarlitArch, Effect::UnicornsRatio) => 5.00,
+        (ArchId::StarlitArch, Effect::StarshardRefine) => 0.10,
+        (ArchId::EverdreamArch, Effect::MaxCap(JarsOfPurrs)) => 2.0,
+        _ => 0.0,
     }
 }
 

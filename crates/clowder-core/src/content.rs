@@ -244,10 +244,58 @@ pub const COGWORKS_AUTOCRAFT: [(ResourceId, CraftId); 5] = [
 /// The (structure, resource) pairs any StructureOutputAdd effect may target;
 /// the production phase consults this list so refinement-granted outputs
 /// land without scanning every key combination.
-pub const STRUCTURE_OUTPUT_ADD_TARGETS: [(StructureId, ResourceId); 2] = [
+pub const STRUCTURE_OUTPUT_ADD_TARGETS: [(StructureId, ResourceId); 3] = [
     (StructureId::Hearth, ResourceId::Embers),
     (StructureId::Cogworks, ResourceId::Stories),
+    // Stained Sunlight / Grand Basking rites add charm at the Sunbeam Altar.
+    // @spec SIM-SUN-005
+    (StructureId::SunbeamAltar, ResourceId::Charm),
 ];
+
+// ---- Wave 4: ceremonies / mystic / colonies ----
+// @spec SIM-UNI-006
+pub const RAINBOW_ARCH_PRISM_DESCENT: f64 = 0.0002; // per day per Rainbow Arch structure
+// @spec SIM-UNI-001
+pub const PARADE_UNICORN_COST: f64 = 2500.0;
+pub const PARADE_RAINBOWS_PER_ARCH: f64 = 2500.0;
+// @spec SIM-UNI-003
+pub const REFINE_INPUT: f64 = 25.0; // 25 prisms → 1 starshard, 25 starshards → 1 echo
+// @spec SIM-UNI-004
+pub const JAR_RAINBOW_COST: f64 = 10000.0;
+// @spec SIM-UNI-007
+pub const DREAM_DRIFT_PER_ARCH: f64 = 0.000001; // per tick per Memory Arch
+pub const DREAM_DRIFT_THROTTLE: f64 = 0.25; // while any dreamcorn already dreams
+pub const SKY_ARCH_PRISM_DRIFT: f64 = 0.00002; // per tick, the Sky Arch's steady drift
+// @spec SIM-UNI-005
+pub const RAINBOW_SHOWER_AMOUNT: f64 = 5000.0; // a windfall on a shower day
+// @spec SIM-UNI-009, SIM-UNI-010
+pub const PROMISE_ECHO_COST: f64 = 1.0;
+pub const PROMISE_UPKEEP_DREAMCORN: f64 = 0.0005; // per day, per kept Promise
+pub const PROMISE_GLOBAL_RATIO: f64 = 0.0005; // each kept Promise's global effect
+pub const PROMISE_SLOTS_PER_EVERDREAM: usize = 3;
+// @spec SIM-TRADE-001
+pub const TRADE_PEP_PER_CARAVAN: f64 = 50.0;
+pub const TRADE_SHINIES_PER_CARAVAN: f64 = 15.0;
+pub const TRADE_FUZZ_WIDTH: f64 = 0.15; // ± width on the basket
+pub const TRADE_BONUS_MULT: f64 = 1.25; // a bonus (warm) outcome
+// @spec SIM-TRADE-005, SIM-TRADE-006
+pub const PENPAL_STANDING_PER: f64 = 0.01; // standing warmed per Pen Pal level
+pub const PENPAL_STANDING_CAP: f64 = 0.75; // soft cap on Pen Pal warming
+pub const PENPAL_BASE_CHARM: f64 = 100.0; // × 1.15^level
+pub const PENPAL_CHARM_RATIO: f64 = 1.15;
+// @spec SIM-TRADE-004 (Foxes' kite-scaled moonstone)
+pub const FOX_MOONSTONE_CHANCE_BASE: f64 = 0.15;
+pub const FOX_MOONSTONE_CHANCE_PER_KITE: f64 = 0.0035;
+pub const FOX_MOONSTONE_AMOUNT_BASE: f64 = 1.5;
+pub const FOX_MOONSTONE_AMOUNT_PER_KITE: f64 = 0.03;
+// @spec SIM-TRADE-007
+pub const SCOUT_PEP_COST: f64 = 1000.0;
+pub const SCOUT_PEP_REFUND: f64 = 950.0; // returned on a quiet day
+pub const SCOUT_FIND_CHANCE: f64 = 0.5; // chance a picnic finds anyone
+pub const SCOUT_FOX_CHARM: f64 = 1500.0;
+pub const SCOUT_OWL_KITES: f64 = 100.0;
+pub const SCOUT_OWL_CURIOSITY_CAP: f64 = 125000.0;
+pub const DEER_STARDUST_MIN_PENPAL: u32 = 5;
 
 // ---- Crowding relief & luxuries (kittens leaf consumes) ----
 // @spec SIM-KIT-011
@@ -596,7 +644,13 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             (ResourceId::Stories, 8.0),
         ],
         productions: &[(ResourceId::Charm, 0.08)],
-        cap_bonuses: &[(ResourceId::Warmth, 120.0), (ResourceId::Charm, 100.0)],
+        // +100 shinies cap: offerings collect at the altar, and the upper rites
+        // are shinies-priced, so this is what keeps them reachable (SIM-ECO-024).
+        cap_bonuses: &[
+            (ResourceId::Warmth, 120.0),
+            (ResourceId::Charm, 100.0),
+            (ResourceId::Shinies, 100.0),
+        ],
         gate: Some(IdeaId::SolarDevotion),
         ..BLD
     },
@@ -761,6 +815,27 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         ratio: 1.75,
         productions: &[(ResourceId::Unicorns, 0.001)], // mystic leaf multiplies later
         gate: Some(IdeaId::UnicornLore),
+        ..BLD
+    },
+    // 38: Rainbow Arch — cross-leaf (mystic effects). @spec SIM-ECO-028, SIM-UNI-005
+    StructureDef {
+        name: "Rainbow Arch",
+        base_costs: &[(ResourceId::Rainbows, 5000.0), (ResourceId::Cairns, 25.0)],
+        ratio: 1.15,
+        gate: Some(IdeaId::ParadeRoutes),
+        ..BLD
+    },
+    // 39: Sunstone — cross-leaf (ceremonies effects). @spec SIM-ECO-028, SIM-SUN-004
+    StructureDef {
+        name: "Sunstone",
+        base_costs: &[
+            (ResourceId::Moonstone, 8.0),
+            (ResourceId::Cairns, 50.0),
+            (ResourceId::Echoes, 1.0),
+        ],
+        ratio: 1.15,
+        energy_cons: 1.0,
+        gate: Some(IdeaId::LongSunMasonry),
         ..BLD
     },
 ];
@@ -1311,6 +1386,23 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
         blurb: "Wiggle, then commit. Unlocks expeditions and the Pouncer job.",
         cost: 200.0,
         prereqs: &[IdeaId::PantryOrganization],
+        ..IDEA
+    },
+    // ---- Band 4, appended: the wonder ideas (ids never reorder) ----
+    IdeaDef {
+        name: "Long Sun Masonry",
+        blurb: "Lay a stone that remembers the light. Unlocks the Sunstone.",
+        cost: 120000.0,
+        gate: &[(ResourceId::Echoes, 3.0)],
+        prereqs: &[IdeaId::SolarDevotion, IdeaId::SkywardLonging],
+        ..IDEA
+    },
+    IdeaDef {
+        name: "Skyward Song",
+        blurb: "A tune that carries to the cosmos. Summons Star Whale visits.",
+        cost: 180000.0,
+        gate: &[(ResourceId::Echoes, 8.0)],
+        prereqs: &[IdeaId::SkywardLonging, IdeaId::NightCourtEtiquette],
         ..IDEA
     },
 ];
@@ -1966,4 +2058,289 @@ pub static FLAVOR_TEMPLATES: [FlavorTemplate; 10] = [
     FlavorTemplate { text: "Somewhere, a cardboard box settled with a dignified whumpf.", needs_kitten: false },
     FlavorTemplate { text: "A moth got in. The meadow has never been so alert.", needs_kitten: false },
     FlavorTemplate { text: "It rained gently. The porch smelled like spring for an hour.", needs_kitten: false },
+];
+
+// ---- Sunbeam Rites ----
+
+use crate::state::{ArchId, ColonyId, RiteId};
+
+/// A Sunbeam Rite: warmth+shinies (+charm) priced, unlocked once devotion's
+/// high-water reached its gate. @spec SIM-SUN-005
+pub struct RiteDef {
+    pub name: &'static str,
+    pub cost: &'static [(ResourceId, f64)],
+    pub devotion_gate: f64,
+}
+
+pub fn rite_def(r: RiteId) -> &'static RiteDef {
+    &RITES[r as usize]
+}
+
+static RITES: [RiteDef; 11] = [
+    RiteDef { name: "Morning Stretch", cost: &[(ResourceId::Warmth, 100.0)], devotion_gate: 150.0 },
+    RiteDef {
+        name: "Shared Sunpuddle",
+        cost: &[(ResourceId::Warmth, 250.0), (ResourceId::Shinies, 150.0)],
+        devotion_gate: 300.0,
+    },
+    RiteDef {
+        name: "Golden Hour",
+        cost: &[(ResourceId::Warmth, 350.0), (ResourceId::Shinies, 250.0)],
+        devotion_gate: 500.0,
+    },
+    RiteDef {
+        name: "Warm Welcome",
+        cost: &[(ResourceId::Warmth, 500.0), (ResourceId::Shinies, 250.0)],
+        devotion_gate: 750.0,
+    },
+    RiteDef {
+        name: "Stained Sunlight",
+        cost: &[(ResourceId::Warmth, 500.0), (ResourceId::Shinies, 250.0)],
+        devotion_gate: 750.0,
+    },
+    RiteDef {
+        name: "The Long Sun",
+        cost: &[(ResourceId::Warmth, 750.0), (ResourceId::Shinies, 500.0)],
+        devotion_gate: 1000.0,
+    },
+    RiteDef {
+        name: "Grand Basking",
+        cost: &[(ResourceId::Warmth, 1250.0), (ResourceId::Shinies, 750.0)],
+        devotion_gate: 10000.0,
+    },
+    RiteDef {
+        name: "Sun Wardens' Oath",
+        cost: &[(ResourceId::Warmth, 3500.0), (ResourceId::Shinies, 1500.0)],
+        devotion_gate: 75000.0,
+    },
+    RiteDef {
+        name: "The Reverie",
+        cost: &[(ResourceId::Warmth, 5000.0), (ResourceId::Shinies, 1800.0)],
+        devotion_gate: 100000.0,
+    },
+    RiteDef {
+        name: "Enlightenment",
+        cost: &[(ResourceId::Warmth, 7500.0), (ResourceId::Shinies, 2000.0)],
+        devotion_gate: 125000.0,
+    },
+    RiteDef {
+        name: "Everwarm Frescoes",
+        cost: &[
+            (ResourceId::Warmth, 4000.0),
+            (ResourceId::Shinies, 1800.0),
+            (ResourceId::Charm, 8000.0),
+        ],
+        devotion_gate: 200000.0,
+    },
+];
+
+/// Rites 0–7 (except the single-purchase Long Sun at index 5) restack once the
+/// Enlightenment rite is bought. @spec SIM-SUN-006
+pub fn rite_restackable(r: RiteId) -> bool {
+    matches!(
+        r,
+        RiteId::MorningStretch
+            | RiteId::SharedSunpuddle
+            | RiteId::GoldenHour
+            | RiteId::WarmWelcome
+            | RiteId::StainedSunlight
+            | RiteId::GrandBasking
+            | RiteId::SunWardensOath
+    )
+}
+pub const RITE_RESTACK_RATIO: f64 = 2.5; // price ×2.5 per additional copy
+
+// ---- Rainbow Arch upgrades ----
+
+/// A Rainbow Arch upgrade: rainbow/prism/other priced, bought once each.
+/// @spec SIM-UNI-005
+pub struct ArchDef {
+    pub name: &'static str,
+    pub cost: &'static [(ResourceId, f64)],
+}
+
+pub fn arch_def(a: ArchId) -> &'static ArchDef {
+    &ARCHES[a as usize]
+}
+
+static ARCHES: [ArchDef; 8] = [
+    ArchDef { name: "Ribbon Arch", cost: &[(ResourceId::Rainbows, 500.0)] },
+    ArchDef {
+        name: "Crystal Arch",
+        cost: &[(ResourceId::Rainbows, 25000.0), (ResourceId::Prisms, 25.0)],
+    },
+    ArchDef {
+        name: "Prism Arch",
+        cost: &[(ResourceId::Rainbows, 50000.0), (ResourceId::Prisms, 50.0)],
+    },
+    ArchDef {
+        name: "Sky Arch",
+        cost: &[(ResourceId::Rainbows, 125000.0), (ResourceId::Prisms, 500.0)],
+    },
+    ArchDef {
+        name: "Dreaming Arch",
+        cost: &[
+            (ResourceId::Shinies, 500.0),
+            (ResourceId::Rainbows, 1_000_000.0),
+            (ResourceId::Prisms, 5000.0),
+        ],
+    },
+    ArchDef {
+        name: "Starlit Arch",
+        cost: &[
+            (ResourceId::Shinies, 1250.0),
+            (ResourceId::Rainbows, 750_000.0),
+            (ResourceId::Prisms, 25000.0),
+        ],
+    },
+    ArchDef {
+        name: "Memory Arch",
+        cost: &[(ResourceId::Stardust, 2500.0), (ResourceId::Prisms, 50000.0)],
+    },
+    ArchDef {
+        name: "Everdream Arch",
+        cost: &[(ResourceId::Dreamcorns, 100.0), (ResourceId::Cairns, 1000.0)],
+    },
+];
+
+// ---- Colonies ----
+
+/// One item in a colony's sell basket: `amount` of `resource` at probability
+/// `chance` per successful caravan, plus `season_bonus` when in `season`, only
+/// once the Pen Pal level reaches `min_penpal`. @spec SIM-TRADE-003
+#[derive(Debug, Clone, Copy)]
+pub struct ColonySell {
+    pub resource: ResourceId,
+    pub amount: f64,
+    pub chance: f64,
+    pub season: Option<Season>,
+    pub season_bonus: f64,
+    pub min_penpal: u32,
+}
+
+const SELL: ColonySell = ColonySell {
+    resource: ResourceId::Catnip,
+    amount: 0.0,
+    chance: 1.0,
+    season: None,
+    season_bonus: 0.0,
+    min_penpal: 0,
+};
+
+/// A tradeable colony: start standing, the buy-resource each caravan spends,
+/// and the sell basket. The Star Whale reserves a visitor slot only.
+/// @spec SIM-TRADE-003
+pub struct ColonyDef {
+    pub name: &'static str,
+    pub start_standing: f64,
+    pub buy: (ResourceId, f64),
+    pub sells: &'static [ColonySell],
+}
+
+pub fn colony_def(c: ColonyId) -> &'static ColonyDef {
+    &COLONIES[c as usize]
+}
+
+#[allow(clippy::needless_update)]
+static COLONIES: [ColonyDef; 8] = [
+    ColonyDef {
+        name: "Otters",
+        start_standing: 0.25,
+        buy: (ResourceId::Pebbles, 1000.0),
+        sells: &[
+            ColonySell {
+                resource: ResourceId::Twigs,
+                amount: 500.0,
+                season: Some(Season::Summer),
+                season_bonus: 0.35,
+                ..SELL
+            },
+            ColonySell { resource: ResourceId::Wands, amount: 10.0, chance: 0.25, ..SELL },
+        ],
+    },
+    ColonyDef {
+        name: "Raccoons",
+        start_standing: 0.0,
+        buy: (ResourceId::Buttons, 100.0),
+        sells: &[
+            ColonySell {
+                resource: ResourceId::Catnip,
+                amount: 35000.0,
+                season: Some(Season::Winter),
+                season_bonus: 0.45,
+                ..SELL
+            },
+            ColonySell { resource: ResourceId::Quills, amount: 5.0, chance: 0.25, ..SELL },
+            ColonySell { resource: ResourceId::Stories, amount: 3.0, chance: 0.15, ..SELL },
+        ],
+    },
+    ColonyDef {
+        name: "Foxes",
+        start_standing: -0.15,
+        buy: (ResourceId::Twigs, 500.0),
+        // Moonstone is added programmatically, kite-scaled. @spec SIM-TRADE-004
+        sells: &[
+            ColonySell {
+                resource: ResourceId::Buttons,
+                amount: 250.0,
+                season: Some(Season::Autumn),
+                season_bonus: 0.35,
+                ..SELL
+            },
+            ColonySell { resource: ResourceId::Brass, amount: 25.0, chance: 0.25, ..SELL },
+            ColonySell { resource: ResourceId::Cogs, amount: 5.0, chance: 0.10, ..SELL },
+        ],
+    },
+    ColonyDef {
+        name: "Hedgehogs",
+        start_standing: 0.0,
+        buy: (ResourceId::Feathers, 500.0),
+        sells: &[
+            ColonySell {
+                resource: ResourceId::Pebbles,
+                amount: 1000.0,
+                season: Some(Season::Spring),
+                season_bonus: 0.25,
+                ..SELL
+            },
+            ColonySell { resource: ResourceId::Tiles, amount: 5.0, chance: 0.75, ..SELL },
+            ColonySell { resource: ResourceId::Pavers, amount: 1.0, chance: 0.10, ..SELL },
+        ],
+    },
+    ColonyDef {
+        name: "Rabbits",
+        start_standing: 0.15,
+        buy: (ResourceId::Tiles, 50.0),
+        sells: &[
+            ColonySell { resource: ResourceId::Embers, amount: 350.0, ..SELL },
+            ColonySell { resource: ResourceId::Dew, amount: 100.0, chance: 0.25, ..SELL },
+        ],
+    },
+    ColonyDef {
+        name: "Deer",
+        start_standing: 0.0,
+        buy: (ResourceId::Shinies, 250.0),
+        sells: &[
+            ColonySell { resource: ResourceId::Moonstone, amount: 1.0, chance: 0.95, ..SELL },
+            ColonySell {
+                resource: ResourceId::Stardust,
+                amount: 0.1,
+                chance: 0.50,
+                min_penpal: DEER_STARDUST_MIN_PENPAL,
+                ..SELL
+            },
+        ],
+    },
+    ColonyDef {
+        name: "Owls",
+        start_standing: -0.10,
+        buy: (ResourceId::Mint, 500.0),
+        sells: &[ColonySell { resource: ResourceId::Curiosity, amount: 80.0, ..SELL }],
+    },
+    ColonyDef {
+        name: "Star Whales",
+        start_standing: 0.0,
+        buy: (ResourceId::Hushfelt, 0.0),
+        sells: &[], // [D] the visitor slot; basket deferred to the cosmic wave
+    },
 ];

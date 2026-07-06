@@ -18,7 +18,7 @@ fn idea_band(i: IdeaId) -> u32 {
         18..=27 => 1,
         28..=35 => 2,
         36..=43 => 3,
-        44..=55 => 4,
+        44..=55 | 57..=58 => 4,
         other => panic!("unmapped idea id {other}"),
     }
 }
@@ -182,7 +182,7 @@ fn new_structures_extend_caps_including_multi_resource_extenders() {
     assert!((s.cap(ResourceId::Buttons) - (40.0 + 2.0 * 25.0 + 80.0)).abs() < 1e-9);
     assert!((s.cap(ResourceId::Embers) - (30.0 + 2.0 * 30.0 + 50.0)).abs() < 1e-9);
     assert!((s.cap(ResourceId::Moonstone) - (8.0 + 2.0 * 10.0 + 25.0)).abs() < 1e-9);
-    assert!((s.cap(ResourceId::Shinies) - (15.0 + 2.0 * 5.0 + 12.0)).abs() < 1e-9);
+    assert!((s.cap(ResourceId::Shinies) - (15.0 + 2.0 * 5.0 + 12.0 + 100.0)).abs() < 1e-9);
     assert!((s.cap(ResourceId::Catnip) - (200.0 + 1000.0)).abs() < 1e-9);
     // Curiosity: Study Nook 200 + Ledges 2×800 + Labyrinth 1500.
     assert!((s.cap(ResourceId::Curiosity) - 3300.0).abs() < 1e-9);
@@ -198,8 +198,8 @@ fn new_structures_extend_caps_including_multi_resource_extenders() {
 // @spec SIM-ECO-028
 #[test]
 fn structure_table_spot_anchors_across_bands() {
-    assert_eq!(StructureId::ALL.len(), 38, "exactly the BLD table, no staged rebuilds");
-    assert_eq!(GameState::new(107).structures, [0u32; 38]);
+    assert_eq!(StructureId::ALL.len(), 40, "exactly the BLD table, no staged rebuilds");
+    assert_eq!(GameState::new(107).structures, [0u32; 40]);
     assert_eq!(StructureId::CatnipPatch.ix(), 0);
     assert_eq!(StructureId::WindowPerch.ix(), 7);
     assert_eq!(StructureId::Porch.ix(), 14);
@@ -1049,7 +1049,7 @@ fn sunwarden_is_idea_gated_and_yields_warmth() {
 // @spec SIM-CUR-005
 #[test]
 fn the_tree_has_57_ideas_with_append_only_ids() {
-    assert_eq!(IdeaId::ALL.len(), 57);
+    assert_eq!(IdeaId::ALL.len(), 59);
     // The founding nine keep their ids.
     assert_eq!(IdeaId::PantryOrganization as usize, 0);
     assert_eq!(IdeaId::ScratchingArts as usize, 1);
@@ -1213,7 +1213,7 @@ fn the_idea_graph_is_acyclic_and_fully_reachable() {
     }
     assert_eq!(
         s.ideas.len(),
-        57,
+        59,
         "unreachable or cyclic ideas: {:?}",
         IdeaId::ALL.iter().filter(|i| !s.ideas.contains(i)).collect::<Vec<_>>()
     );

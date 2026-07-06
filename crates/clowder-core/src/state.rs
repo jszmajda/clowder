@@ -153,9 +153,11 @@ pub enum StructureId {
     MemoryChest,
     YarnComputer,
     UnicornMeadow,
+    RainbowArch,
+    Sunstone,
 }
 
-pub const STRUCTURE_COUNT: usize = 38;
+pub const STRUCTURE_COUNT: usize = 40;
 
 impl StructureId {
     pub const ALL: [StructureId; STRUCTURE_COUNT] = [
@@ -197,6 +199,8 @@ impl StructureId {
         StructureId::MemoryChest,
         StructureId::YarnComputer,
         StructureId::UnicornMeadow,
+        StructureId::RainbowArch,
+        StructureId::Sunstone,
     ];
     pub fn ix(self) -> usize {
         self as usize
@@ -369,9 +373,11 @@ pub enum IdeaId {
     DreamLoomcraft,
     DeepNapTheory,
     PouncingPractice,
+    LongSunMasonry,
+    SkywardSong,
 }
 
-pub const IDEA_COUNT: usize = 57;
+pub const IDEA_COUNT: usize = 59;
 
 impl IdeaId {
     pub const ALL: [IdeaId; IDEA_COUNT] = [
@@ -432,6 +438,8 @@ impl IdeaId {
         IdeaId::DreamLoomcraft,
         IdeaId::DeepNapTheory,
         IdeaId::PouncingPractice,
+        IdeaId::LongSunMasonry,
+        IdeaId::SkywardSong,
     ];
 }
 
@@ -543,6 +551,111 @@ impl RuleId {
         RuleId::LoudPurring,
         RuleId::QuietContemplation,
     ];
+}
+
+/// The eight neighbouring colonies the clowder trades with. Copy + Ord so a
+/// `BTreeSet<ColonyId>` records discoveries in canonical order; `as usize`
+/// indexes the per-colony pen-pal array. @spec SIM-TRADE-003
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum ColonyId {
+    Otters,
+    Raccoons,
+    Foxes,
+    Hedgehogs,
+    Rabbits,
+    Deer,
+    Owls,
+    StarWhales,
+}
+
+impl ColonyId {
+    pub const ALL: [ColonyId; 8] = [
+        ColonyId::Otters,
+        ColonyId::Raccoons,
+        ColonyId::Foxes,
+        ColonyId::Hedgehogs,
+        ColonyId::Rabbits,
+        ColonyId::Deer,
+        ColonyId::Owls,
+        ColonyId::StarWhales,
+    ];
+    pub fn ix(self) -> usize {
+        self as usize
+    }
+}
+
+/// The eleven Sunbeam Rites, in ladder order. @spec SIM-SUN-005
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum RiteId {
+    MorningStretch,
+    SharedSunpuddle,
+    GoldenHour,
+    WarmWelcome,
+    StainedSunlight,
+    TheLongSun,
+    GrandBasking,
+    SunWardensOath,
+    TheReverie,
+    Enlightenment,
+    EverwarmFrescoes,
+}
+
+impl RiteId {
+    pub const ALL: [RiteId; 11] = [
+        RiteId::MorningStretch,
+        RiteId::SharedSunpuddle,
+        RiteId::GoldenHour,
+        RiteId::WarmWelcome,
+        RiteId::StainedSunlight,
+        RiteId::TheLongSun,
+        RiteId::GrandBasking,
+        RiteId::SunWardensOath,
+        RiteId::TheReverie,
+        RiteId::Enlightenment,
+        RiteId::EverwarmFrescoes,
+    ];
+    pub fn ix(self) -> usize {
+        self as usize
+    }
+}
+
+/// The eight Rainbow Arch upgrades, in ladder order. @spec SIM-UNI-005
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum ArchId {
+    RibbonArch,
+    CrystalArch,
+    PrismArch,
+    SkyArch,
+    DreamingArch,
+    StarlitArch,
+    MemoryArch,
+    EverdreamArch,
+}
+
+impl ArchId {
+    pub const ALL: [ArchId; 8] = [
+        ArchId::RibbonArch,
+        ArchId::CrystalArch,
+        ArchId::PrismArch,
+        ArchId::SkyArch,
+        ArchId::DreamingArch,
+        ArchId::StarlitArch,
+        ArchId::MemoryArch,
+        ArchId::EverdreamArch,
+    ];
+    pub fn ix(self) -> usize {
+        self as usize
+    }
+}
+
+/// A Promise to the Night Court: fills a slot, draws gentle dreamcorn upkeep,
+/// and grants a small global effect while kept. A Promise whose upkeep goes
+/// unpaid goes `quiet` (effect suspended, slot held) and wakes on its own.
+/// @spec SIM-UNI-009, SIM-UNI-010
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Promise {
+    #[serde(default)]
+    pub quiet: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -715,6 +828,45 @@ pub struct GameState {
     /// Adopted house rules — permanent for this meadow. @spec SIM-CUR-011
     #[serde(default)]
     pub rules: BTreeSet<RuleId>,
+    // ---- Wave 4: ceremonies (SIM-SUN) ----
+    /// Devotion pool, offered up by Basking. @spec SIM-SUN-001
+    #[serde(default)]
+    pub devotion: f64,
+    /// Legacy serenity — only ever grows, persists the Move. @spec SIM-SUN-002
+    #[serde(default)]
+    pub serenity: f64,
+    /// The high-water mark of devotion ever reached — the Rite worship-gate.
+    /// @spec SIM-SUN-005
+    #[serde(default)]
+    pub peak_devotion: f64,
+    /// The Enlightenment tier, serenity-bought and monotone. @spec SIM-SUN-008
+    #[serde(default)]
+    pub enlightenment_tier: u32,
+    /// Bought Sunbeam Rites (membership). @spec SIM-SUN-005
+    #[serde(default)]
+    pub rites: BTreeSet<RiteId>,
+    /// Per-rite copy count — restacked rites (SIM-SUN-006) exceed one; effects
+    /// and prices scale by it. Old saves zero-fill. @spec SIM-SUN-006
+    #[serde(default)]
+    pub rite_counts: [u32; 11],
+    // ---- Wave 4: mystic (SIM-UNI) ----
+    /// Bought Rainbow Arch upgrades. @spec SIM-UNI-005
+    #[serde(default)]
+    pub arches_bought: BTreeSet<ArchId>,
+    /// Dream-drift accumulator; at ≥ 1 a prism naps into a dreamcorn.
+    /// @spec SIM-UNI-007
+    #[serde(default)]
+    pub dream_drift: f64,
+    /// The Promises to the Night Court, in slot order. @spec SIM-UNI-009
+    #[serde(default)]
+    pub promises: Vec<Promise>,
+    // ---- Wave 4: colonies (SIM-TRADE) ----
+    /// Per-colony Pen Pal level, ColonyId-indexed. @spec SIM-TRADE-006
+    #[serde(default)]
+    pub penpal: [u32; 8],
+    /// Discovered colonies — permanent. @spec SIM-TRADE-008
+    #[serde(default)]
+    pub discovered: BTreeSet<ColonyId>,
     /// Derived accelerator for the per-tick reveal scan: the complement of
     /// `revealed`, in canonical order. Never serialized — rebuilt on load —
     /// so it can't drift from `revealed`, which stays the sole truth.
@@ -763,6 +915,17 @@ impl GameState {
             jamboree_until: 0,
             refinements: BTreeSet::new(),
             rules: BTreeSet::new(),
+            devotion: 0.0,
+            serenity: 0.0,
+            peak_devotion: 0.0,
+            enlightenment_tier: 0,
+            rites: BTreeSet::new(),
+            rite_counts: [0; 11],
+            arches_bought: BTreeSet::new(),
+            dream_drift: 0.0,
+            promises: Vec::new(),
+            penpal: [0; 8],
+            discovered: BTreeSet::new(),
             unrevealed_structs: StructureId::ALL.to_vec(),
             unrevealed_ideas: IdeaId::ALL.to_vec(),
         }
@@ -818,8 +981,63 @@ impl GameState {
     /// Cardboard-Box gate never opens by percentage.
     // @spec SIM-ECO-001, SIM-ECO-002, SIM-CUR-011
     pub fn cap(&self, r: ResourceId) -> f64 {
-        (content::BASE_CAPS[r.ix()] + self.effect(crate::effects::Effect::MaxCap(r)))
-            * (1.0 + self.effect(crate::effects::Effect::CapRatio))
+        use crate::effects::Effect;
+        // MaxCapRatio arrives only from Rites, so the rite-free hot path (the
+        // per-tick clamp) skips that scan entirely.
+        let max_cap_ratio =
+            if self.rites.is_empty() { 0.0 } else { self.effect(Effect::MaxCapRatio(r)) };
+        let ratio = 1.0 + self.effect(Effect::CapRatio) + max_cap_ratio;
+        // The Golden Hour rite multiplies the whole warmth reservoir (every
+        // warmth-cap source, Sun Rooms and Sunbeam Altars alike) by
+        // (1.4 + 0.1 per Golden Hour) — buying it always enlarges the pantry,
+        // never shrinks it. @spec SIM-SUN-005
+        if r == ResourceId::Warmth {
+            let golden = self.rite_counts[RiteId::GoldenHour.ix()];
+            if golden > 0 {
+                let warmth_sources = content::BASE_CAPS[r.ix()] + self.effect(Effect::MaxCap(r));
+                return warmth_sources * (1.4 + 0.1 * golden as f64) * ratio;
+            }
+        }
+        (content::BASE_CAPS[r.ix()] + self.effect(Effect::MaxCap(r))) * ratio
+    }
+
+    // ---- Wave 4 derived queries ----
+
+    /// Every Basking is multiplied by (1 + reverence); reverence grows with
+    /// serenity. @spec SIM-SUN-001
+    pub fn reverence(&self) -> f64 {
+        crate::effects::unlimited_dr(self.serenity, 0.1) * 0.1
+    }
+
+    /// The Long Sun production bonus (layer 8), 0 without the Long Sun rite;
+    /// else limited_dr(unlimited_dr(devotion, 1000) / 100, cap), where
+    /// cap = 10 + 0.05 × enlightenment_tier per Sunstone. @spec SIM-SUN-004
+    pub fn long_sun_bonus(&self) -> f64 {
+        if !self.rites.contains(&RiteId::TheLongSun) {
+            return 0.0;
+        }
+        let sunstones = self.structures[StructureId::Sunstone.ix()] as f64;
+        let cap = 10.0 + 0.05 * self.enlightenment_tier as f64 * sunstones;
+        crate::effects::limited_dr(
+            crate::effects::unlimited_dr(self.devotion, 1000.0) / 100.0,
+            cap,
+        )
+    }
+
+    /// A colony's standing: start + Pen Pal warming + dedicated standing
+    /// effects. A shy colony (negative start) only ever warms toward neutral,
+    /// clamped between its start floor and 0. @spec SIM-TRADE-005
+    pub fn standing(&self, colony: ColonyId) -> f64 {
+        let def = content::colony_def(colony);
+        let warm = (content::PENPAL_STANDING_PER * self.penpal[colony.ix()] as f64)
+            .min(content::PENPAL_STANDING_CAP)
+            + self.effect(crate::effects::Effect::StandingFor(colony));
+        let raw = def.start_standing + warm;
+        if def.start_standing < 0.0 {
+            raw.clamp(def.start_standing, 0.0)
+        } else {
+            raw
+        }
     }
 
     pub fn stock(&self, r: ResourceId) -> f64 {

@@ -1,8 +1,8 @@
 use crate::content;
 use crate::events::Event;
 use crate::state::{
-    CraftId, GameState, IdeaId, JobId, Location, RefinementId, ResourceId, RuleId, StructureId,
-    EPSILON,
+    ArchId, ColonyId, CraftId, GameState, IdeaId, JobId, Location, Promise, RefinementId,
+    ResourceId, RiteId, RuleId, StructureId, EPSILON,
 };
 use serde::{Deserialize, Serialize};
 
@@ -44,6 +44,35 @@ pub enum Command {
     /// Release the most recently assigned bound holder of a recipe.
     /// @spec SIM-ECO-043
     UnassignTinkerer(CraftId),
+    // ---- Wave 4: ceremonies (SIM-SUN) ----
+    /// Offer warmth up into devotion. @spec SIM-SUN-001
+    Bask,
+    /// Settle devotion into permanent serenity. @spec SIM-SUN-002
+    Reverie,
+    /// Buy (or restack) a Sunbeam Rite. @spec SIM-SUN-005
+    BuyRite(RiteId),
+    /// Spend serenity to raise the Enlightenment tier. @spec SIM-SUN-008
+    Enlighten,
+    // ---- Wave 4: mystic (SIM-UNI) ----
+    /// Hold a Unicorn Parade: unicorns → arch-scaled rainbows. @spec SIM-UNI-001
+    HoldParade,
+    /// Buy a Rainbow Arch upgrade. @spec SIM-UNI-005
+    BuyArch(ArchId),
+    /// Refine 25 prisms → 1 starshard. @spec SIM-UNI-003
+    RefineStarshard,
+    /// Refine 25 starshards → 1 echo. @spec SIM-UNI-003
+    RefineEcho,
+    /// Condense 10000 rainbows → 1 Jar of Purrs. @spec SIM-UNI-004
+    CondenseJar,
+    /// Make a Promise to the Night Court. @spec SIM-UNI-009
+    MakePromise,
+    // ---- Wave 4: colonies (SIM-TRADE) ----
+    /// Send `count` caravans to a colony. @spec SIM-TRADE-001
+    Trade(ColonyId, u32),
+    /// Deepen a Pen Pal correspondence. @spec SIM-TRADE-006
+    SendPenPal(ColonyId),
+    /// Scout for the next colony. @spec SIM-TRADE-007
+    ScoutPicnic,
 }
 
 /// Why a command was rejected. Listed in precedence order: when several
@@ -86,6 +115,19 @@ impl GameState {
             Command::AdoptRule(r) => self.adopt_rule(r),
             Command::AssignTinkerer(c) => self.assign_tinkerer(c),
             Command::UnassignTinkerer(c) => self.unassign_tinkerer(c),
+            Command::Bask => self.bask(),
+            Command::Reverie => self.reverie(),
+            Command::BuyRite(r) => self.buy_rite(r),
+            Command::Enlighten => self.enlighten(),
+            Command::HoldParade => self.hold_parade(),
+            Command::BuyArch(a) => self.buy_arch(a),
+            Command::RefineStarshard => self.refine_starshard(),
+            Command::RefineEcho => self.refine_echo(),
+            Command::CondenseJar => self.condense_jar(),
+            Command::MakePromise => self.make_promise(),
+            Command::Trade(c, n) => self.trade(c, n),
+            Command::SendPenPal(c) => self.send_pen_pal(c),
+            Command::ScoutPicnic => self.scout_picnic(),
         }
     }
 
@@ -252,6 +294,27 @@ impl GameState {
         costs.extend_from_slice(def.gate);
         self.spend(&costs)?;
         self.ideas.insert(i);
+        // Cross-leaf bootstraps granted at research time (no RNG):
+        match i {
+            // The first Rainbow Arch structure arrives free, so the Parade loop
+            // bootstraps without a chicken-and-egg. @spec SIM-UNI-011
+            IdeaId::ParadeRoutes => self.structures[StructureId::RainbowArch.ix()] += 1,
+            // The trade surface hands over the first colony free, forever.
+            // @spec SIM-TRADE-008
+            IdeaId::GiftEconomy => {
+                for c in [
+                    ColonyId::Otters,
+                    ColonyId::Raccoons,
+                    ColonyId::Hedgehogs,
+                    ColonyId::Rabbits,
+                ] {
+                    if self.discovered.insert(c) {
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
         Ok(vec![Event::IdeaResearched { id: i }])
     }
 
@@ -437,6 +500,308 @@ impl GameState {
         Ok(Vec::new())
     }
 
+    // ---- Ceremonies (SIM-SUN) ----
+
+    /// Offer warmth up into devotion: devotion += warmth × (1 + reverence),
+    /// warmth zeroed, peak_devotion ratcheted. An empty sunpuddle rejects.
+    // @spec SIM-SUN-001
+    fn bask(&mut self) -> Result<Vec<Event>, CommandError> {
+        let warmth = self.stock(ResourceId::Warmth);
+        if warmth <= EPSILON {
+            return Err(CommandError::InsufficientResources {
+                missing: vec![(ResourceId::Warmth, content::GATHER_YIELD)],
+            });
+        }
+        self.devotion += warmth * (1.0 + self.reverence());
+        self.resources[ResourceId::Warmth.ix()] = 0.0;
+        self.peak_devotion = self.peak_devotion.max(self.devotion);
+        Ok(vec![Event::Basked { devotion: self.devotion }])
+    }
+
+    /// Settle devotion into permanent serenity (needs the Reverie rite):
+    /// serenity += devotion / 1e6 × (tier + 1)² × 1.01, devotion → a 0.01 spark;
+    /// peak_devotion is untouched.
+    // @spec SIM-SUN-002
+    fn reverie(&mut self) -> Result<Vec<Event>, CommandError> {
+        if !self.rites.contains(&RiteId::TheReverie) {
+            return Err(CommandError::Locked);
+        }
+        if self.devotion <= EPSILON {
+            return Err(CommandError::InsufficientResources {
+                missing: vec![(ResourceId::Warmth, 1.0)],
+            });
+        }
+        let tier = (self.enlightenment_tier as f64 + 1.0).powi(2);
+        self.serenity += self.devotion / 1.0e6 * tier * 1.01;
+        self.devotion = 0.01;
+        Ok(vec![Event::Reveried { serenity: self.serenity }])
+    }
+
+    /// Buy or (post-Enlightenment) restack a Sunbeam Rite. Gated on devotion's
+    /// persisted high-water; warmth+shinies(+charm) all-or-nothing; the ×2.5
+    /// restack ramp scales the cost by the copies already held.
+    // @spec SIM-SUN-005, SIM-SUN-006, SIM-SUN-007
+    fn buy_rite(&mut self, r: RiteId) -> Result<Vec<Event>, CommandError> {
+        let def = content::rite_def(r);
+        if self.peak_devotion + EPSILON < def.devotion_gate {
+            return Err(CommandError::Locked);
+        }
+        let count = self.rite_counts[r.ix()];
+        let restackable =
+            self.rites.contains(&RiteId::Enlightenment) && content::rite_restackable(r);
+        if count >= 1 && !restackable {
+            return Err(CommandError::AlreadyResearched);
+        }
+        let ramp = content::RITE_RESTACK_RATIO.powi(count as i32);
+        let discount = 1.0 + self.effect(crate::effects::Effect::RiteCostRatio);
+        let costs: Vec<(ResourceId, f64)> =
+            def.cost.iter().map(|(res, amt)| (*res, amt * ramp * discount)).collect();
+        self.spend(&costs)?;
+        self.rites.insert(r);
+        self.rite_counts[r.ix()] += 1;
+        Ok(vec![Event::RiteBought { id: r }])
+    }
+
+    /// Spend the marginal serenity for the next Enlightenment tier.
+    // @spec SIM-SUN-008
+    fn enlighten(&mut self) -> Result<Vec<Event>, CommandError> {
+        if !self.rites.contains(&RiteId::Enlightenment) {
+            return Err(CommandError::Locked);
+        }
+        let t = self.enlightenment_tier;
+        let cost = enlighten_total_cost(t + 1) - enlighten_total_cost(t);
+        if self.serenity + EPSILON < cost {
+            return Err(CommandError::InsufficientResources {
+                missing: vec![(ResourceId::Reverie, cost - self.serenity)],
+            });
+        }
+        self.serenity = (self.serenity - cost).max(0.0);
+        self.enlightenment_tier += 1;
+        Ok(vec![Event::Enlightened { tier: self.enlightenment_tier }])
+    }
+
+    // ---- Mystic (SIM-UNI) ----
+
+    /// Hold a Unicorn Parade: 2500 unicorns → 2500 × arches × (1 + parade
+    /// ratio) rainbows. No RNG.
+    // @spec SIM-UNI-001
+    fn hold_parade(&mut self) -> Result<Vec<Event>, CommandError> {
+        if !self.ideas.contains(&IdeaId::ParadeRoutes) {
+            return Err(CommandError::Locked);
+        }
+        self.spend(&[(ResourceId::Unicorns, content::PARADE_UNICORN_COST)])?;
+        let arches = self.structures[StructureId::RainbowArch.ix()] as f64;
+        let ratio = 1.0 + self.effect(crate::effects::Effect::ParadeRatio);
+        let rainbows = content::PARADE_RAINBOWS_PER_ARCH * arches * ratio;
+        self.resources[ResourceId::Rainbows.ix()] += rainbows;
+        Ok(vec![Event::ParadeHeld { rainbows }])
+    }
+
+    /// Buy a Rainbow Arch upgrade (once each), gated by the Parade Routes idea.
+    // @spec SIM-UNI-005
+    fn buy_arch(&mut self, a: ArchId) -> Result<Vec<Event>, CommandError> {
+        if !self.ideas.contains(&IdeaId::ParadeRoutes) {
+            return Err(CommandError::Locked);
+        }
+        if self.arches_bought.contains(&a) {
+            return Err(CommandError::AlreadyResearched);
+        }
+        self.spend(content::arch_def(a).cost)?;
+        self.arches_bought.insert(a);
+        Ok(vec![Event::ArchBought { id: a }])
+    }
+
+    /// Refine 25 prisms → 1 × (1 + starshard-refine) starshards.
+    // @spec SIM-UNI-003
+    fn refine_starshard(&mut self) -> Result<Vec<Event>, CommandError> {
+        self.spend(&[(ResourceId::Prisms, content::REFINE_INPUT)])?;
+        let yield_ = 1.0 + self.effect(crate::effects::Effect::StarshardRefine);
+        self.resources[ResourceId::Starshards.ix()] += yield_;
+        Ok(vec![Event::StarshardRefined])
+    }
+
+    /// Refine 25 starshards → 1 × (1 + echo-refine) echoes.
+    // @spec SIM-UNI-003
+    fn refine_echo(&mut self) -> Result<Vec<Event>, CommandError> {
+        self.spend(&[(ResourceId::Starshards, content::REFINE_INPUT)])?;
+        let yield_ = 1.0 + self.effect(crate::effects::Effect::EchoRefine);
+        self.resources[ResourceId::Echoes.ix()] += yield_;
+        Ok(vec![Event::EchoRefined])
+    }
+
+    /// Condense 10000 rainbows → 1 Jar of Purrs (needs the Everdream Arch,
+    /// clamped to the Jar cap).
+    // @spec SIM-UNI-004
+    fn condense_jar(&mut self) -> Result<Vec<Event>, CommandError> {
+        if !self.arches_bought.contains(&ArchId::EverdreamArch) {
+            return Err(CommandError::Locked);
+        }
+        self.spend(&[(ResourceId::Rainbows, content::JAR_RAINBOW_COST)])?;
+        let ix = ResourceId::JarsOfPurrs.ix();
+        self.resources[ix] = (self.resources[ix] + 1.0).min(self.cap(ResourceId::JarsOfPurrs));
+        Ok(vec![Event::JarCondensed])
+    }
+
+    /// Make a Promise: spend echoes, fill a slot. Slots come from Everdream
+    /// Arches; the Night Court surface (idea) must be open.
+    // @spec SIM-UNI-009
+    fn make_promise(&mut self) -> Result<Vec<Event>, CommandError> {
+        if !self.ideas.contains(&IdeaId::NightCourtEtiquette) {
+            return Err(CommandError::Locked);
+        }
+        let slots = if self.arches_bought.contains(&ArchId::EverdreamArch) {
+            content::PROMISE_SLOTS_PER_EVERDREAM
+        } else {
+            0
+        };
+        if self.promises.len() >= slots {
+            return Err(CommandError::NoSeats);
+        }
+        self.spend(&[(ResourceId::Echoes, content::PROMISE_ECHO_COST)])?;
+        self.promises.push(Promise { quiet: false });
+        Ok(vec![Event::PromiseMade])
+    }
+
+    // ---- Colonies (SIM-TRADE) ----
+
+    /// Send `count` caravans to a discovered colony. Cost (50 pep + 15 shinies +
+    /// buy-resource per caravan) is affordable-checked and spent BEFORE any RNG
+    /// draw; each caravan then resolves against standing.
+    // @spec SIM-TRADE-001, SIM-TRADE-002, SIM-TRADE-004
+    fn trade(&mut self, colony: ColonyId, count: u32) -> Result<Vec<Event>, CommandError> {
+        if count == 0 {
+            return Err(CommandError::UnknownId);
+        }
+        if !self.discovered.contains(&colony) {
+            return Err(CommandError::Locked);
+        }
+        let def = content::colony_def(colony);
+        let n = count as f64;
+        // Affordability is checked (and spent) before any draw, so a rejected
+        // trade leaves the RNG untouched.
+        self.spend(&[
+            (ResourceId::Pep, content::TRADE_PEP_PER_CARAVAN * n),
+            (ResourceId::Shinies, content::TRADE_SHINIES_PER_CARAVAN * n),
+            (def.buy.0, def.buy.1 * n),
+        ])?;
+
+        let st = self.standing(colony);
+        let season = self.season();
+        let trade_ratio = 1.0 + self.effect(crate::effects::Effect::TradeRatio);
+        let kites = self.stock(ResourceId::Kites);
+        let penpal = self.penpal[colony.ix()];
+        for _ in 0..count {
+            // Shy colonies nap with probability −standing; warm/neutral trade.
+            let traded = st >= 0.0 || self.rng.chance(1.0 + st);
+            if !traded {
+                continue; // a nap: the caravan travelled, cost already paid
+            }
+            let bonus = st > 0.0 && self.rng.chance(st.min(1.0));
+            let bonus_mult = if bonus { content::TRADE_BONUS_MULT } else { 1.0 };
+            for sell in def.sells {
+                if penpal < sell.min_penpal || !self.rng.chance(sell.chance) {
+                    continue;
+                }
+                let season_mult = if sell.season == Some(season) {
+                    1.0 + sell.season_bonus
+                } else {
+                    1.0
+                };
+                let fuzz = 1.0 + (self.rng.uniform() * 2.0 - 1.0) * content::TRADE_FUZZ_WIDTH;
+                self.resources[sell.resource.ix()] +=
+                    sell.amount * trade_ratio * season_mult * bonus_mult * fuzz;
+            }
+            // Foxes' kite-scaled moonstone — the early metal path.
+            // @spec SIM-TRADE-004
+            if colony == ColonyId::Foxes {
+                let chance = content::FOX_MOONSTONE_CHANCE_BASE
+                    + content::FOX_MOONSTONE_CHANCE_PER_KITE * kites;
+                if self.rng.chance(chance) {
+                    let amount = (content::FOX_MOONSTONE_AMOUNT_BASE
+                        + content::FOX_MOONSTONE_AMOUNT_PER_KITE * kites)
+                        * (1.0 + st).max(0.0);
+                    let fuzz = 1.0 + (self.rng.uniform() * 2.0 - 1.0) * content::TRADE_FUZZ_WIDTH;
+                    self.resources[ResourceId::Moonstone.ix()] +=
+                        amount * trade_ratio * bonus_mult * fuzz;
+                }
+            }
+        }
+        Ok(vec![Event::TradeReturned { colony, caravans: count }])
+    }
+
+    /// Deepen a Pen Pal correspondence: charm base × 1.15^level. Star Whales
+    /// take no Pen Pals.
+    // @spec SIM-TRADE-006
+    fn send_pen_pal(&mut self, colony: ColonyId) -> Result<Vec<Event>, CommandError> {
+        if colony == ColonyId::StarWhales
+            || !self.ideas.contains(&IdeaId::PenPalNetworks)
+            || !self.discovered.contains(&colony)
+        {
+            return Err(CommandError::Locked);
+        }
+        let level = self.penpal[colony.ix()];
+        let cost = content::PENPAL_BASE_CHARM * content::PENPAL_CHARM_RATIO.powi(level as i32);
+        self.spend(&[(ResourceId::Charm, cost)])?;
+        self.penpal[colony.ix()] += 1;
+        Ok(vec![Event::PenPalSent { colony, level: self.penpal[colony.ix()] }])
+    }
+
+    /// Spend 1000 pep to scout the next colony; a quiet day refunds 950.
+    // @spec SIM-TRADE-007
+    fn scout_picnic(&mut self) -> Result<Vec<Event>, CommandError> {
+        if !self.ideas.contains(&IdeaId::GiftEconomy) {
+            return Err(CommandError::Locked);
+        }
+        self.spend(&[(ResourceId::Pep, content::SCOUT_PEP_COST)])?;
+        let found = self.rng.chance(content::SCOUT_FIND_CHANCE).then(|| self.scout_target()).flatten();
+        match found {
+            Some(colony) => {
+                self.discovered.insert(colony);
+                Ok(vec![Event::ColonyDiscovered { colony }])
+            }
+            None => {
+                // A quiet day: they mostly stayed home. Most of the pep returns.
+                self.resources[ResourceId::Pep.ix()] += content::SCOUT_PEP_REFUND;
+                Ok(Vec::new())
+            }
+        }
+    }
+
+    /// The next colony a successful picnic discovers, by deterministic
+    /// prerequisite priority: a random undiscovered first-tier colony, else the
+    /// eligible Foxes, Deer, then Owls. @spec SIM-TRADE-007
+    fn scout_target(&mut self) -> Option<ColonyId> {
+        let first_tier: Vec<ColonyId> = [
+            ColonyId::Otters,
+            ColonyId::Raccoons,
+            ColonyId::Hedgehogs,
+            ColonyId::Rabbits,
+        ]
+        .into_iter()
+        .filter(|c| !self.discovered.contains(c))
+        .collect();
+        if !first_tier.is_empty() {
+            return Some(first_tier[self.rng.index(first_tier.len())]);
+        }
+        let charm = self.stock(ResourceId::Charm);
+        let kites = self.stock(ResourceId::Kites);
+        let curiosity_cap = self.cap(ResourceId::Curiosity);
+        if !self.discovered.contains(&ColonyId::Foxes) && charm + EPSILON >= content::SCOUT_FOX_CHARM
+        {
+            return Some(ColonyId::Foxes);
+        }
+        if !self.discovered.contains(&ColonyId::Deer) && kites >= 1.0 - EPSILON {
+            return Some(ColonyId::Deer);
+        }
+        if !self.discovered.contains(&ColonyId::Owls)
+            && kites + EPSILON >= content::SCOUT_OWL_KITES
+            && curiosity_cap > content::SCOUT_OWL_CURIOSITY_CAP
+        {
+            return Some(ColonyId::Owls);
+        }
+        None
+    }
+
     /// All-or-nothing spend with epsilon-tolerant affordability.
     // @spec SIM-ECO-022
     fn spend(&mut self, costs: &[(ResourceId, f64)]) -> Result<(), CommandError> {
@@ -454,4 +819,12 @@ impl GameState {
         }
         Ok(())
     }
+}
+
+/// The Enlightenment cumulative cost to reach tier t:
+/// total_cost(t) = inverse_unlimited_dr(e^t / 10, 0.1) = 0.1 · y · (y+1) / 2,
+/// with y = e^t / 10 — the brutally exponential ladder. @spec SIM-SUN-008
+pub(crate) fn enlighten_total_cost(t: u32) -> f64 {
+    let y = (t as f64).exp() / 10.0;
+    0.1 * y * (y + 1.0) / 2.0
 }

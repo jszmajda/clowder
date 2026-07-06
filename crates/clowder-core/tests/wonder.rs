@@ -43,6 +43,7 @@
 //!
 //! Derived queries pinned: `reverence()`, `long_sun_bonus()` (the layer-8 bonus
 //! itself, 0 with no Long Sun rite), `standing(ColonyId)`.
+#![allow(clippy::type_complexity, clippy::doc_overindented_list_items)]
 
 mod common;
 
@@ -274,9 +275,11 @@ fn the_rite_ladder_matches_the_design_table() {
     // Shared Sunpuddle: Altars +0.02 curiosity cap-ratio each (1 altar → 0.02).
     buy_rite_free(&mut s, RiteId::SharedSunpuddle);
     assert!((s.effect(Effect::MaxCapRatio(ResourceId::Curiosity)) - 0.02).abs() < 1e-9);
-    // Golden Hour: warmth cap × (1.4 + 0.1 per Golden Hour) — 1 copy → ×1.5.
+    // Golden Hour: the whole warmth reservoir × (1.4 + 0.1 per Golden Hour) —
+    // 1 copy → ×1.5, over every warmth-cap source (Sun Room 75 + Altar 120),
+    // never shrinking it (Tenet 1: buying a rite is never a confiscation).
     buy_rite_free(&mut s, RiteId::GoldenHour);
-    assert!((s.cap(ResourceId::Warmth) - 75.0 * 1.5).abs() < 1e-9, "warmth cap ×1.5");
+    assert!((s.cap(ResourceId::Warmth) - (75.0 + 120.0) * 1.5).abs() < 1e-9, "warmth cap ×1.5");
     // Warm Welcome: Altars +0.4 happiness points each (1 altar → +0.4).
     buy_rite_free(&mut s, RiteId::WarmWelcome);
     assert!((s.effect(Effect::HappinessPoints) - happy_before - 0.4).abs() < 1e-9);
@@ -345,7 +348,7 @@ fn enlightenment_makes_early_rites_restackable_at_a_2_5_ramp() {
         s.apply(Command::BuyRite(RiteId::MorningStretch)).unwrap_err(),
         CommandError::InsufficientResources { .. }
     ));
-    give(&mut s, ResourceId::Warmth, 1.0); // now 250
+    give(&mut s, ResourceId::Warmth, 250.0); // now 250 (give sets, not adds)
     s.apply(Command::BuyRite(RiteId::MorningStretch)).unwrap();
     assert_eq!(s.stock(ResourceId::Warmth), 0.0, "2nd copy cost 250 warmth");
     assert!(
@@ -497,6 +500,7 @@ fn unicorn_meadow_scales_by_the_mystic_unicorns_ratio_not_the_global_layers() {
     grant(&mut dynamo, StructureId::DynamoWheel, 1);
     give(&mut dynamo, ResourceId::Dew, 10.0);
     run_ticks(&mut dynamo, 1);
+    run_ticks(&mut plain, 1); // match dynamo's tick count (dynamo was cloned post-tick)
     assert_eq!(
         dynamo.stock(ResourceId::Unicorns),
         plain.stock(ResourceId::Unicorns),

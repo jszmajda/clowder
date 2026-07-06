@@ -196,6 +196,7 @@ StorageFull rejection when the yield resource is at cap (unchanged rule).
 | Moonstone gating | Pre-Kiln moonstone only via trade (wave 4) | Native early source | The inspiration's titanium pattern: trade opens the metal tier early for those who invest in it, the Kiln arrives later |
 | Gate crafts | stories/anthologies/schemes cost stocked curiosity | Direct curiosity prices only | Makes curiosity *storage* the research gate — the self-reinforcing infrastructure loop that gives the mid-game its shape |
 | Cleverness as a resource | Ordinary transient resource | Hidden non-resource accumulator | Keeps Yarn Computer state visible, serializable, and normalizable like everything else |
+| Global-source self-boost | A structure's own raw output is exempt from the global ratio it contributes | Let it amplify its own faucet | Avoids a self-referential loop and keeps the Star Basin's stardust legible; the boost still applies from every other global source |
 | Treat Bakery pep draw vs pounce budget | Contention by design (the inspiration's mint pattern) | Pep-reserve floor; auto-toggling | Choosing between passive luxury income and active expedition bursts is a real decision; structure on/off toggling is an integration-wave obligation that will hand the player the lever |
 
 ## Open Questions & Future Decisions

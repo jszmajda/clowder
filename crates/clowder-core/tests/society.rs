@@ -15,7 +15,7 @@ fn idea_band(i: IdeaId) -> u32 {
         18..=27 => 1,
         28..=35 => 2,
         36..=43 => 3,
-        44..=55 => 4,
+        44..=55 | 57..=58 => 4,
         other => panic!("unmapped idea id {other}"),
     }
 }

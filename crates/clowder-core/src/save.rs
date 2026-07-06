@@ -157,6 +157,22 @@ pub fn load_string(s: &str, now_unix: u64) -> Result<LoadedGame, LoadError> {
         state.elder = None;
     }
 
+    // Wave-4 normalization: devotion, serenity, peak_devotion, and dream-drift
+    // are physics — floor at zero and stay finite. The enlightenment tier,
+    // pen-pal levels, discoveries, rites, and Promises are valid by
+    // construction. @spec SAVE-013
+    for value in [
+        &mut state.devotion,
+        &mut state.serenity,
+        &mut state.peak_devotion,
+        &mut state.dream_drift,
+    ] {
+        if !value.is_finite() || *value < 0.0 {
+            *value = 0.0;
+        }
+    }
+    state.peak_devotion = state.peak_devotion.max(state.devotion);
+
     // Offline catch-up: same tick(), fast-forwarded at the save's own game
     // speed — away time accrues exactly as attended time would have. A
     // backwards clock is zero ticks, an absurd clock is capped and flagged.

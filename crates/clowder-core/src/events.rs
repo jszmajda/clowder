@@ -1,4 +1,7 @@
-use crate::state::{ContentId, IdeaId, JobId, MoodTier, RefinementId, RuleId, Season, StructureId};
+use crate::state::{
+    ArchId, ColonyId, ContentId, IdeaId, JobId, MoodTier, RefinementId, RiteId, RuleId, Season,
+    StructureId,
+};
 use serde::{Deserialize, Serialize};
 
 /// Typed simulation occurrences returned by `tick()` and command application.
@@ -50,4 +53,23 @@ pub enum Event {
     RefinementBought { id: RefinementId },
     // @spec SIM-CUR-011
     RuleAdopted { id: RuleId },
+    // ---- Wave 4: ceremonies (SIM-SUN) ----
+    Basked { devotion: f64 },
+    Reveried { serenity: f64 },
+    RiteBought { id: RiteId },
+    Enlightened { tier: u32 },
+    // ---- Wave 4: mystic (SIM-UNI) ----
+    ParadeHeld { rainbows: f64 },
+    ArchBought { id: ArchId },
+    StarshardRefined,
+    EchoRefined,
+    JarCondensed,
+    PromiseMade,
+    PromiseQuieted { index: usize },
+    PromiseResumed { index: usize },
+    PrismDescended,
+    // ---- Wave 4: colonies (SIM-TRADE) ----
+    TradeReturned { colony: ColonyId, caravans: u32 },
+    PenPalSent { colony: ColonyId, level: u32 },
+    ColonyDiscovered { colony: ColonyId },
 }
