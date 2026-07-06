@@ -21,7 +21,7 @@
 
 ## Happiness & Mood
 
-- [ ] **SIM-KIT-011**: The system shall compute happiness each tick (never storing it) as 100% − crowding + happiness-point effects + 1 point per loafing Home kitten (at most 5) + 10 points per distinct stocked luxury (dust-guarded: stock > 1e-9) + 30 × (1 + jamboree-ratio effects) while a jamboree runs + unlimited_dr(Warm Memories, 5) (the prestige leaf's happiness legacy) − the economy leaf's mess penalty, floored at 25% with no upper cap — where crowding = 3 points per Home kitten beyond the fifth × (1 − limited_dr(0.048 × Story Circles + 0.075 × Moonlight Stages, 0.9)).
+- [x] **SIM-KIT-011**: The system shall compute happiness each tick (never storing it) as 100% − crowding + happiness-point effects + 1 point per loafing Home kitten (at most 5) + 10 points per distinct stocked luxury (dust-guarded: stock > 1e-9) + 30 × (1 + jamboree-ratio effects) while a jamboree runs + unlimited_dr(Warm Memories, 5) (the prestige leaf's happiness legacy) − the economy leaf's mess penalty, floored at 25% with no upper cap — where crowding = 3 points per Home kitten beyond the fifth × (1 − limited_dr(0.048 × Story Circles + 0.075 × Moonlight Stages, 0.9)).
 - [x] **SIM-KIT-012**: The system shall apply a mood multiplier of happiness/100 to job production, further multiplied by 0.25 while the clowder is Grumpy.
 - [x] **SIM-KIT-013**: While the most recent consumption phase was a shortfall (SIM-ECO: pooled demand exceeded stock), the clowder shall be Grumpy; Grumpiness clears on the first tick whose consumption phase was not a shortfall.
 - [x] **SIM-KIT-014**: The system shall classify mood into tiers — Blissful (happiness ≥ 120), Content (≥ 90), Restless (≥ 60), Fussy (< 60) — with Grumpy overriding all tiers while active.

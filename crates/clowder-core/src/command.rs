@@ -1,8 +1,9 @@
 use crate::content;
 use crate::events::Event;
 use crate::state::{
-    ArchId, ColonyId, CraftId, GameState, IdeaId, JobId, Location, Promise, RefinementId,
-    ResourceId, RiteId, RuleId, StructureId, EPSILON,
+    AdventureId, ArchId, ArchivedKitten, ColonyId, CraftId, GameState, IdeaId, JobId, Kitten,
+    Location, Promise, RefinementId, ResourceId, RiteId, RuleId, StructureId, TraditionId,
+    RESOURCE_COUNT, STRUCTURE_COUNT, EPSILON,
 };
 use serde::{Deserialize, Serialize};
 
@@ -73,6 +74,16 @@ pub enum Command {
     SendPenPal(ColonyId),
     /// Scout for the next colony. @spec SIM-TRADE-007
     ScoutPicnic,
+    // ---- Wave 5: prestige / the Great Meadow Move (SIM-MOVE) ----
+    /// Relocate the whole clowder to a fresh, brighter meadow. @spec SIM-MOVE-001
+    GreatMeadowMove,
+    /// Convert all Elder Wisdom into Passed-Down Wisdom (one-way). @spec SIM-MOVE-009
+    PassItDown,
+    /// Buy a permanent Tradition with Elder Wisdom. @spec SIM-MOVE-010
+    BuyTradition(TraditionId),
+    // ---- Wave 5: adventures (SIM-ADV) ----
+    /// Arm (or, with None, disarm) an Adventure for the next Move. @spec SIM-ADV-001
+    DeclareAdventure(Option<AdventureId>),
 }
 
 /// Why a command was rejected. Listed in precedence order: when several
@@ -128,6 +139,10 @@ impl GameState {
             Command::Trade(c, n) => self.trade(c, n),
             Command::SendPenPal(c) => self.send_pen_pal(c),
             Command::ScoutPicnic => self.scout_picnic(),
+            Command::GreatMeadowMove => self.great_meadow_move(),
+            Command::PassItDown => self.pass_it_down(),
+            Command::BuyTradition(t) => self.buy_tradition(t),
+            Command::DeclareAdventure(id) => self.declare_adventure(id),
         }
     }
 
@@ -332,6 +347,18 @@ impl GameState {
         }
         self.spend(&[(ResourceId::Pep, content::POUNCE_PEP_PER_SQUAD * squads as f64)])?;
 
+        // Gentle Paws: the squads still trot out (pep spent), but come home with
+        // nothing — no yields, no RNG draws. @spec SIM-ADV-002
+        if self.active_adventure == Some(AdventureId::GentlePaws) {
+            return Ok(vec![Event::PounceReturned {
+                squads,
+                feathers: 0.0,
+                bells: 0.0,
+                shinies: 0.0,
+                unicorns: 0,
+            }]);
+        }
+
         // @spec SIM-EXP-004
         let ratio = self.effect(crate::effects::Effect::PounceRatio);
         let feathers =
@@ -377,7 +404,10 @@ impl GameState {
     /// celebrating" is Locked), all-or-nothing bill, 100 days of festivity.
     // @spec SIM-KIT-025
     fn host_jamboree(&mut self) -> Result<Vec<Event>, CommandError> {
-        if !self.ideas.contains(&IdeaId::TeaCeremonies) || self.jamboree_active() {
+        if !self.ideas.contains(&IdeaId::TeaCeremonies)
+            || self.jamboree_active()
+            || self.active_adventure == Some(AdventureId::QuietRetreat)
+        {
             return Err(CommandError::Locked);
         }
         self.spend(&[
@@ -506,6 +536,9 @@ impl GameState {
     /// warmth zeroed, peak_devotion ratcheted. An empty sunpuddle rejects.
     // @spec SIM-SUN-001
     fn bask(&mut self) -> Result<Vec<Event>, CommandError> {
+        if self.silent_sun() {
+            return Err(CommandError::Locked);
+        }
         let warmth = self.stock(ResourceId::Warmth);
         if warmth <= EPSILON {
             return Err(CommandError::InsufficientResources {
@@ -523,6 +556,9 @@ impl GameState {
     /// peak_devotion is untouched.
     // @spec SIM-SUN-002
     fn reverie(&mut self) -> Result<Vec<Event>, CommandError> {
+        if self.silent_sun() {
+            return Err(CommandError::Locked);
+        }
         if !self.rites.contains(&RiteId::TheReverie) {
             return Err(CommandError::Locked);
         }
@@ -542,6 +578,9 @@ impl GameState {
     /// restack ramp scales the cost by the copies already held.
     // @spec SIM-SUN-005, SIM-SUN-006, SIM-SUN-007
     fn buy_rite(&mut self, r: RiteId) -> Result<Vec<Event>, CommandError> {
+        if self.silent_sun() {
+            return Err(CommandError::Locked);
+        }
         let def = content::rite_def(r);
         if self.peak_devotion + EPSILON < def.devotion_gate {
             return Err(CommandError::Locked);
@@ -565,6 +604,9 @@ impl GameState {
     /// Spend the marginal serenity for the next Enlightenment tier.
     // @spec SIM-SUN-008
     fn enlighten(&mut self) -> Result<Vec<Event>, CommandError> {
+        if self.silent_sun() {
+            return Err(CommandError::Locked);
+        }
         if !self.rites.contains(&RiteId::Enlightenment) {
             return Err(CommandError::Locked);
         }
@@ -802,6 +844,184 @@ impl GameState {
         None
     }
 
+    /// The Silent Sun adventure twist: ceremonies unavailable. @spec SIM-ADV-002
+    fn silent_sun(&self) -> bool {
+        self.active_adventure == Some(AdventureId::SilentSun)
+    }
+
+    // ---- Wave 5: prestige / the Great Meadow Move (SIM-MOVE) ----
+
+    /// The one reset in the game: earn the legacies, archive the generation,
+    /// pack the baskets and the Memory Chest, and move into a fresh meadow —
+    /// preserving the legacy set (Elder Wisdom, Warm Memories, Passed-Down
+    /// Wisdom, serenity, enlightenment, Traditions, the Family Album, the
+    /// Adventures state, generation, speed, and the never-reseeded RNG). It
+    /// draws no randomness and takes nothing the player is attached to.
+    /// @spec SIM-MOVE-001, SIM-MOVE-002, SIM-MOVE-003, SIM-MOVE-004,
+    ///       SIM-MOVE-005, SIM-MOVE-006, SIM-MOVE-008, SIM-ADV-002
+    fn great_meadow_move(&mut self) -> Result<Vec<Event>, CommandError> {
+        let roster_len = self.kittens.len();
+        if roster_len < content::MEADOW_MOVE_MIN_KITTENS {
+            // A Move needs a real clowder (Home and Away both count). Nothing
+            // is mutated on rejection.
+            return Err(CommandError::InsufficientResources { missing: Vec::new() });
+        }
+
+        // ---- 1. Snapshot everything the reset would erase ----
+        let old_ticks = self.ticks;
+        let old_stocks = self.resources;
+        let ratio = self.memory_chest_ratio(); // reads OLD structures + traditions
+        let gen = self.generation;
+        let millennia = (old_ticks / 1_000_000) as f64;
+        let cap = self.basket_capacity() as usize;
+        let second_wind = self.traditions.contains(&TraditionId::SecondWind);
+        let old_armed = self.armed_adventure;
+        let old_active = self.active_adventure;
+        let old_done = self.adventure_done;
+        let old_roster = std::mem::take(&mut self.kittens);
+
+        // ---- 2. Earn the legacies (never decreasing) ----
+        self.elder_wisdom += (roster_len as f64 - 70.0).max(0.0) + millennia;
+        self.warm_memories += karma_gain(roster_len as f64);
+
+        // ---- 3. Archive every kitten under the current (pre-increment) gen ----
+        for k in &old_roster {
+            self.family_album.push(ArchivedKitten {
+                name: k.name.clone(),
+                trait_id: k.trait_id,
+                rank: k.rank,
+                generation: gen,
+            });
+        }
+
+        // ---- 4. Pack the Traveling Baskets: most-senior first, normalized ----
+        let mut sorted = old_roster;
+        sorted.sort_by_key(|k| k.arrived_day);
+        let basket: Vec<Kitten> = sorted
+            .into_iter()
+            .take(cap)
+            .enumerate()
+            .map(|(i, k)| {
+                let keep_job = second_wind && i == 0;
+                Kitten {
+                    name: k.name,
+                    job: if keep_job { k.job } else { None },
+                    location: Location::Home,
+                    arrived_day: 0,
+                    job_seq: None,
+                    away_seq: None,
+                    skills: k.skills,
+                    exp: k.exp,
+                    rank: k.rank,
+                    trait_id: k.trait_id,
+                    tinkering: None,
+                }
+            })
+            .collect();
+
+        // ---- 5. Fill the Memory Chest (a fraction of each pre-reset stock) ----
+        let mut carried = [0.0f64; RESOURCE_COUNT];
+        for r in ResourceId::ALL {
+            carried[r.ix()] = ratio * old_stocks[r.ix()];
+        }
+
+        // ---- 6. Move in: reset the meadow in place (NOT GameState::new, which
+        // would reseed the RNG); the legacy set below is left untouched. ----
+        self.structures = [0; STRUCTURE_COUNT];
+        self.ideas.clear();
+        self.refinements.clear();
+        self.rules.clear();
+        self.resources = [0.0; RESOURCE_COUNT];
+        self.kittens = basket;
+        self.devotion = 0.0;
+        self.peak_devotion = 0.0;
+        self.rite_counts = [0; 11];
+        self.rites.clear();
+        self.dream_drift = 0.0;
+        self.arches_bought.clear();
+        self.promises.clear();
+        self.discovered.clear();
+        self.penpal = [0; 8];
+        self.elder = None;
+        self.mess = 0.0;
+        self.grumpy = false;
+        self.pity = 0;
+        self.famine_days = 0;
+        self.recovery_days = 0;
+        self.next_seq = 0;
+        self.zoomies_until = 0;
+        self.jamboree_until = 0;
+        self.kites_high_water = 0.0;
+        self.pending_sky_event = None;
+        self.ticks = 0;
+        self.tidy_progress = 0;
+        self.revealed.clear();
+        self.generation = gen + 1;
+        self.rebuild_unrevealed();
+
+        // ---- 7. Adventures: armed → active; a completed twist lifts, an
+        // unfinished one carries over. @spec SIM-ADV-002, SIM-ADV-004 ----
+        self.active_adventure = if let Some(a) = old_armed {
+            Some(a)
+        } else if old_done {
+            None
+        } else {
+            old_active
+        };
+        self.armed_adventure = None;
+        self.adventure_done = false;
+
+        // ---- 8. Place the carried resources, then the Warm Welcome Home gift ----
+        for r in ResourceId::ALL {
+            self.resources[r.ix()] = carried[r.ix()];
+        }
+        if self.traditions.contains(&TraditionId::WarmWelcomeHome) {
+            self.resources[ResourceId::Catnip.ix()] += content::WARM_WELCOME_CATNIP;
+            self.structures[StructureId::CozyCushion.ix()] += 1;
+        }
+
+        Ok(vec![Event::MeadowMoved { generation: self.generation }])
+    }
+
+    /// Convert all Elder Wisdom into Passed-Down Wisdom (one-way). @spec SIM-MOVE-009
+    fn pass_it_down(&mut self) -> Result<Vec<Event>, CommandError> {
+        self.passed_down_wisdom += self.elder_wisdom;
+        self.elder_wisdom = 0.0;
+        Ok(vec![Event::Passed { passed_down_wisdom: self.passed_down_wisdom }])
+    }
+
+    /// Buy a Tradition once with Elder Wisdom: AlreadyResearched on a re-buy,
+    /// InsufficientResources when unaffordable, all-or-nothing, permanent.
+    /// @spec SIM-MOVE-010, SIM-MOVE-012
+    fn buy_tradition(&mut self, t: TraditionId) -> Result<Vec<Event>, CommandError> {
+        if self.traditions.contains(&t) {
+            return Err(CommandError::AlreadyResearched);
+        }
+        let cost = content::tradition_def(t).cost_wisdom;
+        if self.elder_wisdom + EPSILON < cost {
+            return Err(CommandError::InsufficientResources { missing: Vec::new() });
+        }
+        self.elder_wisdom -= cost;
+        self.traditions.insert(t);
+        Ok(vec![Event::TraditionBought { id: t }])
+    }
+
+    /// Arm (or disarm, with None) an Adventure for the next Move — once the
+    /// Adventures surface is open (the Adventurous Spirit tradition or idea).
+    /// @spec SIM-ADV-001
+    fn declare_adventure(
+        &mut self,
+        id: Option<AdventureId>,
+    ) -> Result<Vec<Event>, CommandError> {
+        let unlocked = self.traditions.contains(&TraditionId::AdventurousSpirit)
+            || self.ideas.contains(&IdeaId::AdventurousSpirit);
+        if !unlocked {
+            return Err(CommandError::Locked);
+        }
+        self.armed_adventure = id;
+        Ok(vec![Event::AdventureDeclared { id }])
+    }
+
     /// All-or-nothing spend with epsilon-tolerant affordability.
     // @spec SIM-ECO-022
     fn spend(&mut self, costs: &[(ResourceId, f64)]) -> Result<(), CommandError> {
@@ -827,4 +1047,15 @@ impl GameState {
 pub(crate) fn enlighten_total_cost(t: u32) -> f64 {
     let y = (t as f64).exp() / 10.0;
     0.1 * y * (y + 1.0) / 2.0
+}
+
+/// The piecewise Warm Memories gain from a Move, steeper for bigger clowders.
+/// @spec SIM-MOVE-008
+fn karma_gain(k: f64) -> f64 {
+    (k - 35.0)
+        + 3.0 * (k - 60.0).max(0.0)
+        + 4.0 * (k - 100.0).max(0.0)
+        + 5.0 * (k - 150.0).max(0.0)
+        + 10.0 * (k - 300.0).max(0.0)
+        + 15.0 * (k - 750.0).max(0.0)
 }

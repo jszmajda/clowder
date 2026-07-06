@@ -3,7 +3,10 @@
 //! there is no loader to maintain.
 
 use crate::effects::Effect;
-use crate::state::{CraftId, IdeaId, JobId, RefinementId, ResourceId, RuleId, Season, StructureId};
+use crate::state::{
+    AdventureId, CraftId, IdeaId, JobId, RefinementId, ResourceId, RuleId, Season, StructureId,
+    TraditionId,
+};
 use crate::state::{IDEA_COUNT, REFINEMENT_COUNT, RESOURCE_COUNT, STRUCTURE_COUNT};
 
 // ---- Time ----
@@ -2342,5 +2345,122 @@ static COLONIES: [ColonyDef; 8] = [
         start_standing: 0.0,
         buy: (ResourceId::Hushfelt, 0.0),
         sells: &[], // [D] the visitor slot; basket deferred to the cosmic wave
+    },
+];
+
+// ---- Wave 5: prestige / the Great Meadow Move (SIM-MOVE) ----
+
+/// The paragon threshold: a Move needs a real clowder. @spec SIM-MOVE-001
+pub const MEADOW_MOVE_MIN_KITTENS: usize = 71;
+/// Warm Welcome Home's new-meadow catnip gift. @spec SIM-MOVE-012
+pub const WARM_WELCOME_CATNIP: f64 = 50.0;
+/// Tidy Meadow's mess-accrual multiplier while active. @spec SIM-ADV-002
+pub const TIDY_MESS_MULT: f64 = 2.0;
+
+/// One Tradition's shop entry — its Elder-Wisdom price. Effects flow through
+/// the effect-key system (see `effects::tradition_effect`). @spec SIM-MOVE-010
+pub struct TraditionDef {
+    pub cost_wisdom: f64,
+}
+
+pub fn tradition_def(t: TraditionId) -> &'static TraditionDef {
+    &TRADITIONS[t.ix()]
+}
+
+/// The prestige shop table, in TraditionId order. @spec SIM-MOVE-010
+static TRADITIONS: [TraditionDef; 30] = [
+    TraditionDef { cost_wisdom: 5.0 },      // CarefulPacking
+    TraditionDef { cost_wisdom: 5.0 },      // TravelingBasketsI
+    TraditionDef { cost_wisdom: 35.0 },     // TravelingBasketsII
+    TraditionDef { cost_wisdom: 300.0 },    // TravelingBasketsIII
+    TraditionDef { cost_wisdom: 10.0 },     // MemoryChestI
+    TraditionDef { cost_wisdom: 100.0 },    // MemoryChestII
+    TraditionDef { cost_wisdom: 5.0 },      // WarmWelcomeHome
+    TraditionDef { cost_wisdom: 25.0 },     // ElderStories
+    TraditionDef { cost_wisdom: 50.0 },     // GoldenRatio
+    TraditionDef { cost_wisdom: 100.0 },    // GrandProportion
+    TraditionDef { cost_wisdom: 250.0 },    // VitruvianCat
+    TraditionDef { cost_wisdom: 750.0 },    // Renaissance
+    TraditionDef { cost_wisdom: 500.0 },    // NineLivesI
+    TraditionDef { cost_wisdom: 750.0 },    // NineLivesII
+    TraditionDef { cost_wisdom: 1250.0 },   // NineLivesIII
+    TraditionDef { cost_wisdom: 1750.0 },   // NineLivesIV
+    TraditionDef { cost_wisdom: 2500.0 },   // NineLivesV
+    TraditionDef { cost_wisdom: 5000.0 },   // NineLivesVI
+    TraditionDef { cost_wisdom: 7500.0 },   // NineLivesVII
+    TraditionDef { cost_wisdom: 15000.0 },  // NineLivesVIII
+    TraditionDef { cost_wisdom: 30000.0 },  // NineLivesIX
+    TraditionDef { cost_wisdom: 60000.0 },  // NineLivesX
+    TraditionDef { cost_wisdom: 5.0 },      // GoodNeighbours
+    TraditionDef { cost_wisdom: 25.0 },     // WellRested
+    TraditionDef { cost_wisdom: 400.0 },    // BrightEyed
+    TraditionDef { cost_wisdom: 25.0 },     // FestivalSpirit
+    TraditionDef { cost_wisdom: 50.0 },     // SecondWind
+    TraditionDef { cost_wisdom: 25.0 },     // Forecaster
+    TraditionDef { cost_wisdom: 125.0 },    // PrismSight
+    TraditionDef { cost_wisdom: 40.0 },     // AdventurousSpirit
+];
+
+// ---- Wave 5: adventures (SIM-ADV) ----
+
+/// One Adventure's reward: a per-completion amount, a LimitedDR cap on the
+/// accumulated pool, and the effect key it flows through. Twists and goals are
+/// engine behavior (see `season`, `produce`, and `adventure_goal_met`).
+/// @spec SIM-ADV-003, SIM-ADV-005
+pub struct AdventureDef {
+    pub reward_per: f64,
+    pub reward_cap: f64,
+    pub reward_key: Effect,
+}
+
+pub fn adventure_def(a: AdventureId) -> &'static AdventureDef {
+    &ADVENTURES[a.ix()]
+}
+
+/// The Adventures catalogue, in AdventureId order. @spec SIM-ADV-003
+static ADVENTURES: [AdventureDef; 7] = [
+    // QuietRetreat: reach 50 kittens → +5% spring catnip (cap ×2).
+    AdventureDef {
+        reward_per: 0.05,
+        reward_cap: 0.10,
+        reward_key: Effect::SeasonResourceRatio(Season::Spring, ResourceId::Catnip),
+    },
+    // LongWinter: reach a Sunbeam Altar → +5% winter catnip (cap ×2).
+    AdventureDef {
+        reward_per: 0.05,
+        reward_cap: 0.10,
+        reward_key: Effect::SeasonResourceRatio(Season::Winter, ResourceId::Catnip),
+    },
+    // NapTime: build a Yarn Computer → +0.2 master-skill multiplier (cap ×4).
+    AdventureDef {
+        reward_per: 0.2,
+        reward_cap: 0.8,
+        reward_key: Effect::MasterSkillMultiplier,
+    },
+    // FrugalMeadow: build the full energy set → −2% energy consumption (cap ×1).
+    AdventureDef {
+        reward_per: 0.02,
+        reward_cap: 0.02,
+        reward_key: Effect::EnergyConsumptionRatio,
+    },
+    // SilentSun: Move with a full Memory Chest → Long Sun boost (cap ×4).
+    // No dedicated Long-Sun effect key yet; the reward pool is inert this wave.
+    AdventureDef {
+        reward_per: 0.10,
+        reward_cap: 0.4,
+        reward_key: Effect::SeasonResourceRatio(Season::Summer, ResourceId::Warmth),
+    },
+    // GentlePaws: research Pen Pal Networks → +10% pounce ratio (cap ×2).
+    AdventureDef {
+        reward_per: 0.10,
+        reward_cap: 0.20,
+        reward_key: Effect::PounceRatio,
+    },
+    // TidyMeadow: a full tidy year → an exclusive tradition unlock (one-shot,
+    // no stacking effect value).
+    AdventureDef {
+        reward_per: 0.0,
+        reward_cap: 1.0,
+        reward_key: Effect::MasterSkillMultiplier,
     },
 ];

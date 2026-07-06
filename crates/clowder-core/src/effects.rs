@@ -3,8 +3,8 @@
 
 use crate::content;
 use crate::state::{
-    ArchId, ColonyId, CraftId, GameState, IdeaId, JobId, KittenTrait, ResourceId, RiteId,
-    StructureId,
+    AdventureId, ArchId, ColonyId, CraftId, GameState, IdeaId, JobId, KittenTrait, ResourceId,
+    RiteId, Season, StructureId, TraditionId,
 };
 
 /// Compiler-checked modifier vocabulary. Variants are added per content wave;
@@ -81,6 +81,22 @@ pub enum Effect {
     ParadeRatio,
     /// Dedicated per-colony standing bonus (dormant baseline). @spec SIM-TRADE-005
     StandingFor(ColonyId),
+    // ---- Wave 5 (prestige / adventures) ----
+    /// Summed structure-price reduction from Traditions, DR-clamped in
+    /// next_cost. @spec SIM-MOVE-013
+    GlobalPriceRatioDelta,
+    /// Multiplier delta on the kitten arrival chance (Well-Rested, Bright-Eyed).
+    /// @spec SIM-MOVE-012
+    KittenGrowthRatio,
+    /// Global trade-standing bonus (Good Neighbours). @spec SIM-MOVE-012
+    StandingRatio,
+    /// Master-skill multiplier reward (Nap Time). @spec SIM-ADV-005
+    MasterSkillMultiplier,
+    /// Energy-consumption reduction reward (Frugal Meadow). @spec SIM-ADV-005
+    EnergyConsumptionRatio,
+    /// Per-season, per-resource production bonus (Quiet Retreat, Long Winter).
+    /// @spec SIM-ADV-005
+    SeasonResourceRatio(Season, ResourceId),
 }
 
 /// Diminishing-returns primitive: linear to 75% of `limit`, asymptotic to
@@ -218,6 +234,16 @@ impl GameState {
                 }
                 sum += rite_effect(*rite, key, altars) * n;
             }
+            // Everwarm Frescoes: each Sun Room gains warmth cap =
+            // unlimited_dr(frescoes, 1.65) × Warm Memories (the prestige legacy
+            // the rite reads). @spec SIM-SUN-005, SIM-MOVE-008
+            if let Effect::MaxCap(ResourceId::Warmth) = key {
+                let frescoes = self.rite_counts[RiteId::EverwarmFrescoes.ix()];
+                if frescoes > 0 && self.warm_memories > 0.0 {
+                    let sun_rooms = self.structures[StructureId::SunRoom.ix()] as f64;
+                    sum += unlimited_dr(frescoes as f64, 1.65) * self.warm_memories * sun_rooms;
+                }
+            }
         }
         // 6. Rainbow Arch upgrades (bought once each). @spec SIM-UNI-005
         if !self.arches_bought.is_empty() {
@@ -225,8 +251,33 @@ impl GameState {
                 sum += arch_effect(*arch, key);
             }
         }
-        // 7–9. Traditions, adventure rewards — arrive with their waves. Colony
-        // standing effects are dormant (StandingFor baseline 0).
+        // 7. Traditions (permanent prestige purchases). Iterate the owned set
+        // (BTree order = TraditionId::ALL order); free when none bought.
+        // @spec SIM-MOVE-010, SIM-MOVE-012
+        if !self.traditions.is_empty() {
+            for t in &self.traditions {
+                sum += tradition_effect(*t, key);
+            }
+        }
+        // 8. Adventure rewards (LimitedDR-capped, permanent). Only these four
+        // key shapes ever carry a reward, so every other (hot-path) key skips
+        // the pool scan; then it is skipped again until a reward has been paid.
+        // @spec SIM-ADV-005
+        if matches!(
+            key,
+            Effect::MasterSkillMultiplier
+                | Effect::EnergyConsumptionRatio
+                | Effect::SeasonResourceRatio(..)
+                | Effect::PounceRatio
+        ) && self.adventure_rewards.iter().any(|&x| x > 0.0)
+        {
+            for a in AdventureId::ALL {
+                let def = content::adventure_def(a);
+                if def.reward_key == key {
+                    sum += limited_dr(self.adventure_rewards[a.ix()], def.reward_cap);
+                }
+            }
+        }
         // Promises: each kept (non-quiet) Promise grants its small global
         // production effect. @spec SIM-UNI-009
         if !self.promises.is_empty() {
@@ -320,6 +371,28 @@ fn trait_effect(trait_id: KittenTrait, key: Effect) -> f64 {
         (KittenTrait::Bold, Effect::PounceRatio) => 0.5,
         (KittenTrait::Curious, Effect::IdeaCostRatio) => -0.05,
         (KittenTrait::Serene, Effect::RiteCostRatio) => -0.09,
+        _ => 0.0,
+    }
+}
+
+/// One Tradition's contribution to one effect key — the prestige shop table,
+/// exactly. Basket capacity, memory-chest ratio, and the Nine Lives ratio are
+/// derived queries (counted directly), not effect-key values. @spec SIM-MOVE-012
+fn tradition_effect(t: TraditionId, key: Effect) -> f64 {
+    use CraftId::{Anthologies, Quills, Stories};
+    use Effect::*;
+    use TraditionId as T;
+    match (t, key) {
+        (T::CarefulPacking, GlobalPriceRatioDelta) => 0.01,
+        (T::GoldenRatio, GlobalPriceRatioDelta) => 0.016,
+        (T::GrandProportion, GlobalPriceRatioDelta) => 0.018,
+        (T::VitruvianCat, GlobalPriceRatioDelta) => 0.02,
+        (T::Renaissance, GlobalPriceRatioDelta) => 0.0225,
+        (T::ElderStories, CraftRatio) => 0.05,
+        (T::ElderStories, CraftRatioFor(Quills | Stories | Anthologies)) => 0.25,
+        (T::GoodNeighbours, StandingRatio) => 0.10,
+        (T::WellRested, KittenGrowthRatio) => 0.75,
+        (T::BrightEyed, KittenGrowthRatio) => 1.5,
         _ => 0.0,
     }
 }

@@ -173,6 +173,25 @@ pub fn load_string(s: &str, now_unix: u64) -> Result<LoadedGame, LoadError> {
     }
     state.peak_devotion = state.peak_devotion.max(state.devotion);
 
+    // Wave-5 normalization: the legacy currencies and adventure reward pools are
+    // physics — floor at zero and stay finite. Generation, completions, and the
+    // armed/active adventure slots are valid by construction (their
+    // deserializers). @spec SAVE-013
+    for value in [
+        &mut state.elder_wisdom,
+        &mut state.warm_memories,
+        &mut state.passed_down_wisdom,
+    ] {
+        if !value.is_finite() || *value < 0.0 {
+            *value = 0.0;
+        }
+    }
+    for reward in &mut state.adventure_rewards {
+        if !reward.is_finite() || *reward < 0.0 {
+            *reward = 0.0;
+        }
+    }
+
     // Offline catch-up: same tick(), fast-forwarded at the save's own game
     // speed — away time accrues exactly as attended time would have. A
     // backwards clock is zero ticks, an absurd clock is capped and flagged.

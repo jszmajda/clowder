@@ -648,6 +648,123 @@ impl ArchId {
     }
 }
 
+/// The prestige Traditions shop, in shop-table order (indices are load-bearing:
+/// the Nine Lives ladder 12..=21 and the derived `nine_lives_ratio` count owned
+/// traditions by index). Copy + Ord so a `BTreeSet<TraditionId>` records
+/// purchases in canonical order. @spec SIM-MOVE-010
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum TraditionId {
+    CarefulPacking,
+    TravelingBasketsI,
+    TravelingBasketsII,
+    TravelingBasketsIII,
+    MemoryChestI,
+    MemoryChestII,
+    WarmWelcomeHome,
+    ElderStories,
+    GoldenRatio,
+    GrandProportion,
+    VitruvianCat,
+    Renaissance,
+    NineLivesI,
+    NineLivesII,
+    NineLivesIII,
+    NineLivesIV,
+    NineLivesV,
+    NineLivesVI,
+    NineLivesVII,
+    NineLivesVIII,
+    NineLivesIX,
+    NineLivesX,
+    GoodNeighbours,
+    WellRested,
+    BrightEyed,
+    FestivalSpirit,
+    SecondWind,
+    Forecaster,
+    PrismSight,
+    AdventurousSpirit,
+}
+
+impl TraditionId {
+    pub const ALL: [TraditionId; 30] = [
+        TraditionId::CarefulPacking,
+        TraditionId::TravelingBasketsI,
+        TraditionId::TravelingBasketsII,
+        TraditionId::TravelingBasketsIII,
+        TraditionId::MemoryChestI,
+        TraditionId::MemoryChestII,
+        TraditionId::WarmWelcomeHome,
+        TraditionId::ElderStories,
+        TraditionId::GoldenRatio,
+        TraditionId::GrandProportion,
+        TraditionId::VitruvianCat,
+        TraditionId::Renaissance,
+        TraditionId::NineLivesI,
+        TraditionId::NineLivesII,
+        TraditionId::NineLivesIII,
+        TraditionId::NineLivesIV,
+        TraditionId::NineLivesV,
+        TraditionId::NineLivesVI,
+        TraditionId::NineLivesVII,
+        TraditionId::NineLivesVIII,
+        TraditionId::NineLivesIX,
+        TraditionId::NineLivesX,
+        TraditionId::GoodNeighbours,
+        TraditionId::WellRested,
+        TraditionId::BrightEyed,
+        TraditionId::FestivalSpirit,
+        TraditionId::SecondWind,
+        TraditionId::Forecaster,
+        TraditionId::PrismSight,
+        TraditionId::AdventurousSpirit,
+    ];
+    pub fn ix(self) -> usize {
+        self as usize
+    }
+}
+
+/// The Adventures catalogue, in catalogue order (`as usize` indexes the
+/// per-adventure completion and reward arrays). @spec SIM-ADV-003
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum AdventureId {
+    QuietRetreat,
+    LongWinter,
+    NapTime,
+    FrugalMeadow,
+    SilentSun,
+    GentlePaws,
+    TidyMeadow,
+}
+
+impl AdventureId {
+    pub const ALL: [AdventureId; 7] = [
+        AdventureId::QuietRetreat,
+        AdventureId::LongWinter,
+        AdventureId::NapTime,
+        AdventureId::FrugalMeadow,
+        AdventureId::SilentSun,
+        AdventureId::GentlePaws,
+        AdventureId::TidyMeadow,
+    ];
+    pub fn ix(self) -> usize {
+        self as usize
+    }
+}
+
+/// A slim Family Album memorial — never a full Kitten (no skills/job). The
+/// Album is append-only across every Move, the game's memory of every kitten.
+/// @spec SIM-MOVE-001
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ArchivedKitten {
+    pub name: String,
+    pub trait_id: KittenTrait,
+    #[serde(default, deserialize_with = "saturating_u8")]
+    pub rank: u8,
+    #[serde(default)]
+    pub generation: u32,
+}
+
 /// A Promise to the Night Court: fills a slot, draws gentle dreamcorn upkeep,
 /// and grants a small global effect while kept. A Promise whose upkeep goes
 /// unpaid goes `quiet` (effect suspended, slot held) and wakes on its own.
@@ -658,7 +775,7 @@ pub struct Promise {
     pub quiet: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Season {
     Spring,
     Summer,
@@ -867,6 +984,50 @@ pub struct GameState {
     /// Discovered colonies — permanent. @spec SIM-TRADE-008
     #[serde(default)]
     pub discovered: BTreeSet<ColonyId>,
+    // ---- Wave 5: prestige / the Great Meadow Move (SIM-MOVE) ----
+    /// Capped-linear production/storage legacy; earned on a Move, spent on
+    /// Traditions and Pass It Down. @spec SIM-MOVE-006, SIM-MOVE-007
+    #[serde(default)]
+    pub elder_wisdom: f64,
+    /// Sqrt-diminishing happiness legacy; earned on a Move, only ever grows.
+    /// @spec SIM-MOVE-008
+    #[serde(default)]
+    pub warm_memories: f64,
+    /// The burn-tier second production pool (Pass It Down). @spec SIM-MOVE-009
+    #[serde(default)]
+    pub passed_down_wisdom: f64,
+    /// The meadow generation, incremented by each Move. @spec SIM-MOVE-004
+    #[serde(default)]
+    pub generation: u32,
+    /// Purchased Traditions — permanent across every Move. @spec SIM-MOVE-010
+    #[serde(default)]
+    pub traditions: BTreeSet<TraditionId>,
+    /// The append-only Family Album — every kitten who ever lived, archived by
+    /// generation, never deleted. @spec SIM-MOVE-001
+    #[serde(default)]
+    pub family_album: Vec<ArchivedKitten>,
+    // ---- Wave 5: adventures (SIM-ADV) ----
+    /// The Adventure armed for the next Move. @spec SIM-ADV-001
+    #[serde(default)]
+    pub armed_adventure: Option<AdventureId>,
+    /// The Adventure active in this meadow (its twist applies). @spec SIM-ADV-002
+    #[serde(default)]
+    pub active_adventure: Option<AdventureId>,
+    /// Per-adventure completion counts, AdventureId-indexed. @spec SIM-ADV-004
+    #[serde(default)]
+    pub adventure_completions: [u32; 7],
+    /// Per-adventure accumulated raw reward pool (LimitedDR-capped in `effect`);
+    /// permanent, surviving every Move. @spec SIM-ADV-005
+    #[serde(default)]
+    pub adventure_rewards: [f64; 7],
+    /// Whether the active adventure's goal has been met this meadow — the twist
+    /// stays until the following Move, then lifts. @spec SIM-ADV-004
+    #[serde(default)]
+    pub(crate) adventure_done: bool,
+    /// Consecutive clean-mess days toward the Tidy Meadow year goal.
+    /// @spec SIM-ADV-004
+    #[serde(default)]
+    pub(crate) tidy_progress: u32,
     /// Derived accelerator for the per-tick reveal scan: the complement of
     /// `revealed`, in canonical order. Never serialized — rebuilt on load —
     /// so it can't drift from `revealed`, which stays the sole truth.
@@ -926,6 +1087,18 @@ impl GameState {
             promises: Vec::new(),
             penpal: [0; 8],
             discovered: BTreeSet::new(),
+            elder_wisdom: 0.0,
+            warm_memories: 0.0,
+            passed_down_wisdom: 0.0,
+            generation: 0,
+            traditions: BTreeSet::new(),
+            family_album: Vec::new(),
+            armed_adventure: None,
+            active_adventure: None,
+            adventure_completions: [0; 7],
+            adventure_rewards: [0.0; 7],
+            adventure_done: false,
+            tidy_progress: 0,
             unrevealed_structs: StructureId::ALL.to_vec(),
             unrevealed_ideas: IdeaId::ALL.to_vec(),
         }
@@ -956,7 +1129,87 @@ impl GameState {
     }
 
     pub fn season(&self) -> Season {
+        // The Long Winter adventure holds the meadow in Winter regardless of
+        // the tick counter — the one engine-owned twist every leaf reads here.
+        // @spec SIM-ADV-002
+        if self.active_adventure == Some(AdventureId::LongWinter) {
+            return Season::Winter;
+        }
         season_of_day(self.day())
+    }
+
+    // ---- Wave 5 derived queries (prestige / adventures) ----
+
+    /// Elder Wisdom's production cap/slope multiplier: 1.0 + 0.05 per owned
+    /// Nine Lives tradition (ladder indices 12..=21). @spec SIM-MOVE-011
+    pub fn nine_lives_ratio(&self) -> f64 {
+        let n = self
+            .traditions
+            .iter()
+            .filter(|t| (12..=21).contains(&(t.ix())))
+            .count();
+        1.0 + 0.05 * n as f64
+    }
+
+    /// Traveling-Basket carry capacity: I +1, II +2, III +4 (default 0).
+    /// @spec SIM-MOVE-002
+    pub fn basket_capacity(&self) -> u32 {
+        let mut cap = 0;
+        if self.traditions.contains(&TraditionId::TravelingBasketsI) {
+            cap += 1;
+        }
+        if self.traditions.contains(&TraditionId::TravelingBasketsII) {
+            cap += 2;
+        }
+        if self.traditions.contains(&TraditionId::TravelingBasketsIII) {
+            cap += 4;
+        }
+        cap
+    }
+
+    /// Memory Chest carry fraction: I +1.5%, II +3%, plus 1.5% per Memory Chest
+    /// structure owned in the CURRENT meadow (read before the Move's reset).
+    /// @spec SIM-MOVE-003
+    pub fn memory_chest_ratio(&self) -> f64 {
+        let mut r = 0.0;
+        if self.traditions.contains(&TraditionId::MemoryChestI) {
+            r += 0.015;
+        }
+        if self.traditions.contains(&TraditionId::MemoryChestII) {
+            r += 0.03;
+        }
+        r += 0.015 * self.structures[StructureId::MemoryChest.ix()] as f64;
+        r
+    }
+
+    /// The active adventure's goal predicate (checked at day close).
+    /// @spec SIM-ADV-004
+    pub(crate) fn adventure_goal_met(&self, a: AdventureId) -> bool {
+        match a {
+            AdventureId::QuietRetreat => self.kittens.len() >= 50,
+            AdventureId::LongWinter => self.structures[StructureId::SunbeamAltar.ix()] >= 1,
+            AdventureId::NapTime => self.structures[StructureId::YarnComputer.ix()] >= 1,
+            AdventureId::FrugalMeadow => {
+                self.structures[StructureId::DynamoWheel.ix()] >= 1
+                    && self.structures[StructureId::StreamWheel.ix()] >= 1
+                    && self.structures[StructureId::StarBasin.ix()] >= 1
+            }
+            AdventureId::SilentSun => self.memory_chest_ratio() > 0.0,
+            AdventureId::GentlePaws => self.ideas.contains(&IdeaId::PenPalNetworks),
+            AdventureId::TidyMeadow => self.tidy_progress >= content::DAYS_PER_YEAR as u32,
+        }
+    }
+
+    /// The stacked structure-price multiplier from price-reduction Traditions:
+    /// 1 − limited_dr(GlobalPriceRatioDelta, 0.5), always > 0.5. Only Traditions
+    /// feed the delta, so the tradition-free hot path is a free 1.0.
+    /// @spec SIM-MOVE-013
+    pub(crate) fn global_price_mult(&self) -> f64 {
+        if self.traditions.is_empty() {
+            return 1.0;
+        }
+        let delta = self.effect(crate::effects::Effect::GlobalPriceRatioDelta);
+        1.0 - crate::effects::limited_dr(delta, 0.5)
     }
 
     pub fn year(&self) -> u64 {
@@ -986,7 +1239,13 @@ impl GameState {
         // per-tick clamp) skips that scan entirely.
         let max_cap_ratio =
             if self.rites.is_empty() { 0.0 } else { self.effect(Effect::MaxCapRatio(r)) };
-        let ratio = 1.0 + self.effect(Effect::CapRatio) + max_cap_ratio;
+        // Elder Wisdom (+0.1%/pt) and Passed-Down Wisdom (+0.05%/pt) fold into
+        // the storage ratio term. @spec SIM-MOVE-007, SIM-MOVE-009
+        let ratio = 1.0
+            + self.effect(Effect::CapRatio)
+            + max_cap_ratio
+            + 0.001 * self.elder_wisdom
+            + 0.0005 * self.passed_down_wisdom;
         // The Golden Hour rite multiplies the whole warmth reservoir (every
         // warmth-cap source, Sun Rooms and Sunbeam Altars alike) by
         // (1.4 + 0.1 per Golden Hour) — buying it always enlarges the pantry,
@@ -1033,10 +1292,14 @@ impl GameState {
             .min(content::PENPAL_STANDING_CAP)
             + self.effect(crate::effects::Effect::StandingFor(colony));
         let raw = def.start_standing + warm;
+        // Good Neighbours (a global StandingRatio) warms standing everywhere:
+        // multiplying up a warm colony, and lifting a shy one toward neutral.
+        // @spec SIM-MOVE-012
+        let ratio = self.effect(crate::effects::Effect::StandingRatio);
         if def.start_standing < 0.0 {
-            raw.clamp(def.start_standing, 0.0)
+            (raw + ratio * (-def.start_standing)).clamp(def.start_standing, 0.0)
         } else {
-            raw
+            raw * (1.0 + ratio)
         }
     }
 
@@ -1049,9 +1312,12 @@ impl GameState {
     pub fn next_cost(&self, s: StructureId) -> Vec<(ResourceId, f64)> {
         let def = content::structure_def(s);
         let owned = self.structures[s.ix()] as i32;
+        // Price-reduction Traditions shave every component (DR-clamped, never
+        // to zero). @spec SIM-MOVE-013
+        let mult = self.global_price_mult();
         def.base_costs
             .iter()
-            .map(|(r, base)| (*r, (base * def.ratio.powi(owned)).ceil()))
+            .map(|(r, base)| (*r, (base * def.ratio.powi(owned) * mult).ceil()))
             .collect()
     }
 
@@ -1156,6 +1422,11 @@ impl GameState {
             h += content::JAMBOREE_HAPPINESS
                 * (1.0 + self.effect(crate::effects::Effect::JamboreeRatio));
         }
+        // The Warm Memories legacy brightens every future meadow (sqrt-DR);
+        // free until a Move earns some. @spec SIM-MOVE-008, SIM-KIT-011
+        if self.warm_memories > 0.0 {
+            h += crate::effects::unlimited_dr(self.warm_memories, 5.0);
+        }
         // Deep clutter dampens the vibe: −5 points per mess level above 1.
         // @spec SIM-ECO-038
         let mess_level = self.mess_level();
@@ -1213,6 +1484,12 @@ impl GameState {
         if self.jamboree_active() {
             chance *= content::JAMBOREE_ARRIVAL_BASE
                 + self.effect(crate::effects::Effect::JamboreeArrivalRatio);
+        }
+        // Arrival-speed Traditions (Well-Rested, Bright-Eyed). Only Traditions
+        // feed KittenGrowthRatio, so the tradition-free hot path skips the scan.
+        // @spec SIM-MOVE-012
+        if !self.traditions.is_empty() {
+            chance *= 1.0 + self.effect(crate::effects::Effect::KittenGrowthRatio);
         }
         chance.clamp(0.0, 1.0)
     }
@@ -1378,6 +1655,10 @@ impl GameState {
     }
 
     /// Would this item reveal right now? (Sticky insertion happens in tick.)
+    /// The tradition-free hot path: no structure-price multiplier, so the
+    /// per-tick reveal scan stays exactly the wave-4 loop. The priced variant
+    /// (`reveal_condition_met_priced`) is only taken once a price Tradition is
+    /// bought. @spec SIM-ENG-023
     pub(crate) fn reveal_condition_met(&self, id: ContentId) -> bool {
         match id {
             ContentId::Structure(s) => {
@@ -1387,6 +1668,25 @@ impl GameState {
                 self.structure_unlocked(s)
                     && def.base_costs.iter().all(|(r, base)| {
                         let amount = (base * def.ratio.powi(owned)).ceil();
+                        self.stock(*r) + EPSILON >= def.reveal_fraction * amount
+                    })
+            }
+            ContentId::Idea(i) => self.idea_unlocked(i),
+        }
+    }
+
+    /// Reveal check with price-reduction Traditions applied — the reveal-cost
+    /// half of SIM-MOVE-013. Only reached post-prestige (when `traditions` is
+    /// non-empty), so it need not be as lean as the hot-path variant.
+    /// @spec SIM-MOVE-013
+    pub(crate) fn reveal_condition_met_priced(&self, id: ContentId, price_mult: f64) -> bool {
+        match id {
+            ContentId::Structure(s) => {
+                let def = content::structure_def(s);
+                let owned = self.structures[s.ix()] as i32;
+                self.structure_unlocked(s)
+                    && def.base_costs.iter().all(|(r, base)| {
+                        let amount = (base * def.ratio.powi(owned) * price_mult).ceil();
                         self.stock(*r) + EPSILON >= def.reveal_fraction * amount
                     })
             }

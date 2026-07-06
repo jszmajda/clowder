@@ -1,6 +1,8 @@
 use crate::content;
 use crate::events::Event;
-use crate::state::{season_of_day, GameState, IdeaId, JobId, Location, ResourceId, StructureId, EPSILON};
+use crate::state::{
+    season_of_day, AdventureId, GameState, IdeaId, JobId, Location, ResourceId, StructureId, EPSILON,
+};
 
 impl GameState {
     /// Advance the simulation one tick (250 ms of game time), running the
@@ -85,16 +87,33 @@ impl GameState {
         // vec is empty during the scan, which that predicate never reads.
         // @spec SIM-ENG-023
         let mut pending = std::mem::take(&mut self.unrevealed_structs);
-        pending.retain(|&s| {
-            let id = crate::state::ContentId::Structure(s);
-            if self.reveal_condition_met(id) {
-                self.revealed.insert(id);
-                events.push(Event::Revealed { id });
-                false
-            } else {
-                true
-            }
-        });
+        if self.traditions.is_empty() {
+            // Hot path (every tick until prestige): the wave-4 reveal loop.
+            pending.retain(|&s| {
+                let id = crate::state::ContentId::Structure(s);
+                if self.reveal_condition_met(id) {
+                    self.revealed.insert(id);
+                    events.push(Event::Revealed { id });
+                    false
+                } else {
+                    true
+                }
+            });
+        } else {
+            // Post-prestige: price-reduction Traditions lower reveal thresholds.
+            // @spec SIM-MOVE-013
+            let price_mult = self.global_price_mult();
+            pending.retain(|&s| {
+                let id = crate::state::ContentId::Structure(s);
+                if self.reveal_condition_met_priced(id, price_mult) {
+                    self.revealed.insert(id);
+                    events.push(Event::Revealed { id });
+                    false
+                } else {
+                    true
+                }
+            });
+        }
         self.unrevealed_structs = pending;
         // The curiosity gate is one check for the whole tree, hoisted out of
         // the scan (idea reveal = gate + prerequisites); while it's shut, the
@@ -232,6 +251,26 @@ impl GameState {
                 }
             }
         }
+
+        // (g) Adventures: track the goal at day close. Tidy Meadow counts
+        // consecutive clean-mess days; a completed goal grows the reward pool
+        // once and stays active (the twist lifts only at the following Move).
+        // @spec SIM-ADV-004
+        if let Some(a) = self.active_adventure {
+            if a == AdventureId::TidyMeadow {
+                if self.mess <= EPSILON {
+                    self.tidy_progress = self.tidy_progress.saturating_add(1);
+                } else {
+                    self.tidy_progress = 0;
+                }
+            }
+            if !self.adventure_done && self.adventure_goal_met(a) {
+                self.adventure_done = true;
+                self.adventure_completions[a.ix()] += 1;
+                self.adventure_rewards[a.ix()] += content::adventure_def(a).reward_per;
+                events.push(Event::AdventureCompleted { id: a });
+            }
+        }
     }
 
     /// The Cogworks year-close auto-craft: 2% per Cogworks (max 50%) of each
@@ -283,11 +322,34 @@ impl GameState {
         // Layer-6 inputs, frozen at phase start (before converters draw fuel).
         // Layers 7–8 (Elder Wisdom, the Long Sun) are ×1.0 until their waves.
         let (deficit, surplus) = self.energy_ratios();
-        let global_mult = 1.0 + self.effect(crate::effects::Effect::GlobalProductionRatio) * deficit;
-        // Layer 8 (the Long Sun) multiplies raw-tier material flows once the rite
-        // is bought; 1.0 otherwise — skip the query when no rites are held.
-        // @spec SIM-ENG-021, SIM-SUN-004
-        let long_sun = if self.rites.is_empty() { 1.0 } else { 1.0 + self.long_sun_bonus() };
+        // Layers 6 (global), 7 (Elder Wisdom), and 8 (the Long Sun) combine
+        // multiplicatively into one raw-tier multiplier whose whole non-base
+        // part is dimmed uniformly by the energy deficit — the ENG-021 revision
+        // that also closes the wave-4 gap where the Long Sun escaped the dimmer.
+        // Each layer is 1.0 (skipped) on the common hot path.
+        // @spec SIM-ENG-021, SIM-MOVE-007, SIM-SUN-004
+        let global_layer = 1.0 + self.effect(crate::effects::Effect::GlobalProductionRatio);
+        let long_sun_layer =
+            if self.rites.is_empty() { 1.0 } else { 1.0 + self.long_sun_bonus() };
+        let wisdom_layer = if self.elder_wisdom > 0.0 || self.passed_down_wisdom > 0.0 {
+            1.0 + crate::effects::limited_dr(
+                0.01 * self.elder_wisdom,
+                2.0 * self.nine_lives_ratio(),
+            ) + crate::effects::limited_dr(0.01 * self.passed_down_wisdom, 1.0)
+        } else {
+            1.0
+        };
+        let raw_mult = 1.0 + (global_layer * wisdom_layer * long_sun_layer - 1.0) * deficit;
+        // Adventure twists on production: Nap Time halves job (kitten) output;
+        // Tidy Meadow raises mess accrual. Both 1.0 with no active adventure.
+        // @spec SIM-ADV-002
+        let job_twist =
+            if self.active_adventure == Some(AdventureId::NapTime) { 0.5 } else { 1.0 };
+        let tidy_mult = if self.active_adventure == Some(AdventureId::TidyMeadow) {
+            content::TIDY_MESS_MULT
+        } else {
+            1.0
+        };
         // The mystic tier's own multiplier on Unicorn Meadow output — NOT a
         // global layer. Only Unicorn Meadows produce unicorns, so the effect
         // scan is skipped entirely when none are built. @spec SIM-UNI-002
@@ -325,7 +387,7 @@ impl GameState {
                 // multiplier instead. @spec SIM-ENG-021, SIM-SUN-004, SIM-UNI-002
                 if content::tier(*r) == content::Tier::Raw {
                     if def.global_ratio == 0.0 {
-                        flow *= global_mult * long_sun;
+                        flow *= raw_mult;
                     }
                 } else if *r == ResourceId::Unicorns {
                     flow *= unicorns_mult;
@@ -399,13 +461,16 @@ impl GameState {
             flow *= 1.0 + self.effect(crate::effects::Effect::ResourceRatio(r));
             flow *= mood * zoomies;
             if content::tier(r) == content::Tier::Raw {
-                // Layers 6 (global) and 8 (the Long Sun) both reach raw jobs.
-                // @spec SIM-ENG-021, SIM-SUN-004
-                flow *= global_mult * long_sun;
+                // Layers 6 (global), 7 (Elder Wisdom), 8 (the Long Sun) all
+                // reach raw jobs. @spec SIM-ENG-021, SIM-MOVE-007, SIM-SUN-004
+                flow *= raw_mult;
             }
             if r == ResourceId::Catnip {
                 flow *= mess_catnip;
             }
+            // Nap Time halves every job's output (structures are untouched).
+            // @spec SIM-ADV-002
+            flow *= job_twist;
             self.resources[r.ix()] += flow;
         }
 
@@ -436,7 +501,7 @@ impl GameState {
         // ---- Converters (throttled), then Tinkerers, accruing mess ----
         let mess = self.run_converters();
         self.run_tinkerers();
-        mess
+        mess * tidy_mult
     }
 
     /// Bound Home Tinkerers craft their recipes in the background, in roster

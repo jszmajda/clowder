@@ -29,11 +29,11 @@
 //!   generation: u32, traditions: BTreeSet<TraditionId>,
 //!   family_album: Vec<ArchivedKitten>, armed_adventure: Option<AdventureId>,
 //!   active_adventure: Option<AdventureId>, adventure_completions: [u32; 7],
-//!   + a minimal adventure reward pool (shape is the implementer's business —
-//!     this suite only observes rewards through `effect()` / behavior) + a
-//!     Tidy-Meadow year timer (observed only through completions here).
-//!   `ArchivedKitten { name: String, trait_id: KittenTrait, rank: u8,
-//!     generation: u32 }` — slim, NOT a full Kitten (no skills/job).
+//!   plus a minimal adventure reward pool (shape is the implementer's business;
+//!   this suite only observes rewards through `effect()` / behavior) and a
+//!   Tidy-Meadow year timer (observed only through completions here).
+//!   ArchivedKitten { name: String, trait_id: KittenTrait, rank: u8,
+//!   generation: u32 } — slim, NOT a full Kitten (no skills/job).
 //!
 //! New commands: GreatMeadowMove, PassItDown, BuyTradition(TraditionId),
 //!   DeclareAdventure(Option<AdventureId>).

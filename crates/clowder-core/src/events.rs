@@ -1,6 +1,6 @@
 use crate::state::{
-    ArchId, ColonyId, ContentId, IdeaId, JobId, MoodTier, RefinementId, RiteId, RuleId, Season,
-    StructureId,
+    AdventureId, ArchId, ColonyId, ContentId, IdeaId, JobId, MoodTier, RefinementId, RiteId, RuleId,
+    Season, StructureId, TraditionId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -72,4 +72,10 @@ pub enum Event {
     TradeReturned { colony: ColonyId, caravans: u32 },
     PenPalSent { colony: ColonyId, level: u32 },
     ColonyDiscovered { colony: ColonyId },
+    // ---- Wave 5: prestige / adventures (SIM-MOVE / SIM-ADV) ----
+    MeadowMoved { generation: u32 },
+    Passed { passed_down_wisdom: f64 },
+    TraditionBought { id: TraditionId },
+    AdventureDeclared { id: Option<AdventureId> },
+    AdventureCompleted { id: AdventureId },
 }
