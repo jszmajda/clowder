@@ -12,7 +12,8 @@
 
 ## Skymaps & Hushfelt
 
-- [ ] **SIM-SKY-005**: The system shall produce skymaps from Lookout Posts, Weather Vanes, and Sky Docks (in addition to the wave-2 Stargazing Ledge and sky events), and hushfelt from the Hushfelt Grotto and Whisper Post, with hushfelt gaining a storage cap from cosmic site structures.
+- [ ] **SIM-SKY-005**: The system shall produce skymaps from Lookout Posts, Weather Vanes, and Sky Docks (in addition to the wave-2 Stargazing Ledge and sky events) and grant skymap storage (Lookout Post +500, Weather Vane +2000, Sky Dock +20000) so the mission ladder's skymap costs are holdable; and produce hushfelt from the Hushfelt Grotto and Whisper Post, each granting hushfelt storage so the Memory Chest (700 hushfelt) and Dreamweave become buildable.
+- [ ] **SIM-SKY-008**: The system shall grant Jars-of-Purrs storage from the outer outposts (Aurora Lantern +50, Star Nursery +100, Far Beacon +500 each) so the Jar-priced sites and the Distant Dawn loom are reachable — the cap raiser the mystic leaf deferred to this wave.
 
 ## The Star Whale
 

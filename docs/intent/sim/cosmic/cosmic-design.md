@@ -19,25 +19,25 @@ One structure per site (the site's outpost), appended to the economy StructureId
 
 | # | Site | Mission fuel (headline) | Outpost structure (id) — effect |
 |---|---|---|---|
-| 0 | **Fence Top** | 5000 curiosity, 50 skymaps | Lookout Post (40) — +skymap/t; +skymap cap |
+| 0 | **Fence Top** | 5000 curiosity, 50 skymaps | Lookout Post (40) — +0.02 skymap/t; +500 skymap cap |
 | 1 | **Old Oak** | 25000 curiosity, 200 skymaps | Treehouse (41) — houses 5; +outdoor catnip/t |
-| 2 | **Rooftops** | 50 moonmilk, 500 skymaps | Weather Vane (42) — +skymap/t; forecast; energy −1 |
+| 2 | **Rooftops** | 50 moonmilk, 500 skymaps | Weather Vane (42) — +0.05 skymap/t; +2000 skymap cap; forecast; energy −1 |
 | 3 | **Sunny Hill** | 150 moonmilk, 2000 skymaps | Solar Array (43) — energy +12 (seasonal) |
 | 4 | **Meadow's Edge** | 400 moonmilk, 25 cometsilk | Ranger Station (44) — outdoor production +8%/bld; energy −2 |
 | 5 | **The Brook** | 1000 moonmilk, 75 cometsilk | Hushfelt Grotto (45) — +hushfelt/t; +hushfelt cap; energy +4 |
 | 6 | **Whispering Woods** | 60 cometsilk, 5 echoes | Whisper Post (46) — +hushfelt/t; +echo/t trickle; energy −2 |
 | 7 | **The Foothills** | 200 cometsilk, 25 echoes | Cairn Circle (47) — outdoor production +12%/bld |
-| 8 | **Cloud Nine** | 500 cometsilk, 100 echoes | Sky Dock (48) — +big skymap/t; enables the Star Whale summon; energy −5 |
-| 9 | **The Aurora** | 5 Jars of Purrs, 250 echoes | Aurora Lantern (49) — outdoor +25%/bld; +Long Sun cap; energy −10 |
-| 10 | **The Milky Way** | 25 Jars, 1000 echoes | Star Nursery (50) — +unicorn/t + prism/t trickle; energy −10 |
-| 11 | **The Far Shore** | 100 Jars, 4000 echoes | Far Beacon (51) — outdoor +50%/bld; storage +10%/bld; energy −20 |
+| 8 | **Cloud Nine** | 500 cometsilk, 100 echoes | Sky Dock (48) — +0.2 skymap/t; +20000 skymap cap; enables the Star Whale summon; energy −5 |
+| 9 | **The Aurora** | 5 Jars of Purrs, 250 echoes | Aurora Lantern (49) — outdoor +25%/bld; +2 Long Sun cap each; +50 Jar cap; energy −10 |
+| 10 | **The Milky Way** | 25 Jars, 1000 echoes | Star Nursery (50) — +unicorn/t + prism/t trickle; +100 Jar cap; energy −10 |
+| 11 | **The Far Shore** | 100 Jars, 4000 echoes | Far Beacon (51) — outdoor +50%/bld; storage +10%/bld; +500 Jar cap; energy −20 |
 | 12 | **The Furthest Star** | 500 Jars, 16000 echoes | Wishing Star (52) — the capstone: outdoor +200%; a large permanent global production bonus; energy −40 |
 
 Site structures are `Build`-able like any structure (they'd be appended to the economy StructureId space, gated by their site) but contribute to a distinct **outdoor** production channel: outdoor materials take the global/wisdom/Long-Sun layers at a *reduced transfer* (the inspiration's space-production dilution — space gets only a fraction of the paragon/SR bonus). Outdoor structures are energy-hungry; the late meadow must over-provision its grid to run them.
 
 ## The Skymap Economy
 
-Skymaps (transient, from Stargazing Ledges + Lookout Posts + Weather Vanes + Sky Docks) are the reaching fuel. Kites convert to skymap capacity (already wired), and the sky-event system (wave 2) trickles skymaps. Reaching the outer sites is gated on skymap *storage* as much as production — the storage-cap-gating pattern, one last time, at cosmic scale.
+Skymaps (transient, from Stargazing Ledges + the sky-event system, then Lookout Posts + Weather Vanes + Sky Docks) are the reaching fuel. Skymap *storage* is the reach gate: the Stargazing Ledge's +10 each bootstraps the first sites, then the outpost skymap caps (Lookout Post +500, Weather Vane +2000, Sky Dock +20000) carry the ladder outward. Reaching the outer sites is gated on skymap *storage* as much as production — the storage-cap-gating pattern, one last time, at cosmic scale.
 
 ## The Star Whale Summon
 

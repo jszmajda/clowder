@@ -13,7 +13,7 @@ The leaf owns the starshard-fueled Deep Nap (year-skipping), the stirred-dreams 
 
 ## The Deep Nap
 
-`DeepNap(years)` (needs the Deep Nap Theory idea) spends starshards to skip the meadow forward `years` game-years instantly — the meadow accrues exactly what it would have accrued awake (the same `tick()`, fast-forwarded, like offline catch-up, so no shadow math), *plus* the per-year yields (a year's Elder-Wisdom millennium trickle lands too). Each nap:
+`DeepNap(years)` (needs the Deep Nap Theory idea) spends starshards to skip the meadow forward `years` game-years instantly — the meadow accrues exactly what it would have accrued awake (the same `tick()`, fast-forwarded, like offline catch-up, so no shadow math — the advancing tick counter alone delivers the next Move's millennium trickle, nothing is added). Each nap is bounded to `max_nap_length` game-years (base 100, raised by the Long Slumber loom) so a single command never freezes the game; the Distant Dawn (meadow-year 40000) is reached by repeated naps in one un-Moved meadow. Each nap:
 
 - spends `starshard_cost(years)` starshards (escalating),
 - accrues **stirred dreams** (heat): `+= years × heat_per_year × (1 − heat_efficiency)` — the more you nap, the warmer the dream-space gets,
