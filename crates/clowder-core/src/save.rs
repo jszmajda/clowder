@@ -108,6 +108,10 @@ pub fn load_string(s: &str, now_unix: u64) -> Result<LoadedGame, LoadError> {
     let file: SaveFile = serde_json::from_value(value)
         .map_err(|e| LoadError::Corrupt { detail: e.to_string() })?;
     let mut state = file.state;
+    // The reveal worklists aren't serialized; rebuild them from `revealed`
+    // before any tick (catch-up) runs, so a reloaded game reveals exactly as
+    // live play would. @spec SIM-ENG-023
+    state.rebuild_unrevealed();
 
     // Normalize hand-edited numerics: physics, not errors. (Counters were
     // already clamped by their wide deserializers.)
@@ -133,6 +137,25 @@ pub fn load_string(s: &str, now_unix: u64) -> Result<LoadedGame, LoadError> {
     // The high-water is a ratchet: it can never sit below the kites in paw.
     // @spec SIM-ECO-031
     state.kites_high_water = state.kites_high_water.max(state.stock(ResourceId::Kites));
+
+    // Society-wave normalization: learning is physics too. Skills and exp
+    // floor at zero and must be finite; an out-of-roster Elder index is no
+    // Elder at all. (Ranks were already clamped by their wide deserializer;
+    // jamboree_until and tinkering recipes are valid by construction.)
+    // @spec SIM-KIT-027
+    for k in &mut state.kittens {
+        if !k.exp.is_finite() || k.exp < 0.0 {
+            k.exp = 0.0;
+        }
+        for s in &mut k.skills {
+            if !s.is_finite() || *s < 0.0 {
+                *s = 0.0;
+            }
+        }
+    }
+    if state.elder.is_some_and(|ix| ix >= state.kittens.len()) {
+        state.elder = None;
+    }
 
     // Offline catch-up: same tick(), fast-forwarded at the save's own game
     // speed — away time accrues exactly as attended time would have. A

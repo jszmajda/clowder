@@ -23,6 +23,6 @@
 
 ## Depth: Refinements & House Rules
 
-- [ ] **SIM-CUR-010**: The system shall define exactly the refinements of the curiosity design's Refinements table (35, append-only ids), purchasable once each via BuyRefinement with curiosity + material costs spent all-or-nothing, gated by their ideas (Locked before), contributing their tabled effects permanently.
-- [ ] **SIM-CUR-011**: The system shall define the four House Rule pairs per the design table; AdoptRule spends charm all-or-nothing, permanently blocks the sibling rule for the current meadow (Locked), and both adoption and blocking survive save/load.
-- [ ] **SIM-CUR-012**: Refinement and house-rule effects shall flow through the typed effect-key system like every other source, in the engine's fixed source order.
+- [x] **SIM-CUR-010**: The system shall define exactly the refinements of the curiosity design's Refinements table (35, append-only ids), purchasable once each via BuyRefinement with curiosity + material costs spent all-or-nothing, gated by their ideas (Locked before), contributing their tabled effects permanently.
+- [x] **SIM-CUR-011**: The system shall define the four House Rule pairs per the design table; AdoptRule spends charm all-or-nothing, permanently blocks the sibling rule for the current meadow (Locked), and both adoption and blocking survive save/load.
+- [x] **SIM-CUR-012**: Refinement and house-rule effects shall flow through the typed effect-key system like every other source, in the engine's fixed source order.

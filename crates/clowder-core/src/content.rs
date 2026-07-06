@@ -2,8 +2,9 @@
 //! Content lives in Rust (HLD decision) — the compiler checks refactors and
 //! there is no loader to maintain.
 
-use crate::state::{CraftId, IdeaId, JobId, ResourceId, Season, StructureId};
-use crate::state::{IDEA_COUNT, RESOURCE_COUNT, STRUCTURE_COUNT};
+use crate::effects::Effect;
+use crate::state::{CraftId, IdeaId, JobId, RefinementId, ResourceId, RuleId, Season, StructureId};
+use crate::state::{IDEA_COUNT, REFINEMENT_COUNT, RESOURCE_COUNT, STRUCTURE_COUNT};
 
 // ---- Time ----
 pub const TICKS_PER_SECOND: u64 = 4;
@@ -167,6 +168,92 @@ pub const BISCUIT_POINTS: f64 = 10.0;
 pub const HAPPINESS_FLOOR: f64 = 25.0;
 pub const GRUMPY_MULTIPLIER: f64 = 0.25;
 
+// ---- Skills, ranks, the Elder ----
+// @spec SIM-KIT-019, SIM-KIT-020, SIM-KIT-021, SIM-KIT-022
+pub const SKILL_XP_PER_TICK: f64 = 0.01; // × (1 + skill-XP effects)
+pub const SKILL_DECAY_PER_TICK: f64 = 0.001; // every other job's skill, floor 0
+pub const PROMOTE_EXP_BASE: f64 = 500.0; // × 1.75^rank
+pub const PROMOTE_EXP_RATIO: f64 = 1.75;
+pub const PROMOTE_SHINIES_STEP: f64 = 25.0; // × (rank + 1)
+pub const ELDER_RANK_DIVISOR: f64 = 1.4; // own-job × max(1, (rank+1)/1.4)
+
+/// Skill tiers multiply the kitten's own-job yield. @spec SIM-KIT-020
+pub fn skill_tier_bonus(xp: f64) -> f64 {
+    if xp >= 9000.0 {
+        0.1875
+    } else if xp >= 5000.0 {
+        0.125
+    } else if xp >= 2500.0 {
+        0.075
+    } else if xp >= 1200.0 {
+        0.045
+    } else if xp >= 500.0 {
+        0.025
+    } else if xp >= 100.0 {
+        0.0125
+    } else {
+        0.0
+    }
+}
+
+// ---- Jamborees ----
+// @spec SIM-KIT-025
+pub const JAMBOREE_PEP: f64 = 800.0;
+pub const JAMBOREE_CHARM: f64 = 1500.0;
+pub const JAMBOREE_QUILLS: f64 = 40.0;
+pub const JAMBOREE_TICKS: u64 = 1000; // 100 days — one game year
+pub const JAMBOREE_HAPPINESS: f64 = 30.0; // × (1 + jamboree-ratio effects)
+pub const JAMBOREE_ARRIVAL_BASE: f64 = 2.0; // + jamboree-arrival effects
+pub const JAMBOREE_LUXURY_DEMAND: f64 = 0.2; // celebrations consume
+
+// ---- Pouncing expeditions ----
+// @spec SIM-EXP-001, SIM-EXP-002, SIM-EXP-003
+pub const POUNCE_PEP_PER_SQUAD: f64 = 100.0;
+pub const POUNCE_FEATHERS_BASE: f64 = 8.0;
+pub const POUNCE_FEATHERS_PER_RATIO: f64 = 6.5;
+pub const POUNCE_BELLS_CHANCE: f64 = 0.45; // + 0.02 × pounce_ratio
+pub const POUNCE_BELLS_CHANCE_PER_RATIO: f64 = 0.02;
+pub const POUNCE_BELLS_BASE: f64 = 5.0;
+pub const POUNCE_BELLS_PER_RATIO: f64 = 4.0;
+pub const POUNCE_SHINIES_CHANCE: f64 = 0.25;
+pub const POUNCE_SHINIES_BASE: f64 = 0.5;
+pub const POUNCE_SHINIES_PER_RATIO: f64 = 0.5;
+pub const POUNCE_UNICORN_CHANCE: f64 = 0.05;
+
+// ---- Tinkerer background crafting ----
+// @spec SIM-ECO-043, SIM-KIT-026
+pub const TINKER_BATCHES_PER_TICK: f64 = 0.0017; // × (1 + speed) × effectiveness
+pub const TINKER_TIER_PENALTY: f64 = 0.15; // per tier above rank + 1
+pub const TINKER_EFFECTIVENESS_FLOOR: f64 = 0.25;
+
+// ---- The Cogworks year-close auto-craft ----
+// @spec SIM-ECO-039
+pub const COGWORKS_CONVERT_PER: f64 = 0.02; // of stock, per Cogworks
+pub const COGWORKS_CONVERT_MAX: f64 = 0.5; // never more than half the pile
+pub const COGWORKS_THRESHOLD: f64 = 0.98; // of cap; below it, skipped
+
+/// The single-input raw → craft pairs the Cogworks converts, in fixed order.
+pub const COGWORKS_AUTOCRAFT: [(ResourceId, CraftId); 5] = [
+    (ResourceId::Twigs, CraftId::Wands),
+    (ResourceId::Pebbles, CraftId::Tiles),
+    (ResourceId::Buttons, CraftId::Badges),
+    (ResourceId::Dew, CraftId::Moonmilk),
+    (ResourceId::Stardust, CraftId::Cometsilk),
+];
+
+/// The (structure, resource) pairs any StructureOutputAdd effect may target;
+/// the production phase consults this list so refinement-granted outputs
+/// land without scanning every key combination.
+pub const STRUCTURE_OUTPUT_ADD_TARGETS: [(StructureId, ResourceId); 2] = [
+    (StructureId::Hearth, ResourceId::Embers),
+    (StructureId::Cogworks, ResourceId::Stories),
+];
+
+// ---- Crowding relief & luxuries (kittens leaf consumes) ----
+// @spec SIM-KIT-011
+pub const CROWDING_RELIEF_DR_LIMIT: f64 = 0.9;
+pub const LUXURY_HAPPINESS_POINTS: f64 = 10.0;
+
 // ---- Zoomies & flavor ----
 pub const ZOOMIES_DAILY_CHANCE: f64 = 0.04;
 pub const ZOOMIES_MULT: f64 = 1.25;
@@ -208,6 +295,10 @@ pub struct StructureDef {
     pub craft_ratio: f64,
     /// Luxury-demand delta per copy (Gift Stands ease the drain).
     pub luxury_demand: f64,
+    /// Bonus on the jamboree happiness term per copy (Tea Houses).
+    pub jamboree_ratio: f64,
+    /// Bonus on the jamboree arrival factor per copy (Tea Houses).
+    pub jamboree_arrival: f64,
     /// Layer-6 contribution per active copy (dynamo term is fuel-scaled and
     /// Cogworks-amplified in the effect sum).
     pub global_ratio: f64,
@@ -235,6 +326,8 @@ const BLD: StructureDef = StructureDef {
     resource_ratios: &[],
     craft_ratio: 0.0,
     luxury_demand: 0.0,
+    jamboree_ratio: 0.0,
+    jamboree_arrival: 0.0,
     global_ratio: 0.0,
     converter: None,
     mess: 0.0,
@@ -261,6 +354,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         name: "Cozy Cushion",
         base_costs: &[(ResourceId::Catnip, 25.0), (ResourceId::Twigs, 5.0)],
         housing: 1,
+        cap_bonuses: &[(ResourceId::Pep, 25.0)], // @spec SIM-ECO-044
         ..BLD
     },
     StructureDef {
@@ -295,7 +389,8 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         name: "Cat Tree",
         base_costs: &[(ResourceId::Twigs, 30.0), (ResourceId::Fluff, 10.0)],
         housing: 3,
-        cap_bonuses: &[(ResourceId::Fluff, 10.0)],
+        // @spec SIM-ECO-044
+        cap_bonuses: &[(ResourceId::Fluff, 10.0), (ResourceId::Pep, 75.0)],
         gate: Some(IdeaId::TwigArchitecture),
         ..BLD
     },
@@ -303,6 +398,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         name: "Window Perch",
         base_costs: &[(ResourceId::Catnip, 40.0), (ResourceId::Twigs, 8.0)],
         housing: 1,
+        cap_bonuses: &[(ResourceId::Pep, 25.0)], // @spec SIM-ECO-044
         productions: &[(ResourceId::Curiosity, 0.001)],
         gate: Some(IdeaId::CozyCarpentry),
         ..BLD
@@ -528,7 +624,9 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             (ResourceId::Quills, 300.0),
         ],
         ratio: 1.5, // a deliberate wall, in the price-band vocabulary
-        // Jamboree effects land with the kittens leaf's society wave.
+        // @spec SIM-KIT-025
+        jamboree_ratio: 0.01,
+        jamboree_arrival: 0.001,
         gate: Some(IdeaId::TeaCeremonies),
         ..BLD
     },
@@ -548,8 +646,8 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         name: "Cogworks",
         base_costs: &[(ResourceId::Brass, 50.0), (ResourceId::Cogs, 15.0)],
         ratio: 1.25,
-        // Amplifies dynamos (COGWORKS_DYNAMO_BOOST); yearly auto-craft is
-        // deferred to the Tinkerer wave (SIM-ECO-039 [D]).
+        // Amplifies dynamos (COGWORKS_DYNAMO_BOOST); converts capped raws at
+        // year close (SIM-ECO-039).
         energy_prod: 1.0,
         mess: 0.5,
         gate: Some(IdeaId::Cogwheels),
@@ -1225,6 +1323,8 @@ pub struct CraftDef {
     pub name: &'static str,
     pub inputs: &'static [(ResourceId, f64)],
     pub gate: Option<IdeaId>,
+    /// Tinkerer work tier (SIM-KIT-026's rank comparison). @spec SIM-ECO-043
+    pub tier: u8,
 }
 
 pub fn craft_def(c: CraftId) -> &'static CraftDef {
@@ -1260,61 +1360,73 @@ static CRAFTS: [CraftDef; 18] = [
         name: "Wands",
         inputs: &[(ResourceId::Twigs, 15.0)],
         gate: Some(IdeaId::Tinkering),
+        tier: 1,
     },
     CraftDef {
         name: "Tiles",
         inputs: &[(ResourceId::Pebbles, 25.0)],
         gate: Some(IdeaId::Tinkering),
+        tier: 1,
     },
     CraftDef {
         name: "Badges",
         inputs: &[(ResourceId::Buttons, 12.0)],
         gate: Some(IdeaId::PackRattery),
+        tier: 1,
     },
     CraftDef {
         name: "Brass",
         inputs: &[(ResourceId::Buttons, 10.0), (ResourceId::Embers, 10.0)],
         gate: Some(IdeaId::Excavation),
+        tier: 2,
     },
     CraftDef {
         name: "Cogs",
         inputs: &[(ResourceId::Brass, 8.0)],
         gate: Some(IdeaId::Cogwheels),
+        tier: 3,
     },
     CraftDef {
         name: "Moonsteel",
         inputs: &[(ResourceId::Moonstone, 1.0), (ResourceId::Brass, 8.0)],
         gate: Some(IdeaId::Moonmetallurgy),
+        tier: 4,
     },
     CraftDef {
         name: "Lattices",
         inputs: &[(ResourceId::Wands, 5.0)],
         gate: Some(IdeaId::Tinkering),
+        tier: 2,
     },
     CraftDef {
         name: "Pavers",
         inputs: &[(ResourceId::Tiles, 250.0), (ResourceId::Brass, 3.0)],
         gate: Some(IdeaId::Moonmetallurgy),
+        tier: 3,
     },
     CraftDef {
         name: "Quills",
         inputs: &[(ResourceId::Feathers, 18.0)],
         gate: Some(IdeaId::OralTradition),
+        tier: 1,
     },
     CraftDef {
         name: "Stories",
         inputs: &[(ResourceId::Charm, 40.0), (ResourceId::Quills, 3.0)],
         gate: Some(IdeaId::Storycraft),
+        tier: 2,
     },
     CraftDef {
         name: "Anthologies",
         inputs: &[(ResourceId::Curiosity, 1000.0), (ResourceId::Stories, 5.0)],
         gate: Some(IdeaId::AnthologyBinding),
+        tier: 3,
     },
     CraftDef {
         name: "Schemes",
         inputs: &[(ResourceId::Curiosity, 2500.0), (ResourceId::Anthologies, 3.0)],
         gate: Some(IdeaId::GrandSchemes),
+        tier: 4,
     },
     CraftDef {
         name: "Cairns",
@@ -1324,6 +1436,7 @@ static CRAFTS: [CraftDef; 18] = [
             (ResourceId::Badges, 1.0),
         ],
         gate: Some(IdeaId::Tinkering),
+        tier: 1,
     },
     CraftDef {
         name: "Kites",
@@ -1333,6 +1446,7 @@ static CRAFTS: [CraftDef; 18] = [
             (ResourceId::Lattices, 10.0),
         ],
         gate: Some(IdeaId::PorchLogistics),
+        tier: 3,
     },
     CraftDef {
         name: "Balloons",
@@ -1342,21 +1456,485 @@ static CRAFTS: [CraftDef; 18] = [
             (ResourceId::Schemes, 1.0),
         ],
         gate: Some(IdeaId::BalloonCraft),
+        tier: 5,
     },
     CraftDef {
         name: "Moonmilk",
         inputs: &[(ResourceId::Dew, 750.0)],
         gate: Some(IdeaId::SkywardLonging),
+        tier: 4,
     },
     CraftDef {
         name: "Dreamweave",
         inputs: &[(ResourceId::Hushfelt, 100.0), (ResourceId::Moonsteel, 250.0)],
         gate: Some(IdeaId::Dreamweaving),
+        tier: 5,
     },
     CraftDef {
         name: "Cometsilk",
         inputs: &[(ResourceId::Stardust, 25.0)],
         gate: Some(IdeaId::Starcatching),
+        tier: 5,
+    },
+];
+
+// ---- Refinements ----
+
+/// One-time improvements priced in curiosity + materials, gated by ideas,
+/// each contributing effect-key values permanently. @spec SIM-CUR-010
+pub struct RefinementDef {
+    pub name: &'static str,
+    pub blurb: &'static str,
+    /// Curiosity price, spent together with the materials, all-or-nothing.
+    pub cost: f64,
+    pub materials: &'static [(ResourceId, f64)],
+    /// Locked until this idea is researched.
+    pub gate: IdeaId,
+    pub effects: &'static [(Effect, f64)],
+    /// When set, the effect values scale by this structure's owned count
+    /// (Catnip Cellars per Pantry, Thicker Blankets per Hearth).
+    pub per_structure: Option<StructureId>,
+}
+
+pub fn refinement_def(r: RefinementId) -> &'static RefinementDef {
+    &REFINEMENTS[r as usize]
+}
+
+const REF: RefinementDef = RefinementDef {
+    name: "",
+    blurb: "",
+    cost: 0.0,
+    materials: &[],
+    gate: IdeaId::PantryOrganization,
+    effects: &[],
+    per_structure: None,
+};
+
+#[allow(clippy::needless_update)]
+static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
+    RefinementDef {
+        name: "Pebble Combs",
+        blurb: "Grooming tools for the garden. Gardeners +50%.",
+        cost: 100.0,
+        materials: &[(ResourceId::Pebbles, 275.0)],
+        gate: IdeaId::CouchSpelunking,
+        effects: &[(Effect::JobRatio(JobId::Gardener), 0.50)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Button Combs",
+        blurb: "Smoother teeth, finer rows. Gardeners +30%.",
+        cost: 200.0,
+        materials: &[(ResourceId::Buttons, 25.0)],
+        gate: IdeaId::Emberkeeping,
+        effects: &[(Effect::JobRatio(JobId::Gardener), 0.30)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Brass Combs",
+        blurb: "They gleam and they rake. Gardeners +50%.",
+        cost: 5000.0,
+        materials: &[(ResourceId::Brass, 75.0)],
+        gate: IdeaId::Cogwheels,
+        effects: &[(Effect::JobRatio(JobId::Gardener), 0.50)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Moonsteel Combs",
+        blurb: "Forged by lamplight for the leaf. Gardeners +50%.",
+        cost: 38000.0,
+        materials: &[(ResourceId::Moonsteel, 10.0)],
+        gate: IdeaId::Moonmetallurgy,
+        effects: &[(Effect::JobRatio(JobId::Gardener), 0.50)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Pebble Snips",
+        blurb: "Crude but decisive. Twig Collectors +70%.",
+        cost: 100.0,
+        materials: &[(ResourceId::Pebbles, 500.0)],
+        gate: IdeaId::CouchSpelunking,
+        effects: &[(Effect::JobRatio(JobId::TwigCollector), 0.70)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Button Shears",
+        blurb: "Snip with dignity. Twig Collectors +50%.",
+        cost: 200.0,
+        materials: &[(ResourceId::Buttons, 50.0)],
+        gate: IdeaId::Emberkeeping,
+        effects: &[(Effect::JobRatio(JobId::TwigCollector), 0.50)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Brass Clippers",
+        blurb: "A satisfying click. Twig Collectors +50%.",
+        cost: 20000.0,
+        materials: &[(ResourceId::Brass, 75.0)],
+        gate: IdeaId::Cogwheels,
+        effects: &[(Effect::JobRatio(JobId::TwigCollector), 0.50)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Moonsteel Pruners",
+        blurb: "The twig barely notices. Twig Collectors +50%.",
+        cost: 38000.0,
+        materials: &[(ResourceId::Moonsteel, 10.0)],
+        gate: IdeaId::Moonmetallurgy,
+        effects: &[(Effect::JobRatio(JobId::TwigCollector), 0.50)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Deep Pockets",
+        blurb: "Where do they keep it all? Rummagers +50%.",
+        cost: 1000.0,
+        materials: &[(ResourceId::Buttons, 50.0)],
+        gate: IdeaId::PackRattery,
+        effects: &[(Effect::JobRatio(JobId::Rummager), 0.50)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Sorting Claws",
+        blurb: "Fluff from treasure, instantly. Rummagers +50%.",
+        cost: 15000.0,
+        materials: &[(ResourceId::Brass, 25.0)],
+        gate: IdeaId::Excavation,
+        effects: &[(Effect::JobRatio(JobId::Rummager), 0.50)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Bolas of Yarn",
+        blurb: "Tangles at a distance. Pounce ratio +1.",
+        cost: 1000.0,
+        materials: &[(ResourceId::Twigs, 50.0), (ResourceId::Pebbles, 250.0)],
+        gate: IdeaId::PouncingPractice,
+        effects: &[(Effect::PounceRatio, 1.0)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Pounce Pads",
+        blurb: "Silent landings, louder hauls. Pounce ratio +2.",
+        cost: 2000.0,
+        materials: &[(ResourceId::Buttons, 750.0)],
+        gate: IdeaId::Emberkeeping,
+        effects: &[(Effect::PounceRatio, 2.0)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Whisker Guards",
+        blurb: "Protect the instruments. Pounce ratio +0.5.",
+        cost: 10000.0,
+        materials: &[(ResourceId::Brass, 50.0)],
+        gate: IdeaId::Cogwheels,
+        effects: &[(Effect::PounceRatio, 0.5)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Moonsteel Mittens",
+        blurb: "Soft outside, serious inside. Pounce ratio +0.5.",
+        cost: 50000.0,
+        materials: &[(ResourceId::Moonsteel, 25.0)],
+        gate: IdeaId::Moonmetallurgy,
+        effects: &[(Effect::PounceRatio, 0.5)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Deep Shelves",
+        blurb: "Higher than a cat can reach, almost. +100 twig cap, +150 pebble cap.",
+        cost: 500.0,
+        materials: &[
+            (ResourceId::Twigs, 1000.0),
+            (ResourceId::Pebbles, 750.0),
+            (ResourceId::Buttons, 50.0),
+        ],
+        gate: IdeaId::PackRattery,
+        effects: &[
+            (Effect::MaxCap(ResourceId::Twigs), 100.0),
+            (Effect::MaxCap(ResourceId::Pebbles), 150.0),
+        ],
+        ..REF
+    },
+    RefinementDef {
+        name: "Stacked Crates",
+        blurb: "A skyline of storage. +100 twig, +150 pebble, +25 button cap.",
+        cost: 800.0,
+        materials: &[(ResourceId::Wands, 25.0), (ResourceId::Tiles, 10.0)],
+        gate: IdeaId::PackRattery,
+        effects: &[
+            (Effect::MaxCap(ResourceId::Twigs), 100.0),
+            (Effect::MaxCap(ResourceId::Pebbles), 150.0),
+            (Effect::MaxCap(ResourceId::Buttons), 25.0),
+        ],
+        ..REF
+    },
+    RefinementDef {
+        name: "Labeled Jars",
+        blurb: "Labels nobody reads, order everybody feels. +50 button, +30 ember, +10 moonstone cap.",
+        cost: 60000.0,
+        materials: &[(ResourceId::Moonstone, 25.0), (ResourceId::Brass, 200.0)],
+        gate: IdeaId::Moonmetallurgy,
+        effects: &[
+            (Effect::MaxCap(ResourceId::Buttons), 50.0),
+            (Effect::MaxCap(ResourceId::Embers), 30.0),
+            (Effect::MaxCap(ResourceId::Moonstone), 10.0),
+        ],
+        ..REF
+    },
+    RefinementDef {
+        name: "Catnip Cellars",
+        blurb: "Cool, dark, fragrant. Pantries also hold +125 catnip each.",
+        cost: 50000.0,
+        materials: &[(ResourceId::Brass, 125.0), (ResourceId::Schemes, 5.0)],
+        gate: IdeaId::Dynamos,
+        effects: &[(Effect::MaxCap(ResourceId::Catnip), 125.0)],
+        per_structure: Some(StructureId::Pantry),
+        ..REF
+    },
+    RefinementDef {
+        name: "Bigger Baskets",
+        blurb: "Weave wider. +200 pebble cap, +50 button cap.",
+        cost: 15000.0,
+        materials: &[(ResourceId::Badges, 50.0), (ResourceId::Brass, 25.0)],
+        gate: IdeaId::Cogwheels,
+        effects: &[
+            (Effect::MaxCap(ResourceId::Pebbles), 200.0),
+            (Effect::MaxCap(ResourceId::Buttons), 50.0),
+        ],
+        ..REF
+    },
+    RefinementDef {
+        name: "Bellows",
+        blurb: "More air, more glow. Hearth embers +0.002/t each.",
+        cost: 5000.0,
+        materials: &[(ResourceId::Wands, 35.0), (ResourceId::Pebbles, 2000.0)],
+        gate: IdeaId::Emberkeeping,
+        effects: &[(
+            Effect::StructureOutputAdd(StructureId::Hearth, ResourceId::Embers),
+            0.002,
+        )],
+        ..REF
+    },
+    RefinementDef {
+        name: "Ember Beds",
+        blurb: "Ceramic cradles keep the coals company. Hearth embers +0.003/t each.",
+        cost: 35000.0,
+        materials: &[(ResourceId::Anthologies, 5.0)],
+        gate: IdeaId::CeramicArts,
+        effects: &[(
+            Effect::StructureOutputAdd(StructureId::Hearth, ResourceId::Embers),
+            0.003,
+        )],
+        ..REF
+    },
+    RefinementDef {
+        name: "Story Press",
+        blurb: "The gears tell tales. Cogworks +0.005 stories/t each.",
+        cost: 7500.0,
+        materials: &[(ResourceId::Cogs, 45.0)],
+        gate: IdeaId::Cogwheels,
+        effects: &[(
+            Effect::StructureOutputAdd(StructureId::Cogworks, ResourceId::Stories),
+            0.005,
+        )],
+        ..REF
+    },
+    RefinementDef {
+        name: "Better Bindings",
+        blurb: "Spines that survive enthusiasm. Stories, anthologies, and schemes craft +25%.",
+        cost: 25000.0,
+        materials: &[(ResourceId::Anthologies, 5.0)],
+        gate: IdeaId::AnthologyBinding,
+        effects: &[
+            (Effect::CraftRatioFor(CraftId::Stories), 0.25),
+            (Effect::CraftRatioFor(CraftId::Anthologies), 0.25),
+            (Effect::CraftRatioFor(CraftId::Schemes), 0.25),
+        ],
+        ..REF
+    },
+    RefinementDef {
+        name: "Field Notes",
+        blurb: "Margins full of paw prints. Observers +30%.",
+        cost: 250.0,
+        materials: &[(ResourceId::Pebbles, 100.0)],
+        gate: IdeaId::Notetaking,
+        effects: &[(Effect::JobRatio(JobId::Observer), 0.30)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Star Diaries",
+        blurb: "The sky repeats itself, if you write it down. Sky-event chance ×2.",
+        cost: 20000.0,
+        materials: &[(ResourceId::Kites, 5.0)],
+        gate: IdeaId::SkyCharts,
+        effects: &[(Effect::SkyEventChanceRatio, 1.0)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Patient Eyes",
+        blurb: "Somebody is always looking up. Auto-observe chance ×2.",
+        cost: 25000.0,
+        materials: &[(ResourceId::Kites, 10.0)],
+        gate: IdeaId::SkyCharts,
+        effects: &[(Effect::AutoObserveChanceRatio, 1.0)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Tidy-Up Rota",
+        blurb: "Whose turn is it? A chart knows. Toy Workshop mess 2 → −2.",
+        cost: 10000.0,
+        materials: &[(ResourceId::Stories, 15.0)],
+        gate: IdeaId::Toymaking,
+        effects: &[(Effect::StructureMessDelta(StructureId::ToyWorkshop), -4.0)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Group Lessons",
+        blurb: "Everyone keeps everyone sharp. Skill decay removed.",
+        cost: 45000.0,
+        materials: &[(ResourceId::Anthologies, 10.0)],
+        gate: IdeaId::DeepCuriosity,
+        effects: &[],
+        ..REF
+    },
+    RefinementDef {
+        name: "Encouraging Mews",
+        blurb: "Praise, frequently and specifically. Skill XP +50%.",
+        cost: 20000.0,
+        materials: &[(ResourceId::Anthologies, 5.0)],
+        gate: IdeaId::Toymaking,
+        effects: &[(Effect::SkillXpRatio, 0.50)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Nimble Paws",
+        blurb: "Practice, but faster. Tinkerer speed +100%.",
+        cost: 30000.0,
+        materials: &[(ResourceId::Cogs, 10.0), (ResourceId::Anthologies, 5.0)],
+        gate: IdeaId::Toymaking,
+        effects: &[(Effect::TinkererSpeed, 1.0)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Patient Paws",
+        blurb: "Slow is smooth; smooth is fast. Tinkerer speed +100%.",
+        cost: 75000.0,
+        materials: &[(ResourceId::Schemes, 10.0)],
+        gate: IdeaId::Dynamos,
+        effects: &[(Effect::TinkererSpeed, 1.0)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Clockwork Paws",
+        blurb: "Tick, tock, toy. Tinkerer speed +200%.",
+        cost: 150000.0,
+        materials: &[(ResourceId::Schemes, 25.0)],
+        gate: IdeaId::YarnComputing,
+        effects: &[(Effect::TinkererSpeed, 2.0)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Warm Welcome Mat",
+        blurb: "It says 'mew'. Arrival chance +5% (inside the cap).",
+        cost: 4000.0,
+        materials: &[(ResourceId::Stories, 20.0)],
+        gate: IdeaId::TeaCeremonies,
+        effects: &[(Effect::ArrivalChanceInCap, 0.05)],
+        ..REF
+    },
+    RefinementDef {
+        name: "Thicker Blankets",
+        blurb: "Warmth you can knead. +1 happiness point per Hearth.",
+        cost: 8000.0,
+        materials: &[(ResourceId::Quills, 50.0)],
+        gate: IdeaId::TeaCeremonies,
+        effects: &[(Effect::HappinessPoints, 1.0)],
+        per_structure: Some(StructureId::Hearth),
+        ..REF
+    },
+    RefinementDef {
+        name: "Dew Funnels",
+        blurb: "The morning pours itself. Dew Collectors +50%.",
+        cost: 30000.0,
+        materials: &[(ResourceId::Lattices, 40.0)],
+        gate: IdeaId::DewHarvest,
+        effects: &[(Effect::StructureRatio(StructureId::DewCollector), 0.50)],
+        ..REF
+    },
+];
+
+// ---- House Rules ----
+
+/// Mutually exclusive pairs, charm-priced; adopting one permanently blocks
+/// its sibling for the current meadow. @spec SIM-CUR-011
+pub struct RuleDef {
+    pub name: &'static str,
+    pub blurb: &'static str,
+    pub cost_charm: f64,
+    /// The sibling this rule permanently blocks (and is blocked by).
+    pub blocks: RuleId,
+    pub effects: &'static [(Effect, f64)],
+}
+
+pub fn rule_def(r: RuleId) -> &'static RuleDef {
+    &RULES[r as usize]
+}
+
+static RULES: [RuleDef; 8] = [
+    RuleDef {
+        name: "Early Birds",
+        blurb: "Dawn patrol tends the patch. Catnip production +10%.",
+        cost_charm: 150.0,
+        blocks: RuleId::NightOwls,
+        effects: &[(Effect::ResourceRatio(ResourceId::Catnip), 0.10)],
+    },
+    RuleDef {
+        name: "Night Owls",
+        blurb: "The best questions come after dark. Curiosity production +10%.",
+        cost_charm: 150.0,
+        blocks: RuleId::EarlyBirds,
+        effects: &[(Effect::ResourceRatio(ResourceId::Curiosity), 0.10)],
+    },
+    RuleDef {
+        name: "Open Meadow",
+        blurb: "The gate stands ajar. Arrival chance +10% (inside the cap).",
+        cost_charm: 1500.0,
+        blocks: RuleId::CozyBurrows,
+        effects: &[(Effect::ArrivalChanceInCap, 0.10)],
+    },
+    RuleDef {
+        name: "Cozy Burrows",
+        blurb: "Everyone gets a nook. +5 happiness points.",
+        cost_charm: 1500.0,
+        blocks: RuleId::OpenMeadow,
+        effects: &[(Effect::HappinessPoints, 5.0)],
+    },
+    RuleDef {
+        name: "Sharing Circle",
+        blurb: "One feather, many admirers. Luxury drain −25%.",
+        cost_charm: 4000.0,
+        blocks: RuleId::PersonalStashes,
+        effects: &[(Effect::LuxuryDemandRatio, -0.25)],
+    },
+    RuleDef {
+        name: "Personal Stashes",
+        blurb: "Mine, labeled and defended. All caps +10%.",
+        cost_charm: 4000.0,
+        blocks: RuleId::SharingCircle,
+        effects: &[(Effect::CapRatio, 0.10)],
+    },
+    RuleDef {
+        name: "Loud Purring",
+        blurb: "Audible contentment carries. Charm production +20%.",
+        cost_charm: 15000.0,
+        blocks: RuleId::QuietContemplation,
+        effects: &[(Effect::ResourceRatio(ResourceId::Charm), 0.20)],
+    },
+    RuleDef {
+        name: "Quiet Contemplation",
+        blurb: "Stillness gathers its own heat. Warmth production +20%.",
+        cost_charm: 15000.0,
+        blocks: RuleId::LoudPurring,
+        effects: &[(Effect::ResourceRatio(ResourceId::Warmth), 0.20)],
     },
 ];
 

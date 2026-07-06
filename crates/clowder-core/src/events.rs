@@ -1,4 +1,4 @@
-use crate::state::{ContentId, IdeaId, JobId, MoodTier, Season, StructureId};
+use crate::state::{ContentId, IdeaId, JobId, MoodTier, RefinementId, RuleId, Season, StructureId};
 use serde::{Deserialize, Serialize};
 
 /// Typed simulation occurrences returned by `tick()` and command application.
@@ -29,4 +29,25 @@ pub enum Event {
     SkyEventVisible,
     // @spec SIM-ENG-024
     SpeedChanged { speed: f64 },
+    /// A pounce came home with its full haul — data, not prose. Shinies are
+    /// reported post-clamp, exactly as the stock moved.
+    /// @spec SIM-EXP-005
+    PounceReturned {
+        squads: u32,
+        feathers: f64,
+        bells: f64,
+        shinies: f64,
+        unicorns: u32,
+    },
+    // @spec SIM-KIT-025
+    JamboreeStarted { until_tick: u64 },
+    JamboreeEnded,
+    // @spec SIM-KIT-022
+    ElderAppointed { name: String },
+    // @spec SIM-KIT-021
+    KittenPromoted { name: String, rank: u8 },
+    // @spec SIM-CUR-010
+    RefinementBought { id: RefinementId },
+    // @spec SIM-CUR-011
+    RuleAdopted { id: RuleId },
 }

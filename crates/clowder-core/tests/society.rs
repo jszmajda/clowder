@@ -121,7 +121,9 @@ fn loafers_and_away_kittens_neither_accrue_nor_decay() {
     assert_eq!(s.kittens[0].exp, 0.0);
     assert!((skill(&s, 1, JobId::TwigCollector) - 49.99).abs() < 1e-9);
 
-    // Away kittens are frozen entirely, job title or not.
+    // Away kittens are frozen entirely, job title or not. A lean meadow
+    // (empty bowl) keeps the wanderer at the neighbor's — a well-fed one would
+    // recover and come home at the next day close, which is a different test.
     let mut away = GameState::new(204);
     adopt(&mut away, 2);
     away.apply(Command::AssignJob(JobId::Gardener)).unwrap();
@@ -130,7 +132,7 @@ fn loafers_and_away_kittens_neither_accrue_nor_decay() {
     away.kittens[1].skills[JobId::Gardener as usize] = 10.0;
     away.kittens[1].skills[JobId::Groomer as usize] = 10.0;
     off_boundary(&mut away);
-    give(&mut away, ResourceId::Catnip, 100.0);
+    give(&mut away, ResourceId::Catnip, 0.0);
     run_calm_ticks(&mut away, 10);
     assert_eq!(
         skill(&away, 1, JobId::Gardener),
@@ -146,13 +148,16 @@ fn loafers_and_away_kittens_neither_accrue_nor_decay() {
 fn grumpiness_slows_paws_not_learning() {
     let mut s = GameState::new(205);
     adopt(&mut s, 1);
-    s.apply(Command::AssignJob(JobId::Gardener)).unwrap();
+    // A Twig Collector, not a Gardener: it makes no catnip, so the bowl stays
+    // empty and the clowder stays Grumpy while the kitten keeps studying twigs.
+    // (A lone Gardener would out-produce its own appetite and never go hungry.)
+    s.apply(Command::AssignJob(JobId::TwigCollector)).unwrap();
     off_boundary(&mut s);
     give(&mut s, ResourceId::Catnip, 0.0); // shortfall every tick: Grumpy
     run_calm_ticks(&mut s, 10);
     assert!(s.grumpy, "an empty bowl keeps the clowder Grumpy");
     assert!(
-        (skill(&s, 0, JobId::Gardener) - 0.1).abs() < 1e-9,
+        (skill(&s, 0, JobId::TwigCollector) - 0.1).abs() < 1e-9,
         "learning is never slowed"
     );
     assert!((s.kittens[0].exp - 0.1).abs() < 1e-9);
@@ -1183,7 +1188,9 @@ fn starved_tinkerers_throttle_quietly_and_away_tinkerers_idle_bound() {
     s.kittens[1].location = Location::NeighborsYard;
     s.kittens[1].away_seq = Some(9);
     off_boundary(&mut s);
-    give(&mut s, ResourceId::Catnip, 100.0);
+    // Lean meadow keeps the bound Tinkerer at the neighbor's for the whole
+    // window (a full bowl would recover it home at a day close).
+    give(&mut s, ResourceId::Catnip, 0.0);
     give(&mut s, ResourceId::Twigs, 50.0);
     run_calm_ticks(&mut s, 100);
     assert_eq!(s.stock(ResourceId::Wands), 0.0, "no output while away");
@@ -1852,3 +1859,4 @@ fn determinism_holds_with_arrivals_traits_and_pounces() {
         "different seed, different world"
     );
 }
+

@@ -39,4 +39,9 @@ impl Pcg32 {
     pub fn index(&mut self, n: usize) -> usize {
         (self.next_u32() as usize) % n.max(1)
     }
+
+    /// Uniform draw in [0, 1) — one Irwin–Hall summand. @spec SIM-EXP-002
+    pub fn uniform(&mut self) -> f64 {
+        self.next_u32() as f64 / (u32::MAX as f64 + 1.0)
+    }
 }

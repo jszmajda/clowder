@@ -10,7 +10,7 @@
 
 - [x] **SIM-ENG-004**: The system shall execute tick phases in the fixed order: calendar/daily processing, production, consumption, mood update, random events, cap clamping.
 - [x] **SIM-ENG-005**: The system shall apply commands only between ticks, and a command shall either fully apply or return a typed error having mutated nothing (RNG state included).
-- [ ] **SIM-ENG-006**: When multiple command-rejection reasons apply simultaneously, the system shall report the first matching error in the precedence order: UnknownId, Locked, AlreadyResearched, NoIdleKittens, NoSeats, NoWorkersAssigned, StorageFull, InsufficientResources (the list grows append-adjacent, never reorders).
+- [x] **SIM-ENG-006**: When multiple command-rejection reasons apply simultaneously, the system shall report the first matching error in the precedence order: UnknownId, Locked, AlreadyResearched, NoIdleKittens, NoSeats, NoWorkersAssigned, StorageFull, InsufficientResources (the list grows append-adjacent, never reorders).
 
 ## Determinism
 
@@ -28,7 +28,7 @@
 - [x] **SIM-ENG-011**: While zoomies are inactive, on each day-boundary tick during the random-events phase (after production), the system shall start zoomies with 4% probability, setting the active window and emitting ZoomiesStarted; zoomies may restart on the same tick their previous window expired.
 - [x] **SIM-ENG-012**: While zoomies are active, the system shall multiply job production by 1.25 — or by 1.5 whenever the zoomies-enhancing idea (SIM-CUR) is researched — for exactly 120 boosted production ticks, or 240 where that idea was already researched when the zoomies started (magnitude is live; duration is fixed at start); zoomies stack multiplicatively with the mood multiplier, including while Grumpy.
 - [x] **SIM-ENG-013**: During each tick's random-events phase, if the zoomies window has expired, the system shall reset it to inactive and emit ZoomiesEnded before rolling any new zoomies start.
-- [ ] **SIM-ENG-018**: On a day-boundary tick, the system shall consume RNG draws in the fixed order: arrival roll (no draw when pity forces success or the check is ineligible), arrival name draw, arrival trait draw (the latter two only on success), zoomies start roll, flavor roll, flavor template draw, flavor kitten draw, sky-event roll, sky auto-observe roll — later draws occurring only when their preceding roll fired, and new subsystems appending to (never reordering) this schedule.
+- [x] **SIM-ENG-018**: On a day-boundary tick, the system shall consume RNG draws in the fixed order: arrival roll (no draw when pity forces success or the check is ineligible), arrival name draw, arrival trait draw (the latter two only on success), zoomies start roll, flavor roll, flavor template draw, flavor kitten draw, sky-event roll, sky auto-observe roll — later draws occurring only when their preceding roll fired, and new subsystems appending to (never reordering) this schedule.
 
 ## Initial State & Derived Queries
 

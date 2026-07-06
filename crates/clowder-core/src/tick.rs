@@ -71,25 +71,41 @@ impl GameState {
             }
         }
 
-        // Reveal scan: sticky, ordered, event-emitting. @spec SIM-ENG-023
-        for s in StructureId::ALL {
+        // Reveal scan: sticky, ordered, event-emitting. We walk only the
+        // unrevealed worklists (the complement of `revealed`, canonical order),
+        // draining each item as it reveals — no per-tick membership probe of
+        // the whole content space. `mem::take` sidesteps the borrow conflict
+        // between `retain`'s &mut and `reveal_condition_met`'s &self; the taken
+        // vec is empty during the scan, which that predicate never reads.
+        // @spec SIM-ENG-023
+        let mut pending = std::mem::take(&mut self.unrevealed_structs);
+        pending.retain(|&s| {
             let id = crate::state::ContentId::Structure(s);
-            if !self.revealed.contains(&id) && self.reveal_condition_met(id) {
+            if self.reveal_condition_met(id) {
                 self.revealed.insert(id);
                 events.push(Event::Revealed { id });
+                false
+            } else {
+                true
             }
-        }
+        });
+        self.unrevealed_structs = pending;
         // The curiosity gate is one check for the whole tree, hoisted out of
-        // the loop (idea reveal = idea_unlocked = gate + prerequisites).
-        let curiosity_open = self.cap(ResourceId::Curiosity) > 0.0;
-        if curiosity_open {
-            for i in crate::state::IdeaId::ALL {
+        // the scan (idea reveal = gate + prerequisites); while it's shut, the
+        // idea worklist can't move, so skip it entirely.
+        if !self.unrevealed_ideas.is_empty() && self.cap(ResourceId::Curiosity) > 0.0 {
+            let mut pending = std::mem::take(&mut self.unrevealed_ideas);
+            pending.retain(|&i| {
                 let id = crate::state::ContentId::Idea(i);
-                if !self.revealed.contains(&id) && self.idea_prereqs_met(i) {
+                if self.idea_prereqs_met(i) {
                     self.revealed.insert(id);
                     events.push(Event::Revealed { id });
+                    false
+                } else {
+                    true
                 }
-            }
+            });
+            self.unrevealed_ideas = pending;
         }
 
         events
@@ -160,6 +176,10 @@ impl GameState {
             };
             if success {
                 let name = self.draw_name();
+                // The trait draw follows the name draw in the fixed schedule.
+                // @spec SIM-KIT-023, SIM-ENG-018
+                let trait_id =
+                    crate::state::KittenTrait::ALL[self.rng.index(crate::state::KittenTrait::ALL.len())];
                 self.kittens.push(crate::state::Kitten {
                     name: name.clone(),
                     job: None,
@@ -167,12 +187,59 @@ impl GameState {
                     arrived_day: self.day(),
                     job_seq: None,
                     away_seq: None,
+                    skills: [0.0; 8],
+                    exp: 0.0,
+                    rank: 0,
+                    trait_id,
+                    tinkering: None,
                 });
                 self.pity = 0;
                 events.push(Event::KittenArrived { name });
             } else {
                 self.pity = self.pity.saturating_add(1);
             }
+        }
+
+        // (e) Year-close hooks, appended to the fixed daily order: the
+        // Cogworks convert capped raws into goods — overflow, not waste.
+        // @spec SIM-ECO-039
+        if self.day().is_multiple_of(content::DAYS_PER_YEAR) {
+            self.cogworks_autocraft();
+        }
+    }
+
+    /// The Cogworks year-close auto-craft: 2% per Cogworks (max 50%) of each
+    /// raw standing at ≥98% of its cap converts through its single-input
+    /// recipe, once per year, unjammed, no RNG. Inputs leave at face value;
+    /// output rides the craft ratio.
+    // @spec SIM-ECO-039
+    fn cogworks_autocraft(&mut self) {
+        let cogworks = self.structures[StructureId::Cogworks.ix()];
+        if cogworks == 0 {
+            return;
+        }
+        let share = (content::COGWORKS_CONVERT_PER * cogworks as f64)
+            .min(content::COGWORKS_CONVERT_MAX);
+        for (raw, craft) in content::COGWORKS_AUTOCRAFT {
+            if !self.craft_unlocked(craft) {
+                continue;
+            }
+            let cap = self.cap(raw);
+            if !cap.is_finite() || cap <= 0.0 {
+                continue;
+            }
+            let stock = self.stock(raw);
+            if stock + EPSILON < content::COGWORKS_THRESHOLD * cap {
+                continue;
+            }
+            let amount = share * stock;
+            let per_batch = content::craft_def(craft).inputs[0].1;
+            let batches = amount / per_batch;
+            let output = content::craft_output(craft);
+            self.resources[raw.ix()] = (stock - amount).max(0.0);
+            let boosted = batches * (1.0 + self.craft_ratio_for(craft));
+            let ix = output.ix();
+            self.resources[ix] = (self.resources[ix] + boosted).min(self.cap(output));
         }
     }
 
@@ -189,9 +256,8 @@ impl GameState {
         let winter_eased = self.ideas.contains(&IdeaId::SeasonalAwareness);
         // Layer-6 inputs, frozen at phase start (before converters draw fuel).
         // Layers 7–8 (Elder Wisdom, the Long Sun) are ×1.0 until their waves.
-        let deficit = self.energy_deficit_ratio();
+        let (deficit, surplus) = self.energy_ratios();
         let global_mult = 1.0 + self.effect(crate::effects::Effect::GlobalProductionRatio) * deficit;
-        let surplus = self.energy_surplus_ratio();
         let mess_catnip = self.mess_catnip_factor();
 
         // ---- Structures (☆ layers only) ----
@@ -203,7 +269,9 @@ impl GameState {
             let def = content::structure_def(s);
             for (r, amount) in def.productions {
                 let mut flow = amount * count as f64;
-                flow *= 1.0 + self.effect(crate::effects::Effect::ResourceRatio(*r));
+                flow *= 1.0
+                    + self.effect(crate::effects::Effect::ResourceRatio(*r))
+                    + self.effect(crate::effects::Effect::StructureRatio(s));
                 if def.seasonal {
                     // @spec SIM-ECO-019
                     flow *= content::season_patch_modifier(season, winter_eased);
@@ -216,6 +284,24 @@ impl GameState {
                     flow *= mess_catnip;
                 }
                 self.resources[r.ix()] += flow;
+            }
+        }
+
+        // Refinement-granted extra outputs on non-converter structures (the
+        // Story Press). Converter hosts (the Hearth's Bellows and Ember
+        // Beds) add theirs throttle-scaled in run_converters.
+        // @spec SIM-CUR-010
+        for (s, r) in content::STRUCTURE_OUTPUT_ADD_TARGETS {
+            if content::structure_def(s).converter.is_some() {
+                continue;
+            }
+            let count = self.structures[s.ix()];
+            if count == 0 {
+                continue;
+            }
+            let add = self.effect(crate::effects::Effect::StructureOutputAdd(s, r));
+            if add != 0.0 {
+                self.resources[r.ix()] += add * count as f64;
             }
         }
 
@@ -232,14 +318,33 @@ impl GameState {
         };
         let mood = self.mood_multiplier();
         for j in JobId::ALL {
-            let workers = self.effective_workers(j);
-            if workers == 0 {
+            let Some((r, per_worker)) = content::job_def(j).yield_per_tick else {
+                continue; // the Tinkerer crafts in the background (below)
+            };
+            // Production resolves per kitten in roster order: each Home
+            // worker contributes base × (1 + job-ratio effects) × its skill
+            // tier × the Elder's own-job leadership; the aggregate layers
+            // (per-resource ratio, mood, zoomies, global, mess) are identical
+            // per kitten and stay aggregate.
+            // @spec SIM-KIT-020, SIM-KIT-022
+            let job_ratio = 1.0 + self.effect(crate::effects::Effect::JobRatio(j));
+            let mut base_sum = 0.0;
+            for (ix, k) in self.kittens.iter().enumerate() {
+                if k.location != Location::Home || k.job != Some(j) {
+                    continue;
+                }
+                let mut per = per_worker
+                    * job_ratio
+                    * (1.0 + content::skill_tier_bonus(k.skills[j as usize]));
+                if self.elder == Some(ix) {
+                    per *= ((k.rank as f64 + 1.0) / content::ELDER_RANK_DIVISOR).max(1.0);
+                }
+                base_sum += per;
+            }
+            if base_sum == 0.0 {
                 continue;
             }
-            let Some((r, per_worker)) = content::job_def(j).yield_per_tick else {
-                continue; // the Tinkerer crafts in the background — later wave
-            };
-            let mut flow = per_worker * workers as f64;
+            let mut flow = base_sum;
             flow *= 1.0 + self.effect(crate::effects::Effect::ResourceRatio(r));
             flow *= mood * zoomies;
             if content::tier(r) == content::Tier::Raw {
@@ -251,8 +356,71 @@ impl GameState {
             self.resources[r.ix()] += flow;
         }
 
-        // ---- Converters (throttled), accruing mess as they run ----
-        self.run_converters()
+        // ---- Skills: employed Home kittens learn; other skills fade ----
+        // Grumpiness slows paws, never learning; loafing and Away kittens
+        // neither accrue nor decay.
+        // @spec SIM-KIT-019
+        let xp_gain = content::SKILL_XP_PER_TICK
+            * (1.0 + self.effect(crate::effects::Effect::SkillXpRatio));
+        let decay_removed = self.refinements.contains(&crate::state::RefinementId::GroupLessons);
+        for k in &mut self.kittens {
+            if k.location != Location::Home {
+                continue;
+            }
+            let Some(job) = k.job else { continue };
+            k.skills[job as usize] += xp_gain;
+            k.exp += xp_gain;
+            if !decay_removed {
+                for j in JobId::ALL {
+                    if j != job {
+                        let s = &mut k.skills[j as usize];
+                        *s = (*s - content::SKILL_DECAY_PER_TICK).max(0.0);
+                    }
+                }
+            }
+        }
+
+        // ---- Converters (throttled), then Tinkerers, accruing mess ----
+        let mess = self.run_converters();
+        self.run_tinkerers();
+        mess
+    }
+
+    /// Bound Home Tinkerers craft their recipes in the background, in roster
+    /// order: 0.0017 batches/tick × (1 + tinkerer-speed effects) × rank-tier
+    /// effectiveness, inputs drawn through the engine throttle at face value,
+    /// output riding the craft ratio. No mood or zoomies factor. An Away
+    /// Tinkerer's recipe idles; its binding (and seat) persist.
+    // @spec SIM-ECO-043, SIM-KIT-026
+    fn run_tinkerers(&mut self) {
+        let speed = 1.0 + self.effect(crate::effects::Effect::TinkererSpeed);
+        for ix in 0..self.kittens.len() {
+            let k = &self.kittens[ix];
+            if k.location != Location::Home || k.job != Some(JobId::Tinkerer) {
+                continue;
+            }
+            let Some(recipe) = k.tinkering else { continue };
+            let def = content::craft_def(recipe);
+            let effectiveness = (1.0
+                - content::TINKER_TIER_PENALTY
+                    * (def.tier as f64 - (k.rank as f64 + 1.0)).max(0.0))
+            .max(content::TINKER_EFFECTIVENESS_FLOOR);
+            let rate = content::TINKER_BATCHES_PER_TICK * speed * effectiveness;
+            let demands: Vec<(ResourceId, f64)> =
+                def.inputs.iter().map(|(r, amount)| (*r, amount * rate)).collect();
+            let fraction = self.throttle_fraction(&demands);
+            if fraction <= 0.0 {
+                continue; // a starved Tinkerer idles quietly, still bound
+            }
+            for (r, demand) in &demands {
+                let rix = r.ix();
+                self.resources[rix] = (self.resources[rix] - demand * fraction).max(0.0);
+            }
+            let output = content::craft_output(recipe);
+            let boosted = rate * fraction * (1.0 + self.craft_ratio_for(recipe));
+            let oix = output.ix();
+            self.resources[oix] = (self.resources[oix] + boosted).min(self.cap(output));
+        }
     }
 
     /// Run every converter through the engine throttle and total the tick's
@@ -267,8 +435,12 @@ impl GameState {
                 continue;
             }
             let def = content::structure_def(s);
+            // Tidy effects flip a structure's mess sign (the Tidy-Up Rota).
+            // @spec SIM-ECO-037, SIM-CUR-010
+            let per_copy_mess =
+                def.mess + self.effect(crate::effects::Effect::StructureMessDelta(s));
             let Some(converter) = def.converter else {
-                mess_accrual += def.mess * count as f64;
+                mess_accrual += per_copy_mess * count as f64;
                 continue;
             };
             let demands: Vec<(ResourceId, f64)> = converter
@@ -277,7 +449,7 @@ impl GameState {
                 .map(|(r, d)| (*r, d * count as f64))
                 .collect();
             let fraction = self.throttle_fraction(&demands);
-            mess_accrual += def.mess * count as f64 * fraction;
+            mess_accrual += per_copy_mess * count as f64 * fraction;
             if fraction <= 0.0 {
                 continue; // a starved converter idles quietly
             }
@@ -287,6 +459,17 @@ impl GameState {
             }
             for (r, out) in converter.outputs {
                 self.resources[r.ix()] += out * count as f64 * fraction;
+            }
+            // Refinement-granted extra outputs ride the same throttle (the
+            // Bellows and Ember Beds stoke the Hearth). @spec SIM-CUR-010
+            for (target, r) in content::STRUCTURE_OUTPUT_ADD_TARGETS {
+                if target != s {
+                    continue;
+                }
+                let add = self.effect(crate::effects::Effect::StructureOutputAdd(s, r));
+                if add != 0.0 {
+                    self.resources[r.ix()] += add * count as f64 * fraction;
+                }
             }
             // The Treat Bakery's outputs ride the pep *cap* (mpr), not a
             // recipe table. @spec SIM-ECO-030
@@ -321,11 +504,20 @@ impl GameState {
             false
         };
 
-        // Luxury drain, per Home kitten, eased by demand effects (floor 0).
+        // Luxury drain, per Home kitten, eased by demand effects and raised
+        // by an active jamboree (celebrations consume), floored at zero.
         // An empty shelf drains nothing — skip the effect sum entirely.
+        // @spec SIM-ECO-026, SIM-KIT-025
         if content::LUXURY_DRAINS.iter().any(|(r, _)| self.resources[r.ix()] > 0.0) {
-            let scale =
-                (1.0 + self.effect(crate::effects::Effect::LuxuryDemandRatio)).max(0.0);
+            let jamboree = if self.jamboree_active() {
+                content::JAMBOREE_LUXURY_DEMAND
+            } else {
+                0.0
+            };
+            let scale = (1.0
+                + self.effect(crate::effects::Effect::LuxuryDemandRatio)
+                + jamboree)
+                .max(0.0);
             for (r, per_kitten) in content::LUXURY_DRAINS {
                 let ix = r.ix();
                 let drain = per_kitten * home as f64 * scale;
@@ -344,6 +536,14 @@ impl GameState {
         if self.zoomies_until != 0 && self.ticks >= self.zoomies_until {
             self.zoomies_until = 0;
             events.push(Event::ZoomiesEnded);
+        }
+
+        // A jamboree ends at its expiry the same way (checked every tick);
+        // the window resets to none and a fresh one may be hosted after.
+        // @spec SIM-KIT-025
+        if self.jamboree_until != 0 && self.ticks >= self.jamboree_until {
+            self.jamboree_until = 0;
+            events.push(Event::JamboreeEnded);
         }
 
         if !day_boundary {
@@ -407,10 +607,16 @@ impl GameState {
         if ledges == 0 || self.pending_sky_event.is_some() {
             return; // no draw at all: at most one pending event at a time
         }
-        if !self.rng.chance(content::SKY_EVENT_CHANCE_PER_LEDGE * ledges as f64) {
+        let event_chance = content::SKY_EVENT_CHANCE_PER_LEDGE
+            * ledges as f64
+            * (1.0 + self.effect(crate::effects::Effect::SkyEventChanceRatio));
+        if !self.rng.chance(event_chance) {
             return;
         }
-        if self.rng.chance(content::SKY_AUTO_OBSERVE_PER_LEDGE * ledges as f64) {
+        let observe_chance = content::SKY_AUTO_OBSERVE_PER_LEDGE
+            * ledges as f64
+            * (1.0 + self.effect(crate::effects::Effect::AutoObserveChanceRatio));
+        if self.rng.chance(observe_chance) {
             // Someone happened to be looking up.
             self.grant_sky_observation();
         } else {

@@ -30,6 +30,7 @@ Content items (structures, ideas, refinements, house rules, rites, colonies, sit
 - An item **reveals** the first time its gate is satisfied and (for cost-revealed items like structures) every cost component has reached the reveal fraction of its current price (default 30%, content-tunable). Revelation is sticky: revealed ids live in a persisted `revealed` set in `GameState`, the scan runs at the end of the clamp phase, and each new revelation emits a `Revealed` event — the "something new is possible" moment.
 - `Availability::{Hidden, Teased, Available}` — *Hidden*: not yet revealed; *Teased*: revealed but not currently affordable/unlockable; *Available*: revealed and actionable now. The shell renders Teased items dimmed; presentation is entirely the shell's.
 - Purchase-time gating stays the command layer's job (`Locked` per error precedence); Availability is advisory for display.
+- **Implementation note.** The per-tick reveal scan walks a derived, non-serialized worklist (the complement of `revealed`, canonical order) rather than probing the whole content space each tick — a hot-path accelerator, rebuilt from `revealed` on load so it can never drift from that serialized truth. Purely a performance concern; the observable reveal behavior is identical to a naive full scan.
 
 ## Game Speed
 

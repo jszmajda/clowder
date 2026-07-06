@@ -276,6 +276,36 @@ impl CraftId {
     ];
 }
 
+/// Birth traits, rolled uniformly at arrival (one draw after the name draw).
+/// A trait's clowder-wide effect applies only while its kitten is the Elder.
+/// Some cats simply are: None is a full member of the eight.
+// @spec SIM-KIT-023, SIM-KIT-024
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum KittenTrait {
+    #[default]
+    None,
+    Crafty,
+    Brassy,
+    Alchemical,
+    Charming,
+    Bold,
+    Curious,
+    Serene,
+}
+
+impl KittenTrait {
+    pub const ALL: [KittenTrait; 8] = [
+        KittenTrait::None,
+        KittenTrait::Crafty,
+        KittenTrait::Brassy,
+        KittenTrait::Alchemical,
+        KittenTrait::Charming,
+        KittenTrait::Bold,
+        KittenTrait::Curious,
+        KittenTrait::Serene,
+    ];
+}
+
 /// The banded idea tree, ids append-only: 0–8 are the founding nine, 9–17
 /// finish band 0, 18–27 band 1, 28–35 band 2, 36–43 band 3, 44–55 band 4,
 /// and 56 (Pouncing Practice) is a band-0 idea appended late — ids never
@@ -405,6 +435,116 @@ impl IdeaId {
     ];
 }
 
+/// The Refinements table, ids append-only (35 in the society wave).
+// @spec SIM-CUR-010
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum RefinementId {
+    PebbleCombs,
+    ButtonCombs,
+    BrassCombs,
+    MoonsteelCombs,
+    PebbleSnips,
+    ButtonShears,
+    BrassClippers,
+    MoonsteelPruners,
+    DeepPockets,
+    SortingClaws,
+    BolasOfYarn,
+    PouncePads,
+    WhiskerGuards,
+    MoonsteelMittens,
+    DeepShelves,
+    StackedCrates,
+    LabeledJars,
+    CatnipCellars,
+    BiggerBaskets,
+    Bellows,
+    EmberBeds,
+    StoryPress,
+    BetterBindings,
+    FieldNotes,
+    StarDiaries,
+    PatientEyes,
+    TidyUpRota,
+    GroupLessons,
+    EncouragingMews,
+    NimblePaws,
+    PatientPaws,
+    ClockworkPaws,
+    WarmWelcomeMat,
+    ThickerBlankets,
+    DewFunnels,
+}
+
+pub const REFINEMENT_COUNT: usize = 35;
+
+impl RefinementId {
+    pub const ALL: [RefinementId; REFINEMENT_COUNT] = [
+        RefinementId::PebbleCombs,
+        RefinementId::ButtonCombs,
+        RefinementId::BrassCombs,
+        RefinementId::MoonsteelCombs,
+        RefinementId::PebbleSnips,
+        RefinementId::ButtonShears,
+        RefinementId::BrassClippers,
+        RefinementId::MoonsteelPruners,
+        RefinementId::DeepPockets,
+        RefinementId::SortingClaws,
+        RefinementId::BolasOfYarn,
+        RefinementId::PouncePads,
+        RefinementId::WhiskerGuards,
+        RefinementId::MoonsteelMittens,
+        RefinementId::DeepShelves,
+        RefinementId::StackedCrates,
+        RefinementId::LabeledJars,
+        RefinementId::CatnipCellars,
+        RefinementId::BiggerBaskets,
+        RefinementId::Bellows,
+        RefinementId::EmberBeds,
+        RefinementId::StoryPress,
+        RefinementId::BetterBindings,
+        RefinementId::FieldNotes,
+        RefinementId::StarDiaries,
+        RefinementId::PatientEyes,
+        RefinementId::TidyUpRota,
+        RefinementId::GroupLessons,
+        RefinementId::EncouragingMews,
+        RefinementId::NimblePaws,
+        RefinementId::PatientPaws,
+        RefinementId::ClockworkPaws,
+        RefinementId::WarmWelcomeMat,
+        RefinementId::ThickerBlankets,
+        RefinementId::DewFunnels,
+    ];
+}
+
+/// House Rules: four mutually exclusive, charm-priced pairs.
+// @spec SIM-CUR-011
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum RuleId {
+    EarlyBirds,
+    NightOwls,
+    OpenMeadow,
+    CozyBurrows,
+    SharingCircle,
+    PersonalStashes,
+    LoudPurring,
+    QuietContemplation,
+}
+
+impl RuleId {
+    pub const ALL: [RuleId; 8] = [
+        RuleId::EarlyBirds,
+        RuleId::NightOwls,
+        RuleId::OpenMeadow,
+        RuleId::CozyBurrows,
+        RuleId::SharingCircle,
+        RuleId::PersonalStashes,
+        RuleId::LoudPurring,
+        RuleId::QuietContemplation,
+    ];
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Season {
     Spring,
@@ -456,6 +596,23 @@ pub struct Kitten {
     pub arrived_day: u64,
     pub job_seq: Option<u64>,
     pub away_seq: Option<u64>,
+    /// Per-job skill XP, JobId-indexed. Older saves zero-fill.
+    /// @spec SIM-KIT-019, SIM-KIT-027
+    #[serde(default)]
+    pub skills: [f64; 8],
+    /// Lifetime XP pool, spent on promotions. @spec SIM-KIT-021
+    #[serde(default)]
+    pub exp: f64,
+    /// Promoted with exp + shinies. @spec SIM-KIT-021
+    #[serde(default, deserialize_with = "saturating_u8")]
+    pub rank: u8,
+    /// Birth trait; active clowder-wide only while this kitten is the Elder.
+    /// @spec SIM-KIT-023
+    #[serde(default)]
+    pub trait_id: KittenTrait,
+    /// The recipe this Tinkerer is bound to, if any. @spec SIM-ECO-043
+    #[serde(default)]
+    pub tinkering: Option<CraftId>,
 }
 
 /// Deserialize a counter wide and clamp — hand-edited saves get physics, not
@@ -545,6 +702,27 @@ pub struct GameState {
     /// @spec SIM-ENG-025
     #[serde(default, rename = "pending_sky")]
     pub pending_sky_event: Option<u64>,
+    /// Roster index of the Elder, if one is appointed. @spec SIM-KIT-022
+    #[serde(default)]
+    pub elder: Option<usize>,
+    /// Tick until which a jamboree runs (active while ticks < jamboree_until);
+    /// 0 when none. @spec SIM-KIT-025
+    #[serde(default)]
+    pub jamboree_until: u64,
+    /// Purchased refinements — permanent. @spec SIM-CUR-010
+    #[serde(default)]
+    pub refinements: BTreeSet<RefinementId>,
+    /// Adopted house rules — permanent for this meadow. @spec SIM-CUR-011
+    #[serde(default)]
+    pub rules: BTreeSet<RuleId>,
+    /// Derived accelerator for the per-tick reveal scan: the complement of
+    /// `revealed`, in canonical order. Never serialized — rebuilt on load —
+    /// so it can't drift from `revealed`, which stays the sole truth.
+    /// @spec SIM-ENG-023
+    #[serde(skip)]
+    pub(crate) unrevealed_structs: Vec<StructureId>,
+    #[serde(skip)]
+    pub(crate) unrevealed_ideas: Vec<IdeaId>,
 }
 
 fn default_speed() -> f64 {
@@ -581,7 +759,30 @@ impl GameState {
             kites_high_water: 0.0,
             mess: 0.0,
             pending_sky_event: None,
+            elder: None,
+            jamboree_until: 0,
+            refinements: BTreeSet::new(),
+            rules: BTreeSet::new(),
+            unrevealed_structs: StructureId::ALL.to_vec(),
+            unrevealed_ideas: IdeaId::ALL.to_vec(),
         }
+    }
+
+    /// Rebuild the unrevealed worklists as the exact complement of `revealed`,
+    /// in canonical order. Called after deserialization (the worklists are not
+    /// serialized) so live play and a reloaded game share one reveal state.
+    // @spec SIM-ENG-023
+    pub(crate) fn rebuild_unrevealed(&mut self) {
+        self.unrevealed_structs = StructureId::ALL
+            .iter()
+            .copied()
+            .filter(|s| !self.revealed.contains(&ContentId::Structure(*s)))
+            .collect();
+        self.unrevealed_ideas = IdeaId::ALL
+            .iter()
+            .copied()
+            .filter(|i| !self.revealed.contains(&ContentId::Idea(*i)))
+            .collect();
     }
 
     // ---- Calendar (derived from ticks alone) ----
@@ -612,10 +813,13 @@ impl GameState {
 
     // ---- Derived economy queries ----
 
-    /// Storage cap for a resource: base plus every cap-extension effect.
-    // @spec SIM-ECO-001, SIM-ECO-002
+    /// Storage cap for a resource: (base + flat extensions) × (1 + cap-ratio
+    /// effects). Infinite caps stay infinite and a zero cap stays zero — the
+    /// Cardboard-Box gate never opens by percentage.
+    // @spec SIM-ECO-001, SIM-ECO-002, SIM-CUR-011
     pub fn cap(&self, r: ResourceId) -> f64 {
-        content::BASE_CAPS[r.ix()] + self.effect(crate::effects::Effect::MaxCap(r))
+        (content::BASE_CAPS[r.ix()] + self.effect(crate::effects::Effect::MaxCap(r)))
+            * (1.0 + self.effect(crate::effects::Effect::CapRatio))
     }
 
     pub fn stock(&self, r: ResourceId) -> f64 {
@@ -712,9 +916,28 @@ impl GameState {
             .filter(|k| k.location == Location::Home && k.job.is_none())
             .count() as f64;
         let crowding = home.saturating_sub(content::CROWDING_FREE) as f64;
-        let mut h = 100.0 - content::CROWDING_POINTS * crowding
+        // Story Circles and Moonlight Stages pool into one DR-limited relief
+        // knob: at least 10% of the crowding always bites.
+        let relief_sum: f64 = StructureId::ALL
+            .iter()
+            .map(|s| content::structure_def(*s).crowding_relief * self.structures[s.ix()] as f64)
+            .sum();
+        let relief =
+            crate::effects::limited_dr(relief_sum, content::CROWDING_RELIEF_DR_LIMIT);
+        // Each distinct stocked luxury brightens the room (dust-guarded).
+        let luxuries = content::LUXURY_DRAINS
+            .iter()
+            .filter(|(r, _)| self.resources[r.ix()] > EPSILON)
+            .count() as f64;
+        let mut h = 100.0 - content::CROWDING_POINTS * crowding * (1.0 - relief)
             + (content::LOAFER_POINTS * loafers).min(content::LOAFER_POINTS_MAX)
+            + content::LUXURY_HAPPINESS_POINTS * luxuries
             + self.effect(crate::effects::Effect::HappinessPoints);
+        // @spec SIM-KIT-025
+        if self.jamboree_active() {
+            h += content::JAMBOREE_HAPPINESS
+                * (1.0 + self.effect(crate::effects::Effect::JamboreeRatio));
+        }
         // Deep clutter dampens the vibe: −5 points per mess level above 1.
         // @spec SIM-ECO-038
         let mess_level = self.mess_level();
@@ -753,23 +976,36 @@ impl GameState {
     }
 
     /// Probability the next *eligible* arrival check succeeds (before pity).
+    /// The pipeline composes in the specified order: inside-cap effects join
+    /// the base sum before the 60% cap, on-top effects land after it, mess
+    /// multiplies the whole sum, a jamboree multiplies again, clamp [0, 1].
     // @spec SIM-KIT-004
     pub fn arrival_chance(&self) -> f64 {
         let hundreds = (self.stock(ResourceId::Catnip) / 100.0).floor();
-        let mut chance = (content::ARRIVAL_BASE_CHANCE + content::ARRIVAL_PER_100_CATNIP * hundreds)
-            .min(content::ARRIVAL_CHANCE_CAP);
-        if self.ideas.contains(&IdeaId::NeighborhoodWatch) {
-            chance += content::ARRIVAL_WATCH_BONUS;
-        }
+        let mut chance = (content::ARRIVAL_BASE_CHANCE
+            + content::ARRIVAL_PER_100_CATNIP * hundreds
+            + self.effect(crate::effects::Effect::ArrivalChanceInCap))
+        .min(content::ARRIVAL_CHANCE_CAP);
+        chance += self.effect(crate::effects::Effect::ArrivalChanceOnTop);
         // Serious clutter makes newcomers shy (level 1+). @spec SIM-ECO-038
         if self.mess_level() >= 1 {
             chance *= content::MESS_ARRIVAL_FACTOR;
         }
-        chance
+        // @spec SIM-KIT-025
+        if self.jamboree_active() {
+            chance *= content::JAMBOREE_ARRIVAL_BASE
+                + self.effect(crate::effects::Effect::JamboreeArrivalRatio);
+        }
+        chance.clamp(0.0, 1.0)
     }
 
     pub fn zoomies_active(&self) -> bool {
         self.ticks < self.zoomies_until
+    }
+
+    /// A jamboree runs while ticks < jamboree_until. @spec SIM-KIT-025
+    pub fn jamboree_active(&self) -> bool {
+        self.ticks < self.jamboree_until
     }
 
     // ---- Derived energy queries (NRG facet) ----
@@ -846,6 +1082,22 @@ impl GameState {
     // @spec SIM-ECO-036
     pub fn energy_surplus_ratio(&self) -> f64 {
         (self.energy_production() / self.energy_consumption().max(1.0)).clamp(0.0, 1.75)
+    }
+
+    /// (deficit, surplus) ratios from a single production/consumption pass —
+    /// the hot-path form used inside `tick()`, byte-identical to calling the
+    /// two public queries but scanning the structures once instead of four
+    /// times. @spec SIM-ECO-036
+    pub(crate) fn energy_ratios(&self) -> (f64, f64) {
+        let prod = self.energy_production();
+        let cons = self.energy_consumption();
+        let deficit = if cons <= EPSILON {
+            1.0
+        } else {
+            (prod / cons).clamp(0.25, 1.0)
+        };
+        let surplus = (prod / cons.max(1.0)).clamp(0.0, 1.75);
+        (deficit, surplus)
     }
 
     // ---- Derived mess queries (MESS facet) ----

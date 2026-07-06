@@ -55,6 +55,7 @@ Derived values (happiness, rates, season) — recomputed from state. Event histo
 | Elapsed cap | 365 days | Uncapped, 30 days | Uncapped invites clock-damage absurdity; 30 days punishes a long real absence (violates idle-respect); a year is generous to humans and hostile only to broken clocks |
 | Backwards clock | Zero ticks, load anyway | Refuse to load, error | The player's game should never be hostage to NTP; zero-tick load is safe by determinism |
 | Save slots | One, atomic-replace | Rotating backups, multiple slots | v1 simplicity; atomic write already prevents the corruption case backups mostly guard |
+| JSON float fidelity | `serde_json` with the `float_roundtrip` feature | Default `serde_json` float parsing | Without it the parser is off-by-one-ULP for some values, so `parse(serialize(x)) ≠ x` and the byte-stable round-trip (SAVE-010) silently fails on unlucky stock values; the feature makes serialize/parse exact inverses |
 
 ## Open Questions & Future Decisions
 

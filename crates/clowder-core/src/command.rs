@@ -1,6 +1,9 @@
 use crate::content;
 use crate::events::Event;
-use crate::state::{CraftId, GameState, IdeaId, JobId, Location, ResourceId, StructureId, EPSILON};
+use crate::state::{
+    CraftId, GameState, IdeaId, JobId, Location, RefinementId, ResourceId, RuleId, StructureId,
+    EPSILON,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -19,6 +22,28 @@ pub enum Command {
     /// @spec SIM-ENG-025
     ObserveSky,
     SetSpeed(f64),
+    /// Send squads beyond the meadow: 100 pep each, instant loot.
+    /// @spec SIM-EXP-001
+    Pounce(u32),
+    /// 800 pep + 1500 charm + 40 quills buy 100 days of celebration.
+    /// @spec SIM-KIT-025
+    HostJamboree,
+    /// Spend a kitten's exp (plus shinies) to raise its rank.
+    /// @spec SIM-KIT-021
+    Promote(usize),
+    /// Name a kitten the Elder (replacing any prior one, freely).
+    /// @spec SIM-KIT-022
+    AppointElder(usize),
+    // @spec SIM-CUR-010
+    BuyRefinement(RefinementId),
+    // @spec SIM-CUR-011
+    AdoptRule(RuleId),
+    /// Bind the newest unbound Home Tinkerer to a recipe (seat permitting).
+    /// @spec SIM-ECO-043
+    AssignTinkerer(CraftId),
+    /// Release the most recently assigned bound holder of a recipe.
+    /// @spec SIM-ECO-043
+    UnassignTinkerer(CraftId),
 }
 
 /// Why a command was rejected. Listed in precedence order: when several
@@ -30,6 +55,8 @@ pub enum CommandError {
     Locked,
     AlreadyResearched,
     NoIdleKittens,
+    /// Every Tinkerer seat (Toy Workshops) is taken. @spec SIM-ENG-006
+    NoSeats,
     NoWorkersAssigned,
     StorageFull,
     InsufficientResources { missing: Vec<(ResourceId, f64)> },
@@ -51,6 +78,14 @@ impl GameState {
             Command::Craft(c) => self.craft(c),
             Command::ObserveSky => self.observe_sky(),
             Command::SetSpeed(v) => self.set_speed(v),
+            Command::Pounce(squads) => self.pounce(squads),
+            Command::HostJamboree => self.host_jamboree(),
+            Command::Promote(ix) => self.promote(ix),
+            Command::AppointElder(ix) => self.appoint_elder(ix),
+            Command::BuyRefinement(r) => self.buy_refinement(r),
+            Command::AdoptRule(r) => self.adopt_rule(r),
+            Command::AssignTinkerer(c) => self.assign_tinkerer(c),
+            Command::UnassignTinkerer(c) => self.unassign_tinkerer(c),
         }
     }
 
@@ -125,7 +160,7 @@ impl GameState {
         let def = content::craft_def(c);
         self.spend(def.inputs)?;
         let output = content::craft_output(c);
-        let batch = 1.0 * (1.0 + self.effect(crate::effects::Effect::CraftRatio));
+        let batch = 1.0 * (1.0 + self.craft_ratio_for(c));
         let ix = output.ix();
         self.resources[ix] = (self.resources[ix] + batch).min(self.cap(output));
         Ok(Vec::new())
@@ -193,6 +228,9 @@ impl GameState {
         let kitten = &mut self.kittens[ix];
         kitten.job = None;
         kitten.job_seq = None;
+        // A Tinkerer leaving the job releases its recipe binding (and seat).
+        // @spec SIM-ECO-043
+        kitten.tinkering = None;
         Ok(vec![Event::JobUnassigned { name: kitten.name.clone(), job: j }])
     }
 
@@ -207,11 +245,196 @@ impl GameState {
             return Err(CommandError::AlreadyResearched);
         }
         let def = content::idea_def(i);
-        let mut costs = vec![(ResourceId::Curiosity, def.cost)];
+        // The Curious Elder discounts the curiosity price at spend time;
+        // gate crafts stay full price. @spec SIM-KIT-024
+        let curiosity = def.cost * (1.0 + self.effect(crate::effects::Effect::IdeaCostRatio));
+        let mut costs = vec![(ResourceId::Curiosity, curiosity)];
         costs.extend_from_slice(def.gate);
         self.spend(&costs)?;
         self.ideas.insert(i);
         Ok(vec![Event::IdeaResearched { id: i }])
+    }
+
+    /// Squads scamper beyond the meadow and come back at once with loot:
+    /// affordability is checked before any draw (a rejected pounce leaves
+    /// the RNG untouched), then yields resolve in the fixed draw order —
+    /// feathers, bells, shinies (cap-clamped), unicorns.
+    // @spec SIM-EXP-001, SIM-EXP-002, SIM-EXP-003, SIM-EXP-005, SIM-EXP-006
+    fn pounce(&mut self, squads: u32) -> Result<Vec<Event>, CommandError> {
+        if !self.ideas.contains(&IdeaId::PouncingPractice) {
+            return Err(CommandError::Locked);
+        }
+        if squads == 0 {
+            return Err(CommandError::UnknownId); // a zero-squad pounce is no pounce
+        }
+        self.spend(&[(ResourceId::Pep, content::POUNCE_PEP_PER_SQUAD * squads as f64)])?;
+
+        // @spec SIM-EXP-004
+        let ratio = self.effect(crate::effects::Effect::PounceRatio);
+        let feathers =
+            (content::POUNCE_FEATHERS_BASE + content::POUNCE_FEATHERS_PER_RATIO * ratio)
+                * self.irwin_hall(squads);
+        let bell_hits = self.binomial(
+            squads,
+            content::POUNCE_BELLS_CHANCE + content::POUNCE_BELLS_CHANCE_PER_RATIO * ratio,
+        );
+        let bells = (content::POUNCE_BELLS_BASE + content::POUNCE_BELLS_PER_RATIO * ratio)
+            * self.irwin_hall(bell_hits);
+        let shiny_hits = self.binomial(squads, content::POUNCE_SHINIES_CHANCE);
+        let shinies_rolled = (content::POUNCE_SHINIES_BASE
+            + content::POUNCE_SHINIES_PER_RATIO * ratio)
+            * self.irwin_hall(shiny_hits);
+        let unicorns = self.binomial(squads, content::POUNCE_UNICORN_CHANCE);
+
+        self.resources[ResourceId::Feathers.ix()] += feathers;
+        self.resources[ResourceId::Bells.ix()] += bells;
+        // Shinies clamp to cap at yield time; the event reports the amount
+        // that actually landed.
+        let cap = self.cap(ResourceId::Shinies);
+        let held = self.stock(ResourceId::Shinies);
+        let shinies = shinies_rolled.min((cap - held).max(0.0));
+        self.resources[ResourceId::Shinies.ix()] = held + shinies;
+        self.resources[ResourceId::Unicorns.ix()] += unicorns as f64;
+
+        Ok(vec![Event::PounceReturned { squads, feathers, bells, shinies, unicorns }])
+    }
+
+    /// Irwin–Hall: the sum of n uniform draws (mean n/2, bell-shaped).
+    // @spec SIM-EXP-002
+    fn irwin_hall(&mut self, n: u32) -> f64 {
+        (0..n).map(|_| self.rng.uniform()).sum()
+    }
+
+    /// Binomial(n, p) as n Bernoulli draws — the schedule stays fixed given n.
+    fn binomial(&mut self, n: u32, p: f64) -> u32 {
+        (0..n).filter(|_| self.rng.chance(p)).count() as u32
+    }
+
+    /// Host a jamboree: gated by its idea, one at a time ("already
+    /// celebrating" is Locked), all-or-nothing bill, 100 days of festivity.
+    // @spec SIM-KIT-025
+    fn host_jamboree(&mut self) -> Result<Vec<Event>, CommandError> {
+        if !self.ideas.contains(&IdeaId::TeaCeremonies) || self.jamboree_active() {
+            return Err(CommandError::Locked);
+        }
+        self.spend(&[
+            (ResourceId::Pep, content::JAMBOREE_PEP),
+            (ResourceId::Charm, content::JAMBOREE_CHARM),
+            (ResourceId::Quills, content::JAMBOREE_QUILLS),
+        ])?;
+        self.jamboree_until = self.ticks + content::JAMBOREE_TICKS;
+        Ok(vec![Event::JamboreeStarted { until_tick: self.jamboree_until }])
+    }
+
+    /// Promote a kitten: 500 × 1.75^rank exp from its own pool plus
+    /// 25 × (rank+1) shinies, both all-or-nothing.
+    // @spec SIM-KIT-021
+    fn promote(&mut self, ix: usize) -> Result<Vec<Event>, CommandError> {
+        let Some(kitten) = self.kittens.get(ix) else {
+            return Err(CommandError::UnknownId);
+        };
+        let rank = kitten.rank;
+        let exp_cost = content::PROMOTE_EXP_BASE * content::PROMOTE_EXP_RATIO.powi(rank as i32);
+        let shinies_cost = content::PROMOTE_SHINIES_STEP * (rank as f64 + 1.0);
+        let shinies = self.stock(ResourceId::Shinies);
+        let mut missing = Vec::new();
+        if shinies + EPSILON < shinies_cost {
+            missing.push((ResourceId::Shinies, shinies_cost - shinies));
+        }
+        if kitten.exp + EPSILON < exp_cost || !missing.is_empty() {
+            return Err(CommandError::InsufficientResources { missing });
+        }
+        self.resources[ResourceId::Shinies.ix()] = (shinies - shinies_cost).max(0.0);
+        let kitten = &mut self.kittens[ix];
+        kitten.exp = (kitten.exp - exp_cost).max(0.0);
+        kitten.rank += 1;
+        Ok(vec![Event::KittenPromoted { name: kitten.name.clone(), rank: kitten.rank }])
+    }
+
+    /// Name a kitten the Elder. Free, replaceable anytime; the game itself
+    /// never removes one.
+    // @spec SIM-KIT-022
+    fn appoint_elder(&mut self, ix: usize) -> Result<Vec<Event>, CommandError> {
+        let Some(kitten) = self.kittens.get(ix) else {
+            return Err(CommandError::UnknownId);
+        };
+        self.elder = Some(ix);
+        Ok(vec![Event::ElderAppointed { name: kitten.name.clone() }])
+    }
+
+    /// Buy a refinement: Locked before its gate idea, purchasable once,
+    /// curiosity + materials spent together, all-or-nothing, permanent.
+    // @spec SIM-CUR-010
+    fn buy_refinement(&mut self, r: RefinementId) -> Result<Vec<Event>, CommandError> {
+        let def = content::refinement_def(r);
+        if !self.ideas.contains(&def.gate) {
+            return Err(CommandError::Locked);
+        }
+        if self.refinements.contains(&r) {
+            return Err(CommandError::AlreadyResearched);
+        }
+        let mut costs = vec![(ResourceId::Curiosity, def.cost)];
+        costs.extend_from_slice(def.materials);
+        self.spend(&costs)?;
+        self.refinements.insert(r);
+        Ok(vec![Event::RefinementBought { id: r }])
+    }
+
+    /// Adopt a house rule: charm all-or-nothing; the sibling rule is
+    /// permanently Locked for this meadow, in both directions.
+    // @spec SIM-CUR-011
+    fn adopt_rule(&mut self, r: RuleId) -> Result<Vec<Event>, CommandError> {
+        let def = content::rule_def(r);
+        if self.rules.contains(&def.blocks) {
+            return Err(CommandError::Locked);
+        }
+        if self.rules.contains(&r) {
+            return Err(CommandError::AlreadyResearched);
+        }
+        self.spend(&[(ResourceId::Charm, def.cost_charm)])?;
+        self.rules.insert(r);
+        Ok(vec![Event::RuleAdopted { id: r }])
+    }
+
+    /// Bind the most recently arrived unbound Home Tinkerer to a recipe.
+    /// Error precedence: Locked (the recipe), NoIdleKittens (no unbound Home
+    /// Tinkerer), NoSeats (bindings would exceed the Toy Workshop count —
+    /// an absent Tinkerer still holds its seat).
+    // @spec SIM-ECO-043, SIM-ENG-006
+    fn assign_tinkerer(&mut self, c: CraftId) -> Result<Vec<Event>, CommandError> {
+        if !self.craft_unlocked(c) {
+            return Err(CommandError::Locked);
+        }
+        let Some(ix) = self.kittens.iter().rposition(|k| {
+            k.location == Location::Home && k.job == Some(JobId::Tinkerer) && k.tinkering.is_none()
+        }) else {
+            return Err(CommandError::NoIdleKittens);
+        };
+        let seats = self.structures[StructureId::ToyWorkshop.ix()];
+        let bound = self.kittens.iter().filter(|k| k.tinkering.is_some()).count() as u32;
+        if bound + 1 > seats {
+            return Err(CommandError::NoSeats);
+        }
+        self.kittens[ix].tinkering = Some(c);
+        Ok(Vec::new())
+    }
+
+    /// Release the bound Home holder of this recipe with the highest
+    /// job_seq — the later assignee unbinds first.
+    // @spec SIM-ECO-043
+    fn unassign_tinkerer(&mut self, c: CraftId) -> Result<Vec<Event>, CommandError> {
+        let Some(ix) = self
+            .kittens
+            .iter()
+            .enumerate()
+            .filter(|(_, k)| k.location == Location::Home && k.tinkering == Some(c))
+            .max_by_key(|(_, k)| k.job_seq)
+            .map(|(ix, _)| ix)
+        else {
+            return Err(CommandError::NoWorkersAssigned);
+        };
+        self.kittens[ix].tinkering = None;
+        Ok(Vec::new())
     }
 
     /// All-or-nothing spend with epsilon-tolerant affordability.
