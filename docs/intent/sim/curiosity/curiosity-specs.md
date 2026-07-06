@@ -12,7 +12,7 @@
 
 ## The Tree
 
-- [x] **SIM-CUR-005**: The system shall define exactly the ideas of the curiosity design's banded Idea Tree tables (57 ideas, ids append-only, the founding nine unchanged), with the tabled costs, gate-craft components, prerequisites, and unlock targets.
+- [x] **SIM-CUR-005**: The system shall define exactly the ideas of the curiosity design's banded Idea Tree tables (59 ideas, ids append-only, the founding nine unchanged), with the tabled costs, gate-craft components, prerequisites, and unlock targets.
 - [x] **SIM-CUR-006**: The system shall expose idea effects as pure lookups (researched-flags and derived modifiers) consumed inside the owning leaf's rules; researching an idea shall mutate nothing beyond the curiosity spend and the researched set.
 
 ## Depth: The Banded Tree

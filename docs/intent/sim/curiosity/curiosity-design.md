@@ -86,7 +86,7 @@ The tree is a banded ladder with short forks — each band's gate craft requires
 
 | # | Idea | Cost | Prereq | Unlocks / effect |
 |---|---|---|---|---|
-| 44 | Parade Routes | 30000 + 15 schemes | Unicorn Lore, Grand Schemes | Parades (mystic leaf) |
+| 44 | Parade Routes | 30000 + 15 schemes | Unicorn Lore, Grand Schemes | Parades, Rainbow Arch structure, refining (mystic leaf) |
 | 45 | Pen Pal Networks | 26000 + 10 schemes | Gift Economy, Grand Schemes | Pen Pals (colonies leaf) |
 | 46 | Scout Picnicking | 20000 + 5 schemes | Gift Economy, Grand Schemes | Scout Picnics (colonies leaf) |
 | 47 | Dream Tending | 90000 + 3 starshards | Parade Routes | dreaming surface (mystic leaf) |
@@ -98,6 +98,8 @@ The tree is a banded ladder with short forks — each band's gate craft requires
 | 53 | Adventurous Spirit | 40000 + 20 schemes | Grand Schemes | adventures surface (adventures leaf) |
 | 54 | Dream Loomcraft | 200000 + 10 starshards | Memory Weaving | Dream Loom (dreamtime leaf) |
 | 55 | Deep Nap Theory | 300000 + 10 echoes | Dream Loomcraft | the Deep Nap (dreamtime leaf) |
+| 57 | Long Sun Masonry | 120000 + 3 echoes | Solar Devotion, Skyward Longing | Sunstone structure (ceremonies leaf) |
+| 58 | Skyward Song | 180000 + 8 echoes | Skyward Longing, Night Court Etiquette | Star Whale visits (colonies/cosmic leaf) |
 
 The DAG must stay acyclic and every idea reachable (property-tested). Refinements (tool/storage/automation ladders) and House Rules (mutually exclusive policies) are this leaf's remaining depth content — designed in the society wave.
 

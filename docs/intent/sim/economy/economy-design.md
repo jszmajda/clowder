@@ -110,8 +110,10 @@ Cost of copy k+1 = `ceil(base × ratio^k)` per component. Reveal fraction 30% un
 | 35 | Memory Chest | 700 hushfelt, 60000 curiosity, 1 starshard, 25 schemes | 1.25 | Move carryover +1.5%/bld; déjà-vu chance +1%/season; energy −20 | MemoryWeaving |
 | 36 | Yarn Computer | 30 stardust, 60000 curiosity | 1.15 | +0.02 cleverness/t; energy −(2·n + n²/2) total at n copies | YarnComputing |
 | 37 | Unicorn Meadow | 2 unicorns | 1.75 | +0.001 unicorns/t (mystic leaf multiplies) | UnicornLore |
+| 38 | Rainbow Arch | 5000 rainbows, 25 cairns | 1.15 | count is the Parade exchange rate; hosts Arch upgrades; +prism-descent chance (mystic leaf consumes) | ParadeRoutes |
+| 39 | Sunstone | 8 moonstone, 50 cairns, 1 echo | 1.15 | Long Sun cap +0.05 per enlightenment tier each (ceremonies leaf consumes); energy −1 | LongSunMasonry |
 
-No staged rebuilds in this pass: every structure is its own entry (see Decisions).
+No staged rebuilds in this pass: every structure is its own entry (see Decisions). Structures 38–39 are cross-leaf: they live in this table (the economy owns the StructureId space, costs, and ramps) but their effects are defined and consumed by the mystic and ceremonies leaves respectively — the same split as the Sunbeam Altar hosting Rites.
 
 ## CRAFT — Crafting
 

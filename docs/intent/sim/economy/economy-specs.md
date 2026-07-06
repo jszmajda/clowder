@@ -55,7 +55,7 @@ Job yields are per effective worker (SIM-KIT: Home kittens holding the job) per 
 
 ## Depth: Structures (BLD facet)
 
-- [x] **SIM-ECO-028**: The system shall define exactly the structures of the economy design's BLD table — ids, costs, ratios, effects, and idea gates — with no staged rebuilds.
+- [x] **SIM-ECO-028**: The system shall define exactly the structures of the economy design's BLD table (40 structures, append-only) — ids, costs, ratios, effects, and idea gates — with no staged rebuilds; the cross-leaf structures (Rainbow Arch, Sunstone) carry costs/ramps here and effects in their owning leaves.
 - [x] **SIM-ECO-029**: The system shall run every converter structure (Hearth, Kiln, Treat Bakery, Prism Spinner, Dynamo Wheel fuel draw) through the engine's throttle: all inputs and outputs scale by the worst-supplied input fraction each tick.
 - [x] **SIM-ECO-030**: The system shall scale Treat Bakery output by the pep-cap ratio mpr = pep_cap × 0.007 / 100 (feathers ×1.25·mpr, bells ×0.3·mpr per active bakery per tick) — storage feeding production.
 - [x] **SIM-ECO-031**: The system shall multiply all Porch cap extensions by 1 + limited_dr(0.01 × the highest kite stock ever held, 2.25) — a persisted high-water ratchet, so spending kites never shrinks storage.
