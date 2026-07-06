@@ -1,9 +1,9 @@
 use crate::content;
 use crate::events::Event;
 use crate::state::{
-    AdventureId, ArchId, ArchivedKitten, ColonyId, CraftId, GameState, IdeaId, JobId, Kitten,
-    Location, Promise, RefinementId, ResourceId, RiteId, RuleId, StructureId, TraditionId,
-    RESOURCE_COUNT, STRUCTURE_COUNT, EPSILON,
+    AdventureId, ArchId, ArchivedKitten, ColonyId, CraftId, DreamLoomId, GameState, IdeaId, JobId,
+    Kitten, Location, Promise, RefinementId, ResourceId, RiteId, RuleId, SiteId, StructureId,
+    TraditionId, RESOURCE_COUNT, STRUCTURE_COUNT, EPSILON,
 };
 use serde::{Deserialize, Serialize};
 
@@ -84,6 +84,17 @@ pub enum Command {
     // ---- Wave 5: adventures (SIM-ADV) ----
     /// Arm (or, with None, disarm) an Adventure for the next Move. @spec SIM-ADV-001
     DeclareAdventure(Option<AdventureId>),
+    // ---- Wave 6: cosmic (SIM-SKY) / dreamtime (SIM-DREAM) ----
+    /// Reach the next cosmic site, spending its mission fuel. @spec SIM-SKY-001
+    LaunchExpedition(SiteId),
+    /// Call a Star Whale to visit (Sky Dock + Skyward Song). @spec SIM-SKY-006
+    SummonStarWhale,
+    /// Feed the visiting whale a dreamcorn lullaby. @spec SIM-SKY-007
+    FeedWhale,
+    /// Skip the meadow forward `years` game-years. @spec SIM-DREAM-001
+    DeepNap(u32),
+    /// Weave a Dream Loom upgrade with reverie. @spec SIM-DREAM-006
+    BuyDreamLoom(DreamLoomId),
 }
 
 /// Why a command was rejected. Listed in precedence order: when several
@@ -143,6 +154,11 @@ impl GameState {
             Command::PassItDown => self.pass_it_down(),
             Command::BuyTradition(t) => self.buy_tradition(t),
             Command::DeclareAdventure(id) => self.declare_adventure(id),
+            Command::LaunchExpedition(site) => self.launch_expedition(site),
+            Command::SummonStarWhale => self.summon_star_whale(),
+            Command::FeedWhale => self.feed_whale(),
+            Command::DeepNap(years) => self.deep_nap(years),
+            Command::BuyDreamLoom(id) => self.buy_dream_loom(id),
         }
     }
 
@@ -714,6 +730,11 @@ impl GameState {
         if count == 0 {
             return Err(CommandError::UnknownId);
         }
+        // The Star Whale is a visitor, not a caravan route: its exchange runs
+        // only while it visits. @spec SIM-SKY-007, SIM-TRADE-001
+        if colony == ColonyId::StarWhales {
+            return self.whale_exchange(count);
+        }
         if !self.discovered.contains(&colony) {
             return Err(CommandError::Locked);
         }
@@ -870,6 +891,9 @@ impl GameState {
         // ---- 1. Snapshot everything the reset would erase ----
         let old_ticks = self.ticks;
         let old_stocks = self.resources;
+        // Reverie is a permanent dreamtime currency: preserved in full across a
+        // Move (carved out of the resource reset). @spec SIM-MOVE-004
+        let kept_reverie = self.stock(ResourceId::Reverie);
         let ratio = self.memory_chest_ratio(); // reads OLD structures + traditions
         let gen = self.generation;
         let millennia = (old_ticks / 1_000_000) as f64;
@@ -955,6 +979,13 @@ impl GameState {
         self.pending_sky_event = None;
         self.ticks = 0;
         self.tidy_progress = 0;
+        // Wave-6 meadow-local state resets; sites_reached, dream_looms, the
+        // distant_dawn flag, and reverie are the preserved legacies (untouched).
+        // @spec SIM-MOVE-004
+        self.stirred_dreams = 0.0;
+        self.whale_visit_years = 0;
+        self.whale_contentment = 0;
+        self.deja_vu_until = 0;
         self.revealed.clear();
         self.generation = gen + 1;
         self.rebuild_unrevealed();
@@ -975,6 +1006,9 @@ impl GameState {
         for r in ResourceId::ALL {
             self.resources[r.ix()] = carried[r.ix()];
         }
+        // Reverie is preserved in full, not fractioned into the Memory Chest.
+        // @spec SIM-MOVE-004
+        self.resources[ResourceId::Reverie.ix()] = kept_reverie;
         if self.traditions.contains(&TraditionId::WarmWelcomeHome) {
             self.resources[ResourceId::Catnip.ix()] += content::WARM_WELCOME_CATNIP;
             self.structures[StructureId::CozyCushion.ix()] += 1;
@@ -1020,6 +1054,129 @@ impl GameState {
         }
         self.armed_adventure = id;
         Ok(vec![Event::AdventureDeclared { id }])
+    }
+
+    // ---- Wave 6: cosmic (SIM-SKY) ----
+
+    /// Reach the next unreached site: surface-gated (Skyward Longing), strictly
+    /// in ladder order, spending the exact mission fuel all-or-nothing. An
+    /// out-of-order or surface-locked launch is Locked; an unaffordable one is
+    /// InsufficientResources.
+    // @spec SIM-SKY-001
+    fn launch_expedition(&mut self, site: SiteId) -> Result<Vec<Event>, CommandError> {
+        if !self.site_reachable(site) {
+            return Err(CommandError::Locked);
+        }
+        self.spend(content::site_def(site).mission_fuel)?;
+        self.sites_reached.insert(site);
+        Ok(vec![Event::SiteReached { site }])
+    }
+
+    /// Summon a Star Whale: needs the Sky Dock built and the Skyward Song idea;
+    /// spends curiosity + echoes; the visit lasts 5 years + 1 per contentment.
+    // @spec SIM-SKY-006
+    fn summon_star_whale(&mut self) -> Result<Vec<Event>, CommandError> {
+        if self.structures[StructureId::SkyDock.ix()] < 1
+            || !self.ideas.contains(&IdeaId::SkywardSong)
+        {
+            return Err(CommandError::Locked);
+        }
+        self.spend(&[
+            (ResourceId::Curiosity, content::WHALE_SUMMON_CURIOSITY),
+            (ResourceId::Echoes, content::WHALE_SUMMON_ECHOES),
+        ])?;
+        self.whale_visit_years = content::WHALE_BASE_VISIT_YEARS + self.whale_contentment;
+        Ok(vec![Event::WhaleSummoned])
+    }
+
+    /// Feed the visiting whale a dreamcorn lullaby: contentment (and the visit)
+    /// rise. Needs a visiting whale and a dreamcorn.
+    // @spec SIM-SKY-007
+    fn feed_whale(&mut self) -> Result<Vec<Event>, CommandError> {
+        if self.whale_visit_years == 0 {
+            return Err(CommandError::Locked);
+        }
+        self.spend(&[(ResourceId::Dreamcorns, content::WHALE_LULLABY_DREAMCORNS)])?;
+        self.whale_contentment += 1;
+        self.whale_visit_years += 1;
+        Ok(vec![Event::WhaleFed { contentment: self.whale_contentment }])
+    }
+
+    /// The visit-gated hushfelt exchange: spend hushfelt for cosmic goods
+    /// (skymaps, starshards, echoes), scaled by contentment; Locked with no
+    /// visit. No pep or shinies change paws.
+    // @spec SIM-SKY-007
+    fn whale_exchange(&mut self, count: u32) -> Result<Vec<Event>, CommandError> {
+        if self.whale_visit_years == 0 {
+            return Err(CommandError::Locked);
+        }
+        let n = count as f64;
+        self.spend(&[(ResourceId::Hushfelt, content::WHALE_HUSHFELT_PER_CARAVAN * n)])?;
+        let scale = n * (1.0 + self.whale_contentment as f64);
+        let skymaps = ResourceId::Skymaps.ix();
+        self.resources[skymaps] = (self.resources[skymaps]
+            + content::WHALE_SKYMAPS_PER_CARAVAN * scale)
+            .min(self.cap(ResourceId::Skymaps));
+        self.resources[ResourceId::Starshards.ix()] += content::WHALE_STARSHARDS_PER_CARAVAN * scale;
+        self.resources[ResourceId::Echoes.ix()] += content::WHALE_ECHOES_PER_CARAVAN * scale;
+        Ok(vec![Event::TradeReturned { colony: ColonyId::StarWhales, caravans: count }])
+    }
+
+    // ---- Wave 6: dreamtime (SIM-DREAM) ----
+
+    /// The Deep Nap: idea-gated, bounded to max_nap_length, spends the
+    /// escalating starshard cost, then fast-forwards the meadow through the
+    /// standard tick() (pure — the identical path as offline catch-up, no added
+    /// yields). Accrues stirred-dreams heat and returns one summarized report.
+    // @spec SIM-DREAM-001, SIM-DREAM-002, SIM-DREAM-007
+    fn deep_nap(&mut self, years: u32) -> Result<Vec<Event>, CommandError> {
+        if !self.ideas.contains(&IdeaId::DeepNapTheory) {
+            return Err(CommandError::Locked);
+        }
+        if years < 1 || years > self.max_nap_length() {
+            return Err(CommandError::InsufficientResources { missing: Vec::new() });
+        }
+        // Affordability is checked (and the cost spent) before any tick draw.
+        let cost = self.starshard_cost(years);
+        let held = self.stock(ResourceId::Starshards);
+        if held + EPSILON < cost {
+            return Err(CommandError::InsufficientResources {
+                missing: vec![(ResourceId::Starshards, cost - held)],
+            });
+        }
+        self.resources[ResourceId::Starshards.ix()] = (held - cost).max(0.0);
+
+        // Fast-forward through the pure tick(), folding away the per-tick event
+        // stream (like the save.rs catch-up loop); the advancing counter alone
+        // delivers any Move-time trickle. distant_dawn lights inside tick() at
+        // the year-40000 boundary (with the loom) and persists.
+        let was_dawn = self.distant_dawn;
+        for _ in 0..(years as u64 * 1000) {
+            self.tick();
+        }
+
+        // Heat accrues after the replay so it survives dissipation (a nap warms
+        // the dream-space by years × heat_per_year × (1 − heat efficiency)).
+        let heat_eff = self.effect(crate::effects::Effect::HeatEfficiency);
+        self.stirred_dreams +=
+            years as f64 * content::HEAT_PER_YEAR * (1.0 - heat_eff).max(0.0);
+
+        let mut events = vec![Event::Napped { years }];
+        if self.distant_dawn && !was_dawn {
+            events.push(Event::DistantDawn);
+        }
+        Ok(events)
+    }
+
+    /// Weave a Dream Loom upgrade: reverie (and, for Distant Dawn, Jars) spent
+    /// all-or-nothing, once each. @spec SIM-DREAM-006
+    fn buy_dream_loom(&mut self, id: DreamLoomId) -> Result<Vec<Event>, CommandError> {
+        if self.dream_looms.contains(&id) {
+            return Err(CommandError::AlreadyResearched);
+        }
+        self.spend(content::dream_loom_def(id).cost)?;
+        self.dream_looms.insert(id);
+        Ok(vec![Event::DreamLoomBought { id }])
     }
 
     /// All-or-nothing spend with epsilon-tolerant affordability.

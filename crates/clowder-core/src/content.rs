@@ -4,8 +4,8 @@
 
 use crate::effects::Effect;
 use crate::state::{
-    AdventureId, CraftId, IdeaId, JobId, RefinementId, ResourceId, RuleId, Season, StructureId,
-    TraditionId,
+    AdventureId, CraftId, DreamLoomId, IdeaId, JobId, RefinementId, ResourceId, RuleId, Season,
+    SiteId, StructureGate, StructureId, TraditionId,
 };
 use crate::state::{IDEA_COUNT, REFINEMENT_COUNT, RESOURCE_COUNT, STRUCTURE_COUNT};
 
@@ -358,7 +358,15 @@ pub struct StructureDef {
     pub mess: f64,
     pub energy_prod: f64,
     pub energy_cons: f64,
-    pub gate: Option<IdeaId>,
+    pub gate: StructureGate,
+    /// A cosmic outpost: its raw material output routes through the outdoor
+    /// channel (the global layers at a reduced transfer). @spec SIM-SKY-004
+    pub outdoor: bool,
+    /// Per-copy outdoor-production ratio contribution (Ranger Station, Cairn
+    /// Circle, Aurora Lantern, Far Beacon, Wishing Star). @spec SIM-SKY-004
+    pub outdoor_ratio: f64,
+    /// Per-copy Long Sun cap extension (Aurora Lantern). @spec SIM-SKY-005
+    pub long_sun_cap: f64,
 }
 
 /// Baseline for the table: every field its "nothing special" value.
@@ -384,7 +392,10 @@ const BLD: StructureDef = StructureDef {
     mess: 0.0,
     energy_prod: 0.0,
     energy_cons: 0.0,
-    gate: None,
+    gate: StructureGate::Always,
+    outdoor: false,
+    outdoor_ratio: 0.0,
+    long_sun_cap: 0.0,
 };
 
 // @spec SIM-ECO-008, SIM-ECO-009, SIM-ECO-010, SIM-ECO-011, SIM-ECO-012, SIM-ECO-013, SIM-ECO-014
@@ -419,21 +430,21 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         name: "Pantry",
         base_costs: &[(ResourceId::Twigs, 20.0)],
         cap_bonuses: &[(ResourceId::Catnip, 250.0)],
-        gate: Some(IdeaId::PantryOrganization),
+        gate: StructureGate::Idea(IdeaId::PantryOrganization),
         ..BLD
     },
     StructureDef {
         name: "Twig Pile",
         base_costs: &[(ResourceId::Catnip, 50.0), (ResourceId::Twigs, 10.0)],
         cap_bonuses: &[(ResourceId::Twigs, 40.0)],
-        gate: Some(IdeaId::TwigArchitecture),
+        gate: StructureGate::Idea(IdeaId::TwigArchitecture),
         ..BLD
     },
     StructureDef {
         name: "Scratching Post",
         base_costs: &[(ResourceId::Twigs, 15.0), (ResourceId::Fluff, 5.0)],
         happiness_points: 5.0,
-        gate: Some(IdeaId::ScratchingArts),
+        gate: StructureGate::Idea(IdeaId::ScratchingArts),
         ..BLD
     },
     StructureDef {
@@ -442,7 +453,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         housing: 3,
         // @spec SIM-ECO-044
         cap_bonuses: &[(ResourceId::Fluff, 10.0), (ResourceId::Pep, 75.0)],
-        gate: Some(IdeaId::TwigArchitecture),
+        gate: StructureGate::Idea(IdeaId::TwigArchitecture),
         ..BLD
     },
     StructureDef {
@@ -451,7 +462,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         housing: 1,
         cap_bonuses: &[(ResourceId::Pep, 25.0)], // @spec SIM-ECO-044
         productions: &[(ResourceId::Curiosity, 0.001)],
-        gate: Some(IdeaId::CozyCarpentry),
+        gate: StructureGate::Idea(IdeaId::CozyCarpentry),
         ..BLD
     },
     StructureDef {
@@ -459,7 +470,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         base_costs: &[(ResourceId::Pebbles, 60.0)],
         ratio: 1.12,
         resource_ratios: &[(ResourceId::Catnip, 0.03)],
-        gate: Some(IdeaId::Horticulture),
+        gate: StructureGate::Idea(IdeaId::Horticulture),
         ..BLD
     },
     StructureDef {
@@ -467,7 +478,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         base_costs: &[(ResourceId::Twigs, 90.0)],
         productions: &[(ResourceId::Pebbles, 0.01)],
         resource_ratios: &[(ResourceId::Pebbles, 0.20)],
-        gate: Some(IdeaId::CouchSpelunking),
+        gate: StructureGate::Idea(IdeaId::CouchSpelunking),
         ..BLD
     },
     StructureDef {
@@ -476,7 +487,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         productions: &[(ResourceId::Embers, 0.004)],
         resource_ratios: &[(ResourceId::Pebbles, 0.35)],
         mess: 0.25,
-        gate: Some(IdeaId::Excavation),
+        gate: StructureGate::Idea(IdeaId::Excavation),
         ..BLD
     },
     StructureDef {
@@ -488,7 +499,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         }),
         happiness_points: 2.0,
         mess: 0.1,
-        gate: Some(IdeaId::Emberkeeping),
+        gate: StructureGate::Idea(IdeaId::Emberkeeping),
         ..BLD
     },
     StructureDef {
@@ -503,7 +514,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             outputs: &[(ResourceId::Buttons, 0.15), (ResourceId::Moonstone, 0.0005)],
         }),
         mess: 1.0,
-        gate: Some(IdeaId::CeramicArts),
+        gate: StructureGate::Idea(IdeaId::CeramicArts),
         ..BLD
     },
     StructureDef {
@@ -517,7 +528,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             (ResourceId::Moonstone, 10.0),
             (ResourceId::Shinies, 5.0),
         ],
-        gate: Some(IdeaId::PackRattery),
+        gate: StructureGate::Idea(IdeaId::PackRattery),
         ..BLD
     },
     StructureDef {
@@ -537,7 +548,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             (ResourceId::Moonstone, 25.0),
             (ResourceId::Shinies, 12.0),
         ],
-        gate: Some(IdeaId::PorchLogistics),
+        gate: StructureGate::Idea(IdeaId::PorchLogistics),
         ..BLD
     },
     StructureDef {
@@ -549,7 +560,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         ],
         resource_ratios: &[(ResourceId::Curiosity, 0.20)],
         cap_bonuses: &[(ResourceId::Curiosity, 200.0)],
-        gate: Some(IdeaId::Notetaking),
+        gate: StructureGate::Idea(IdeaId::Notetaking),
         ..BLD
     },
     StructureDef {
@@ -563,7 +574,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         ratio: 1.10,
         resource_ratios: &[(ResourceId::Curiosity, 0.25)],
         cap_bonuses: &[(ResourceId::Curiosity, 800.0), (ResourceId::Skymaps, 10.0)],
-        gate: Some(IdeaId::SkyCharts),
+        gate: StructureGate::Idea(IdeaId::SkyCharts),
         ..BLD
     },
     StructureDef {
@@ -577,7 +588,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         resource_ratios: &[(ResourceId::Curiosity, 0.35)],
         cap_bonuses: &[(ResourceId::Curiosity, 1200.0)],
         energy_cons: 1.0,
-        gate: Some(IdeaId::DeepCuriosity),
+        gate: StructureGate::Idea(IdeaId::DeepCuriosity),
         ..BLD
     },
     StructureDef {
@@ -585,7 +596,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         base_costs: &[(ResourceId::Twigs, 80.0), (ResourceId::Pebbles, 300.0)],
         reveal_fraction: 0.01, // an early tease: sawdust drifts from a corner
         craft_ratio: 0.06,
-        gate: Some(IdeaId::Tinkering),
+        gate: StructureGate::Idea(IdeaId::Tinkering),
         ..BLD
     },
     StructureDef {
@@ -598,7 +609,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         craft_ratio: 0.05,
         energy_cons: 2.0,
         mess: 2.0, // the Tidy rota flips this — society wave
-        gate: Some(IdeaId::Toymaking),
+        gate: StructureGate::Idea(IdeaId::Toymaking),
         ..BLD
     },
     StructureDef {
@@ -610,7 +621,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         ],
         // Trade ratio +1.5%/bld lands with the colonies leaf.
         luxury_demand: -0.04,
-        gate: Some(IdeaId::GiftEconomy),
+        gate: StructureGate::Idea(IdeaId::GiftEconomy),
         ..BLD
     },
     StructureDef {
@@ -623,7 +634,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         crowding_relief: 0.048,
         productions: &[(ResourceId::Charm, 0.005)],
         cap_bonuses: &[(ResourceId::Charm, 40.0)],
-        gate: Some(IdeaId::OralTradition),
+        gate: StructureGate::Idea(IdeaId::OralTradition),
         ..BLD
     },
     StructureDef {
@@ -635,7 +646,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         ],
         productions: &[(ResourceId::Charm, 0.04), (ResourceId::Warmth, 0.004)],
         cap_bonuses: &[(ResourceId::Warmth, 75.0), (ResourceId::Charm, 60.0)],
-        gate: Some(IdeaId::SunSalutations),
+        gate: StructureGate::Idea(IdeaId::SunSalutations),
         ..BLD
     },
     StructureDef {
@@ -654,7 +665,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             (ResourceId::Charm, 100.0),
             (ResourceId::Shinies, 100.0),
         ],
-        gate: Some(IdeaId::SolarDevotion),
+        gate: StructureGate::Idea(IdeaId::SolarDevotion),
         ..BLD
     },
     StructureDef {
@@ -669,7 +680,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             inputs: &[(ResourceId::Shinies, 0.004), (ResourceId::Pep, 0.6)],
             outputs: &[], // computed: feathers 1.25·mpr, bells 0.3·mpr
         }),
-        gate: Some(IdeaId::TreatAlchemy),
+        gate: StructureGate::Idea(IdeaId::TreatAlchemy),
         ..BLD
     },
     StructureDef {
@@ -684,7 +695,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         // @spec SIM-KIT-025
         jamboree_ratio: 0.01,
         jamboree_arrival: 0.001,
-        gate: Some(IdeaId::TeaCeremonies),
+        gate: StructureGate::Idea(IdeaId::TeaCeremonies),
         ..BLD
     },
     StructureDef {
@@ -696,7 +707,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         ],
         productions: &[(ResourceId::Dew, 0.02)],
         cap_bonuses: &[(ResourceId::Dew, 1200.0)],
-        gate: Some(IdeaId::DewHarvest),
+        gate: StructureGate::Idea(IdeaId::DewHarvest),
         ..BLD
     },
     StructureDef {
@@ -707,7 +718,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         // year close (SIM-ECO-039).
         energy_prod: 1.0,
         mess: 0.5,
-        gate: Some(IdeaId::Cogwheels),
+        gate: StructureGate::Idea(IdeaId::Cogwheels),
         ..BLD
     },
     StructureDef {
@@ -725,21 +736,21 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         global_ratio: DYNAMO_GLOBAL_RATIO,
         energy_prod: 5.0, // × fuel fraction
         mess: 5.0,        // a starved wheel spins down proportionally
-        gate: Some(IdeaId::Dynamos),
+        gate: StructureGate::Idea(IdeaId::Dynamos),
         ..BLD
     },
     StructureDef {
         name: "Sunning Deck",
         base_costs: &[(ResourceId::Moonstone, 60.0)],
         energy_prod: 2.0, // winter ×0.75, summer ×1.25
-        gate: Some(IdeaId::SolarBasking),
+        gate: StructureGate::Idea(IdeaId::SolarBasking),
         ..BLD
     },
     StructureDef {
         name: "Stream Wheel",
         base_costs: &[(ResourceId::Moonstone, 120.0), (ResourceId::Pavers, 25.0)],
         energy_prod: 5.0,
-        gate: Some(IdeaId::Millworks),
+        gate: StructureGate::Idea(IdeaId::Millworks),
         ..BLD
     },
     StructureDef {
@@ -754,7 +765,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         productions: &[(ResourceId::Stardust, 0.0003)],
         cap_bonuses: &[(ResourceId::Stardust, 60.0)],
         energy_prod: 10.0,
-        gate: Some(IdeaId::Starcatching),
+        gate: StructureGate::Idea(IdeaId::Starcatching),
         ..BLD
     },
     StructureDef {
@@ -769,7 +780,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             outputs: &[(ResourceId::Stardust, 0.0006)],
         }),
         energy_cons: 2.0,
-        gate: Some(IdeaId::PrismCraft),
+        gate: StructureGate::Idea(IdeaId::PrismCraft),
         ..BLD
     },
     StructureDef {
@@ -777,7 +788,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         base_costs: &[(ResourceId::Brass, 30.0), (ResourceId::Tiles, 90.0)],
         cap_bonuses: &[(ResourceId::Curiosity, 1500.0)],
         energy_cons: 2.0,
-        gate: Some(IdeaId::LabyrinthTheory),
+        gate: StructureGate::Idea(IdeaId::LabyrinthTheory),
         ..BLD
     },
     StructureDef {
@@ -786,7 +797,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         crowding_relief: 0.075,
         productions: &[(ResourceId::Charm, 0.25)],
         surplus_scaled: true, // an unpowered stage is dark by design
-        gate: Some(IdeaId::MoonlightArts),
+        gate: StructureGate::Idea(IdeaId::MoonlightArts),
         ..BLD
     },
     StructureDef {
@@ -801,7 +812,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         // Move carryover and déjà-vu chance land with the prestige/dreamtime
         // leaves.
         energy_cons: 20.0,
-        gate: Some(IdeaId::MemoryWeaving),
+        gate: StructureGate::Idea(IdeaId::MemoryWeaving),
         ..BLD
     },
     StructureDef {
@@ -809,7 +820,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         base_costs: &[(ResourceId::Stardust, 30.0), (ResourceId::Curiosity, 60000.0)],
         productions: &[(ResourceId::Cleverness, 0.02)],
         energy_cons: 0.0, // special-cased: 2n + n²/2 in total at n copies
-        gate: Some(IdeaId::YarnComputing),
+        gate: StructureGate::Idea(IdeaId::YarnComputing),
         ..BLD
     },
     StructureDef {
@@ -817,7 +828,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         base_costs: &[(ResourceId::Unicorns, 2.0)],
         ratio: 1.75,
         productions: &[(ResourceId::Unicorns, 0.001)], // mystic leaf multiplies later
-        gate: Some(IdeaId::UnicornLore),
+        gate: StructureGate::Idea(IdeaId::UnicornLore),
         ..BLD
     },
     // 38: Rainbow Arch — cross-leaf (mystic effects). @spec SIM-ECO-028, SIM-UNI-005
@@ -825,7 +836,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         name: "Rainbow Arch",
         base_costs: &[(ResourceId::Rainbows, 5000.0), (ResourceId::Cairns, 25.0)],
         ratio: 1.15,
-        gate: Some(IdeaId::ParadeRoutes),
+        gate: StructureGate::Idea(IdeaId::ParadeRoutes),
         ..BLD
     },
     // 39: Sunstone — cross-leaf (ceremonies effects). @spec SIM-ECO-028, SIM-SUN-004
@@ -838,7 +849,145 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         ],
         ratio: 1.15,
         energy_cons: 1.0,
-        gate: Some(IdeaId::LongSunMasonry),
+        gate: StructureGate::Idea(IdeaId::LongSunMasonry),
+        ..BLD
+    },
+    // ---- Wave 6: cosmic outposts (ids 40..=52), each Site-gated ----
+    // @spec SIM-ECO-028, SIM-SKY-002, SIM-SKY-005, SIM-SKY-008
+    // 40: Lookout Post — skymap trickle + storage.
+    StructureDef {
+        name: "Lookout Post",
+        base_costs: &[(ResourceId::Skymaps, 20.0)],
+        productions: &[(ResourceId::Skymaps, 0.02)],
+        cap_bonuses: &[(ResourceId::Skymaps, 500.0)],
+        gate: StructureGate::Site(SiteId::FenceTop),
+        ..BLD
+    },
+    // 41: Treehouse — houses 5; outdoor catnip.
+    StructureDef {
+        name: "Treehouse",
+        base_costs: &[(ResourceId::Skymaps, 50.0), (ResourceId::Twigs, 500.0)],
+        productions: &[(ResourceId::Catnip, 0.2)],
+        housing: 5,
+        gate: StructureGate::Site(SiteId::OldOak),
+        outdoor: true,
+        ..BLD
+    },
+    // 42: Weather Vane — skymap trickle + storage; energy −1.
+    StructureDef {
+        name: "Weather Vane",
+        base_costs: &[(ResourceId::Skymaps, 100.0), (ResourceId::Moonmilk, 10.0)],
+        productions: &[(ResourceId::Skymaps, 0.05)],
+        cap_bonuses: &[(ResourceId::Skymaps, 2000.0)],
+        energy_cons: 1.0,
+        gate: StructureGate::Site(SiteId::Rooftops),
+        outdoor: true,
+        ..BLD
+    },
+    // 43: Solar Array — seasonal energy.
+    StructureDef {
+        name: "Solar Array",
+        base_costs: &[(ResourceId::Skymaps, 200.0), (ResourceId::Moonstone, 100.0)],
+        energy_prod: 12.0, // winter ×0.75, summer ×1.25 (seasonal, like the Sunning Deck)
+        gate: StructureGate::Site(SiteId::SunnyHill),
+        outdoor: true,
+        ..BLD
+    },
+    // 44: Ranger Station — outdoor production +8%/bld; energy −2.
+    StructureDef {
+        name: "Ranger Station",
+        base_costs: &[(ResourceId::Cometsilk, 20.0), (ResourceId::Moonmilk, 50.0)],
+        energy_cons: 2.0,
+        gate: StructureGate::Site(SiteId::MeadowsEdge),
+        outdoor: true,
+        outdoor_ratio: 0.08,
+        ..BLD
+    },
+    // 45: Hushfelt Grotto — hushfelt trickle + storage; energy +4.
+    StructureDef {
+        name: "Hushfelt Grotto",
+        base_costs: &[(ResourceId::Cometsilk, 40.0), (ResourceId::Moonmilk, 100.0)],
+        productions: &[(ResourceId::Hushfelt, 0.05)],
+        cap_bonuses: &[(ResourceId::Hushfelt, 50.0)],
+        energy_prod: 4.0,
+        gate: StructureGate::Site(SiteId::TheBrook),
+        outdoor: true,
+        ..BLD
+    },
+    // 46: Whisper Post — hushfelt + echo trickle; storage; energy −2.
+    StructureDef {
+        name: "Whisper Post",
+        base_costs: &[(ResourceId::Cometsilk, 30.0), (ResourceId::Echoes, 2.0)],
+        productions: &[(ResourceId::Hushfelt, 0.03), (ResourceId::Echoes, 0.0001)],
+        cap_bonuses: &[(ResourceId::Hushfelt, 50.0)],
+        energy_cons: 2.0,
+        gate: StructureGate::Site(SiteId::WhisperingWoods),
+        outdoor: true,
+        ..BLD
+    },
+    // 47: Cairn Circle — outdoor production +12%/bld.
+    StructureDef {
+        name: "Cairn Circle",
+        base_costs: &[(ResourceId::Cometsilk, 60.0), (ResourceId::Echoes, 5.0)],
+        gate: StructureGate::Site(SiteId::TheFoothills),
+        outdoor: true,
+        outdoor_ratio: 0.12,
+        ..BLD
+    },
+    // 48: Sky Dock — skymap trickle + storage; enables the Star Whale; energy −5.
+    StructureDef {
+        name: "Sky Dock",
+        base_costs: &[(ResourceId::Cometsilk, 100.0), (ResourceId::Echoes, 20.0)],
+        productions: &[(ResourceId::Skymaps, 0.2)],
+        cap_bonuses: &[(ResourceId::Skymaps, 20000.0)],
+        energy_cons: 5.0,
+        gate: StructureGate::Site(SiteId::CloudNine),
+        outdoor: true,
+        ..BLD
+    },
+    // 49: Aurora Lantern — outdoor +25%/bld; +2 Long Sun cap; +50 Jar cap; energy −10.
+    StructureDef {
+        name: "Aurora Lantern",
+        base_costs: &[(ResourceId::Echoes, 50.0), (ResourceId::JarsOfPurrs, 1.0)],
+        cap_bonuses: &[(ResourceId::JarsOfPurrs, 50.0)],
+        energy_cons: 10.0,
+        gate: StructureGate::Site(SiteId::TheAurora),
+        outdoor: true,
+        outdoor_ratio: 0.25,
+        long_sun_cap: 2.0,
+        ..BLD
+    },
+    // 50: Star Nursery — unicorn + prism trickle; +100 Jar cap; energy −10.
+    StructureDef {
+        name: "Star Nursery",
+        base_costs: &[(ResourceId::Echoes, 100.0), (ResourceId::JarsOfPurrs, 3.0)],
+        productions: &[(ResourceId::Unicorns, 0.001), (ResourceId::Prisms, 0.0001)],
+        cap_bonuses: &[(ResourceId::JarsOfPurrs, 100.0)],
+        energy_cons: 10.0,
+        gate: StructureGate::Site(SiteId::TheMilkyWay),
+        outdoor: true,
+        ..BLD
+    },
+    // 51: Far Beacon — outdoor +50%/bld; +500 Jar cap; energy −20.
+    StructureDef {
+        name: "Far Beacon",
+        base_costs: &[(ResourceId::Echoes, 500.0), (ResourceId::JarsOfPurrs, 10.0)],
+        cap_bonuses: &[(ResourceId::JarsOfPurrs, 500.0)],
+        energy_cons: 20.0,
+        gate: StructureGate::Site(SiteId::TheFarShore),
+        outdoor: true,
+        outdoor_ratio: 0.50,
+        ..BLD
+    },
+    // 52: Wishing Star — the capstone: outdoor +200%; a large global bonus; energy −40.
+    StructureDef {
+        name: "Wishing Star",
+        base_costs: &[(ResourceId::Echoes, 2000.0), (ResourceId::JarsOfPurrs, 50.0)],
+        global_ratio: 0.5,
+        energy_cons: 40.0,
+        gate: StructureGate::Site(SiteId::TheFurthestStar),
+        outdoor: true,
+        outdoor_ratio: 2.0,
         ..BLD
     },
 ];
@@ -2462,5 +2611,154 @@ static ADVENTURES: [AdventureDef; 7] = [
         reward_per: 0.0,
         reward_cap: 1.0,
         reward_key: Effect::MasterSkillMultiplier,
+    },
+];
+
+// ---- Wave 6: cosmic (SIM-SKY) / dreamtime (SIM-DREAM) ----
+
+/// The reduced transfer fraction the outdoor channel takes of the global,
+/// Elder Wisdom, and Long Sun layers. @spec SIM-SKY-004
+pub const OUTDOOR_TRANSFER: f64 = 0.25;
+
+/// A Star Whale summon's curiosity + echo cost. @spec SIM-SKY-006
+pub const WHALE_SUMMON_CURIOSITY: f64 = 50000.0;
+pub const WHALE_SUMMON_ECHOES: f64 = 100.0;
+/// A base visit lasts five game-years plus one per contentment point.
+pub const WHALE_BASE_VISIT_YEARS: u32 = 5;
+/// One lullaby (a dreamcorn offering) raises contentment and lengthens the visit.
+/// @spec SIM-SKY-007
+pub const WHALE_LULLABY_DREAMCORNS: f64 = 1.0;
+/// The visit-gated exchange: hushfelt per caravan → cosmic goods, scaled by
+/// contentment. @spec SIM-SKY-007
+pub const WHALE_HUSHFELT_PER_CARAVAN: f64 = 1000.0;
+pub const WHALE_SKYMAPS_PER_CARAVAN: f64 = 200.0;
+pub const WHALE_STARSHARDS_PER_CARAVAN: f64 = 2.0;
+pub const WHALE_ECHOES_PER_CARAVAN: f64 = 5.0;
+
+/// Deep Nap bounds and starshard cost curve. @spec SIM-DREAM-001, SIM-DREAM-002
+pub const NAP_BASE_MAX_YEARS: u32 = 100;
+pub const LONG_SLUMBER_MAX_YEARS: u32 = 400;
+pub const LONG_SLUMBER_COST_DISCOUNT: f64 = 0.10;
+pub const STARSHARD_COST_BASE: f64 = 5.0;
+pub const STARSHARD_COST_RATIO: f64 = 1.08;
+pub const STARSHARD_HEAT_COUPLING: f64 = 0.01; // × stirred_dreams, raising nap cost
+/// One nap-year's stirred-dreams heat (before heat-efficiency). @spec SIM-DREAM-002
+pub const HEAT_PER_YEAR: f64 = 1.0;
+/// Stirred dreams dissipate this much per tick (× 1 + dissipation effects),
+/// flooring at zero. @spec SIM-DREAM-003
+pub const HEAT_DISSIPATION_PER_TICK: f64 = 0.5;
+/// Meadow-year the Distant Dawn era lights (with the loom). @spec SIM-DREAM-007
+pub const DISTANT_DAWN_YEAR: u64 = 40000;
+
+/// Per-Memory-Chest déjà-vu chance per season boundary. @spec SIM-DREAM-004
+pub const MEMORY_CHEST_DEJA_VU: f64 = 0.01;
+/// Reverie gathered on a déjà-vu day (a deterministic RNG draw in this band),
+/// raised by reverie-yield effects. @spec SIM-DREAM-004
+pub const DEJA_VU_REVERIE_BASE: f64 = 0.5;
+pub const DEJA_VU_REVERIE_SPREAD: f64 = 1.5;
+
+/// One cosmic site: its one-time mission fuel and the one outpost it hosts.
+/// @spec SIM-SKY-001, SIM-SKY-002
+pub struct SiteDef {
+    pub name: &'static str,
+    pub mission_fuel: &'static [(ResourceId, f64)],
+    pub outpost: StructureId,
+}
+
+pub fn site_def(s: SiteId) -> &'static SiteDef {
+    &SITES[s.ix()]
+}
+
+static SITES: [SiteDef; 13] = [
+    SiteDef {
+        name: "Fence Top",
+        mission_fuel: &[(ResourceId::Curiosity, 5000.0), (ResourceId::Skymaps, 50.0)],
+        outpost: StructureId::LookoutPost,
+    },
+    SiteDef {
+        name: "Old Oak",
+        mission_fuel: &[(ResourceId::Curiosity, 25000.0), (ResourceId::Skymaps, 200.0)],
+        outpost: StructureId::Treehouse,
+    },
+    SiteDef {
+        name: "Rooftops",
+        mission_fuel: &[(ResourceId::Moonmilk, 50.0), (ResourceId::Skymaps, 500.0)],
+        outpost: StructureId::WeatherVane,
+    },
+    SiteDef {
+        name: "Sunny Hill",
+        mission_fuel: &[(ResourceId::Moonmilk, 150.0), (ResourceId::Skymaps, 2000.0)],
+        outpost: StructureId::SolarArray,
+    },
+    SiteDef {
+        name: "Meadow's Edge",
+        mission_fuel: &[(ResourceId::Moonmilk, 400.0), (ResourceId::Cometsilk, 25.0)],
+        outpost: StructureId::RangerStation,
+    },
+    SiteDef {
+        name: "The Brook",
+        mission_fuel: &[(ResourceId::Moonmilk, 1000.0), (ResourceId::Cometsilk, 75.0)],
+        outpost: StructureId::HushfeltGrotto,
+    },
+    SiteDef {
+        name: "Whispering Woods",
+        mission_fuel: &[(ResourceId::Cometsilk, 60.0), (ResourceId::Echoes, 5.0)],
+        outpost: StructureId::WhisperPost,
+    },
+    SiteDef {
+        name: "The Foothills",
+        mission_fuel: &[(ResourceId::Cometsilk, 200.0), (ResourceId::Echoes, 25.0)],
+        outpost: StructureId::CairnCircle,
+    },
+    SiteDef {
+        name: "Cloud Nine",
+        mission_fuel: &[(ResourceId::Cometsilk, 500.0), (ResourceId::Echoes, 100.0)],
+        outpost: StructureId::SkyDock,
+    },
+    SiteDef {
+        name: "The Aurora",
+        mission_fuel: &[(ResourceId::JarsOfPurrs, 5.0), (ResourceId::Echoes, 250.0)],
+        outpost: StructureId::AuroraLantern,
+    },
+    SiteDef {
+        name: "The Milky Way",
+        mission_fuel: &[(ResourceId::JarsOfPurrs, 25.0), (ResourceId::Echoes, 1000.0)],
+        outpost: StructureId::StarNursery,
+    },
+    SiteDef {
+        name: "The Far Shore",
+        mission_fuel: &[(ResourceId::JarsOfPurrs, 100.0), (ResourceId::Echoes, 4000.0)],
+        outpost: StructureId::FarBeacon,
+    },
+    SiteDef {
+        name: "The Furthest Star",
+        mission_fuel: &[(ResourceId::JarsOfPurrs, 500.0), (ResourceId::Echoes, 16000.0)],
+        outpost: StructureId::WishingStar,
+    },
+];
+
+/// One Dream Loom upgrade: its reverie (and Jar) cost. Effects flow through the
+/// effect-key system (see `effects::loom_effect`). @spec SIM-DREAM-006
+pub struct DreamLoomDef {
+    pub name: &'static str,
+    pub cost: &'static [(ResourceId, f64)],
+}
+
+pub fn dream_loom_def(l: DreamLoomId) -> &'static DreamLoomDef {
+    &DREAM_LOOMS[l.ix()]
+}
+
+static DREAM_LOOMS: [DreamLoomDef; 9] = [
+    DreamLoomDef { name: "Soft Pillow", cost: &[(ResourceId::Reverie, 5.0)] },
+    DreamLoomDef { name: "Warm Blanket", cost: &[(ResourceId::Reverie, 15.0)] },
+    DreamLoomDef { name: "Dream Catcher", cost: &[(ResourceId::Reverie, 40.0)] },
+    DreamLoomDef { name: "Deep Cushion", cost: &[(ResourceId::Reverie, 100.0)] },
+    DreamLoomDef { name: "Lucid Nap", cost: &[(ResourceId::Reverie, 250.0)] },
+    DreamLoomDef { name: "Cozy Cave", cost: &[(ResourceId::Reverie, 500.0)] },
+    DreamLoomDef { name: "Long Slumber", cost: &[(ResourceId::Reverie, 1000.0)] },
+    DreamLoomDef { name: "Reverie Net", cost: &[(ResourceId::Reverie, 2500.0)] },
+    DreamLoomDef {
+        name: "The Distant Dawn",
+        cost: &[(ResourceId::Reverie, 10000.0), (ResourceId::JarsOfPurrs, 100.0)],
     },
 ];

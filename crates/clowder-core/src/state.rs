@@ -155,9 +155,23 @@ pub enum StructureId {
     UnicornMeadow,
     RainbowArch,
     Sunstone,
+    // ---- Wave 6: cosmic outposts (ids 40..=52), each Site-gated ----
+    LookoutPost,
+    Treehouse,
+    WeatherVane,
+    SolarArray,
+    RangerStation,
+    HushfeltGrotto,
+    WhisperPost,
+    CairnCircle,
+    SkyDock,
+    AuroraLantern,
+    StarNursery,
+    FarBeacon,
+    WishingStar,
 }
 
-pub const STRUCTURE_COUNT: usize = 40;
+pub const STRUCTURE_COUNT: usize = 53;
 
 impl StructureId {
     pub const ALL: [StructureId; STRUCTURE_COUNT] = [
@@ -201,6 +215,127 @@ impl StructureId {
         StructureId::UnicornMeadow,
         StructureId::RainbowArch,
         StructureId::Sunstone,
+        StructureId::LookoutPost,
+        StructureId::Treehouse,
+        StructureId::WeatherVane,
+        StructureId::SolarArray,
+        StructureId::RangerStation,
+        StructureId::HushfeltGrotto,
+        StructureId::WhisperPost,
+        StructureId::CairnCircle,
+        StructureId::SkyDock,
+        StructureId::AuroraLantern,
+        StructureId::StarNursery,
+        StructureId::FarBeacon,
+        StructureId::WishingStar,
+    ];
+    pub fn ix(self) -> usize {
+        self as usize
+    }
+}
+
+/// A structure's build gate: always available, unlocked by an idea, or gated on
+/// a cosmic site being reached (the outposts 40..=52). @spec SIM-ECO-028
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StructureGate {
+    Always,
+    Idea(IdeaId),
+    Site(SiteId),
+}
+
+impl StructureGate {
+    /// The idea gate as an `Option` (Always/Site → None) — a source-compatible
+    /// view of the pre-wave-6 `gate: Option<IdeaId>` field, so `.map(..)` /
+    /// `.unwrap_or(..)` read the gate's band as before. @spec SIM-ECO-028
+    pub fn map<T>(self, f: impl FnOnce(IdeaId) -> T) -> Option<T> {
+        match self {
+            StructureGate::Idea(i) => Some(f(i)),
+            _ => None,
+        }
+    }
+}
+
+/// Source-compatible equality against the old `Option<IdeaId>` gate: an Idea
+/// gate equals `Some(idea)`, an Always gate equals `None`; a Site gate matches
+/// neither. @spec SIM-ECO-028
+impl PartialEq<Option<IdeaId>> for StructureGate {
+    fn eq(&self, other: &Option<IdeaId>) -> bool {
+        match (self, other) {
+            (StructureGate::Idea(a), Some(b)) => a == b,
+            (StructureGate::Always, None) => true,
+            _ => false,
+        }
+    }
+}
+
+/// The thirteen cosmic expedition sites, in ladder order (a site is reachable
+/// only once its predecessor is reached). Copy + Ord so a `BTreeSet<SiteId>`
+/// records reached sites in canonical order. @spec SIM-SKY-002
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum SiteId {
+    FenceTop,
+    OldOak,
+    Rooftops,
+    SunnyHill,
+    MeadowsEdge,
+    TheBrook,
+    WhisperingWoods,
+    TheFoothills,
+    CloudNine,
+    TheAurora,
+    TheMilkyWay,
+    TheFarShore,
+    TheFurthestStar,
+}
+
+impl SiteId {
+    pub const ALL: [SiteId; 13] = [
+        SiteId::FenceTop,
+        SiteId::OldOak,
+        SiteId::Rooftops,
+        SiteId::SunnyHill,
+        SiteId::MeadowsEdge,
+        SiteId::TheBrook,
+        SiteId::WhisperingWoods,
+        SiteId::TheFoothills,
+        SiteId::CloudNine,
+        SiteId::TheAurora,
+        SiteId::TheMilkyWay,
+        SiteId::TheFarShore,
+        SiteId::TheFurthestStar,
+    ];
+    pub fn ix(self) -> usize {
+        self as usize
+    }
+}
+
+/// The nine Dream Loom upgrades, in ladder order. Copy + Ord so a
+/// `BTreeSet<DreamLoomId>` records woven looms in canonical order.
+/// @spec SIM-DREAM-006
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum DreamLoomId {
+    SoftPillow,
+    WarmBlanket,
+    DreamCatcher,
+    DeepCushion,
+    LucidNap,
+    CozyCave,
+    LongSlumber,
+    ReverieNet,
+    DistantDawn,
+}
+
+impl DreamLoomId {
+    pub const ALL: [DreamLoomId; 9] = [
+        DreamLoomId::SoftPillow,
+        DreamLoomId::WarmBlanket,
+        DreamLoomId::DreamCatcher,
+        DreamLoomId::DeepCushion,
+        DreamLoomId::LucidNap,
+        DreamLoomId::CozyCave,
+        DreamLoomId::LongSlumber,
+        DreamLoomId::ReverieNet,
+        DreamLoomId::DistantDawn,
     ];
     pub fn ix(self) -> usize {
         self as usize
@@ -1028,6 +1163,34 @@ pub struct GameState {
     /// @spec SIM-ADV-004
     #[serde(default)]
     pub(crate) tidy_progress: u32,
+    // ---- Wave 6: cosmic (SIM-SKY) / dreamtime (SIM-DREAM) ----
+    /// Reached cosmic sites — permanent, preserved across every Move.
+    /// @spec SIM-SKY-003, SIM-MOVE-004
+    #[serde(default)]
+    pub sites_reached: BTreeSet<SiteId>,
+    /// Woven Dream Loom upgrades — permanent, preserved across every Move.
+    /// @spec SIM-DREAM-006, SIM-MOVE-004
+    #[serde(default)]
+    pub dream_looms: BTreeSet<DreamLoomId>,
+    /// Stirred-dreams heat: raised by naps, dissipating passively; a nap-cadence
+    /// brake that never reduces any stock. @spec SIM-DREAM-002, SIM-DREAM-003
+    #[serde(default)]
+    pub stirred_dreams: f64,
+    /// The Distant Dawn era, once lit never cleared, preserved across Moves;
+    /// raises the Passed-Down Wisdom production cap. @spec SIM-DREAM-007
+    #[serde(default)]
+    pub distant_dawn: bool,
+    /// Remaining Star Whale visit in game-years (0 = not visiting).
+    /// @spec SIM-SKY-006
+    #[serde(default)]
+    pub whale_visit_years: u32,
+    /// The visiting whale's contentment, raised by feeding. @spec SIM-SKY-007
+    #[serde(default)]
+    pub whale_contentment: u32,
+    /// Tick until which a déjà-vu day pauses production and consumption.
+    /// @spec SIM-DREAM-004
+    #[serde(default)]
+    pub deja_vu_until: u64,
     /// Derived accelerator for the per-tick reveal scan: the complement of
     /// `revealed`, in canonical order. Never serialized — rebuilt on load —
     /// so it can't drift from `revealed`, which stays the sole truth.
@@ -1099,6 +1262,13 @@ impl GameState {
             adventure_rewards: [0.0; 7],
             adventure_done: false,
             tidy_progress: 0,
+            sites_reached: BTreeSet::new(),
+            dream_looms: BTreeSet::new(),
+            stirred_dreams: 0.0,
+            distant_dawn: false,
+            whale_visit_years: 0,
+            whale_contentment: 0,
+            deja_vu_until: 0,
             unrevealed_structs: StructureId::ALL.to_vec(),
             unrevealed_ideas: IdeaId::ALL.to_vec(),
         }
@@ -1276,7 +1446,9 @@ impl GameState {
             return 0.0;
         }
         let sunstones = self.structures[StructureId::Sunstone.ix()] as f64;
-        let cap = 10.0 + 0.05 * self.enlightenment_tier as f64 * sunstones;
+        // Aurora Lanterns extend the Long Sun cap (+2 each). @spec SIM-SKY-005
+        let cap = 10.0 + 0.05 * self.enlightenment_tier as f64 * sunstones
+            + self.effect(crate::effects::Effect::LongSunCapBonus);
         crate::effects::limited_dr(
             crate::effects::unlimited_dr(self.devotion, 1000.0) / 100.0,
             cap,
@@ -1323,9 +1495,65 @@ impl GameState {
 
     pub fn structure_unlocked(&self, s: StructureId) -> bool {
         match content::structure_def(s).gate {
-            None => true,
-            Some(idea) => self.ideas.contains(&idea),
+            StructureGate::Always => true,
+            StructureGate::Idea(idea) => self.ideas.contains(&idea),
+            StructureGate::Site(site) => self.sites_reached.contains(&site),
         }
+    }
+
+    // ---- Wave 6 derived queries (cosmic / dreamtime) ----
+
+    /// The next unreached site is reachable once the cosmic surface (Skyward
+    /// Longing) is open and every prior rung is reached. An already-reached
+    /// site is not "reachable" (it needs no launching). @spec SIM-SKY-001
+    pub fn site_reachable(&self, site: SiteId) -> bool {
+        if !self.ideas.contains(&IdeaId::SkywardLonging) || self.sites_reached.contains(&site) {
+            return false;
+        }
+        for prior in SiteId::ALL {
+            if prior == site {
+                break;
+            }
+            if !self.sites_reached.contains(&prior) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// The longest a single Deep Nap may run, in game-years: base 100, raised by
+    /// the Long Slumber loom. @spec SIM-DREAM-001, SIM-DREAM-006
+    pub fn max_nap_length(&self) -> u32 {
+        let mut n = content::NAP_BASE_MAX_YEARS;
+        if self.dream_looms.contains(&DreamLoomId::LongSlumber) {
+            n += content::LONG_SLUMBER_MAX_YEARS;
+        }
+        n
+    }
+
+    /// The starshard cost of a `years`-long nap: an escalating geometric sum,
+    /// raised by the current stirred-dreams heat, shaved by the Long Slumber
+    /// loom. @spec SIM-DREAM-001, SIM-DREAM-002
+    pub fn starshard_cost(&self, years: u32) -> f64 {
+        let y = years as f64;
+        let ratio = content::STARSHARD_COST_RATIO;
+        let base = content::STARSHARD_COST_BASE * (ratio.powf(y) - 1.0) / (ratio - 1.0);
+        let heat = 1.0 + content::STARSHARD_HEAT_COUPLING * self.stirred_dreams;
+        let discount = if self.dream_looms.contains(&DreamLoomId::LongSlumber) {
+            1.0 - content::LONG_SLUMBER_COST_DISCOUNT
+        } else {
+            1.0
+        };
+        // A whole number of starshards: exact against any (even 1e12) stock, so
+        // the spend is precise. @spec SIM-DREAM-001
+        (base * heat * discount).ceil()
+    }
+
+    /// The reduced transfer fraction the outdoor channel takes of the global,
+    /// Elder Wisdom, and Long Sun layers — a state-independent constant.
+    /// @spec SIM-SKY-004, SIM-ENG-021
+    pub fn outdoor_transfer(&self) -> f64 {
+        content::OUTDOOR_TRANSFER
     }
 
     pub fn job_unlocked(&self, j: JobId) -> bool {
@@ -1401,13 +1629,21 @@ impl GameState {
             .count() as f64;
         let crowding = home.saturating_sub(content::CROWDING_FREE) as f64;
         // Story Circles and Moonlight Stages pool into one DR-limited relief
-        // knob: at least 10% of the crowding always bites.
-        let relief_sum: f64 = StructureId::ALL
-            .iter()
-            .map(|s| content::structure_def(*s).crowding_relief * self.structures[s.ix()] as f64)
-            .sum();
-        let relief =
-            crate::effects::limited_dr(relief_sum, content::CROWDING_RELIEF_DR_LIMIT);
+        // knob: at least 10% of the crowding always bites. With no crowding the
+        // relief term vanishes (it multiplies crowding), so the structure scan is
+        // skipped — the quiet/small-meadow hot path, and happiness runs thrice a
+        // tick.
+        let relief = if crowding > 0.0 {
+            let relief_sum: f64 = StructureId::ALL
+                .iter()
+                .map(|s| {
+                    content::structure_def(*s).crowding_relief * self.structures[s.ix()] as f64
+                })
+                .sum();
+            crate::effects::limited_dr(relief_sum, content::CROWDING_RELIEF_DR_LIMIT)
+        } else {
+            0.0
+        };
         // Each distinct stocked luxury brightens the room (dust-guarded).
         let luxuries = content::LUXURY_DRAINS
             .iter()
@@ -1533,7 +1769,7 @@ impl GameState {
             }
             let base = content::structure_def(s).energy_prod;
             sum += match s {
-                StructureId::SunningDeck => {
+                StructureId::SunningDeck | StructureId::SolarArray => {
                     base * count * content::sunning_deck_season_factor(self.season())
                 }
                 StructureId::DynamoWheel => base * count * self.dynamo_fuel_fraction(),
@@ -1581,11 +1817,32 @@ impl GameState {
 
     /// (deficit, surplus) ratios from a single production/consumption pass —
     /// the hot-path form used inside `tick()`, byte-identical to calling the
-    /// two public queries but scanning the structures once instead of four
-    /// times. @spec SIM-ECO-036
+    /// two public queries but scanning the structures once instead of twice.
+    /// @spec SIM-ECO-036
     pub(crate) fn energy_ratios(&self) -> (f64, f64) {
-        let prod = self.energy_production();
-        let cons = self.energy_consumption();
+        let mut prod = 0.0;
+        let mut cons = 0.0;
+        for (ix, &count) in self.structures.iter().enumerate() {
+            if count == 0 {
+                continue;
+            }
+            let s = StructureId::ALL[ix];
+            let n = count as f64;
+            let def = content::structure_def(s);
+            if def.energy_prod != 0.0 {
+                prod += match s {
+                    StructureId::SunningDeck | StructureId::SolarArray => {
+                        def.energy_prod * n * content::sunning_deck_season_factor(self.season())
+                    }
+                    StructureId::DynamoWheel => def.energy_prod * n * self.dynamo_fuel_fraction(),
+                    _ => def.energy_prod * n,
+                };
+            }
+            cons += match s {
+                StructureId::YarnComputer => 2.0 * n + n * n / 2.0,
+                _ => def.energy_cons * n,
+            };
+        }
         let deficit = if cons <= EPSILON {
             1.0
         } else {

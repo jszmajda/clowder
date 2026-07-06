@@ -22,7 +22,7 @@ pub use save::{
     OfflineReport, SAVE_VERSION,
 };
 pub use state::{
-    AdventureId, ArchId, ArchivedKitten, Availability, ColonyId, ContentId, CraftId, GameState,
-    IdeaId, JobId, Kitten, KittenTrait, Location, MoodTier, Promise, RefinementId, ResourceId,
-    RiteId, RuleId, Season, StructureId, TraditionId,
+    AdventureId, ArchId, ArchivedKitten, Availability, ColonyId, ContentId, CraftId, DreamLoomId,
+    GameState, IdeaId, JobId, Kitten, KittenTrait, Location, MoodTier, Promise, RefinementId,
+    ResourceId, RiteId, RuleId, Season, SiteId, StructureGate, StructureId, TraditionId,
 };

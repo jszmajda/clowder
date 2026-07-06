@@ -1,6 +1,6 @@
 use crate::state::{
-    AdventureId, ArchId, ColonyId, ContentId, IdeaId, JobId, MoodTier, RefinementId, RiteId, RuleId,
-    Season, StructureId, TraditionId,
+    AdventureId, ArchId, ColonyId, ContentId, DreamLoomId, IdeaId, JobId, MoodTier, RefinementId,
+    RiteId, RuleId, Season, SiteId, StructureId, TraditionId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -78,4 +78,13 @@ pub enum Event {
     TraditionBought { id: TraditionId },
     AdventureDeclared { id: Option<AdventureId> },
     AdventureCompleted { id: AdventureId },
+    // ---- Wave 6: cosmic (SIM-SKY) / dreamtime (SIM-DREAM) ----
+    SiteReached { site: SiteId },
+    WhaleSummoned,
+    WhaleFed { contentment: u32 },
+    /// A summarized nap report — never a per-tick stream. @spec SIM-DREAM-001
+    Napped { years: u32 },
+    DreamLoomBought { id: DreamLoomId },
+    DejaVuDay,
+    DistantDawn,
 }

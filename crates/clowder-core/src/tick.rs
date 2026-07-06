@@ -50,6 +50,14 @@ impl GameState {
         // @spec SIM-ECO-037
         self.mess =
             (self.mess + mess_accrual - content::MESS_DISSIPATION * self.mess).max(0.0);
+        // Stirred dreams cool passively each tick (a nap-cadence brake, never a
+        // loss), flooring at zero; free when the dream-space is already cool.
+        // @spec SIM-DREAM-003
+        if self.stirred_dreams > 0.0 {
+            let dissip = content::HEAT_DISSIPATION_PER_TICK
+                * (1.0 + self.effect(crate::effects::Effect::HeatDissipation));
+            self.stirred_dreams = (self.stirred_dreams - dissip).max(0.0);
+        }
         let tier_after = self.mood_tier();
         if tier_after != tier_before {
             // @spec SIM-ENG-010
@@ -230,6 +238,20 @@ impl GameState {
         // @spec SIM-ECO-039
         if self.day().is_multiple_of(content::DAYS_PER_YEAR) {
             self.cogworks_autocraft();
+            // The Star Whale's visit ticks down a year; at zero it drifts calmly
+            // on, never angry. @spec SIM-SKY-007
+            if self.whale_visit_years > 0 {
+                self.whale_visit_years -= 1;
+            }
+            // The Distant Dawn lights when the meadow reaches year 40000 with the
+            // loom woven; once lit it never clears. @spec SIM-DREAM-007
+            if !self.distant_dawn
+                && self.year() >= content::DISTANT_DAWN_YEAR
+                && self.dream_looms.contains(&crate::state::DreamLoomId::DistantDawn)
+            {
+                self.distant_dawn = true;
+                events.push(Event::DistantDawn);
+            }
         }
 
         // (f) Promise upkeep: each kept Promise draws 0.0005 dreamcorn/day; one
@@ -317,6 +339,12 @@ impl GameState {
     /// mess accrual (applied in phase 4).
     // @spec SIM-ENG-021, SIM-ECO-023, SIM-ECO-025, SIM-ECO-032, SIM-ECO-036
     fn produce(&mut self) -> f64 {
+        // A déjà-vu day pauses production entirely — a strange half-remembered
+        // day where the meadow simply holds still (no growth, no mess).
+        // @spec SIM-DREAM-004
+        if self.deja_vu_until > self.ticks {
+            return 0.0;
+        }
         let season = self.season();
         let winter_eased = self.ideas.contains(&IdeaId::SeasonalAwareness);
         // Layer-6 inputs, frozen at phase start (before converters draw fuel).
@@ -332,14 +360,25 @@ impl GameState {
         let long_sun_layer =
             if self.rites.is_empty() { 1.0 } else { 1.0 + self.long_sun_bonus() };
         let wisdom_layer = if self.elder_wisdom > 0.0 || self.passed_down_wisdom > 0.0 {
+            // The Distant Dawn era lifts the Passed-Down cap +100% → +400%.
+            // @spec SIM-MOVE-009, SIM-DREAM-007
+            let passed_cap = if self.distant_dawn { 4.0 } else { 1.0 };
             1.0 + crate::effects::limited_dr(
                 0.01 * self.elder_wisdom,
                 2.0 * self.nine_lives_ratio(),
-            ) + crate::effects::limited_dr(0.01 * self.passed_down_wisdom, 1.0)
+            ) + crate::effects::limited_dr(0.01 * self.passed_down_wisdom, passed_cap)
         } else {
             1.0
         };
-        let raw_mult = 1.0 + (global_layer * wisdom_layer * long_sun_layer - 1.0) * deficit;
+        let combined_layers = global_layer * wisdom_layer * long_sun_layer;
+        let raw_mult = 1.0 + (combined_layers - 1.0) * deficit;
+        // The outdoor channel (cosmic outposts) takes the global layers at a
+        // reduced transfer, times its own per-source ratio. Computed lazily on
+        // the first outdoor structure with raw output — free (no scan, no effect
+        // sum) until then, the outpost-free hot path. @spec SIM-SKY-004, SIM-ENG-021
+        let outdoor_raw_mult =
+            1.0 + (combined_layers - 1.0) * deficit * self.outdoor_transfer();
+        let mut outdoor_ratio: Option<f64> = None;
         // Adventure twists on production: Nap Time halves job (kitten) output;
         // Tidy Meadow raises mess accrual. Both 1.0 with no active adventure.
         // @spec SIM-ADV-002
@@ -386,7 +425,15 @@ impl GameState {
                 // flows skip the global layers; unicorns take their own mystic
                 // multiplier instead. @spec SIM-ENG-021, SIM-SUN-004, SIM-UNI-002
                 if content::tier(*r) == content::Tier::Raw {
-                    if def.global_ratio == 0.0 {
+                    if def.outdoor {
+                        // The outdoor channel: the global layers at a reduced
+                        // transfer, times the outdoor per-source ratio (summed
+                        // once, on demand). @spec SIM-SKY-004, SIM-ENG-021
+                        let oratio = *outdoor_ratio.get_or_insert_with(|| {
+                            1.0 + self.effect(crate::effects::Effect::OutdoorProductionRatio)
+                        });
+                        flow *= outdoor_raw_mult * oratio;
+                    } else if def.global_ratio == 0.0 {
                         flow *= raw_mult;
                     }
                 } else if *r == ResourceId::Unicorns {
@@ -607,6 +654,11 @@ impl GameState {
     /// shortfalls: an empty shelf just drops its happiness bonus.
     // @spec SIM-ECO-020, SIM-ECO-021, SIM-ECO-026
     fn consume(&mut self) -> bool {
+        // A déjà-vu day pauses consumption too, so the dreamy pause never causes
+        // a shortfall (Tenet 1). @spec SIM-DREAM-004
+        if self.deja_vu_until > self.ticks {
+            return false;
+        }
         let home = self.kittens.iter().filter(|k| k.location == Location::Home).count();
         if home == 0 {
             return false;
@@ -724,6 +776,26 @@ impl GameState {
             let shower = self.effect(crate::effects::Effect::RainbowShowerChance);
             if shower > 0.0 && self.rng.chance(shower) {
                 self.resources[ResourceId::Rainbows.ix()] += content::RAINBOW_SHOWER_AMOUNT;
+            }
+        }
+
+        // Déjà-vu roll — appended AFTER the mystic rolls, at season boundaries
+        // only (the ENG-018 schedule extension). Guarded so the chest/loom-free
+        // hot path draws nothing. On a hit the day pauses production and
+        // consumption and gathers reverie (a deterministic RNG draw).
+        // @spec SIM-DREAM-004, SIM-ENG-018
+        if self.day().is_multiple_of(content::DAYS_PER_SEASON)
+            && (self.structures[StructureId::MemoryChest.ix()] > 0
+                || !self.dream_looms.is_empty())
+        {
+            let chance = self.effect(crate::effects::Effect::DejaVuChance);
+            if chance > 0.0 && self.rng.chance(chance) {
+                self.deja_vu_until = self.ticks + content::TICKS_PER_DAY;
+                let amount = (content::DEJA_VU_REVERIE_BASE
+                    + self.rng.uniform() * content::DEJA_VU_REVERIE_SPREAD)
+                    * (1.0 + self.effect(crate::effects::Effect::ReverieYield));
+                self.resources[ResourceId::Reverie.ix()] += amount;
+                events.push(Event::DejaVuDay);
             }
         }
     }

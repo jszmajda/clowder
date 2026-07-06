@@ -1043,11 +1043,11 @@ fn the_global_layer_now_reaches_structure_raw_production() {
 #[test]
 fn the_structure_table_is_forty_with_the_two_cross_leaf_arches() {
     use ResourceId::{Cairns, Echoes, Moonstone, Rainbows};
-    assert_eq!(StructureId::ALL.len(), 40, "40 structures, append-only");
+    assert_eq!(StructureId::ALL.len(), 53, "40 structures, append-only");
     assert_eq!(StructureId::RainbowArch.ix(), 38);
     assert_eq!(StructureId::Sunstone.ix(), 39);
     let s = GameState::new(358);
-    assert_eq!(s.structures, [0u32; 40], "a new meadow across the widened array");
+    assert_eq!(s.structures, [0u32; 53], "a new meadow across the widened array");
 
     // The cross-leaf structures carry costs/ramps here; effects live in mystic
     // (Rainbow Arch) and ceremonies (Sunstone) respectively.
@@ -1137,7 +1137,7 @@ fn v1_saves_still_load_with_wave_4_fields_defaulted() {
     let loaded = load_string(fixture, 1_751_700_000).expect("v1 fixture still loads");
     let st = &loaded.state;
     assert_eq!(st.ticks, 45, "the old meadow is preserved exactly");
-    assert_eq!(st.structures.len(), 40, "structures zero-filled forward to 40");
+    assert_eq!(st.structures.len(), 53, "structures zero-filled forward to 53");
     assert_eq!(st.structures[StructureId::CatnipPatch.ix()], 1);
     // Every wave-4 field gets its new-game default.
     assert_eq!(st.devotion, 0.0);

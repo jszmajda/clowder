@@ -198,8 +198,8 @@ fn new_structures_extend_caps_including_multi_resource_extenders() {
 // @spec SIM-ECO-028
 #[test]
 fn structure_table_spot_anchors_across_bands() {
-    assert_eq!(StructureId::ALL.len(), 40, "exactly the BLD table, no staged rebuilds");
-    assert_eq!(GameState::new(107).structures, [0u32; 40]);
+    assert_eq!(StructureId::ALL.len(), 53, "exactly the BLD table, no staged rebuilds");
+    assert_eq!(GameState::new(107).structures, [0u32; 53]);
     assert_eq!(StructureId::CatnipPatch.ix(), 0);
     assert_eq!(StructureId::WindowPerch.ix(), 7);
     assert_eq!(StructureId::Porch.ix(), 14);

@@ -181,6 +181,10 @@ pub fn load_string(s: &str, now_unix: u64) -> Result<LoadedGame, LoadError> {
         &mut state.elder_wisdom,
         &mut state.warm_memories,
         &mut state.passed_down_wisdom,
+        // Wave-6: stirred-dreams heat is physics too — floor at zero and stay
+        // finite. Sites, looms, whale counters, and deja_vu_until are valid by
+        // construction (their deserializers). @spec SAVE-013
+        &mut state.stirred_dreams,
     ] {
         if !value.is_finite() || *value < 0.0 {
             *value = 0.0;

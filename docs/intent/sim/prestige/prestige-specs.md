@@ -13,7 +13,7 @@
 - [x] **SIM-MOVE-006**: On a Move, the system shall add max(0, kittens − 70) to Elder Wisdom, plus one per game-millennium elapsed since the last Move.
 - [x] **SIM-MOVE-007**: The system shall contribute Elder Wisdom to production stack layer 7 as +1% per point, limited_dr-capped at (2.0 × nine_lives_ratio), and to storage as +0.1% per point (linear); the cap and slope scale with the Nine Lives traditions.
 - [x] **SIM-MOVE-008**: On a Move, the system shall add karma_gain(kittens) = (k−35) + 3·max(0,k−60) + 4·max(0,k−100) + 5·max(0,k−150) + 10·max(0,k−300) + 15·max(0,k−750) to Warm Memories (accumulated across Moves), and expose warm_memory = unlimited_dr(Warm Memories, 5) as +1% happiness per point.
-- [ ] **SIM-MOVE-009**: When PassItDown is applied, the system shall convert all Elder Wisdom into Passed-Down Wisdom (one-way), which contributes a second production pool of +1% per point capped at +100% (raised to +400% once the dreamtime leaf's distant_dawn flag is set) and storage of +0.05% per point.
+- [x] **SIM-MOVE-009**: When PassItDown is applied, the system shall convert all Elder Wisdom into Passed-Down Wisdom (one-way), which contributes a second production pool of +1% per point capped at +100% (raised to +400% once the dreamtime leaf's distant_dawn flag is set) and storage of +0.05% per point.
 
 ## Traditions
 

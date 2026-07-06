@@ -97,6 +97,26 @@ pub enum Effect {
     /// Per-season, per-resource production bonus (Quiet Retreat, Long Winter).
     /// @spec SIM-ADV-005
     SeasonResourceRatio(Season, ResourceId),
+    // ---- Wave 6 (cosmic / dreamtime) ----
+    /// +% on the outdoor production channel (Ranger Station, Cairn Circle,
+    /// Aurora Lantern, Far Beacon, Wishing Star). @spec SIM-SKY-004
+    OutdoorProductionRatio,
+    /// Flat Long Sun cap extension (Aurora Lantern). @spec SIM-SKY-005
+    LongSunCapBonus,
+    /// Per-season déjà-vu day chance (Memory Chests + the Dream Catcher loom).
+    /// @spec SIM-DREAM-004
+    DejaVuChance,
+    /// +% reverie gathered on a déjà-vu day (the Reverie Net loom).
+    /// @spec SIM-DREAM-004
+    ReverieYield,
+    /// Nap heat efficiency: naps stir (1 − this) as much (Soft Pillow, Cozy
+    /// Cave). @spec SIM-DREAM-002
+    HeatEfficiency,
+    /// +% stirred-dreams dissipation (the Warm Blanket loom). @spec SIM-DREAM-003
+    HeatDissipation,
+    /// Per-year nap yield bonus (the Deep Cushion / Lucid Nap looms; dormant —
+    /// naps replay the pure tick path). @spec SIM-DREAM-006
+    NapYield,
 }
 
 /// Diminishing-returns primitive: linear to 75% of `limit`, asymptotic to
@@ -130,12 +150,37 @@ impl GameState {
     pub fn effect(&self, key: Effect) -> f64 {
         let mut sum = 0.0;
         // 1. Structures (× owned count; global/energy terms count actives —
-        // the active set is the built set until toggling lands).
-        for s in StructureId::ALL {
-            let count = self.structures[s.ix()] as f64;
-            if count == 0.0 {
+        // the active set is the built set until toggling lands). Only these key
+        // shapes ever carry a structure contribution, so every other key (e.g.
+        // JobRatio, called for all eight jobs each tick, and StructureRatio, per
+        // production flow) skips the whole structure scan — effect() is the
+        // per-tick hot path. Iterate the packed counts array directly so the
+        // (usually many) empty structures are skipped with an elided-bounds,
+        // cache-friendly scan. @spec SIM-ENG-019
+        let structures_carry = matches!(
+            key,
+            Effect::MaxCap(_)
+                | Effect::HappinessPoints
+                | Effect::JamboreeRatio
+                | Effect::JamboreeArrivalRatio
+                | Effect::ResourceRatio(_)
+                | Effect::CraftRatio
+                | Effect::LuxuryDemandRatio
+                | Effect::PrismDescentChance
+                | Effect::GlobalProductionRatio
+                | Effect::OutdoorProductionRatio
+                | Effect::LongSunCapBonus
+                | Effect::DejaVuChance
+        );
+        for (ix, &raw_count) in self.structures.iter().enumerate() {
+            if !structures_carry {
+                break;
+            }
+            if raw_count == 0 {
                 continue;
             }
+            let s = StructureId::ALL[ix];
+            let count = raw_count as f64;
             let def = content::structure_def(s);
             match key {
                 Effect::MaxCap(r) => {
@@ -183,6 +228,14 @@ impl GameState {
                                     * self.structures[StructureId::Cogworks.ix()] as f64);
                     }
                     sum += value;
+                }
+                // ---- Wave 6: cosmic outposts ----
+                // @spec SIM-SKY-004, SIM-SKY-005
+                Effect::OutdoorProductionRatio => sum += def.outdoor_ratio * count,
+                Effect::LongSunCapBonus => sum += def.long_sun_cap * count,
+                // Memory Chests drive the per-season déjà-vu roll. @spec SIM-DREAM-004
+                Effect::DejaVuChance if s == StructureId::MemoryChest => {
+                    sum += content::MEMORY_CHEST_DEJA_VU * count;
                 }
                 _ => {}
             }
@@ -286,6 +339,13 @@ impl GameState {
                 sum += content::PROMISE_GLOBAL_RATIO * kept;
             }
         }
+        // Dream Loom upgrades (bought once each). Iterate the owned set (BTree
+        // order = DreamLoomId::ALL order); free when none woven. @spec SIM-DREAM-006
+        if !self.dream_looms.is_empty() {
+            for l in &self.dream_looms {
+                sum += loom_effect(*l, key);
+            }
+        }
         // 10. The Elder's birth trait, active only from the chair.
         // @spec SIM-KIT-024
         if let Some(trait_id) = self.elder.and_then(|ix| self.kittens.get(ix)).map(|k| k.trait_id)
@@ -351,6 +411,25 @@ fn arch_effect(arch: ArchId, key: Effect) -> f64 {
         (ArchId::StarlitArch, Effect::UnicornsRatio) => 5.00,
         (ArchId::StarlitArch, Effect::StarshardRefine) => 0.10,
         (ArchId::EverdreamArch, Effect::MaxCap(JarsOfPurrs)) => 2.0,
+        _ => 0.0,
+    }
+}
+
+/// One Dream Loom upgrade's contribution to one effect key — the dreamtime
+/// design's loom table. Deep Cushion / Lucid Nap drive NapYield (dormant: the
+/// nap replays the pure tick path); Long Slumber's nap-length and cost effects
+/// are derived queries (`max_nap_length`, `starshard_cost`), not keys.
+/// @spec SIM-DREAM-006
+fn loom_effect(loom: crate::state::DreamLoomId, key: Effect) -> f64 {
+    use crate::state::DreamLoomId as L;
+    match (loom, key) {
+        (L::SoftPillow, Effect::HeatEfficiency) => 0.10,
+        (L::WarmBlanket, Effect::HeatDissipation) => 0.20,
+        (L::DreamCatcher, Effect::DejaVuChance) => 0.25,
+        (L::DeepCushion, Effect::NapYield) => 0.05,
+        (L::LucidNap, Effect::NapYield) => 0.05,
+        (L::CozyCave, Effect::HeatEfficiency) => 0.15,
+        (L::ReverieNet, Effect::ReverieYield) => 0.50,
         _ => 0.0,
     }
 }
