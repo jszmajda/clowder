@@ -113,7 +113,7 @@ Cost of copy k+1 = `ceil(base × ratio^k)` per component. Reveal fraction 30% un
 | 38 | Rainbow Arch | 5000 rainbows, 25 cairns | 1.15 | count is the Parade exchange rate; hosts Arch upgrades; +0.02%/day prism-descent chance each (mystic leaf consumes); first copy granted free with the Parade Routes idea | ParadeRoutes |
 | 39 | Sunstone | 8 moonstone, 50 cairns, 1 echo | 1.15 | Long Sun cap +0.05 per enlightenment tier each (ceremonies leaf consumes); energy −1 | LongSunMasonry |
 
-No staged rebuilds in this pass: every structure is its own entry (see Decisions). Structures 38–39 are cross-leaf: they live in this table (the economy owns the StructureId space, costs, and ramps) but their effects are defined and consumed by the mystic and ceremonies leaves respectively — the same split as the Sunbeam Altar hosting Rites.
+No staged rebuilds in this pass: every structure is its own entry (see Decisions). Structures 38–39 are cross-leaf: they live in this table (the economy owns the StructureId space, costs, and ramps) but their effects are defined and consumed by the mystic and ceremonies leaves respectively — the same split as the Sunbeam Altar hosting Rites. Structures 40–52 are the cosmic outposts (Lookout Post … Wishing Star): they too live in the StructureId space, but they are gated on their *site being reached* (a cosmic-leaf state, not an idea), their production flows through the cosmic **outdoor** channel (diluted global/wisdom/Long-Sun transfer), and their effects are owned by the cosmic leaf. Their build costs escalate off cosmic materials (moonmilk, cometsilk, hushfelt, Jars) per the cosmic design.
 
 ## CRAFT — Crafting
 
