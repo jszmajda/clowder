@@ -18,7 +18,7 @@ The leaf owns the Move itself, the three legacy currencies and their formulas, t
 `GreatMeadowMove` is available once the clowder has at least 71 Home-or-Away kittens (the inspiration's paragon threshold — a Move needs a real clowder). On a Move:
 
 1. **Earn the legacies** (below) from the clowder's size and the years elapsed.
-2. **Archive the generation.** Every current kitten is copied into the Family Album with its name, traits, ranks, and the meadow's generation number — archived, never deleted. The kittens themselves become "Elders of the old meadow" in the Album's telling.
+2. **Archive the generation.** Every current kitten is copied into the Family Album as a slim memorial — its name, trait, rank, and the current (pre-increment) generation number — archived, never deleted. The kittens themselves become "Elders of the old meadow" in the Album's telling. (Skills are not memorialized; they travel only in the Baskets.)
 3. **Pack the Traveling Baskets.** Up to `basket_capacity` kittens (a Tradition-raised count, default 0 → raised by the Traveling Baskets tradition) are carried into the new meadow, keeping their names, traits, ranks, and skills.
 4. **Fill the Memory Chest.** `memory_chest_ratio` (Tradition-raised, default 0) of each resource stock travels along.
 5. **Move in.** The meadow resets to a fresh `GameState` — zero structures, the carried kittens (Traveling Baskets) placed Home, Memory-Chest resources, generation + 1 — *except* the persistent legacy state (Elder Wisdom, Warm Memories, Passed-Down Wisdom, serenity + enlightenment tier from ceremonies, purchased Traditions, and the Family Album), which carry over untouched.
