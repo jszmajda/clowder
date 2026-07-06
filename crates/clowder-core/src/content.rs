@@ -181,6 +181,19 @@ pub const PROMOTE_SHINIES_STEP: f64 = 25.0; // × (rank + 1)
 pub const ELDER_RANK_DIVISOR: f64 = 1.4; // own-job × max(1, (rank+1)/1.4)
 
 /// Skill tiers multiply the kitten's own-job yield. @spec SIM-KIT-020
+/// The skill-tier bonus with the Nap Time reward applied: only the master tier
+/// (≥ 9000 XP) scales by the master-skill multiplier; the lower tiers are
+/// untouched. `master_mult` is 1.0 (a no-op) until Nap Time is completed.
+/// @spec SIM-KIT-020, SIM-ADV-005
+pub fn skill_tier_bonus_scaled(xp: f64, master_mult: f64) -> f64 {
+    let base = skill_tier_bonus(xp);
+    if xp >= 9000.0 {
+        base * master_mult
+    } else {
+        base
+    }
+}
+
 pub fn skill_tier_bonus(xp: f64) -> f64 {
     if xp >= 9000.0 {
         0.1875
@@ -2505,6 +2518,9 @@ pub const MEADOW_MOVE_MIN_KITTENS: usize = 71;
 pub const WARM_WELCOME_CATNIP: f64 = 50.0;
 /// Tidy Meadow's mess-accrual multiplier while active. @spec SIM-ADV-002
 pub const TIDY_MESS_MULT: f64 = 2.0;
+/// Frugal Meadow's energy-consumption twist (+10%) while active, added into the
+/// EnergyConsumptionRatio key the reward also flows through. @spec SIM-ADV-002
+pub const FRUGAL_MEADOW_TWIST: f64 = 0.10;
 
 /// One Tradition's shop entry — its Elder-Wisdom price. Effects flow through
 /// the effect-key system (see `effects::tradition_effect`). @spec SIM-MOVE-010
@@ -2574,7 +2590,10 @@ static ADVENTURES: [AdventureDef; 7] = [
         reward_cap: 0.10,
         reward_key: Effect::SeasonResourceRatio(Season::Spring, ResourceId::Catnip),
     },
-    // LongWinter: reach a Sunbeam Altar → +5% winter catnip (cap ×2).
+    // LongWinter: reach a Sunbeam Altar → +5% winter catnip and +5% Sunning-Deck
+    // summer energy (cap ×2). Only the winter-catnip half is expressible today
+    // (SeasonResourceRatio); the Sunning-Deck summer-energy half has no clean
+    // effect key yet and is DEFERRED. @spec SIM-ADV-005
     AdventureDef {
         reward_per: 0.05,
         reward_cap: 0.10,
@@ -2587,17 +2606,21 @@ static ADVENTURES: [AdventureDef; 7] = [
         reward_key: Effect::MasterSkillMultiplier,
     },
     // FrugalMeadow: build the full energy set → −2% energy consumption (cap ×1).
+    // The reward is a NEGATIVE ratio: it lowers consumption through the
+    // EnergyConsumptionRatio key (the twist raises it). The cap magnitude is 0.02.
     AdventureDef {
-        reward_per: 0.02,
+        reward_per: -0.02,
         reward_cap: 0.02,
         reward_key: Effect::EnergyConsumptionRatio,
     },
-    // SilentSun: Move with a full Memory Chest → Long Sun boost (cap ×4).
-    // No dedicated Long-Sun effect key yet; the reward pool is inert this wave.
+    // SilentSun: Move with a full Memory Chest → +10% Long Sun effectiveness
+    // and +cap (cap ×4). The reward raises the Long Sun cap through the real
+    // LongSunCapBonus key (the "+cap" half; the effectiveness half rides the
+    // same raised cap). @spec SIM-ADV-005, SIM-SKY-005
     AdventureDef {
         reward_per: 0.10,
         reward_cap: 0.4,
-        reward_key: Effect::SeasonResourceRatio(Season::Summer, ResourceId::Warmth),
+        reward_key: Effect::LongSunCapBonus,
     },
     // GentlePaws: research Pen Pal Networks → +10% pounce ratio (cap ×2).
     AdventureDef {

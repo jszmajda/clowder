@@ -636,11 +636,13 @@ fn prisms_descend_from_rainbow_arches_over_the_days() {
 // @spec SIM-UNI-007
 #[test]
 fn dreaming_drifts_prisms_into_dreamcorns_but_never_the_last_one() {
-    // Dream-drift accrues from Memory Arches, throttled ×0.25 once any dreamcorn
-    // already dreams. Same arches, same span: the throttled run drifts a quarter
-    // as fast (a slowdown, never a loss).
+    // The Memory Arch upgrade turns the Rainbow Arch *structures* into the
+    // dreamcorn engine; drift scales with the arch count. Throttled ×0.25 once
+    // any dreamcorn already dreams. Same arches, same span: the throttled run
+    // drifts a quarter as fast (a slowdown, never a loss).
     let mut awake = GameState::new(335);
     awake.arches_bought.insert(ArchId::MemoryArch);
+    grant(&mut awake, StructureId::RainbowArch, 100); // the engine scales with structures
     let mut dreaming = awake.clone();
     give(&mut dreaming, ResourceId::Dreamcorns, 1.0); // a dreamcorn already asleep
     run_days(&mut awake, 1);
@@ -1054,12 +1056,12 @@ fn the_structure_table_is_forty_with_the_two_cross_leaf_arches() {
     let d = content::structure_def(StructureId::RainbowArch);
     assert_eq!(d.base_costs, &[(Rainbows, 5000.0), (Cairns, 25.0)]);
     assert_eq!(d.ratio, 1.15);
-    assert_eq!(d.gate, Some(IdeaId::ParadeRoutes));
+    assert_eq!(d.gate, StructureGate::Idea(IdeaId::ParadeRoutes));
 
     let d = content::structure_def(StructureId::Sunstone);
     assert_eq!(d.base_costs, &[(Moonstone, 8.0), (Cairns, 50.0), (Echoes, 1.0)]);
     assert_eq!(d.ratio, 1.15);
-    assert_eq!(d.gate, Some(IdeaId::LongSunMasonry));
+    assert_eq!(d.gate, StructureGate::Idea(IdeaId::LongSunMasonry));
 }
 
 // @spec SIM-ECO-024

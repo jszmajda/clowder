@@ -243,31 +243,6 @@ pub enum StructureGate {
     Site(SiteId),
 }
 
-impl StructureGate {
-    /// The idea gate as an `Option` (Always/Site → None) — a source-compatible
-    /// view of the pre-wave-6 `gate: Option<IdeaId>` field, so `.map(..)` /
-    /// `.unwrap_or(..)` read the gate's band as before. @spec SIM-ECO-028
-    pub fn map<T>(self, f: impl FnOnce(IdeaId) -> T) -> Option<T> {
-        match self {
-            StructureGate::Idea(i) => Some(f(i)),
-            _ => None,
-        }
-    }
-}
-
-/// Source-compatible equality against the old `Option<IdeaId>` gate: an Idea
-/// gate equals `Some(idea)`, an Always gate equals `None`; a Site gate matches
-/// neither. @spec SIM-ECO-028
-impl PartialEq<Option<IdeaId>> for StructureGate {
-    fn eq(&self, other: &Option<IdeaId>) -> bool {
-        match (self, other) {
-            (StructureGate::Idea(a), Some(b)) => a == b,
-            (StructureGate::Always, None) => true,
-            _ => false,
-        }
-    }
-}
-
 /// The thirteen cosmic expedition sites, in ladder order (a site is reachable
 /// only once its predecessor is reached). Copy + Ord so a `BTreeSet<SiteId>`
 /// records reached sites in canonical order. @spec SIM-SKY-002
@@ -1794,7 +1769,12 @@ impl GameState {
                 _ => content::structure_def(s).energy_cons * count,
             };
         }
-        sum
+        // The Frugal Meadow reward (−2% per completion) and its twist (+10%
+        // while active) both flow through the EnergyConsumptionRatio key: the
+        // twist raises the draw, the reward lowers it, summed together. The
+        // effect is 1.0 (no change) with neither active — the common hot path.
+        // @spec SIM-ADV-005, SIM-ADV-002
+        sum * (1.0 + self.effect(crate::effects::Effect::EnergyConsumptionRatio)).max(0.0)
     }
 
     /// Brownout multiplier for production-stack layers 6–8:
@@ -1842,6 +1822,16 @@ impl GameState {
                 StructureId::YarnComputer => 2.0 * n + n * n / 2.0,
                 _ => def.energy_cons * n,
             };
+        }
+        // Frugal Meadow scales consumption through the EnergyConsumptionRatio key
+        // (twist raises, reward lowers) — kept byte-identical to
+        // energy_consumption(). Only Frugal Meadow ever touches this key, so the
+        // effect() sum is skipped entirely when it is neither active nor earned —
+        // the common hot path draws nothing extra. @spec SIM-ADV-005, SIM-ADV-002
+        if self.active_adventure == Some(AdventureId::FrugalMeadow)
+            || self.adventure_rewards[AdventureId::FrugalMeadow.ix()] != 0.0
+        {
+            cons *= (1.0 + self.effect(crate::effects::Effect::EnergyConsumptionRatio)).max(0.0);
         }
         let deficit = if cons <= EPSILON {
             1.0

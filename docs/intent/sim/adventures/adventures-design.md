@@ -52,6 +52,7 @@ Rewards stack across completions with per-reward LimitedDR caps (the inspiration
 ### Deferred
 1. A cosmic-tier Adventure (a long voyage) — lands with the cosmic wave.
 2. Whether completing all Adventures grants a capstone Tradition — a nice-to-have, decided after play.
+3. Long Winter's **Sunning-Deck summer-energy** reward half. The winter-catnip half ships through `SeasonResourceRatio(Winter, Catnip)`; the summer-energy half has no clean effect key yet (a per-season energy-production ratio) and is deferred until one lands.
 
 ## References
 

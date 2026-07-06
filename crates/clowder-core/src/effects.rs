@@ -79,6 +79,10 @@ pub enum Effect {
     EchoRefine,
     /// +% on Parade rainbow yield. @spec SIM-UNI-001
     ParadeRatio,
+    /// +% on the dreamcorn engine's dream-drift rate (dormant baseline — no
+    /// content grants it yet; keeps the SIM-UNI-007 formula honest). Summed like
+    /// any other key; contributes 0 until content lands. @spec SIM-UNI-007
+    DreamBoost,
     /// Dedicated per-colony standing bonus (dormant baseline). @spec SIM-TRADE-005
     StandingFor(ColonyId),
     // ---- Wave 5 (prestige / adventures) ----
@@ -312,7 +316,7 @@ impl GameState {
                 sum += tradition_effect(*t, key);
             }
         }
-        // 8. Adventure rewards (LimitedDR-capped, permanent). Only these four
+        // 8. Adventure rewards (LimitedDR-capped, permanent). Only these five
         // key shapes ever carry a reward, so every other (hot-path) key skips
         // the pool scan; then it is skipped again until a reward has been paid.
         // @spec SIM-ADV-005
@@ -322,13 +326,25 @@ impl GameState {
                 | Effect::EnergyConsumptionRatio
                 | Effect::SeasonResourceRatio(..)
                 | Effect::PounceRatio
-        ) && self.adventure_rewards.iter().any(|&x| x > 0.0)
+                | Effect::LongSunCapBonus
+        ) && self.adventure_rewards.iter().any(|&x| x != 0.0)
         {
             for a in AdventureId::ALL {
                 let def = content::adventure_def(a);
                 if def.reward_key == key {
-                    sum += limited_dr(self.adventure_rewards[a.ix()], def.reward_cap);
+                    // The pool may be negative (Frugal Meadow lowers
+                    // consumption); LimitedDR caps its magnitude, sign kept.
+                    let pool = self.adventure_rewards[a.ix()];
+                    sum += pool.signum() * limited_dr(pool.abs(), def.reward_cap);
                 }
+            }
+        }
+        // The Frugal Meadow twist raises energy consumption +10% while active —
+        // it flows through the same EnergyConsumptionRatio key the reward lowers,
+        // so both land in one summed multiplier. @spec SIM-ADV-002
+        if let Effect::EnergyConsumptionRatio = key {
+            if self.active_adventure == Some(AdventureId::FrugalMeadow) {
+                sum += content::FRUGAL_MEADOW_TWIST;
             }
         }
         // Promises: each kept (non-quiet) Promise grants its small global

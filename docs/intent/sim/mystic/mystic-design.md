@@ -35,12 +35,12 @@ Arches (economy structure, gated by the Parade Routes idea) are the Parade excha
 | 3 | Sky Arch | 125000 rainbows, 500 prisms | unicorns +50%; +0.00002 prism/t (a steady drift) |
 | 4 | Dreaming Arch | 500 shinies, 1M rainbows, 5000 prisms | unicorns +250%; starshard refine +5% |
 | 5 | Starlit Arch | 1250 shinies, 750k rainbows, 25000 prisms | unicorns +500%; starshard refine +10% |
-| 6 | Memory Arch | 2500 stardust, 50000 prisms | dream-drift +0.000001/t each (the dreamcorn engine) |
+| 6 | Memory Arch | 2500 stardust, 50000 prisms | turns the clowder's Rainbow Arches into the dreamcorn engine (enables dream-drift; the rate scales with Rainbow Arch structures built) |
 | 7 | Everdream Arch | 100 dreamcorns, 1000 cairns | Jars of Purrs cap +2 each; unlocks Jar condensing |
 
 ## Dreaming & Dreamcorns
 
-`dream_drift` accrues per tick from Memory Arches: `+0.000001 × arches × (1 + dream_boost)`, reduced ×0.25 while any dreamcorn is already dreaming (the inspiration's corruption self-throttle, softened) — *this is a slowdown of the drift rate, never a loss*. When `dream_drift ≥ 1`, one dreaming prism becomes a dreamcorn (`prisms −1, dreamcorns +1`), but **never the last prism** (a prism must stay awake to keep the dream going — the cozy floor). Dreamcorns are the softest, sleepiest resource; they are never consumed except by a Promise's upkeep, and even then they are only *kept asleep*, not spent away.
+The **Memory Arch upgrade** turns the clowder's Rainbow Arches into a dreamcorn engine: buying it *enables* dreaming, and the drift rate then **scales with the number of Rainbow Arch structures built**, so the engine grows as the player raises more arches. `dream_drift` accrues per tick as `+0.000001 × Rainbow Arch structures × (1 + dream_boost)`, reduced ×0.25 while any dreamcorn is already dreaming (the inspiration's corruption self-throttle, softened) — *this is a slowdown of the drift rate, never a loss*. When `dream_drift ≥ 1`, one dreaming prism becomes a dreamcorn (`prisms −1, dreamcorns +1`), but **never the last prism** (a prism must stay awake to keep the dream going — the cozy floor). Dreamcorns are the softest, sleepiest resource; they are never consumed except by a Promise's upkeep, and even then they are only *kept asleep*, not spent away.
 
 ## Promises to the Night Court
 
@@ -56,6 +56,7 @@ Condensing 10000 rainbows into 1 Jar of Purrs is the condensed-contentment curre
 |----------|--------|------------------------|-----------|
 | Parade exchange rate = arches | rainbows_per_parade scales with Arches built | Fixed rate; rate as an upgrade | The inspiration's ziggurat-count-as-tears-rate pattern; makes Arches doubly valuable (rate + upgrades) |
 | Dreaming has a floor | The last prism never sleeps | Allow full conversion | Cozy: something must stay awake to dream; also keeps a prism faucet alive |
+| Dreamcorn engine scales with Rainbow Arch structures | Memory Arch upgrade enables it; rate = per-arch drift × Rainbow Arch structure count | Flat rate gated on the once-bought Memory Arch upgrade | A once-bought flat trickle never grows, so reaching the dreamcorn endgame (Everdream Arch → Jar cap) took ~10× the design horizon; scaling with the buildable arch count makes the engine a build target that keeps pace with play |
 | Promises go quiet, never break | Suspend + auto-resume on upkeep | Permanent destruction (Fracture) | Tenet 1 — depth needs upkeep tension, not catastrophic permanent loss |
 | Jars from joy, not sorrow | Condense rainbows (contentment) | Keep the sorrow framing | The single darkest currency in the inspiration becomes the single sweetest here |
 

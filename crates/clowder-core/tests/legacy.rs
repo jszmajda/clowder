@@ -1031,6 +1031,177 @@ fn adventure_rewards_are_applied_through_effects_and_survive_a_move() {
     );
 }
 
+// A reward pool is inert on the effect key until it is EARNED, then it must
+// actually change simulated behavior — not merely grow the pool. The tests
+// below drive each consumer end to end.
+
+// @spec SIM-ADV-005
+#[test]
+fn quiet_retreat_reward_measurably_raises_spring_catnip() {
+    // A seasonal catnip source, measured in spring (fresh meadow, day 0).
+    let mut base = GameState::new(460);
+    grant(&mut base, StructureId::CatnipPatch, 1);
+    off_boundary(&mut base);
+    assert_eq!(base.season(), Season::Spring, "day 0 is spring");
+
+    // One Quiet Retreat completion → +5% spring catnip through the effect key.
+    let mut rewarded = base.clone();
+    rewarded.adventure_completions[AdventureId::QuietRetreat as usize] = 1;
+    rewarded.adventure_rewards[AdventureId::QuietRetreat as usize] = 0.05;
+    run_ticks(&mut base, 1);
+    run_ticks(&mut rewarded, 1);
+
+    let b = base.stock(ResourceId::Catnip);
+    let r = rewarded.stock(ResourceId::Catnip);
+    assert!(b > 0.0, "the patch produced catnip");
+    assert!((r - b * 1.05).abs() < TOL, "Quiet Retreat adds +5% spring catnip, got {r} vs {b}");
+
+    // A second completion stacks (still under the LDR cap): strictly more.
+    let mut twice = rewarded.clone();
+    twice.adventure_rewards[AdventureId::QuietRetreat as usize] = 0.10;
+    twice.resources[ResourceId::Catnip.ix()] = 0.0;
+    run_ticks(&mut twice, 1);
+    assert!(twice.stock(ResourceId::Catnip) > r, "rewards stack across completions");
+
+    // Out of season the spring reward does nothing: winter catnip is unchanged.
+    let mut winter_base = GameState::new(461);
+    grant(&mut winter_base, StructureId::CatnipPatch, 1);
+    winter_base.ticks = 76 * content::TICKS_PER_DAY; // deep winter
+    off_boundary(&mut winter_base);
+    assert_eq!(winter_base.season(), Season::Winter);
+    let mut winter_reward = winter_base.clone();
+    winter_reward.adventure_rewards[AdventureId::QuietRetreat as usize] = 0.05;
+    run_ticks(&mut winter_base, 1);
+    run_ticks(&mut winter_reward, 1);
+    assert!(
+        (winter_reward.stock(ResourceId::Catnip) - winter_base.stock(ResourceId::Catnip)).abs()
+            < TOL,
+        "a spring reward never touches winter catnip"
+    );
+}
+
+// @spec SIM-ADV-005
+#[test]
+fn long_winter_reward_measurably_raises_winter_catnip() {
+    let mut base = GameState::new(462);
+    grant(&mut base, StructureId::CatnipPatch, 1);
+    base.ticks = 76 * content::TICKS_PER_DAY; // deep winter
+    off_boundary(&mut base);
+    assert_eq!(base.season(), Season::Winter);
+
+    let mut rewarded = base.clone();
+    rewarded.adventure_rewards[AdventureId::LongWinter as usize] = 0.05;
+    run_ticks(&mut base, 1);
+    run_ticks(&mut rewarded, 1);
+
+    let b = base.stock(ResourceId::Catnip);
+    assert!(b > 0.0);
+    assert!(
+        (rewarded.stock(ResourceId::Catnip) - b * 1.05).abs() < TOL,
+        "Long Winter adds +5% winter catnip"
+    );
+}
+
+// @spec SIM-ADV-005, SIM-ADV-002
+#[test]
+fn frugal_meadow_reward_lowers_energy_and_its_twist_raises_it() {
+    // A single Yarn Computer draws 2n + n²/2 = 2.5 energy at n = 1.
+    let mut base = GameState::new(463);
+    grant(&mut base, StructureId::YarnComputer, 1);
+    let draw = base.energy_consumption();
+    assert!((draw - 2.5).abs() < TOL, "baseline consumption");
+
+    // The reward (−2% per completion, a NEGATIVE ratio, LDR-capped) lowers the
+    // draw. One completion adds reward_per (−0.02) to the pool.
+    let reward_per = content::adventure_def(AdventureId::FrugalMeadow).reward_per;
+    assert!(reward_per < 0.0, "the Frugal Meadow reward is a negative ratio");
+    let mut rewarded = base.clone();
+    rewarded.adventure_rewards[AdventureId::FrugalMeadow as usize] = reward_per;
+    let reward_delta = -limited_dr(reward_per.abs(), 0.02); // signed, LDR-capped
+    assert!(
+        (rewarded.energy_consumption() - draw * (1.0 + reward_delta)).abs() < TOL,
+        "Frugal Meadow lowers energy consumption"
+    );
+    assert!(rewarded.energy_consumption() < draw, "measurably lower");
+
+    // The twist (+10% while active) raises the draw through the same key.
+    let mut twisted = base.clone();
+    twisted.active_adventure = Some(AdventureId::FrugalMeadow);
+    assert!(
+        (twisted.energy_consumption() - draw * (1.0 + content::FRUGAL_MEADOW_TWIST)).abs() < TOL,
+        "the Frugal Meadow twist raises consumption +10%"
+    );
+
+    // Both together sum in one multiplier: +10% twist plus the (negative) reward.
+    let mut both = base.clone();
+    both.active_adventure = Some(AdventureId::FrugalMeadow);
+    both.adventure_rewards[AdventureId::FrugalMeadow as usize] = reward_per;
+    assert!(
+        (both.energy_consumption()
+            - draw * (1.0 + content::FRUGAL_MEADOW_TWIST + reward_delta))
+            .abs()
+            < TOL,
+        "twist and reward flow through one summed EnergyConsumptionRatio key"
+    );
+}
+
+// @spec SIM-ADV-005, SIM-KIT-020
+#[test]
+fn nap_time_reward_lifts_only_the_master_tier_yield() {
+    // A lone master-tier worker (≥ 9000 XP → +18.75%) producing twigs.
+    let mut base = GameState::new(464);
+    base.kittens.push(kitten("Sensei", 0));
+    base.kittens[0].job = Some(JobId::TwigCollector);
+    base.kittens[0].job_seq = Some(0);
+    base.kittens[0].skills[JobId::TwigCollector as usize] = 9000.0;
+    give(&mut base, ResourceId::Catnip, 100.0); // no shortfall → mood 1.0
+    off_boundary(&mut base);
+
+    let mut rewarded = base.clone();
+    rewarded.adventure_rewards[AdventureId::NapTime as usize] = 0.2; // one completion
+    run_ticks(&mut base, 1);
+    run_ticks(&mut rewarded, 1);
+
+    let b = base.stock(ResourceId::Twigs);
+    let r = rewarded.stock(ResourceId::Twigs);
+    assert!(b > 0.0);
+    // The master tier's +18.75% becomes 0.1875 × (1 + 0.2); lower tiers untouched.
+    let expected = (1.0 + 0.1875 * 1.2) / (1.0 + 0.1875);
+    assert!((r / b - expected).abs() < 1e-9, "Nap Time lifts the master-tier yield");
+
+    // A non-master worker (5000 XP → +12.5% tier) is unchanged by the reward.
+    let mut jr_base = GameState::new(465);
+    jr_base.kittens.push(kitten("Pupil", 0));
+    jr_base.kittens[0].job = Some(JobId::TwigCollector);
+    jr_base.kittens[0].job_seq = Some(0);
+    jr_base.kittens[0].skills[JobId::TwigCollector as usize] = 5000.0;
+    give(&mut jr_base, ResourceId::Catnip, 100.0);
+    off_boundary(&mut jr_base);
+    let mut jr_reward = jr_base.clone();
+    jr_reward.adventure_rewards[AdventureId::NapTime as usize] = 0.2;
+    run_ticks(&mut jr_base, 1);
+    run_ticks(&mut jr_reward, 1);
+    assert!(
+        (jr_reward.stock(ResourceId::Twigs) - jr_base.stock(ResourceId::Twigs)).abs() < TOL,
+        "the reward scales only the master tier, per KIT-020"
+    );
+}
+
+// @spec SIM-ADV-005
+#[test]
+fn silent_sun_reward_now_flows_through_the_long_sun_cap_key() {
+    // The Silent Sun reward was mapped to an unread key; it now raises the Long
+    // Sun cap through the real LongSunCapBonus effect.
+    let mut s = GameState::new(466);
+    assert!((s.effect(Effect::LongSunCapBonus) - 0.0).abs() < TOL, "no reward yet");
+    s.adventure_completions[AdventureId::SilentSun as usize] = 1;
+    s.adventure_rewards[AdventureId::SilentSun as usize] = 0.10;
+    assert!(
+        (s.effect(Effect::LongSunCapBonus) - 0.10).abs() < TOL,
+        "a Silent Sun completion raises the Long Sun cap"
+    );
+}
+
 // =====================================================================
 // SIM-ENG-021 REVISED — Elder Wisdom (layer 7) & Long Sun (layer 8) are
 // real production multipliers, both dimmed by the energy deficit

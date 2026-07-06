@@ -398,6 +398,18 @@ impl GameState {
             1.0
         };
         let mess_catnip = self.mess_catnip_factor();
+        // Adventure rewards (Quiet Retreat / Long Winter seasonal catnip; Nap
+        // Time master-skill multiplier) flow through the effect-key system and
+        // are LimitedDR-capped. A single array scan gates both, so the hot path
+        // (no rewards earned) draws nothing: the seasonal multiply is skipped
+        // and the master multiplier stays 1.0 with no effect() sum.
+        // @spec SIM-ADV-005
+        let season_reward = self.adventure_rewards.iter().any(|&x| x != 0.0);
+        let master_mult = if season_reward {
+            1.0 + self.effect(crate::effects::Effect::MasterSkillMultiplier)
+        } else {
+            1.0
+        };
 
         // ---- Structures (☆ layers only) ----
         for s in StructureId::ALL {
@@ -442,6 +454,12 @@ impl GameState {
                 if *r == ResourceId::Catnip {
                     // @spec SIM-ECO-038
                     flow *= mess_catnip;
+                }
+                // Per-season, per-resource Adventure reward (Quiet Retreat +spring
+                // catnip, Long Winter +winter catnip). @spec SIM-ADV-005
+                if season_reward {
+                    flow *= 1.0
+                        + self.effect(crate::effects::Effect::SeasonResourceRatio(season, *r));
                 }
                 self.resources[r.ix()] += flow;
             }
@@ -495,7 +513,7 @@ impl GameState {
                 }
                 let mut per = per_worker
                     * job_ratio
-                    * (1.0 + content::skill_tier_bonus(k.skills[j as usize]));
+                    * (1.0 + content::skill_tier_bonus_scaled(k.skills[j as usize], master_mult));
                 if self.elder == Some(ix) {
                     per *= ((k.rank as f64 + 1.0) / content::ELDER_RANK_DIVISOR).max(1.0);
                 }
@@ -514,6 +532,12 @@ impl GameState {
             }
             if r == ResourceId::Catnip {
                 flow *= mess_catnip;
+            }
+            // Per-season, per-resource Adventure reward (Quiet Retreat +spring
+            // catnip, Long Winter +winter catnip) reaches job output too.
+            // @spec SIM-ADV-005
+            if season_reward {
+                flow *= 1.0 + self.effect(crate::effects::Effect::SeasonResourceRatio(season, r));
             }
             // Nap Time halves every job's output (structures are untouched).
             // @spec SIM-ADV-002
@@ -800,9 +824,12 @@ impl GameState {
         }
     }
 
-    /// Per-tick dreaming: dream-drift accrues from Memory Arches (throttled
-    /// ×0.25 while any dreamcorn already dreams); at ≥ 1 a prism naps into a
-    /// dreamcorn — never the last prism. A Sky Arch adds a steady prism drift.
+    /// Per-tick dreaming: the Memory Arch upgrade turns the clowder's Rainbow
+    /// Arch *structures* into a dreamcorn engine — dream-drift accrues per tick
+    /// as 0.000001 × Rainbow Arch structures × (1 + dream-boost effects),
+    /// throttled ×0.25 while any dreamcorn already dreams; at ≥ 1 a prism naps
+    /// into a dreamcorn — never the last prism. A Sky Arch adds a steady prism
+    /// drift.
     // @spec SIM-UNI-007, SIM-UNI-008
     fn dream_step(&mut self) {
         use crate::state::ArchId;
@@ -812,15 +839,20 @@ impl GameState {
         if self.arches_bought.contains(&ArchId::SkyArch) {
             self.resources[ResourceId::Prisms.ix()] += content::SKY_ARCH_PRISM_DRIFT;
         }
+        // The Memory Arch upgrade ENABLES the engine; the drift RATE scales with
+        // the buildable Rainbow Arch structure count, so the engine grows as the
+        // player raises more arches (not a flat once-bought trickle).
         if !self.arches_bought.contains(&ArchId::MemoryArch) {
             return;
         }
+        let arches = self.structures[StructureId::RainbowArch.ix()] as f64;
         let throttle = if self.stock(ResourceId::Dreamcorns) > EPSILON {
             content::DREAM_DRIFT_THROTTLE
         } else {
             1.0
         };
-        self.dream_drift += content::DREAM_DRIFT_PER_ARCH * throttle;
+        let boost = 1.0 + self.effect(crate::effects::Effect::DreamBoost);
+        self.dream_drift += content::DREAM_DRIFT_PER_ARCH * arches * boost * throttle;
         // A prism must stay awake to keep the dream going (the cozy floor).
         while self.dream_drift >= 1.0 && self.stock(ResourceId::Prisms) >= 2.0 - EPSILON {
             self.dream_drift -= 1.0;

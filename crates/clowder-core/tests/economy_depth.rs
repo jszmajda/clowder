@@ -25,7 +25,10 @@ fn idea_band(i: IdeaId) -> u32 {
 
 /// A structure's band is the band of its gate idea; ungated = band 0.
 fn structure_band(s: StructureId) -> u32 {
-    content::structure_def(s).gate.map(idea_band).unwrap_or(0)
+    match content::structure_def(s).gate {
+        StructureGate::Idea(i) => idea_band(i),
+        _ => 0,
+    }
 }
 
 /// The crafted resource each recipe outputs (1:1 by the RES/CRAFT tables).
@@ -209,12 +212,12 @@ fn structure_table_spot_anchors_across_bands() {
     let d = content::structure_def(StructureId::HerbGarden);
     assert_eq!(d.base_costs, &[(ResourceId::Pebbles, 60.0)]);
     assert_eq!(d.ratio, 1.12);
-    assert_eq!(d.gate, Some(IdeaId::Horticulture));
+    assert_eq!(d.gate, StructureGate::Idea(IdeaId::Horticulture));
 
     let d = content::structure_def(StructureId::Hearth);
     assert_eq!(d.base_costs, &[(ResourceId::Pebbles, 45.0), (ResourceId::Twigs, 25.0)]);
     assert_eq!(d.ratio, 1.15);
-    assert_eq!(d.gate, Some(IdeaId::Emberkeeping));
+    assert_eq!(d.gate, StructureGate::Idea(IdeaId::Emberkeeping));
 
     // Band 1.
     let d = content::structure_def(StructureId::StargazingLedge);
@@ -228,7 +231,7 @@ fn structure_table_spot_anchors_across_bands() {
         ]
     );
     assert_eq!(d.ratio, 1.10);
-    assert_eq!(d.gate, Some(IdeaId::SkyCharts));
+    assert_eq!(d.gate, StructureGate::Idea(IdeaId::SkyCharts));
 
     let d = content::structure_def(StructureId::Porch);
     assert_eq!(
@@ -236,7 +239,7 @@ fn structure_table_spot_anchors_across_bands() {
         &[(ResourceId::Tiles, 40.0), (ResourceId::Badges, 60.0), (ResourceId::Lattices, 4.0)]
     );
     assert_eq!(d.ratio, 1.15);
-    assert_eq!(d.gate, Some(IdeaId::PorchLogistics));
+    assert_eq!(d.gate, StructureGate::Idea(IdeaId::PorchLogistics));
 
     let d = content::structure_def(StructureId::TeaHouse);
     assert_eq!(
@@ -249,7 +252,7 @@ fn structure_table_spot_anchors_across_bands() {
         ]
     );
     assert_eq!(d.ratio, 1.5, "a deliberate wall");
-    assert_eq!(d.gate, Some(IdeaId::TeaCeremonies));
+    assert_eq!(d.gate, StructureGate::Idea(IdeaId::TeaCeremonies));
 
     // Band 2.
     let d = content::structure_def(StructureId::Kiln);
@@ -258,7 +261,7 @@ fn structure_table_spot_anchors_across_bands() {
         &[(ResourceId::Moonstone, 4.0), (ResourceId::Dew, 150.0), (ResourceId::Brass, 30.0)]
     );
     assert_eq!(d.ratio, 1.15);
-    assert_eq!(d.gate, Some(IdeaId::CeramicArts));
+    assert_eq!(d.gate, StructureGate::Idea(IdeaId::CeramicArts));
 
     // Band 3.
     let d = content::structure_def(StructureId::DynamoWheel);
@@ -267,18 +270,18 @@ fn structure_table_spot_anchors_across_bands() {
         &[(ResourceId::Cogs, 4.0), (ResourceId::Moonsteel, 8.0), (ResourceId::Schemes, 1.0)]
     );
     assert_eq!(d.ratio, 1.25);
-    assert_eq!(d.gate, Some(IdeaId::Dynamos));
+    assert_eq!(d.gate, StructureGate::Idea(IdeaId::Dynamos));
 
     let d = content::structure_def(StructureId::YarnComputer);
     assert_eq!(d.base_costs, &[(ResourceId::Stardust, 30.0), (ResourceId::Curiosity, 60000.0)]);
     assert_eq!(d.ratio, 1.15);
-    assert_eq!(d.gate, Some(IdeaId::YarnComputing));
+    assert_eq!(d.gate, StructureGate::Idea(IdeaId::YarnComputing));
 
     // Band 0 wall (mystic-priced).
     let d = content::structure_def(StructureId::UnicornMeadow);
     assert_eq!(d.base_costs, &[(ResourceId::Unicorns, 2.0)]);
     assert_eq!(d.ratio, 1.75);
-    assert_eq!(d.gate, Some(IdeaId::UnicornLore));
+    assert_eq!(d.gate, StructureGate::Idea(IdeaId::UnicornLore));
 
     // Gate behavior: locked until the idea, unlocked after.
     let mut s = GameState::new(108);

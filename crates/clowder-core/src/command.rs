@@ -115,7 +115,9 @@ pub enum CommandError {
 
 impl GameState {
     /// Apply a command between ticks. All-or-nothing: a rejected command has
-    /// mutated nothing, RNG included. Commands never draw randomness.
+    /// mutated nothing, RNG included. An ACCEPTED command may draw randomness
+    /// (Pounce, Trade, ScoutPicnic, DeepNap do); a REJECTED command never draws.
+    /// Determinism holds because every draw goes through the single ordered RNG.
     // @spec SIM-ENG-005
     pub fn apply(&mut self, cmd: Command) -> Result<Vec<Event>, CommandError> {
         match cmd {

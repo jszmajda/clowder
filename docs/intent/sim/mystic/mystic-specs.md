@@ -15,7 +15,7 @@
 
 - [x] **SIM-UNI-006**: At each day boundary, the system shall roll a prism descent with probability equal to the summed prism-descent effects (0.02%/day per Rainbow Arch structure, plus Arch-upgrade bonuses), adding one prism on success, in the fixed random-event draw order.
 - [x] **SIM-UNI-011**: When the Parade Routes idea is researched, the system shall grant one Rainbow Arch structure free (so Parades yield rainbows and prisms can descend without a bootstrap deadlock).
-- [x] **SIM-UNI-007**: The system shall accrue dream-drift per tick as 0.000001 × Memory Arches × (1 + dream-boost effects), multiplied by 0.25 while any dreamcorn already exists; when dream-drift reaches 1 it shall reset by 1 and turn one prism into one dreamcorn — never the last prism.
+- [x] **SIM-UNI-007**: While the Memory Arch upgrade is owned (which enables the dreamcorn engine), the system shall accrue dream-drift per tick as 0.000001 × Rainbow Arch structures × (1 + dream-boost effects), multiplied by 0.25 while any dreamcorn already exists; when dream-drift reaches 1 it shall reset by 1 and turn one prism into one dreamcorn — never the last prism.
 - [x] **SIM-UNI-008**: The system shall never reduce the dreamcorn stock except as a Promise's daily upkeep, and dreaming shall never delete a prism below one.
 
 ## Promises

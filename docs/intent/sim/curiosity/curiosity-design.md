@@ -173,7 +173,7 @@ Effects are **flags and modifier values exposed by pure lookup** (`ideas.has(Ide
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
-| Tree shape | Banded ladder with short forks — 57 ideas over five bands, each band gated by the previous band's crafted currency | Wide branching tree; flat shop | Bands make every idea a visible milestone while gate crafts turn research into an infrastructure problem, not a wait |
+| Tree shape | Banded ladder with short forks — 59 ideas over five bands, each band gated by the previous band's crafted currency | Wide branching tree; flat shop | Bands make every idea a visible milestone while gate crafts turn research into an infrastructure problem, not a wait |
 | Effects as flags/lookups | Pure `has(idea)` + derived modifiers | Event-driven effect application, direct state mutation on research | Idempotent under save/load and catch-up; no ordering bugs; each owning leaf keeps its own math legible |
 | Ideas are permanent | No respec, no disable | Respec mechanic | Nothing the player earns is ever taken (Tenet 1); respec adds decision anxiety to a cozy game |
 | Cost curve | 15 → 300,000 across bands, roughly ×1.4 steps within a band, gate crafts escalating between bands | Flat costs; steeper exponential | Within-band steps stay session-scale; between-band jumps are infrastructure projects |

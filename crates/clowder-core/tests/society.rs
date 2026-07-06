@@ -22,7 +22,10 @@ fn idea_band(i: IdeaId) -> u32 {
 
 /// A structure's band is the band of its gate idea; ungated = band 0.
 fn structure_band(s: StructureId) -> u32 {
-    content::structure_def(s).gate.map(idea_band).unwrap_or(0)
+    match content::structure_def(s).gate {
+        StructureGate::Idea(i) => idea_band(i),
+        _ => 0,
+    }
 }
 
 /// Step off the day boundary and quiet any adoption-day zoomies so a single
