@@ -105,7 +105,7 @@ Every actionable thing is a row. Row anatomy (one aligned line):
 
 `▸` cursor · availability marker · flavor name · owned count · next cost. Markers are **glyph-first, color-second** (CVD-safe): `●` affordable now, `◐` partially affordable, `○` revealed but not affordable, `✓` owned/done for one-shots. `Availability::Teased` rows render dim *with* their marker; Hidden content is absent.
 
-**Repeat:** the cursor does not move on action, so holding `Enter` repeats via terminal key-repeat — but the shell **rate-limits repeated Enter to ~10/second** so behavior is uniform across machines (not hostage to the OS key-repeat rate).
+**Repeat:** the cursor does not move on action, so holding `Enter` repeats via terminal key-repeat — but the shell **rate-limits repeated Enter to ~10/second** so behavior is uniform across machines (not hostage to the OS key-repeat rate). Repeat is for ordinary rows only: a heavy row's second Enter must be a *distinct* press, so a held key arms and stops there (TUI-NAV-051). Auto-repeat is a machine typing, not a player deciding, and the armed-row pattern exists precisely to make the deciding press deliberate — letting key-repeat satisfy it would defeat the whole mechanism at 10 commits per second. For the same reason `x` and `X` never reach a heavy row at all.
 
 **×N:** `x` opens a count prompt that captures digits and live-previews total cost; `Enter` fires the command N times, or passes N where the command takes a count (`Pounce(n)`, `Trade(c, n)`, `DeepNap(n)`).
 
@@ -134,7 +134,7 @@ Always on screen, at every size:
 
 **The two-second glance contract.** The header's attention-chip cluster is empty when nothing waits. Chips are curated *opportunities*, never obligations, each rendered glyph + count + word (triple-channel, CVD-safe):
 
-- `◦N idle` — kittens with no job (free production you're leaving on the table)
+- `◦N idle` — kittens with no job *who are in the meadow to be assigned* (free production you're leaving on the table); a kitten visiting the neighbour's yard is not counted, because the chip would then ask for an action the player cannot take
 - `!sky` — an observable sky-event window is open (act with `o`; expires harmlessly)
 - `★N new` — content revealed since you last looked (clears on visiting)
 - `~away` — an unread "while you were away" report waits (clears on reading)
@@ -164,13 +164,14 @@ The first time a count-taking row is focused, the hint bar surfaces `x amount` �
 ## Event Log & Offline Report
 
 - **Ticker + Journal.** Typed `Event`s render into one dim ticker line (or a strip when wide). `e` opens the Journal overlay: full scrollback, `↑↓`/`j`/`k` scroll, `[`/`]` by day, Esc closes. Flavor events are quieter (dim, `·` prefix) than mechanical ones (`▪`); milestones get `★`. Nothing flashes, blocks, or expires unseen — the Journal keeps it all.
-- **Offline report.** On load, `OfflineReport` renders as (a) a one-line banner under the tab bar — reverse-video, not color-only: `~ while you were away (2d 4h): +12.4k catnip, 3 kittens arrived · e for the tale · Esc dismiss` — and (b) a pinned Journal entry with the full folded detail. The banner dismisses on Esc or first navigation and demands nothing; the pinned entry means dismissing loses nothing. A `truncated` report renders as gentle flavor. `Event::Napped` reports reuse the same path — one mechanism for "time passed in bulk."
+- **Offline report.** On load, `OfflineReport` renders as (a) a one-line banner under the tab bar — reverse-video, not color-only: `~ while you were away (2d 4h): +12.4k catnip, 3 kittens arrived · e for the tale · Esc dismiss` — and (b) a pinned Journal entry with the full folded detail. The one line is *curated*, not a summary of the whole struct: elapsed span, the largest resource gains, and arrivals. Wanderings and other absences live in the pinned entry, where they are stated as what they are — a visit that reverses on its own, never a loss or a count going down. The banner is the first thing a returning player sees, so it leads with what grew. The banner dismisses on Esc or first navigation and demands nothing; the pinned entry means dismissing loses nothing. A `truncated` report renders as gentle flavor. `Event::Napped` reports reuse the same path — one mechanism for "time passed in bulk."
 
 ## Edge Cases
 
 - **80×24 (floor):** header 1 + tabs 1 + body 19 (sidebar ~26 | list ~54) + ticker 1 + hints 1. The inspector becomes Space-toggled; the log becomes a 1-line ticker; the offline banner replaces the group-header line when present. Everything stays reachable; degradation removes *simultaneity*, never capability. Below 80×24, render a calm "this pane is too cozy — 80×24 needed" card; the sim ticks regardless.
 - **Very wide (~120+):** three columns — sidebar | list (capped ~60 cols for scannability) | inspector (rest). Extra width feeds the inspector and log.
 - **Resize:** layout is a pure function of terminal size, recomputed per frame with breakpoints near 100 and 130 cols; cursor, per-screen memory, armed state, and open overlays survive resize (an armed row that no longer fits re-renders compact, still armed).
+- **Keys inside a full-screen overlay:** the Journal and help overlays take the cursor, section, and action keys for their own navigation, suspending those global meanings while open. The speed keys, `q`, `Ctrl-C`, and `Esc` stay live — retiming the sim, leaving, and closing must work from anywhere, and all four are safe wherever they land. (The count prompt and the palette field differ: they capture *all* printable input, which is what stops a digit from jumping sections mid-type.)
 - **Esc under tmux `escape-time`:** Esc *only* closes the topmost transient; on a bare screen it is a no-op. No Esc-prefixed sequences exist anywhere, so escape-time coalescing can never form a phantom binding, and a late Esc can at worst close an overlay — never act, quit, or lose anything. Quit is `q` or Ctrl-C; both save.
 
 ## Resolved Edge Cases
@@ -198,7 +199,7 @@ The shell renders from existing surface except for these read-only additions, wh
 
 1. **`net_rate(ResourceId) -> f64`** — net per-second at current state (production stack minus consumption). Powers sidebar rates and the inspector's time-to-afford. This math currently lives only inside `tick()`.
 2. **`lock_reason(content) -> LockReason`** (or equivalent) — the plain "why locked" per content kind. The shell *can* read `prereqs`/`gate`/`StructureGate`, but a core query keeps the rule logic core-side.
-3. **Availability coverage** — `ContentId` spans only `Structure | Idea`; crafts, rites, arches, refinements, rules, traditions, looms rely on per-kind `*_unlocked` booleans with no Teased tier. Either extend `ContentId`/`availability()` to those kinds, or document that non-Structure/Idea kinds are two-state (absent/available) so the shell has one consistent answer.
+3. **Availability coverage** — `ContentId` spans only `Structure | Idea`; crafts, rites, arches, refinements, rules, traditions, looms rely on per-kind `*_unlocked` booleans with no Teased tier. Either extend `ContentId`/`availability()` to those kinds, or document that non-Structure/Idea kinds are two-state (absent/available). The shell's side is already pinned: it renders exactly what the core reports and invents no state the core did not give it (TUI-NAV-053), so whichever way the sim leaves resolve this, the shell needs no branch of its own.
 4. **`max_affordable(...) -> u32`** (optional) — lets `X` and the hint bar name a closed-form count; without it, `X` loops-until-error under a cap.
 
 ## Decisions & Alternatives
@@ -209,7 +210,7 @@ The shell renders from existing surface except for these read-only additions, wh
 | Section addressing | Digits `1`–`0`, statically pre-assigned | Unlock-order numbering; letter-per-tab; Tab-cycling only | Static map kills the renumbering hazard forever; cycling alone is O(n) travel |
 | Modifier substitute | Uppercase as the shift tier (`x`→`X`) | Chord emulation | Shift emits plain printable chars — tmux-safe by construction |
 | Count entry | `x` prompt captures digits; `X` = max | Vim count-prefix (`10Enter`) | Prefix digits collide with section jumps, the higher-value use |
-| Repeat | Hold Enter, cursor stays; **rate-limited to ~10/s** | OS key-repeat verbatim; a `.` repeat key | Uniform across machines; no new concept (player choice: rate-limit) |
+| Repeat | Hold Enter, cursor stays; **rate-limited to ~10/s**; never reaches a heavy row | OS key-repeat verbatim; a `.` repeat key; letting repeat commit an armed row | Uniform across machines; no new concept (player choice: rate-limit). Repeat must stop at arming, or holding Enter on the heaviest row in the game commits it in a tenth of a second — the confirm exists to make that press deliberate |
 | hjkl | Full hjkl — h/l section prev/next, j/k cursor | j/k only; none | Player's choice; arrows/Tab still work, so nothing depends on the letters |
 | Big-action confirm | Inline armed-row, second Enter, auto-disarm ~8s | Blocking modal; type-the-word; long-press | Modal violates idle-respect; terminals have no key-release for long-press; the armed row shows real consequences and expires harmlessly |
 | Quit | `q` quits instantly (saves first) | `q` + confirming Enter | Quitting is always safe (autosave + offline accrual); a confirm is ceremony (player's choice) |
@@ -225,9 +226,8 @@ The shell renders from existing surface except for these read-only additions, wh
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. Palette matching — substring (predictable) vs. fuzzy (faster, occasionally surprising). Defaulting to **substring** unless play argues otherwise.
-2. The Journal's retention (unbounded scrollback vs. a cap) — decide once the event volume of a real long game is observable.
-3. Exact widths/breakpoints and per-screen list groupings — refined in the `render` leaf against a real terminal.
+1. The Journal keeps every event (TUI-NAV-026) — nothing expires unseen. What is deferred is *how*: whether months of play need a compaction or on-disk strategy behind that guarantee, decided once the event volume of a real long game is observable. The guarantee does not move; the storage behind it might.
+2. Exact widths/breakpoints and per-screen list groupings — refined in the `render` leaf against a real terminal.
 
 ## References
 
