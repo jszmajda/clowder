@@ -34,7 +34,7 @@ The loop is the sim's clock at the boundary (the HLD's "shell drives ticks" deci
 |---|---|---|
 | `navigation/` | `TUI-NAV` | The input model, key map, section/tab navigation, the action model (select/act/repeat/bulk/confirm), the inspector, glanceability chrome, discoverability, and the event-log/offline-report surfacing — the whole UX grammar |
 | `runtime/` | `TUI-RUN` | Terminal lifecycle (raw mode, alt screen, panic-safe restore), the event loop, the tick accumulator and the two clocks behind it, autosave cadence, save-path resolution, load-failure policy |
-| `theme/` (later) | `TUI-THEME` | The truecolor palette, per-tier resource colors, the CVD-safe glyph+color channel discipline, light/dark posture |
+| `theme/` | `TUI-THEME` | The truecolor palette, what colour is allowed to mean, the CVD-safe glyph+colour channel discipline, the contrast floor, and the posture toward light and dark terminals |
 | `render/` (later) | `TUI-RENDER` | Widget layout, the responsive breakpoints, per-screen rendering, the frame budget |
 
 `navigation` is designed first because the UX is the part the player lives in and it constrains everything else; `runtime` second because nothing runs without it and its time model is what makes the HLD's idle-respect tenet true in practice.
