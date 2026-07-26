@@ -21,6 +21,10 @@
 ## Events
 
 - [x] **SIM-ENG-009**: The system shall report simulation occurrences as typed events (carrying names, ids, and values — never prose) returned from tick() and from command application.
+- [ ] **SIM-ENG-026**: The system shall classify every event as flavor, mechanical, or milestone and expose that classification as a query on the event, so a consumer can rank an event's prominence without encoding rules about which event is which.
+- [ ] **SIM-ENG-027**: The system shall retain an event journal in game state holding a bounded rolling window of the most recent entries plus every milestone entry permanently, each entry carrying the tick at which it occurred so entries can be grouped by day.
+- [ ] **SIM-ENG-028**: The system shall append events to the journal when they arise from a live tick or an applied command, and shall not append events arising from catch-up replay — a long absence is recorded as its folded report, never as its millions of constituent events.
+- [ ] **SIM-ENG-029**: When the rolling window is full, the system shall evict its oldest non-milestone entry, so growth is bounded without ever discarding a milestone.
 - [x] **SIM-ENG-010**: The system shall emit a KittenMood event only when the mood tier changes (tiers defined in SIM-KIT; entering or leaving Grumpy is a tier change).
 
 ## Zoomies

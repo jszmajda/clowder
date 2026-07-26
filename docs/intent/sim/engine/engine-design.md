@@ -90,6 +90,14 @@ pub fn tick(state: &mut GameState) -> Vec<Event>;
 - `KittenMood { mood }` — emitted only on mood-tier transitions (content, not spam)
 - `Flavor { template_id, kitten: Option<name> }` — pure-delight events with no mechanical effect; templates are content-table entries the shell renders
 
+Every event carries a **classification** — flavor, mechanical, or milestone. It is a property of the vocabulary rather than a judgement the consumer makes: deciding that reaching a new site matters more than a job reassignment is a rule about the game, and a shell that made that call itself would be encoding game rules in the frontend. The classification is what lets a display rank prominence, and what lets the journal below decide what it may never evict.
+
+## The Journal
+
+`GameState` carries an event journal, because the events a player has lived through are part of their game and should survive closing the terminal. It holds a **bounded rolling window** of the most recent entries plus **every milestone entry, permanently**; each entry carries the tick at which it occurred, so a reader can group by day. When the window is full, the oldest non-milestone entry is evicted — growth is bounded, and the moments worth remembering are never what gets dropped.
+
+**Catch-up replay does not append.** A year-long absence replays millions of ticks, and recording their events would write an enormous save and slow every load — the exact costs the persistence leaf's replay budget exists to prevent. Replay already folds into an `OfflineReport`; that summary is what enters the journal, and the constituent events are discarded as they always were. Live ticks and applied commands append; replay does not. This is what keeps a journal in the save file affordable.
+
 ## Random Events
 
 Drawn in pipeline phase 5, at day boundaries, from the state RNG. The complete RNG draw schedule on a boundary tick is fixed: arrival roll (phase 1d — skipped entirely, no draw, when pity forces the arrival or the check is ineligible) → zoomies expiry check (no draw; per-tick, `ticks ≥ zoomies_until`) → zoomies start roll → flavor roll → flavor template draw → flavor kitten draw (the last two only when the preceding roll fired). Zoomies may restart on the same boundary tick they expired (expiry is checked first), and may start or run while the clowder is Grumpy — the multipliers stack (0.25 × zoomies), which is intended: zoomies shorten famines, and taking them away from a grumpy clowder would be anti-cozy.
@@ -112,6 +120,9 @@ Same seed + same command sequence applied at the same tick counts ⇒ bit-identi
 | Command atomicity | All-or-nothing, error enum | Partial application, panics | Shell can render precise "why not" hints; sim state can't half-change |
 | RNG | PCG-32, hand-rolled, serialized with state | `rand` crate StdRng, reseeding on load | Stable serde round-trip across versions; ~30 lines; reseeding on load would break catch-up determinism |
 | Events carry data, tier-gated | Typed enum; mood emitted on transitions only | Emit-every-tick, string messages in core | Tests assert on events; transition-gating keeps a week's catch-up report bounded |
+| Event history | Bounded ring in `GameState` + permanent milestones | Shell-owned session history; unbounded log; milestones only | History in the save survives a quit, which is what makes a report the player hasn't read safe; unbounded turns every autosave into a growing rewrite over a months-long game |
+| Event classification | A property of the event vocabulary, queryable | The shell decides which events are prominent | "This moment matters" is a rule about the game; a shell deciding it would hold game knowledge the split forbids |
+| Replay and the journal | Replay events fold into the report and never append | Append replay events like any other | A year of replay is millions of events; appending them would blow up the save and the load budget in one step |
 | Daily randomness cadence | Random events roll at day boundaries only | Per-tick probabilities | Fewer RNG draws keeps catch-up fast and probabilities legible ("8%/day", not "0.0083%/tick") |
 
 ## Open Questions & Future Decisions
@@ -120,7 +131,6 @@ Same seed + same command sequence applied at the same tick counts ⇒ bit-identi
 1. ✅ Zoomies frequency: daily 4% ≈ once per 25 game-days (about once a season) — frequent enough to delight, rare enough to feel like an event.
 
 ### Deferred
-1. Event-log ring buffer in core (for a TUI history pane) vs. shell-owned history — decide in the TUI segment; core returning `Vec<Event>` doesn't foreclose either.
 
 ## References
 

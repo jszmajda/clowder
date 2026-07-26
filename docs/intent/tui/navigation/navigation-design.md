@@ -225,9 +225,11 @@ The shell renders from existing surface except for these read-only additions, wh
 
 ## Open Questions & Future Decisions
 
+### Resolved
+1. ✅ **Journal retention.** The journal is saved state, so it survives closing the game — which is what makes a report the player never got to read safe. It keeps a bounded rolling window of recent events plus every milestone and report permanently; the core owns the ring and the eviction rule (SIM-ENG-027, SIM-ENG-029). Unbounded retention was the alternative, and it turns every autosave of a months-long game into a growing rewrite.
+
 ### Deferred
-1. The Journal keeps every event (TUI-NAV-026) — nothing expires unseen. What is deferred is *how*: whether months of play need a compaction or on-disk strategy behind that guarantee, decided once the event volume of a real long game is observable. The guarantee does not move; the storage behind it might.
-2. Exact widths/breakpoints and per-screen list groupings — refined in the `render` leaf against a real terminal.
+1. Exact widths/breakpoints and per-screen list groupings — refined in the `render` leaf against a real terminal.
 
 ## References
 

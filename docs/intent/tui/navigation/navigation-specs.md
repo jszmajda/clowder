@@ -60,7 +60,8 @@
 
 ## Events & Offline Report
 
-- [ ] **TUI-NAV-026**: The system shall render typed events into a dim ticker (flavor events quieter than mechanical ones, milestones marked) and, on e, a scrollable Journal overlay retaining full scrollback; no event shall flash, block, or expire unseen.
+- [ ] **TUI-NAV-026**: The system shall render typed events into a dim ticker and, on e, a scrollable Journal overlay over the retained journal — the recent-event window plus every milestone and report the core has kept — which survives closing and reopening the game; no event shall flash, block, or expire unseen while it is retained.
+- [ ] **TUI-NAV-057**: The system shall rank an event's prominence from the classification the core supplies — flavor quieter than mechanical, milestones marked — and shall not decide from the event's identity which tier it belongs to.
 - [ ] **TUI-NAV-027**: On load, the system shall present the OfflineReport as a non-blocking one-line banner (dismissed on Esc or first navigation) and as a pinned Journal entry with the full folded detail, so dismissing the banner loses nothing; a Napped report reuses the same path.
 - [ ] **TUI-NAV-050**: When more than one bulk-time report is unread, the system shall queue their banners newest-first while pinning every one as its own Journal entry, so no report is displaced unseen.
 - [ ] **TUI-NAV-055**: The system shall fill the offline banner's one line with the elapsed span, the largest resource gains, and any kittens who arrived, and shall leave departures and absences to the pinned Journal entry — so the glance the player returns to leads with what grew, never with what left.

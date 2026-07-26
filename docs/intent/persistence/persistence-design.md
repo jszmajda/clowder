@@ -21,7 +21,7 @@ JSON via serde, pretty-printed (hand-rescuable with a text editor and `jq`):
 }
 ```
 
-- `save_version` — integer schema version, currently **2**. Loading a *newer* version than the binary knows fails with a clear error (never guess forward). Loading an *older* version walks migrations in sequence. **v1 → v2**: fields added by the depth expansion (speed, and each wave's new state blocks) receive their new-game defaults; a v1 save loads into a valid v2 state with its meadow exactly as it was. Migration fidelity is tested against a committed v1 fixture file.
+- `save_version` — integer schema version, currently **3**. Loading a *newer* version than the binary knows fails with a clear error (never guess forward). Loading an *older* version walks migrations in sequence. **v1 → v2**: fields added by the depth expansion (speed, and each wave's new state blocks) receive their new-game defaults; a v1 save loads into a valid v2 state with its meadow exactly as it was. **v2 → v3**: the event journal arrives empty — a save written before the journal existed holds no history to recover, and an empty journal is the honest representation of that. Migration fidelity is tested against a committed fixture file per prior version.
 - `saved_at_unix` — wall-clock seconds at save, supplied by the caller; the basis for catch-up.
 - Default location: the platform data directory (`directories` crate) + `clowder/save.json`; every IO function takes an explicit path so tests and the shell can redirect.
 
