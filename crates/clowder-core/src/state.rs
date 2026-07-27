@@ -318,7 +318,7 @@ impl DreamLoomId {
 }
 
 // @spec SIM-ECO-040, SIM-ECO-041, SIM-ECO-042, SIM-ECO-043
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum JobId {
     Gardener,
     TwigCollector,
@@ -913,10 +913,36 @@ pub enum MoodTier {
 }
 
 /// One id space across every kind of revealable content.
+///
+/// Two kinds are *reveal-tracked*: they climb the cost-fraction ladder of
+/// SIM-ENG-023 and their reveals persist in `revealed`. The rest carry no
+/// ladder and answer with the two states they have. New variants are appended
+/// rather than inserted: `revealed` is a `BTreeSet<ContentId>` whose iteration
+/// order reaches the save bytes, and derived `Ord` follows declaration order,
+/// so inserting a variant ahead of `Structure` or `Idea` would reorder every
+/// existing save. @spec SIM-ENG-032
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ContentId {
     Structure(StructureId),
     Idea(IdeaId),
+    Craft(CraftId),
+    Job(JobId),
+    Rite(RiteId),
+    Arch(ArchId),
+    Refinement(RefinementId),
+    Rule(RuleId),
+    Tradition(TraditionId),
+    DreamLoom(DreamLoomId),
+}
+
+impl ContentId {
+    /// Whether this kind climbs the reveal ladder and persists in `revealed`.
+    /// The two-state kinds are absent from that set by construction, so an
+    /// availability query must not read it for them — it would answer Hidden
+    /// forever. @spec SIM-ENG-032
+    pub fn is_reveal_tracked(self) -> bool {
+        matches!(self, ContentId::Structure(_) | ContentId::Idea(_))
+    }
 }
 
 /// Advisory display state; command gating is unaffected.
@@ -965,7 +991,7 @@ fn saturating_u8<'de, D: Deserializer<'de>>(d: D) -> Result<u8, D::Error> {
 
 /// Serialize an enum-indexed array as a plain JSON sequence (serde's built-in
 /// array impls stop at 32 elements).
-fn serialize_array<S: serde::Serializer, T: Serialize, const N: usize>(
+pub(crate) fn serialize_array<S: serde::Serializer, T: Serialize, const N: usize>(
     v: &[T; N],
     s: S,
 ) -> Result<S::Ok, S::Error> {
@@ -976,7 +1002,7 @@ fn serialize_array<S: serde::Serializer, T: Serialize, const N: usize>(
 /// carry shorter arrays because ids only ever append. Longer-than-known
 /// arrays are corrupt (a newer save is refused by the version check first).
 // @spec SAVE-013
-fn zero_filled_array<'de, D: Deserializer<'de>, T, const N: usize>(
+pub(crate) fn zero_filled_array<'de, D: Deserializer<'de>, T, const N: usize>(
     d: D,
 ) -> Result<[T; N], D::Error>
 where
@@ -1027,6 +1053,12 @@ pub struct GameState {
     /// Permanently revealed content ids. @spec SIM-ENG-023
     #[serde(default)]
     pub revealed: BTreeSet<ContentId>,
+    /// What the player has lived through — canonical state, because it cannot
+    /// be recomputed from anything else. A save written before the journal
+    /// existed defaults to empty, which is the honest representation of
+    /// history it never recorded. @spec SIM-ENG-027, SAVE-011, SAVE-014
+    #[serde(default)]
+    pub journal: crate::journal::Journal,
     /// The most kites ever held — a persisted ratchet the Porch's cap
     /// multiplier reads, so spending kites never shrinks storage.
     /// @spec SIM-ECO-031
@@ -1197,6 +1229,7 @@ impl GameState {
             rng: Pcg32::new(seed),
             resources: [0.0; RESOURCE_COUNT],
             structures: [0; STRUCTURE_COUNT],
+            journal: crate::journal::Journal::default(),
             kittens: Vec::new(),
             ideas: BTreeSet::new(),
             pity: 0,
@@ -1872,6 +1905,9 @@ impl GameState {
     /// (scanned at the end of each tick's clamp phase).
     // @spec SIM-ENG-023
     pub fn availability(&self, id: ContentId) -> Availability {
+        if !id.is_reveal_tracked() {
+            return self.two_state_availability(id);
+        }
         if !self.revealed.contains(&id) {
             return Availability::Hidden;
         }
@@ -1893,12 +1929,19 @@ impl GameState {
                         .iter()
                         .all(|(r, amount)| self.stock(*r) + EPSILON >= *amount)
             }
+            _ => unreachable!("guarded by is_reveal_tracked"),
         };
         if actionable {
             Availability::Available
         } else {
             Availability::Teased
         }
+    }
+
+    /// Availability for a kind that carries no reveal ladder: it is either
+    /// there to act on or not there at all, never Teased. @spec SIM-ENG-032
+    fn two_state_availability(&self, _id: ContentId) -> Availability {
+        todo!("SIM-ENG-032: two-state availability per non-reveal-tracked kind")
     }
 
     /// Would this item reveal right now? (Sticky insertion happens in tick.)
@@ -1919,6 +1962,8 @@ impl GameState {
                     })
             }
             ContentId::Idea(i) => self.idea_unlocked(i),
+            // Kinds with no cost-reveal ladder never enter the scan worklist.
+            _ => false,
         }
     }
 
@@ -1938,6 +1983,8 @@ impl GameState {
                     })
             }
             ContentId::Idea(i) => self.idea_unlocked(i),
+            // Kinds with no cost-reveal ladder never enter the scan worklist.
+            _ => false,
         }
     }
 }

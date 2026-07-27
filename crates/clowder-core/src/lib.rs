@@ -8,6 +8,8 @@ pub mod content;
 mod command;
 mod effects;
 mod events;
+mod journal;
+mod query;
 mod rng;
 mod save;
 mod state;
@@ -15,11 +17,13 @@ mod tick;
 
 pub use command::{Command, CommandError};
 pub use effects::{limited_dr, unlimited_dr, Effect};
-pub use events::Event;
+pub use events::{Event, EventClass};
+pub use journal::{Journal, JournalEntry, JournalItem};
+pub use query::LockReason;
 pub use rng::Pcg32;
 pub use save::{
     default_save_path, load_string, read_save, save_string, write_save, LoadError, LoadedGame,
-    OfflineReport, SAVE_VERSION,
+    OfflineReport, CATCHUP_CAP_SECONDS, SAVE_VERSION,
 };
 pub use state::{
     AdventureId, ArchId, ArchivedKitten, Availability, ColonyId, ContentId, CraftId, DreamLoomId,

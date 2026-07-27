@@ -8,7 +8,10 @@ use std::path::{Path, PathBuf};
 /// blocks. Older versions load via serde defaults (the fields' new-game
 /// values), verified against committed fixtures. @spec SAVE-013
 pub const SAVE_VERSION: u32 = 2;
-const CATCHUP_CAP_SECONDS: u64 = 365 * 86_400;
+/// The one rule for how much absence is replayed. Public so a caller
+/// applying it to an interval it observed itself uses this value rather than
+/// a copy of it. @spec SAVE-016
+pub const CATCHUP_CAP_SECONDS: u64 = 365 * 86_400;
 const TICKS_PER_SECOND: u64 = crate::content::TICKS_PER_SECOND;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,11 +36,17 @@ pub enum LoadError {
 /// Name lists are gross with per-name counts — a kitten may appear in more
 /// than one list, and more than once per list.
 // @spec SAVE-008
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OfflineReport {
     pub elapsed_seconds: u64,
     pub truncated: bool,
     /// Net stock change per resource, indexed by `ResourceId::ix()`.
+    /// Serde has no array impl past 32, so this borrows the same helpers
+    /// `GameState` uses; older reports zero-fill forward.
+    #[serde(
+        serialize_with = "crate::state::serialize_array",
+        deserialize_with = "crate::state::zero_filled_array"
+    )]
     pub resource_deltas: [f64; crate::state::RESOURCE_COUNT],
     pub arrived: Vec<(String, u32)>,
     pub wandered: Vec<(String, u32)>,

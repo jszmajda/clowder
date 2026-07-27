@@ -4,6 +4,22 @@ use crate::state::{
 };
 use serde::{Deserialize, Serialize};
 
+/// How prominent an occurrence is. A property of the vocabulary rather than a
+/// judgement the consumer makes: deciding that one occurrence matters more
+/// than another is a rule about the game, and a shell deciding it would hold
+/// knowledge the crate split exists to keep out. It is also what the journal
+/// reads to know which entries it may never evict.
+/// @spec SIM-ENG-026
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EventClass {
+    /// Pure delight, no mechanical effect. Rendered quietest.
+    Flavor,
+    /// An ordinary mechanical occurrence.
+    Mechanical,
+    /// A moment worth remembering. Never evicted from the journal.
+    Milestone,
+}
+
 /// Typed simulation occurrences returned by `tick()` and command application.
 /// Events carry data, never prose — presentation belongs to the shell.
 // @spec SIM-ENG-009
@@ -87,4 +103,11 @@ pub enum Event {
     DreamLoomBought { id: DreamLoomId },
     DejaVuDay,
     DistantDawn,
+}
+
+impl Event {
+    /// This occurrence's prominence. @spec SIM-ENG-026
+    pub fn class(&self) -> EventClass {
+        todo!("SIM-ENG-026: classify every variant as flavor, mechanical, or milestone")
+    }
 }
