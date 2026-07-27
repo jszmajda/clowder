@@ -78,6 +78,17 @@ pub fn tick(state: &mut GameState) -> Vec<Event>;
 
 `CommandError` names the reason: `UnknownId`, `Locked` (structure/job/idea not yet unlocked), `AlreadyResearched`, `NoIdleKittens`, `NoWorkersAssigned`, `StorageFull` (a manual action whose yield resource sits at cap — spending a press for a trimmed-away yield would be a clarity failure), `InsufficientResources { missing }`. When several apply, the **first in that list wins** — report the most fundamental blocker, and never leak the cost of content the player hasn't unlocked. Commands either fully apply or return an error — no partial spends. A rejected command never mutates state (RNG included).
 
+## Derived Queries
+
+The shell renders; the core rules. Any question whose answer is a *rule* is answered here, even when the shell could technically assemble it from public state — a frontend that computes affordability, or explains why something is locked, is holding game knowledge the crate split exists to prevent, and it will drift from the real rule the first time the rule changes.
+
+Four read-only queries carry that boundary:
+
+- **Net rate per resource** — production minus consumption at current state, per second. This must be *derived from the tick pipeline itself*, not re-implemented as a parallel formula. A second copy of the production maths is exactly the shadow math the HLD rejects for offline progress, and it would drift the moment any leaf adds a multiplier.
+- **Lock reason** — why a given piece of content is not actionable, as typed data rather than prose, drawn from the same gate the command layer enforces. Two sources for one answer is how a screen ends up explaining a rule the command layer no longer applies.
+- **Availability, total over every content kind** — the query answers for anything revealable, not only the kinds that carry a reveal ladder. Kinds without one answer with the two states they have. Totality is the point: the shell renders exactly what it is told (TUI-NAV-053), so a query that silently has no answer for some kinds pushes the branch back into the frontend.
+- **Maximum affordable count** — where a closed form exists, so a bulk action can name its count before acting instead of discovering it by attempting and failing.
+
 ## Event Vocabulary
 
 `tick()` and `apply()` return `Vec<Event>` — typed data, no prose:

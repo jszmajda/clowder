@@ -25,6 +25,17 @@
 - [ ] **SIM-ENG-027**: The system shall retain an event journal in game state holding a bounded rolling window of the most recent entries plus every milestone entry permanently, each entry carrying the tick at which it occurred so entries can be grouped by day.
 - [ ] **SIM-ENG-028**: The system shall append events to the journal when they arise from a live tick or an applied command, and shall not append events arising from catch-up replay — a long absence is recorded as its folded report, never as its millions of constituent events.
 - [ ] **SIM-ENG-029**: When the rolling window is full, the system shall evict its oldest non-milestone entry, so growth is bounded without ever discarding a milestone.
+
+## Derived Queries
+
+- [ ] **SIM-ENG-030**: The system shall expose a per-resource net rate — production less consumption at current state, per game second — computed from the same production and consumption path the tick pipeline runs, never from a separate formula that could diverge from it.
+- [ ] **SIM-ENG-034**: The system shall report the net rate free of the speed multiplier, no more reading speed than any other rule does; a caller wanting a real-time estimate applies speed itself, at the same boundary that converts real time into ticks.
+- [ ] **SIM-ENG-035**: The system shall report the net rate as advisory, reflecting throttling and current state but carrying no guarantee against a stock reaching a cap or a supply changing before the rate is realised.
+- [ ] **SIM-ENG-031**: The system shall expose the reason a piece of content is not currently actionable as typed data rather than prose, determined by the same gate the command layer enforces, so a caller can state the reason without deciding it.
+- [ ] **SIM-ENG-036**: The system shall resolve a lock reason by the same precedence the command layer applies when several blockers hold at once, so the reason shown for an item and the error returned by acting on it never name different causes.
+- [ ] **SIM-ENG-037**: The system shall withhold from a lock reason any cost or prerequisite detail of content the player has not yet revealed, the reason for an unrevealed item saying only that it is not yet available.
+- [ ] **SIM-ENG-032**: The system shall answer an availability query for every revealable content kind, returning the two-state answer for kinds that carry no reveal ladder, so a caller never has to branch on which kind it is holding.
+- [ ] **SIM-ENG-033**: Where a repeatable action's affordable count has a closed form, the system shall expose that count, so a caller can name it in advance instead of deriving it by attempting the action until it is rejected.
 - [x] **SIM-ENG-010**: The system shall emit a KittenMood event only when the mood tier changes (tiers defined in SIM-KIT; entering or leaving Grumpy is a tier change).
 
 ## Zoomies
