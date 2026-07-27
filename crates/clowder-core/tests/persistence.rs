@@ -235,10 +235,11 @@ fn v1_saves_migrate_forward_losslessly() {
     assert_eq!(s.kittens.len(), 2);
     assert_eq!(s.structures[StructureId::CatnipPatch.ix()], 1);
     assert_eq!(s.speed, 1.0, "new fields get new-game defaults");
-    // Re-saving stamps the current version.
+    // Re-saving stamps the current version — whatever it currently is, which
+    // is the property under test. A literal here just breaks on every bump.
     let resaved = save_string(s, 1_751_700_000);
     let v: serde_json::Value = serde_json::from_str(&resaved).unwrap();
-    assert_eq!(v["save_version"], 2);
+    assert_eq!(v["save_version"], clowder_core::SAVE_VERSION);
 }
 
 // @spec SAVE-006

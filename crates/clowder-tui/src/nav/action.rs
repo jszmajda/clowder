@@ -30,6 +30,12 @@ pub enum Action {
     ObserveSky,
     SpeedUp,
     SpeedDown,
+    /// A printable character routed into an open field rather than to its
+    /// global binding — which is exactly what stops a digit jumping sections
+    /// mid-type. @spec TUI-NAV-037, TUI-NAV-038
+    Type(char),
+    /// Erase one character from an open field. @spec TUI-NAV-037
+    Erase,
     /// Esc: close the topmost transient only. @spec TUI-NAV-030
     Dismiss,
     Quit,

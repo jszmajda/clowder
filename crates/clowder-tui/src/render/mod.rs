@@ -15,7 +15,17 @@ use crate::nav::ViewState;
 
 pub use layout::{Body, Layout};
 
-/// Draw one frame. @spec TUI-RENDER-001, TUI-RENDER-002
-pub fn frame(_f: &mut Frame, _state: &GameState, _view: &ViewState, _prev: Option<&Layout>) {
-    todo!("TUI-RENDER-001/002: compute layout, then draw each region")
+/// Draw one frame, returning the layout it used.
+///
+/// The layout must escape: the breakpoints' dead-band is a function of the
+/// *previous* frame's layout, so a frame that computed one and dropped it
+/// would leave the next frame unable to tell which side of a boundary it was
+/// already on. @spec TUI-RENDER-001, TUI-RENDER-002, TUI-RENDER-008
+pub fn frame(
+    _f: &mut Frame,
+    _state: &GameState,
+    _view: &ViewState,
+    _prev: Option<&Layout>,
+) -> Layout {
+    todo!("TUI-RENDER-001/002: compute layout, draw each region, return it")
 }

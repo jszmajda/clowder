@@ -23,7 +23,7 @@ pub use query::LockReason;
 pub use rng::Pcg32;
 pub use save::{
     default_save_path, load_string, read_save, save_string, write_save, LoadError, LoadedGame,
-    OfflineReport, CATCHUP_CAP_SECONDS, SAVE_VERSION,
+    OfflineReport, CATCHUP_CAP_SECONDS, MIN_REPORTABLE_ABSENCE_SECONDS, SAVE_VERSION,
 };
 pub use state::{
     AdventureId, ArchId, ArchivedKitten, Availability, ColonyId, ContentId, CraftId, DreamLoomId,

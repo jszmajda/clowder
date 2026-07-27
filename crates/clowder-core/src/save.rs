@@ -4,10 +4,18 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-/// v2: depth expansion — adds speed, revealed set, and each wave's state
-/// blocks. Older versions load via serde defaults (the fields' new-game
-/// values), verified against committed fixtures. @spec SAVE-013
-pub const SAVE_VERSION: u32 = 2;
+/// v3: the event journal joins canonical state. v2 was the depth expansion —
+/// speed, the revealed set, and each wave's state blocks. Older versions load
+/// via serde defaults (the fields' new-game values), verified against
+/// committed fixtures; a pre-journal save migrates to an empty journal, which
+/// is the honest representation of history it never recorded.
+/// @spec SAVE-013, SAVE-014
+pub const SAVE_VERSION: u32 = 3;
+/// The shortest absence worth reporting. Public for the same reason the cap
+/// is: a caller deciding whether to surface a report must use this value, not
+/// a copy of it. @spec SAVE-015
+pub const MIN_REPORTABLE_ABSENCE_SECONDS: u64 = 60;
+
 /// The one rule for how much absence is replayed. Public so a caller
 /// applying it to an interval it observed itself uses this value rather than
 /// a copy of it. @spec SAVE-016

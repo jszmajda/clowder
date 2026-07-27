@@ -7,9 +7,11 @@ pub mod action;
 pub mod keys;
 pub mod rows;
 pub mod section;
+pub mod update;
 pub mod view;
 
 pub use action::{Action, CountSemantics};
 pub use rows::{Row, RowKey, RowKind};
 pub use section::Section;
-pub use view::{ArmedRow, CountPrompt, InspectorMode, Overlay, ViewState};
+pub use update::{update, Outcome};
+pub use view::{ArmedRow, CountPrompt, Overlay, PendingReport, SeenMark, ViewState};

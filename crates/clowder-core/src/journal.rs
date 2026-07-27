@@ -55,7 +55,7 @@ impl Journal {
 
     /// Every retained entry in occurrence order, rolling window and kept
     /// entries merged — what a reader scrolls.
-    pub fn iter_chronological(&self) -> impl Iterator<Item = &JournalEntry> {
-        std::iter::empty()
+    pub fn iter_chronological(&self) -> Vec<&JournalEntry> {
+        todo!("SIM-ENG-027: merge kept and recent in occurrence order")
     }
 }

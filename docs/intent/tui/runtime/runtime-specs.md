@@ -40,7 +40,8 @@
 - [ ] **TUI-RUN-023**: When wall-clock elapsed falls short of monotonic elapsed, the system shall keep the monotonic reading and re-base its checkpoint silently; the simulation shall never move backwards.
 - [ ] **TUI-RUN-024**: The system shall cap an in-process time gap at the same limit the load path applies and flag it the same way, so an absence spanning a suspend and an absence spanning a restart are indistinguishable to the player.
 - [ ] **TUI-RUN-025**: The system shall spend at most a bounded slice of wall time per frame running a tick backlog and shall bank the remainder for following frames, so a long catch-up never blocks the loop and never discards owed ticks.
-- [ ] **TUI-RUN-030**: The system shall hold banked time as two distinct quantities — a sub-tick fractional remainder awaiting conversion, and a whole-tick backlog already converted but not yet run — and shall apply a speed change only to the former, the latter having been converted at the speed in force when its time elapsed.
+- [ ] **TUI-RUN-032**: The system shall bank the real-time span an unrun backlog represents as it accrues, rather than deriving that span by dividing the backlog by the current speed — a backlog accrued at one speed and saved at another would otherwise back-date by the ratio between them, and could cross the absence cap on an absence that never happened.
+- [ ] **TUI-RUN-030**: The system shall distinguish the sub-tick fractional remainder awaiting conversion from the whole-tick backlog already converted but not yet run, and shall apply a speed change only to the former, the latter having been converted at the speed in force when its time elapsed.
 - [ ] **TUI-RUN-031**: When shutdown begins while a tick backlog is outstanding, the system shall save and exit promptly rather than draining the backlog first; the back-dated save timestamp shall carry the unrun interval forward so the next load runs it.
 
 ## Saving

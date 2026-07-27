@@ -35,6 +35,8 @@
 - [ ] **SIM-ENG-036**: The system shall resolve a lock reason by the same precedence the command layer applies when several blockers hold at once, so the reason shown for an item and the error returned by acting on it never name different causes.
 - [ ] **SIM-ENG-037**: The system shall withhold from a lock reason any cost or prerequisite detail of content the player has not yet revealed, the reason for an unrevealed item saying only that it is not yet available.
 - [ ] **SIM-ENG-032**: The system shall answer an availability query for every revealable content kind, returning the two-state answer for kinds that carry no reveal ladder, so a caller never has to branch on which kind it is holding.
+- [ ] **SIM-ENG-038**: The system shall expose the total cost of taking a repeatable action a given number of times from current state, escalation included, so a caller previewing a bulk action does not reimplement the escalation rule outside the core.
+- [ ] **SIM-ENG-039**: The system shall expose how far current stock covers an action's next cost as a fraction, so the distinction between partly and not-at-all affordable is drawn by the same rules that gate the action rather than by a caller's own threshold.
 - [ ] **SIM-ENG-033**: Where a repeatable action's affordable count has a closed form, the system shall expose that count, so a caller can name it in advance instead of deriving it by attempting the action until it is rejected.
 - [x] **SIM-ENG-010**: The system shall emit a KittenMood event only when the mood tier changes (tiers defined in SIM-KIT; entering or leaving Grumpy is a tier change).
 

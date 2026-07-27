@@ -2,26 +2,24 @@
 //! mirrors a value the core holds — if the shell needs a number the core
 //! computes, it asks. @spec TUI-NAV-008, TUI-NAV-015, TUI-NAV-030
 
+use std::time::Instant;
+
+use clowder_core::Command;
+
 use super::rows::RowKey;
 use super::section::Section;
 
-/// Where the inspector is. @spec TUI-NAV-017
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum InspectorMode {
-    /// Wide terminal: a persistent pane, always live.
-    Pane,
-    /// Narrow terminal: hidden until Space swaps it in over the list.
-    Swapped,
-    Hidden,
-}
-
 /// A full-screen transient. Takes the cursor, section, and action keys for its
 /// own navigation; speed, quit, and Esc stay live. @spec TUI-NAV-052
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Overlay {
-    Journal,
+    /// Scrollback over the retained journal. Holds its own scroll anchor.
+    /// @spec TUI-NAV-026
+    Journal { anchor: usize },
     Help,
-    Palette,
+    /// Find-anything over revealed content, narrowing by substring as
+    /// characters arrive. @spec TUI-NAV-038
+    Palette { query: String, selected: usize },
 }
 
 /// A count being typed. While open, all printable input goes to the field —
@@ -37,8 +35,36 @@ pub struct CountPrompt {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ArmedRow {
     pub key: RowKey,
-    /// Tick at which arming lapses, silently. @spec TUI-NAV-015
-    pub expires_at: u64,
+    /// The exact command the commit will re-run. A count-taking heavy row is
+    /// armed *by* its count prompt (TUI-NAV-036), and rows are rebuilt every
+    /// frame from state, so the typed count has nowhere else to survive
+    /// between arming and committing. @spec TUI-NAV-036, TUI-NAV-043
+    pub command: Command,
+    /// Wall-clock expiry, silently. Deliberately not a sim tick: TUI-NAV-015
+    /// says about eight *seconds*, and a tick-based expiry would last one
+    /// second at the fastest speed and half a minute at the slowest.
+    /// @spec TUI-NAV-015
+    pub expires_at: Instant,
+}
+
+/// An unread bulk-time report awaiting its banner. Reports queue newest-first
+/// and each clears on its own signal, so a single flag will not do.
+/// @spec TUI-NAV-044, TUI-NAV-050
+#[derive(Debug, Clone, PartialEq)]
+pub struct PendingReport {
+    /// Index into the journal's retained entries.
+    pub entry: usize,
+    pub dismissed: bool,
+}
+
+/// What a section looked like when last visited, so new content can re-badge
+/// a section the player has already been to. A monotone "visited" flag could
+/// only ever badge once. @spec TUI-NAV-006, TUI-NAV-020, TUI-NAV-044
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SeenMark {
+    pub visited: bool,
+    /// Count of revealed rows at last visit; anything beyond it is `★N new`.
+    pub revealed_at_last_visit: usize,
 }
 
 /// The whole of the shell's own state.
@@ -48,15 +74,22 @@ pub struct ViewState {
     /// Remembered focus per section, by identity. Indexed by
     /// `Section::index()`. @spec TUI-NAV-008
     pub focus: [Option<RowKey>; 10],
-    pub inspector: Option<InspectorMode>,
+    /// Whether the player has called for the inspector. Whether that shows as
+    /// a pane or a swap is a pure function of width, derived by layout — not
+    /// stored, so it cannot disagree after a resize.
+    /// @spec TUI-NAV-017, TUI-NAV-029
+    pub inspector_wanted: bool,
     pub overlay: Option<Overlay>,
     pub prompt: Option<CountPrompt>,
     pub armed: Option<ArmedRow>,
-    /// A transient footer note; the plain-language face of a rejection.
-    /// @spec TUI-NAV-014
-    pub footer: Option<(String, u64)>,
-    /// Sections visited at least once — clears their new-content badge.
-    /// @spec TUI-NAV-044
-    pub visited: [bool; 10],
-    pub banner_dismissed: bool,
+    /// A transient footer note and its wall-clock expiry; the plain-language
+    /// face of a rejection. @spec TUI-NAV-014
+    pub footer: Option<(String, Instant)>,
+    /// Per-section watermarks. @spec TUI-NAV-044
+    pub seen: [SeenMark; 10],
+    /// Unread reports, newest first. @spec TUI-NAV-050
+    pub reports: Vec<PendingReport>,
+    /// When the last Enter-driven action fired, for the ~10/s repeat limit.
+    /// @spec TUI-NAV-010
+    pub last_repeat: Option<Instant>,
 }
