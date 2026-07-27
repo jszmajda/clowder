@@ -140,7 +140,7 @@ No staged rebuilds in this pass: every structure is its own entry (see Decisions
 | Dreamweave | 100 hushfelt + 250 moonsteel |
 | Cometsilk | 25 stardust |
 
-Each recipe carries a **tier** for Tinkerer work (KIT-026's rank comparison): tier 1 — Wands, Tiles, Badges, Quills, Cairns; tier 2 — Brass, Lattices, Stories; tier 3 — Cogs, Pavers, Anthologies, Kites; tier 4 — Moonsteel, Schemes, Moonmilk; tier 5 — Balloons, Dreamweave, Cometsilk.
+Each recipe carries a **tier** for Tinkerer work (SIM-KIT-026's rank comparison): tier 1 — Wands, Tiles, Badges, Quills, Cairns; tier 2 — Brass, Lattices, Stories; tier 3 — Cogs, Pavers, Anthologies, Kites; tier 4 — Moonsteel, Schemes, Moonmilk; tier 5 — Balloons, Dreamweave, Cometsilk.
 
 Craft unlocks ride the idea tree (a craft is `Locked` until its granting idea). Gate-currency pattern: stories (band 1), anthologies (band 2), schemes (band 3) enter idea costs — since anthologies/schemes cost *stocked curiosity*, curiosity **storage** becomes the real research gate, forcing the Ledge/Lab/Labyrinth loop. Tinkerer background crafting (kittens leaf, wave 3) consumes these same recipes.
 

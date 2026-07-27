@@ -99,7 +99,7 @@ The tree is a banded ladder with short forks — each band's gate craft requires
 | 54 | Dream Loomcraft | 200000 + 10 starshards | Memory Weaving | Dream Loom (dreamtime leaf) |
 | 55 | Deep Nap Theory | 300000 + 10 echoes | Dream Loomcraft | the Deep Nap (dreamtime leaf) |
 | 57 | Long Sun Masonry | 120000 + 3 echoes | Solar Devotion, Skyward Longing | Sunstone structure (ceremonies leaf) |
-| 58 | Skyward Song | 180000 + 8 echoes | Skyward Longing, Night Court Etiquette | Star Whale visits [D] (colonies/cosmic leaf — the idea exists; whale mechanics land in the cosmic wave) |
+| 58 | Skyward Song | 180000 + 8 echoes | Skyward Longing, Night Court Etiquette | Star Whale visits (the whale's mechanics belong to the cosmic leaf — SIM-SKY-006, SIM-SKY-007) |
 
 The DAG must stay acyclic and every idea reachable (property-tested). Refinements (tool/storage/automation ladders) and House Rules (mutually exclusive policies) are this leaf's remaining depth content — designed in the society wave.
 

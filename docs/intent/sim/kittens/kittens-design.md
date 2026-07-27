@@ -99,7 +99,7 @@ The wander threshold (3 days ≈ 7.5 real seconds per day of famine at live spee
 | Arrival pity counter | Guaranteed success after 4 eligible misses | Pure probability, deterministic schedule | Pure RNG produces cruel droughts; fixed schedules feel mechanical; pity keeps surprise with bounded frustration |
 | Crowding penalty | −3%/kitten past the 5th, floor 25% | Hard population cap, no penalty | Soft pressure toward housing/happiness investment without ever forbidding growth |
 | Away kittens don't eat | Suspended entirely while away | Eating from neighbor's stock, half-rate | The neighbor feeds them (it's that kind of neighborhood); simplest rule that reads warmly |
-| Skill decay is cozy-compatible | Gentle 0.001/tick on non-current skills only, floor 0, removable by a refinement | No decay; harsh decay | Specialization needs a cost to be a choice; the cost is a slowdown with a purchasable off-switch, and KIT-027 carves it out of the confiscation ban explicitly |
+| Skill decay is cozy-compatible | Gentle 0.001/tick on non-current skills only, floor 0, removable by a refinement | No decay; harsh decay | Specialization needs a cost to be a choice; the cost is a slowdown with a purchasable off-switch, and SIM-KIT-027 carves it out of the confiscation ban explicitly |
 
 ## Open Questions & Future Decisions
 
