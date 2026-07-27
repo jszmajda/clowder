@@ -1939,9 +1939,33 @@ impl GameState {
     }
 
     /// Availability for a kind that carries no reveal ladder: it is either
-    /// there to act on or not there at all, never Teased. @spec SIM-ENG-032
-    fn two_state_availability(&self, _id: ContentId) -> Availability {
-        todo!("SIM-ENG-032: two-state availability per non-reveal-tracked kind")
+    /// there to act on or not there at all, never Teased. The presence check
+    /// mirrors the same gate the command layer's Locked precondition tests
+    /// for each kind, so this answer and that error can never disagree.
+    /// @spec SIM-ENG-032
+    fn two_state_availability(&self, id: ContentId) -> Availability {
+        let unlocked = match id {
+            ContentId::Structure(_) | ContentId::Idea(_) => {
+                unreachable!("guarded by is_reveal_tracked")
+            }
+            ContentId::Craft(c) => self.craft_unlocked(c),
+            ContentId::Job(j) => self.job_unlocked(j),
+            ContentId::Rite(r) => {
+                let silent_sun = self.active_adventure == Some(AdventureId::SilentSun);
+                !silent_sun && self.peak_devotion + EPSILON >= content::rite_def(r).devotion_gate
+            }
+            ContentId::Arch(_) => self.ideas.contains(&IdeaId::ParadeRoutes),
+            ContentId::Refinement(r) => self.ideas.contains(&content::refinement_def(r).gate),
+            ContentId::Rule(r) => !self.rules.contains(&content::rule_def(r).blocks),
+            // Traditions and Dream Looms carry no gate beyond their own
+            // one-shot purchase: they are there to act on from the start.
+            ContentId::Tradition(_) | ContentId::DreamLoom(_) => true,
+        };
+        if unlocked {
+            Availability::Available
+        } else {
+            Availability::Hidden
+        }
     }
 
     /// Would this item reveal right now? (Sticky insertion happens in tick.)

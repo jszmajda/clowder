@@ -5,7 +5,7 @@
 //! second copy of a rule drifts from the first the moment the rule changes.
 //! @spec SIM-ENG-030, SIM-ENG-031, SIM-ENG-032, SIM-ENG-033
 
-use crate::state::{ContentId, GameState, ResourceId, RESOURCE_COUNT};
+use crate::state::{GameState, ResourceId, RESOURCE_COUNT};
 
 /// Why a piece of content is not currently actionable — data, not prose, on
 /// the same principle as the event vocabulary.
@@ -56,39 +56,21 @@ impl GameState {
     /// per resource — while caching the results shell-side is exactly what
     /// TUI-RENDER-001 forbids. @spec SIM-ENG-030, SIM-ENG-034, SIM-ENG-035
     pub fn net_rates(&self) -> [f64; RESOURCE_COUNT] {
-        todo!("SIM-ENG-030: one pass over the tick pipeline's production/consumption")
-    }
-
-    /// Why this content is not actionable, or `None` when it is.
-    /// @spec SIM-ENG-031, SIM-ENG-036, SIM-ENG-037
-    pub fn lock_reason(&self, _id: ContentId) -> Option<LockReason> {
-        todo!("SIM-ENG-031: resolve by the command layer's blocker precedence")
-    }
-
-    /// How many times a repeatable action could be taken right now, where a
-    /// closed form exists — so a caller can name the count in advance instead
-    /// of discovering it by attempting until rejected. `None` where the
-    /// action has no closed form. @spec SIM-ENG-033
-    pub fn max_affordable(&self, _id: ContentId) -> Option<u32> {
-        todo!("SIM-ENG-033: closed-form affordable count where one exists")
-    }
-
-    /// The total cost of taking a repeatable action `n` times from here,
-    /// escalation included.
-    ///
-    /// A count prompt previews this before committing (TUI-NAV-011). The
-    /// escalation is a rule, and a caller summing it from single-step costs
-    /// would be reimplementing that rule outside the core — the same shadow
-    /// math the HLD rejects. @spec SIM-ENG-038
-    pub fn cost_of_next(&self, _id: ContentId, _n: u32) -> Vec<(ResourceId, f64)> {
-        todo!("SIM-ENG-038: escalating cost summed over n steps")
-    }
-
-    /// How far the stock covers a cost, as a fraction in [0, 1] — 1 meaning
-    /// affordable now. What separates a partially-affordable row from an
-    /// unaffordable one, decided here rather than by a caller inventing a
-    /// threshold. @spec SIM-ENG-039
-    pub fn affordability(&self, _id: ContentId) -> f64 {
-        todo!("SIM-ENG-039: fraction of the next cost currently covered")
+        // A scratch clone runs `resource_phases` — the tick pipeline's own
+        // single definition of every phase that moves a stock — without its
+        // ticks counter moving — so no day boundary, no random-event RNG
+        // draw, and no cap clamp folds into the number. That keeps the
+        // answer "at current state" (SIM-ENG-030) rather than at whatever
+        // the next tick's daily processing would do to it, and pre-cap
+        // (SIM-ENG-035). `self` is untouched: probing is free.
+        let before = self.resources;
+        let mut probe = self.clone();
+        probe.resource_phases();
+        let per_second = crate::content::TICKS_PER_SECOND as f64;
+        let mut out = [0.0; RESOURCE_COUNT];
+        for i in 0..RESOURCE_COUNT {
+            out[i] = (probe.resources[i] - before[i]) * per_second;
+        }
+        out
     }
 }

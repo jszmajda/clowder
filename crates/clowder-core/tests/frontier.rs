@@ -599,7 +599,16 @@ fn a_deep_nap_fast_forwards_the_meadow_through_the_real_tick() {
         1,
         "one summarized Napped report"
     );
-    assert!(events.iter().any(|e| matches!(e, Event::Napped { years: y } if *y == years)));
+    // The summary is the folded report — elapsed span and net deltas — carried
+    // back by the same route an absence uses, not a bare year count. Its
+    // contents are pinned in tests/bulktime.rs (SIM-DREAM-001, SIM-DREAM-008);
+    // here it is enough that a report is what comes back at all.
+    let napped = events.iter().find(|e| matches!(e, Event::Napped { .. })).unwrap();
+    let summary = serde_json::to_value(napped).unwrap();
+    assert!(
+        summary.to_string().contains("resource_deltas"),
+        "the nap's summary carries the folded report, not just a year count: {summary}"
+    );
     assert!(events.len() < 50, "a summary, never a per-tick event stream");
 }
 

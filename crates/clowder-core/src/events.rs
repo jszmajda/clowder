@@ -98,16 +98,75 @@ pub enum Event {
     SiteReached { site: SiteId },
     WhaleSummoned,
     WhaleFed { contentment: u32 },
-    /// A summarized nap report — never a per-tick stream. @spec SIM-DREAM-001
-    Napped { years: u32 },
+    /// A summarized nap report — never a per-tick stream, and the same
+    /// `OfflineReport` kind offline absence folds. @spec SIM-DREAM-001, SIM-DREAM-008
+    Napped { years: u32, report: crate::save::OfflineReport },
     DreamLoomBought { id: DreamLoomId },
     DejaVuDay,
     DistantDawn,
 }
 
 impl Event {
-    /// This occurrence's prominence. @spec SIM-ENG-026
+    /// This occurrence's prominence — a property of which variant this is,
+    /// never its payload. Milestones are the moments worth remembering:
+    /// permanent unlocks, new content reached, one-time turning points.
+    /// Ordinary state changes are mechanical; pure delight with no mechanical
+    /// effect is flavor. @spec SIM-ENG-026
     pub fn class(&self) -> EventClass {
-        todo!("SIM-ENG-026: classify every variant as flavor, mechanical, or milestone")
+        match self {
+            Event::Flavor { .. } => EventClass::Flavor,
+
+            Event::KittenArrived { .. }
+            | Event::KittenWanderedOff { .. }
+            | Event::KittenReturned { .. }
+            | Event::JobAssigned { .. }
+            | Event::JobUnassigned { .. }
+            | Event::SeasonChanged { .. }
+            | Event::ZoomiesStarted { .. }
+            | Event::ZoomiesEnded
+            | Event::KittenMood { .. }
+            | Event::Revealed { .. }
+            | Event::SkyEventVisible
+            | Event::SpeedChanged { .. }
+            | Event::PounceReturned { .. }
+            | Event::JamboreeStarted { .. }
+            | Event::JamboreeEnded
+            | Event::RefinementBought { .. }
+            | Event::RuleAdopted { .. }
+            | Event::Basked { .. }
+            | Event::Reveried { .. }
+            | Event::ParadeHeld { .. }
+            | Event::StarshardRefined
+            | Event::EchoRefined
+            | Event::JarCondensed
+            | Event::PromiseMade
+            | Event::PromiseQuieted { .. }
+            | Event::PromiseResumed { .. }
+            | Event::PrismDescended
+            | Event::TradeReturned { .. }
+            | Event::PenPalSent { .. }
+            | Event::Passed { .. }
+            | Event::AdventureDeclared { .. }
+            | Event::WhaleFed { .. }
+            | Event::Napped { .. }
+            | Event::DejaVuDay => EventClass::Mechanical,
+
+            Event::NewYear { .. }
+            | Event::StructureBuilt { .. }
+            | Event::IdeaResearched { .. }
+            | Event::ElderAppointed { .. }
+            | Event::KittenPromoted { .. }
+            | Event::RiteBought { .. }
+            | Event::Enlightened { .. }
+            | Event::ArchBought { .. }
+            | Event::ColonyDiscovered { .. }
+            | Event::MeadowMoved { .. }
+            | Event::TraditionBought { .. }
+            | Event::AdventureCompleted { .. }
+            | Event::SiteReached { .. }
+            | Event::WhaleSummoned
+            | Event::DreamLoomBought { .. }
+            | Event::DistantDawn => EventClass::Milestone,
+        }
     }
 }

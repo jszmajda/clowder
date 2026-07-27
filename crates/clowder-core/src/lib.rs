@@ -9,6 +9,7 @@ mod command;
 mod effects;
 mod events;
 mod journal;
+mod gating;
 mod query;
 mod rng;
 mod save;

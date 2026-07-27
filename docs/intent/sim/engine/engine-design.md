@@ -107,7 +107,9 @@ Every event carries a **classification** — flavor, mechanical, or milestone. I
 
 `GameState` carries an event journal, because the events a player has lived through are part of their game and should survive closing the terminal. It holds a **bounded rolling window** of the most recent entries plus **every milestone entry, permanently**; each entry carries the tick at which it occurred, so a reader can group by day. When the window is full, the oldest non-milestone entry is evicted — growth is bounded, and the moments worth remembering are never what gets dropped.
 
-**Catch-up replay does not append.** A year-long absence replays millions of ticks, and recording their events would write an enormous save and slow every load — the exact costs the persistence leaf's replay budget exists to prevent. Replay already folds into an `OfflineReport`; that summary is what enters the journal, and the constituent events are discarded as they always were. Live ticks and applied commands append; replay does not. This is what keeps a journal in the save file affordable.
+**Catch-up replay does not append.** A year-long absence replays millions of ticks, and recording their events would write an enormous save and slow every load — the exact costs the persistence leaf's replay budget exists to prevent. Replay already folds into an `OfflineReport`; that summary is what enters the journal, and the constituent events are discarded as they always were. Live ticks and applied commands append; replay does not.
+
+The distinction is drawn *inside* the core. A tick cannot tell from its own state whether it is live or replaying, so if the caller decided, the rule would live outside the crate that owns it — invisible to headless tests, and wrong for any frontend that forgot. Instead the ordinary tick journals and replay takes a non-journaling entry point of its own, so journaling a replay is not something a caller can do by omission. This is what keeps a journal in the save file affordable.
 
 ## Random Events
 

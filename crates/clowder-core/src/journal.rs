@@ -5,10 +5,15 @@
 //! moments worth remembering ever being what gets dropped.
 //! @spec SIM-ENG-027, SIM-ENG-029
 
-use crate::events::Event;
-use crate::save::OfflineReport;
+use crate::events::{Event, EventClass};
+use crate::save::{OfflineReport, MIN_REPORTABLE_ABSENCE_SECONDS};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+
+/// The rolling window's capacity. Bounded so a months-long game's save stays
+/// a fixed size regardless of how much has happened — milestones are what
+/// carry the permanent record. @spec SIM-ENG-027, SIM-ENG-029
+const RECENT_CAPACITY: usize = 1_000;
 
 /// What a journal entry records. An away-report is not an `Event` — it is a
 /// fold of an interval rather than an occurrence at an instant, which is why
@@ -39,23 +44,38 @@ pub struct Journal {
 }
 
 impl Journal {
-    /// Append a live occurrence. Milestones land in `kept`; everything else
-    /// joins the rolling window, evicting the oldest when it is full.
-    /// Replay events never reach here — SIM-ENG-028 keeps them out.
+    /// Append a live occurrence. Milestones land in `kept`, permanently;
+    /// everything else joins the rolling window, evicting the oldest entry
+    /// when it is full. Replay events never reach here — SIM-ENG-028 keeps
+    /// them out by routing replay through its own non-journaling tick.
     /// @spec SIM-ENG-027, SIM-ENG-028, SIM-ENG-029
-    pub fn record(&mut self, _tick: u64, _event: &Event) {
-        todo!("SIM-ENG-027/028/029: classify, append, evict oldest non-milestone")
+    pub fn record(&mut self, tick: u64, event: &Event) {
+        let entry = JournalEntry { tick, item: JournalItem::Happened(event.clone()) };
+        if event.class() == EventClass::Milestone {
+            self.kept.push(entry);
+        } else {
+            if self.recent.len() >= RECENT_CAPACITY {
+                self.recent.pop_front();
+            }
+            self.recent.push_back(entry);
+        }
     }
 
-    /// Record a qualifying away-report as a permanent entry.
-    /// @spec SAVE-015
-    pub fn record_away(&mut self, _tick: u64, _report: &OfflineReport) {
-        todo!("SAVE-015: retain a report above the minimum span, else nothing")
+    /// Record a qualifying away-report as a permanent entry. Reports shorter
+    /// than the reportable minimum leave no trace — nothing worth
+    /// remembering happened in a blink. @spec SAVE-015
+    pub fn record_away(&mut self, tick: u64, report: &OfflineReport) {
+        if report.elapsed_seconds < MIN_REPORTABLE_ABSENCE_SECONDS {
+            return;
+        }
+        self.kept.push(JournalEntry { tick, item: JournalItem::Away(report.clone()) });
     }
 
     /// Every retained entry in occurrence order, rolling window and kept
-    /// entries merged — what a reader scrolls.
+    /// entries merged — what a reader scrolls. @spec SIM-ENG-027
     pub fn iter_chronological(&self) -> Vec<&JournalEntry> {
-        todo!("SIM-ENG-027: merge kept and recent in occurrence order")
+        let mut merged: Vec<&JournalEntry> = self.kept.iter().chain(self.recent.iter()).collect();
+        merged.sort_by_key(|e| e.tick);
+        merged
     }
 }

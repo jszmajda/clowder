@@ -227,17 +227,23 @@ pub fn load_string(s: &str, now_unix: u64) -> Result<LoadedGame, LoadError> {
         ..OfflineReport::default()
     };
     for _ in 0..ticks_to_replay {
-        for event in state.tick() {
+        // @spec SIM-ENG-028, SIM-ENG-040
+        for event in state.tick_replay() {
             fold_event(&mut report, event);
         }
     }
     for r in ResourceId::ALL {
         report.resource_deltas[r.ix()] = state.resources[r.ix()] - before[r.ix()];
     }
+    // @spec SAVE-015
+    state.journal.record_away(state.ticks, &report);
     Ok(LoadedGame { state, report })
 }
 
-fn fold_event(report: &mut OfflineReport, event: Event) {
+/// Fold one replayed event into a report in progress. Shared by offline
+/// catch-up and the Deep Nap (SIM-DREAM-008) so both bulk-time routes fold
+/// identically. @spec SAVE-008, SIM-DREAM-008
+pub(crate) fn fold_event(report: &mut OfflineReport, event: Event) {
     match event {
         Event::KittenArrived { name } => bump(&mut report.arrived, &name),
         Event::KittenWanderedOff { name } => bump(&mut report.wandered, &name),

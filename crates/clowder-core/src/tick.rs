@@ -7,9 +7,55 @@ use crate::state::{
 impl GameState {
     /// Advance the simulation one tick (250 ms of game time), running the
     /// fixed phase pipeline: calendar/daily processing, production,
-    /// consumption, mood, random events, clamp.
+    /// consumption, mood, random events, clamp. Live entry point: the
+    /// occurrence is journaled.
     // @spec SIM-ENG-004
+    // @spec SIM-ENG-028, SIM-ENG-040
     pub fn tick(&mut self) -> Vec<Event> {
+        let events = self.tick_replay();
+        let tick = self.ticks;
+        for event in &events {
+            self.journal.record(tick, event);
+        }
+        events
+    }
+
+    /// Every phase of a tick that moves a resource stock, in pipeline order,
+    /// returning the mess accrued and whether consumption fell short.
+    ///
+    /// This exists so there is exactly **one** definition of what a tick does
+    /// to stocks. `tick_replay` runs it to advance the game and `net_rates`
+    /// derives from it to report a rate (SIM-ENG-030), and a derived rate that
+    /// re-listed the phases itself would be a second copy of pipeline
+    /// structure — silently wrong the moment a phase is added here and not
+    /// there, which is the exact drift SIM-ENG-030 forbids. Adding a
+    /// stock-moving phase means adding it here, once.
+    // @spec SIM-ENG-004, SIM-ENG-030
+    pub(crate) fn resource_phases(&mut self) -> (f64, bool) {
+        // ---- Phase 2: production (structures, jobs, converters) ----
+        let mess_accrual = self.produce();
+        // ---- Phase 2b: dreaming (mystic drift, per tick) ----
+        // Only Arch upgrades drive drift, so the arch-free hot path skips it.
+        // @spec SIM-UNI-007, SIM-UNI-008
+        if !self.arches_bought.is_empty() {
+            self.dream_step();
+        }
+        // ---- Phase 3: consumption (food, then luxury drain) ----
+        // @spec SIM-ECO-020, SIM-ECO-021
+        let shortfall = self.consume();
+        (mess_accrual, shortfall)
+    }
+
+    /// The identical simulation step as [`GameState::tick`], but never
+    /// journals. This is the core's own non-journaling entry point —
+    /// catch-up replay and any other fast-forward (a long absence, a Deep
+    /// Nap) call this instead of `tick`, so recording a replay's millions of
+    /// constituent events is not something a caller can do by omission.
+    /// A tick has no way to tell, from its own state, whether it is live or
+    /// replaying; the distinction is made here, at the two entry points,
+    /// rather than inside the pipeline itself.
+    // @spec SIM-ENG-028, SIM-ENG-040
+    pub fn tick_replay(&mut self) -> Vec<Event> {
         let mut events = Vec::new();
         let tier_before = self.mood_tier();
 
@@ -31,18 +77,8 @@ impl GameState {
             self.day_close(&mut events);
         }
 
-        // ---- Phase 2: production (structures, jobs, converters) ----
-        let mess_accrual = self.produce();
-        // ---- Phase 2b: dreaming (mystic drift, per tick) ----
-        // Only Arch upgrades drive drift, so the arch-free hot path skips it.
-        // @spec SIM-UNI-007, SIM-UNI-008
-        if !self.arches_bought.is_empty() {
-            self.dream_step();
-        }
-
-        // ---- Phase 3: consumption (food, then luxury drain) ----
-        // @spec SIM-ECO-020, SIM-ECO-021
-        let shortfall = self.consume();
+        // ---- Phases 2, 2b, 3: everything that moves a stock ----
+        let (mess_accrual, shortfall) = self.resource_phases();
 
         // ---- Phase 4: mood, famine flag & mess recompute ----
         // @spec SIM-KIT-013
@@ -338,7 +374,7 @@ impl GameState {
     /// energy deficit; mess multiplies catnip growth last. Returns the tick's
     /// mess accrual (applied in phase 4).
     // @spec SIM-ENG-021, SIM-ECO-023, SIM-ECO-025, SIM-ECO-032, SIM-ECO-036
-    fn produce(&mut self) -> f64 {
+    pub(crate) fn produce(&mut self) -> f64 {
         // A déjà-vu day pauses production entirely — a strange half-remembered
         // day where the meadow simply holds still (no growth, no mess).
         // @spec SIM-DREAM-004
@@ -677,7 +713,7 @@ impl GameState {
     /// first, then the luxury drain — which floors at zero and never
     /// shortfalls: an empty shelf just drops its happiness bonus.
     // @spec SIM-ECO-020, SIM-ECO-021, SIM-ECO-026
-    fn consume(&mut self) -> bool {
+    pub(crate) fn consume(&mut self) -> bool {
         // A déjà-vu day pauses consumption too, so the dreamy pause never causes
         // a shortfall (Tenet 1). @spec SIM-DREAM-004
         if self.deja_vu_until > self.ticks {

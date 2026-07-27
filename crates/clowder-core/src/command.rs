@@ -119,7 +119,20 @@ impl GameState {
     /// (Pounce, Trade, ScoutPicnic, DeepNap do); a REJECTED command never draws.
     /// Determinism holds because every draw goes through the single ordered RNG.
     // @spec SIM-ENG-005
+    // @spec SIM-ENG-028
     pub fn apply(&mut self, cmd: Command) -> Result<Vec<Event>, CommandError> {
+        let events = self.apply_inner(cmd)?;
+        let tick = self.ticks;
+        for event in &events {
+            self.journal.record(tick, event);
+        }
+        Ok(events)
+    }
+
+    /// The command dispatch itself, kept apart from journaling so a rejected
+    /// command (an `Err` here) never reaches `apply`'s recording step.
+    // @spec SIM-ENG-005
+    fn apply_inner(&mut self, cmd: Command) -> Result<Vec<Event>, CommandError> {
         match cmd {
             Command::GatherCatnip => self.gather(),
             Command::Forage => self.forage(),
@@ -1129,8 +1142,9 @@ impl GameState {
     /// The Deep Nap: idea-gated, bounded to max_nap_length, spends the
     /// escalating starshard cost, then fast-forwards the meadow through the
     /// standard tick() (pure — the identical path as offline catch-up, no added
-    /// yields). Accrues stirred-dreams heat and returns one summarized report.
-    // @spec SIM-DREAM-001, SIM-DREAM-002, SIM-DREAM-007
+    /// yields). Accrues stirred-dreams heat and returns one summarized report,
+    /// folded the same way offline absence folds its report and retained in
+    /// the journal alongside it. @spec SIM-DREAM-001, SIM-DREAM-002, SIM-DREAM-007, SIM-DREAM-008
     fn deep_nap(&mut self, years: u32) -> Result<Vec<Event>, CommandError> {
         if !self.ideas.contains(&IdeaId::DeepNapTheory) {
             return Err(CommandError::Locked);
@@ -1153,8 +1167,21 @@ impl GameState {
         // delivers any Move-time trickle. distant_dawn lights inside tick() at
         // the year-40000 boundary (with the loom) and persists.
         let was_dawn = self.distant_dawn;
-        for _ in 0..(years as u64 * 1000) {
-            self.tick();
+        let ticks = years as u64 * 1000;
+        let before = self.resources;
+        let mut report = crate::save::OfflineReport {
+            elapsed_seconds: ticks / content::TICKS_PER_SECOND,
+            truncated: false, // a nap is bounded by max_nap_length; it never hits the catch-up cap
+            ..crate::save::OfflineReport::default()
+        };
+        // @spec SIM-ENG-028, SIM-ENG-040
+        for _ in 0..ticks {
+            for event in self.tick_replay() {
+                crate::save::fold_event(&mut report, event);
+            }
+        }
+        for r in ResourceId::ALL {
+            report.resource_deltas[r.ix()] = self.resources[r.ix()] - before[r.ix()];
         }
 
         // Heat accrues after the replay so it survives dissipation (a nap warms
@@ -1163,7 +1190,12 @@ impl GameState {
         self.stirred_dreams +=
             years as f64 * content::HEAT_PER_YEAR * (1.0 - heat_eff).max(0.0);
 
-        let mut events = vec![Event::Napped { years }];
+        // Retained in the journal by the same route offline absence uses, so
+        // the returned summary and the retained one are one report.
+        // @spec SIM-DREAM-008
+        self.journal.record_away(self.ticks, &report);
+
+        let mut events = vec![Event::Napped { years, report }];
         if self.distant_dawn && !was_dawn {
             events.push(Event::DistantDawn);
         }
