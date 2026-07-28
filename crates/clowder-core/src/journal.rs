@@ -50,6 +50,18 @@ impl Journal {
     /// them out by routing replay through its own non-journaling tick.
     /// @spec SIM-ENG-027, SIM-ENG-028, SIM-ENG-029
     pub fn record(&mut self, tick: u64, event: &Event) {
+        match event {
+            // Speed is the pace you watch the meadow at, not something that
+            // happens in it. Keeping it out is also what preserves the
+            // invariant that two meadows differing only in speed are
+            // otherwise identical. @spec SIM-ENG-024, SIM-ENG-028
+            Event::SpeedChanged { .. } => return,
+            // A nap's report was already retained as its away entry; journaling
+            // the event too would record one sleep in two places.
+            // @spec SIM-DREAM-008
+            Event::Napped { .. } => return,
+            _ => {}
+        }
         let entry = JournalEntry { tick, item: JournalItem::Happened(event.clone()) };
         if event.class() == EventClass::Milestone {
             self.kept.push(entry);

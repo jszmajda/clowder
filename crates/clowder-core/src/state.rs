@@ -1957,9 +1957,14 @@ impl GameState {
             ContentId::Arch(_) => self.ideas.contains(&IdeaId::ParadeRoutes),
             ContentId::Refinement(r) => self.ideas.contains(&content::refinement_def(r).gate),
             ContentId::Rule(r) => !self.rules.contains(&content::rule_def(r).blocks),
-            // Traditions and Dream Looms carry no gate beyond their own
-            // one-shot purchase: they are there to act on from the start.
-            ContentId::Tradition(_) | ContentId::DreamLoom(_) => true,
+            // A Tradition's currency cannot exist before a first Move, so the
+            // shop opens with the generation that earns it. Ungated, a fresh
+            // meadow would report the whole prestige ladder and its prices —
+            // the reveal pacing every other kind honours. @spec SIM-ENG-032
+            ContentId::Tradition(_) => self.generation >= 1,
+            // Likewise the loom ladder waits on the idea that introduces it.
+            // @spec SIM-ENG-032
+            ContentId::DreamLoom(_) => self.ideas.contains(&IdeaId::DeepNapTheory),
         };
         if unlocked {
             Availability::Available

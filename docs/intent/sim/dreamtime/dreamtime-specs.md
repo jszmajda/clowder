@@ -18,4 +18,4 @@
 ## The Distant Dawn
 
 - [x] **SIM-DREAM-007**: When the Distant Dawn loom upgrade is bought and the meadow reaches year 40000, the system shall set a persisted distant_dawn flag (never cleared, preserved across Moves) that raises the Passed-Down Wisdom production cap from +100% to +400%; the flag is read in the production stack, not re-derived from the (Move-resettable) tick counter.
-- [ ] **SIM-DREAM-008**: The system shall deliver a bulk-time action's summary by the same route offline absence uses — a report folded from the replay and retained in the journal — so that one mechanism serves every way time passes in bulk and a caller has one place to read it.
+- [x] **SIM-DREAM-008**: The system shall deliver a bulk-time action's summary by the same route offline absence uses — a report folded from the replay and retained in the journal exactly once, as its away entry — so that one mechanism serves every way time passes in bulk and a caller has one place to read it. A deliberate sleep is always retained, however short: the minimum span below which nothing is recorded exists for absences, which are accidents of the clock, not for an act the player chose.

@@ -113,6 +113,12 @@ impl Event {
     /// Ordinary state changes are mechanical; pure delight with no mechanical
     /// effect is flavor. @spec SIM-ENG-026
     pub fn class(&self) -> EventClass {
+        // Only the *first* of a structure is the moment worth keeping; later
+        // copies are ordinary. Milestones are permanent, so every one must be
+        // bounded over a playthrough by construction. @spec SIM-ENG-026
+        if let Event::StructureBuilt { count, .. } = self {
+            return if *count == 1 { EventClass::Milestone } else { EventClass::Mechanical };
+        }
         match self {
             Event::Flavor { .. } => EventClass::Flavor,
 
@@ -148,12 +154,13 @@ impl Event {
             | Event::Passed { .. }
             | Event::AdventureDeclared { .. }
             | Event::WhaleFed { .. }
+            | Event::DejaVuDay
             | Event::Napped { .. }
-            | Event::DejaVuDay => EventClass::Mechanical,
+            // A year turns every ~31 real seconds at the fastest speed; as a
+            // milestone it would write permanent entries without bound.
+            | Event::NewYear { .. } => EventClass::Mechanical,
 
-            Event::NewYear { .. }
-            | Event::StructureBuilt { .. }
-            | Event::IdeaResearched { .. }
+            Event::IdeaResearched { .. }
             | Event::ElderAppointed { .. }
             | Event::KittenPromoted { .. }
             | Event::RiteBought { .. }
@@ -167,6 +174,9 @@ impl Event {
             | Event::WhaleSummoned
             | Event::DreamLoomBought { .. }
             | Event::DistantDawn => EventClass::Milestone,
+
+            // Decided above, on its count.
+            Event::StructureBuilt { .. } => unreachable!("handled before the match"),
         }
     }
 }

@@ -364,6 +364,13 @@ fn occurrences(j: &Journal) -> Vec<(u64, Event)> {
         .collect()
 }
 
+/// An event that must survive eviction forever.
+fn milestone_event() -> Event {
+    let e = Event::StructureBuilt { id: StructureId::CatnipPatch, count: 1 };
+    assert_eq!(e.class(), EventClass::Milestone, "this helper must drive the kept list");
+    e
+}
+
 /// An event the rolling window is allowed to evict.
 fn rolling_event() -> Event {
     let e = Event::Flavor { template: 0, kitten: None };
@@ -427,6 +434,11 @@ fn a_heavy_journal_does_not_perturb_the_bit_identical_round_trip() {
     )
     .expect("the staging load succeeds")
     .state;
+    // A genuine milestone, recorded explicitly. Ticking alone no longer
+    // produces one: milestones must be bounded over a playthrough, so the
+    // recurring calendar turn is ordinary and only the *first* of a structure
+    // is the moment worth keeping. @spec SIM-ENG-026
+    s.journal.record(s.ticks, &milestone_event());
     for i in 0..1_500u64 {
         s.journal.record(s.ticks + i, &rolling_event());
     }

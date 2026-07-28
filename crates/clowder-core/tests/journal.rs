@@ -567,14 +567,25 @@ fn a_replay_inside_a_command_does_not_stream_into_the_journal() {
     let events = s.apply(Command::DeepNap(years)).expect("the nap is affordable");
     assert_eq!(s.ticks, ticks_before + years as u64 * 1_000, "years of ticks really replayed");
 
-    let after = happened(&s.journal);
+    // The summary IS recorded — as the nap's away entry, which is the one
+    // place a bulk-time span is read from (SIM-DREAM-008). Journaling the
+    // Napped event as well would file one sleep under two headings.
+    let aways = s
+        .journal
+        .iter_chronological()
+        .into_iter()
+        .filter(|e| matches!(&e.item, JournalItem::Away(_)))
+        .count();
+    assert_eq!(aways, 1, "the nap left exactly one away entry — its summary");
     assert!(
-        after.iter().any(|(_, e)| matches!(e, Event::Napped { .. })),
-        "the command's own summary is journaled — it arose from an applied command"
+        events.iter().any(|e| matches!(e, Event::Napped { .. })),
+        "and the caller still receives the summary event for the wake-up screen"
     );
+
+    let after = happened(&s.journal);
     assert_eq!(
         after.len(),
-        before + events.len(),
+        before,
         "and nothing else: none of the {} replayed ticks reached the journal",
         years as u64 * 1_000
     );
