@@ -48,7 +48,9 @@ The core exposes `TICKS_PER_SECOND` and takes wall-clock time only as a caller-s
 
 **Ticks owed** accumulate as `elapsed_seconds × TICKS_PER_SECOND × speed`, with the fractional remainder banked across frames so no partial tick is ever lost or double-counted. Speed changes apply from the moment they happen and never retroactively rescale already-banked time — banked time was earned at the old rate.
 
-Two quantities are banked, and conflating them is the easy mistake: a **sub-tick remainder** of time not yet worth a whole tick, and a **whole-tick backlog** already converted but not yet run. A speed change applies to the first and not the second — backlog ticks were converted at the speed in force when their time elapsed, and rescaling them would retroactively rewrite history the player already lived through.
+Two quantities are banked, and conflating them is the easy mistake: a **sub-tick remainder**, a fraction of one tick, and a **whole-tick backlog** not yet run. Both are held *already converted* — every interval becomes ticks at the speed in force when that interval elapsed, at the moment it is observed.
+
+That is what makes the rule simple enough to keep: **nothing banked is ever re-rated.** The tempting alternative, banking the remainder as raw seconds, quietly breaks it — the remainder would convert at whatever speed happened to be set when it was next folded, so changing speed would retroactively re-price a span the player already lived at another pace. The error is under one tick, which is exactly why it would never be noticed and never be fixed.
 
 **Two clocks, because neither alone is correct:**
 

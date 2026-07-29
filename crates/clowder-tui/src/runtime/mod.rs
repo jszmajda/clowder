@@ -42,7 +42,134 @@ pub struct App {
 /// version, or a save that cannot be read at all.
 /// @spec TUI-RUN-001, TUI-RUN-007, TUI-RUN-011, TUI-RUN-013
 pub fn run() -> ExitCode {
-    todo!("TUI-RUN-001/006/029: lock, load, enter raw mode, loop, shut down")
+    let save_path = persist::resolve_save_path();
+
+    // TUI-RUN-029: the lock comes before the save is read. Acquiring it after
+    // would leave a window in which two launches both read the same save and
+    // both believe they are alone. Every refusal below returns while `_lock`
+    // is still in scope, so its Drop releases it — a refusal never leaves a
+    // lock behind for the next launch to inherit.
+    let _lock = match SessionLock::acquire(&save_path, false) {
+        Ok(l) => l,
+        Err(lock::LockError::Held { pid }) => {
+            eprintln!(
+                "clowder is already open in another session (process {pid}).\n\
+                 Only one session may hold a meadow at a time.\n\
+                 If that session is gone, start again with --force to take the lock."
+            );
+            return ExitCode::FAILURE;
+        }
+        Err(lock::LockError::Io(e)) => {
+            eprintln!("clowder could not take its session lock beside {}: {e}", save_path.display());
+            return ExitCode::FAILURE;
+        }
+    };
+
+    // TUI-RUN-013 vs TUI-RUN-012: read the bytes here rather than letting the
+    // core's reader decide, because it reports *every* non-missing IO failure
+    // as a corrupt save — and the policy for corrupt is to move the file
+    // aside. A permission error or a directory in the save's place would then
+    // destroy a save whose contents were never even seen. Unreadable is not
+    // unparseable: if we could not read it, we do not touch it.
+    let contents = match std::fs::read_to_string(&save_path) {
+        Ok(c) => Some(c),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+        Err(e) => {
+            eprintln!(
+                "clowder could not read its save at {}: {e}\n\
+                 The file has been left exactly as it is.",
+                save_path.display()
+            );
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let now_unix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    let state = match contents {
+        // TUI-RUN-010: an ordinary first run, not an error.
+        None => GameState::new(now_unix),
+        Some(c) => match clowder_core::load_string(&c, now_unix) {
+            Ok(loaded) => loaded.state,
+            // TUI-RUN-011: never guess forward over a save that is currently fine.
+            Err(clowder_core::LoadError::TooNew { found }) => {
+                eprintln!(
+                    "This meadow was saved by a newer clowder (save version {found}).\n\
+                     Opening it with this one could damage it, so it has been left alone.\n\
+                     Update clowder, or move {} aside yourself.",
+                    save_path.display()
+                );
+                return ExitCode::FAILURE;
+            }
+            // TUI-RUN-012: readable but not parseable. Move it aside — never
+            // over-write it. Saves are human-readable precisely so a broken one
+            // can be rescued by hand, and replacing it destroys the only thing
+            // that made that promise real.
+            Err(clowder_core::LoadError::Corrupt { detail }) => {
+                match persist::set_aside(&save_path) {
+                    Ok(moved) => {
+                        eprintln!(
+                            "clowder could not make sense of its save ({detail}).\n\
+                             Your old save is safe at {} — nothing was overwritten.\n\
+                             Starting a new meadow.",
+                            moved.display()
+                        );
+                        GameState::new(now_unix)
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "clowder could not make sense of its save ({detail}), and could \
+                             not move it aside either ({e}).\n\
+                             Nothing has been changed."
+                        );
+                        return ExitCode::FAILURE;
+                    }
+                }
+            }
+            Err(clowder_core::LoadError::NotFound) => GameState::new(now_unix),
+        },
+    };
+
+    // Past every refusal: the terminal may now be taken over (TUI-RUN-001).
+    let _guard = match TerminalGuard::enter() {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("clowder could not prepare the terminal: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if let Err(e) = term::install_signal_handlers() {
+        eprintln!("clowder could not install its signal handlers: {e}");
+        return ExitCode::FAILURE;
+    }
+
+    let mut app = App {
+        state,
+        view: ViewState::default(),
+        clock: TickAccumulator::default(),
+        save_path,
+        last_save: Instant::now(),
+        prev_layout: None,
+        quitting: false,
+    };
+
+    while !app.quitting && !term::termination_requested() {
+        if let Err(e) = app.step() {
+            eprintln!("clowder stopped: {e}");
+            break;
+        }
+    }
+
+    // TUI-RUN-026: every clean shutdown saves. A failure here is reported and
+    // does not change the exit code — the session is ending either way, and
+    // the player is better served by the message than by a status.
+    if let Err(e) = app.save() {
+        eprintln!("clowder could not save on the way out: {e}");
+    }
+    ExitCode::SUCCESS
 }
 
 impl App {
@@ -58,6 +185,21 @@ impl App {
     /// Save, using a timestamp naming the instant the *simulation* has
     /// reached rather than the wall clock. @spec TUI-RUN-027, TUI-RUN-031
     pub fn save(&self) -> std::io::Result<()> {
-        todo!("TUI-RUN-026/027/028: back-dated stamp, atomic write, tolerate failure")
+        // TUI-RUN-027: the stamp names where the *simulation* has reached, not
+        // where the wall clock has. Banked ticks mean the state in memory can
+        // sit legitimately behind real time, and stamping the present on a
+        // banked save would tell the next load it is caught up when it is not
+        // — that load computes its own elapsed from this origin, so the owed
+        // interval would simply vanish. Back-dating hands it forward instead,
+        // to be run exactly once.
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let stamp = now.saturating_sub(self.clock.unrun_span().as_secs());
+        // The write itself is the core's atomic temp-and-rename. The error is
+        // returned rather than swallowed: whether a failed save ends the
+        // session is the caller's call, and TUI-RUN-028 says it must not.
+        clowder_core::write_save(&self.save_path, &self.state, stamp)
     }
 }

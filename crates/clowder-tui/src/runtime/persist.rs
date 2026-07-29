@@ -23,7 +23,7 @@ pub enum StartupRefusal {
 /// platform data directory resolves — and saying where it landed rather than
 /// refusing to start. @spec TUI-RUN-005
 pub fn resolve_save_path() -> PathBuf {
-    todo!("TUI-RUN-005: platform data dir, else a stated fallback")
+    clowder_core::default_save_path().unwrap_or_else(|| PathBuf::from("clowder-save.json"))
 }
 
 /// Move an unparseable save aside under a suffixed name, returning where it
@@ -31,11 +31,26 @@ pub fn resolve_save_path() -> PathBuf {
 /// broken one can be hand-rescued, and a shell that replaces it with a fresh
 /// game destroys the only artifact that made that promise real.
 /// @spec TUI-RUN-012
-pub fn set_aside(_path: &std::path::Path) -> std::io::Result<PathBuf> {
-    todo!("TUI-RUN-012: rename aside, report the new path")
+pub fn set_aside(path: &std::path::Path) -> std::io::Result<PathBuf> {
+    let mut name = path
+        .file_name()
+        .ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "save path has no file name")
+        })?
+        .to_os_string();
+    name.push(".broken");
+    let moved_to = path.with_file_name(name);
+    std::fs::rename(path, &moved_to)?;
+    Ok(moved_to)
 }
 
-/// Whether the autosave cadence has elapsed. @spec TUI-RUN-026
-pub fn autosave_due() -> bool {
-    todo!("TUI-RUN-026: wall-clock cadence")
+/// The wall-clock interval between autosaves. The exact value is an open
+/// tuning question per the runtime design's deferred decisions; this is a
+/// placeholder pending measurement against a real long session.
+pub const AUTOSAVE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Whether the autosave cadence has elapsed since `since_last_save`.
+/// @spec TUI-RUN-026
+pub fn autosave_due(since_last_save: std::time::Duration) -> bool {
+    since_last_save >= AUTOSAVE_INTERVAL
 }
