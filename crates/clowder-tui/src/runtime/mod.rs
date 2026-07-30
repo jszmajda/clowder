@@ -42,6 +42,9 @@ pub struct App {
 /// version, or a save that cannot be read at all.
 /// @spec TUI-RUN-001, TUI-RUN-007, TUI-RUN-011, TUI-RUN-013
 pub fn run() -> ExitCode {
+    // TUI-RUN-009. The refusal below tells the player about --force, so the
+    // binary had better honour it.
+    let force = std::env::args().any(|a| a == "--force");
     let save_path = persist::resolve_save_path();
 
     // TUI-RUN-029: the lock comes before the save is read. Acquiring it after
@@ -49,7 +52,7 @@ pub fn run() -> ExitCode {
     // both believe they are alone. Every refusal below returns while `_lock`
     // is still in scope, so its Drop releases it — a refusal never leaves a
     // lock behind for the next launch to inherit.
-    let _lock = match SessionLock::acquire(&save_path, false) {
+    let _lock = match SessionLock::acquire(&save_path, force) {
         Ok(l) => l,
         Err(lock::LockError::Held { pid }) => {
             eprintln!(
@@ -71,8 +74,12 @@ pub fn run() -> ExitCode {
     // aside. A permission error or a directory in the save's place would then
     // destroy a save whose contents were never even seen. Unreadable is not
     // unparseable: if we could not read it, we do not touch it.
-    let contents = match std::fs::read_to_string(&save_path) {
-        Ok(c) => Some(c),
+    let contents = match std::fs::read(&save_path) {
+        // Bytes we could read but not decode are *corrupt*, not unreadable —
+        // the contents are known, which is the case the rescue policy exists
+        // for. Refusing here would leave the player hard-stuck on exactly the
+        // damage TUI-RUN-012 promises to preserve.
+        Ok(bytes) => Some(String::from_utf8_lossy(&bytes).into_owned()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
         Err(e) => {
             eprintln!(
@@ -156,18 +163,27 @@ pub fn run() -> ExitCode {
         quitting: false,
     };
 
-    while !app.quitting && !term::termination_requested() {
-        if let Err(e) = app.step() {
-            eprintln!("clowder stopped: {e}");
-            break;
+    // Anything said from in here would be printed onto the alternate screen and
+    // then wiped out by the restore that follows. Collect instead, and speak
+    // once the player's own terminal is back.
+    let mut parting = Vec::new();
+    {
+        let _guard = _guard;
+        while !app.quitting && !term::termination_requested() {
+            if let Err(e) = app.step() {
+                parting.push(format!("clowder stopped: {e}"));
+                break;
+            }
+        }
+        // TUI-RUN-026: every clean shutdown saves. A failure does not change the
+        // exit code — the session is ending either way, and the player is better
+        // served by being told than by a status nobody reads.
+        if let Err(e) = app.save() {
+            parting.push(format!("clowder could not save on the way out: {e}"));
         }
     }
-
-    // TUI-RUN-026: every clean shutdown saves. A failure here is reported and
-    // does not change the exit code — the session is ending either way, and
-    // the player is better served by the message than by a status.
-    if let Err(e) = app.save() {
-        eprintln!("clowder could not save on the way out: {e}");
+    for line in parting {
+        eprintln!("{line}");
     }
     ExitCode::SUCCESS
 }

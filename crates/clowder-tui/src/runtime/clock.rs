@@ -48,7 +48,9 @@ pub struct Reading {
 /// @spec TUI-RUN-019, TUI-RUN-027, TUI-RUN-030
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct TickAccumulator {
-    /// Real time not yet worth a whole tick, in seconds.
+    /// A fraction of one tick, already converted at the speed in force when
+    /// its time elapsed — never raw seconds, which a later speed change would
+    /// silently re-price. @spec TUI-RUN-020, TUI-RUN-030
     fractional: f64,
     /// Whole ticks converted but not yet run. @spec TUI-RUN-019
     backlog: u64,

@@ -39,7 +39,18 @@ pub fn set_aside(path: &std::path::Path) -> std::io::Result<PathBuf> {
         })?
         .to_os_string();
     name.push(".broken");
-    let moved_to = path.with_file_name(name);
+    let base = path.with_file_name(&name);
+    // A fixed suffix would rename over the previous rescue — destroying the one
+    // file the player was told was safe, which is the whole point of moving it
+    // aside rather than overwriting it.
+    let mut moved_to = base.clone();
+    let mut n = 1u32;
+    while moved_to.exists() {
+        let mut numbered = name.clone();
+        numbered.push(format!(".{n}"));
+        moved_to = path.with_file_name(numbered);
+        n += 1;
+    }
     std::fs::rename(path, &moved_to)?;
     Ok(moved_to)
 }

@@ -160,6 +160,15 @@ impl SessionLock {
     /// @spec TUI-RUN-006, TUI-RUN-008, TUI-RUN-009, TUI-RUN-029
     pub fn acquire(beside: &Path, force: bool) -> Result<Self, LockError> {
         let path = lock_path_for(beside);
+        // A first run has no data directory yet — nothing has written a save
+        // to create it, and the lock is deliberately taken before the save is
+        // read. Without this, a brand-new player is refused at the door.
+        // @spec TUI-RUN-010
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent).map_err(LockError::Io)?;
+            }
+        }
         let my_pid = std::process::id();
         let my_start = process_start_time(my_pid).unwrap_or(0);
         let contents = render_lock(my_pid, my_start);

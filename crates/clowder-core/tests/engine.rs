@@ -474,22 +474,12 @@ fn speed_is_clamped_state_that_never_touches_tick_rules() {
     let ev_fast = run_ticks(&mut fast, 200);
     assert_eq!(ev_slow, ev_fast, "speed changes cadence at the boundary, never tick behavior");
 
-    // Two permitted differences: the speed field, and the journal's faithful
-    // record that one world was sent a SetSpeed command and the other was not.
-    // Neither is tick behaviour. What the *ticks* wrote must still match
-    // exactly — that is this spec's actual claim, so assert it before
-    // normalizing rather than papering over the journal wholesale.
-    let ticked = |s: &GameState| -> Vec<_> {
-        s.journal
-            .recent
-            .iter()
-            .filter(|e| !matches!(&e.item, JournalItem::Happened(Event::SpeedChanged { .. })))
-            .cloned()
-            .collect()
-    };
-    assert_eq!(ticked(&slow), ticked(&fast), "the ticks wrote identical history");
+    // The speed field is the ONE permitted difference. The journals must match
+    // outright: a speed change is never journaled (SIM-ENG-043), because the
+    // journal records what happened in the meadow and speed is the pace it is
+    // watched at. Asserting that here is the only coverage 043 has.
+    assert_eq!(slow.journal, fast.journal, "a speed change leaves no trace in the journal");
 
     fast.speed = slow.speed;
-    fast.journal = slow.journal.clone();
     assert_eq!(save_string(&slow, 0), save_string(&fast, 0));
 }
