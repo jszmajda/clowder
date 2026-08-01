@@ -1,0 +1,1443 @@
+//! Colour, and what it is allowed to mean — `theme`.
+//!
+//! @spec TUI-THEME-001, TUI-THEME-002, TUI-THEME-003, TUI-THEME-004,
+//! TUI-THEME-005, TUI-THEME-006, TUI-THEME-007, TUI-THEME-008, TUI-THEME-009,
+//! TUI-THEME-010, TUI-THEME-011, TUI-THEME-012, TUI-THEME-013, TUI-THEME-014,
+//! TUI-THEME-015
+//!
+//! **How this test reaches the code.** `clowder-tui` is a binary crate with no
+//! library target, so an integration test cannot `use clowder_tui::…`.
+//! `theme` depends on nothing else in the crate — only `clowder_core::Season`
+//! and `ratatui::style::Color` — so this file compiles the module in by path,
+//! as the sibling runtime tests do. If the implementation later reaches for a
+//! crate sibling (`crate::…`), this include stops compiling and the crate needs
+//! a `[lib]` target instead; that belongs to `Cargo.toml`, which is another
+//! chunk's, and is reported as an open question rather than fixed here.
+//!
+//! **Why so much colour arithmetic lives here.** Three of this leaf's specs are
+//! claims about *values*, not about control flow: TUI-THEME-002's contrast
+//! floor against both extremes of ground, TUI-THEME-011's red-green
+//! compression, and TUI-THEME-014's "recedes rather than competes". None of
+//! them can be checked by calling a function and looking at the tag on the
+//! answer — they need relative luminance, CIE Lab, and a dichromacy
+//! simulation, so those are implemented below and applied to the palette the
+//! module returns. Restating the hex table would test nothing; the assertions
+//! are about the *separation* the design says those values must have.
+//!
+//! **The meaning table.** `MEANINGS` transcribes the design's "Colour Is Always
+//! the Second Channel" table, with affordability and flavour/mechanical
+//! expanded to one row per state, and the armed row added from the palette
+//! table. Its glyphs and words belong to the navigation leaf (TUI-NAV-009's
+//! markers, TUI-NAV-020's chips, TUI-NAV-015's armed expansion) — this leaf
+//! only asserts properties *of* the pairing, so a glyph changing there
+//! legitimately fails a test here, which is the cascade signal the design asks
+//! for.
+//!
+//! **What is deliberately not tested here.**
+//!
+//! - The *confinement* half of TUI-THEME-009 — that nothing but the header rule
+//!   and the pane divider ever calls `seasonal_accent` — is a property of call
+//!   sites in `render`, which are `todo!()` in a leaf this chunk does not own.
+//!   What is checked instead is that no accent is a state colour, and that
+//!   nothing about the values themselves keeps the two apart.
+//! - TUI-THEME-012's "once" — that the notice is said at startup and never
+//!   again — has no seam: `App::step` is `todo!()`, so no run reaches a second
+//!   frame to say it twice in.
+//! - TUI-THEME-006's cursor glyph and TUI-THEME-007's reversal are rendered by
+//!   `render`, and `theme` exposes no style seam for either; what is checked
+//!   here is the half that is this leaf's — that no palette colour is spent on
+//!   focus, and that a reversal carries no palette value.
+
+use clowder_tui::theme;
+
+use std::collections::HashSet;
+use std::ffi::OsString;
+use std::sync::Mutex;
+
+use clowder_core::Season;
+use ratatui::backend::TestBackend;
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::widgets::Paragraph;
+use ratatui::Terminal;
+
+use theme::{seasonal_accent, truecolor_advertised, Role};
+
+// ---------------------------------------------------------------------------
+// The roles, and a compile-time guard on there being six of them
+// ---------------------------------------------------------------------------
+
+/// Every role the design names, written out rather than derived: a seventh
+/// cannot appear without this list and `role_name` below both being revisited.
+/// @spec TUI-THEME-004
+const ROLES: [Role; 6] = [
+    Role::Inherited,
+    Role::Dim,
+    Role::Ready,
+    Role::Partial,
+    Role::Attention,
+    Role::Milestone,
+];
+
+/// The five roles that take a colour of their own. `Inherited` is the sixth,
+/// and it is the *absence* of one.
+const PALETTE_ROLES: [Role; 5] = [
+    Role::Dim,
+    Role::Ready,
+    Role::Partial,
+    Role::Attention,
+    Role::Milestone,
+];
+
+/// Exhaustive on purpose, with no wildcard arm: a seventh role stops this file
+/// compiling, which is what TUI-THEME-004's "no seventh" is worth as a test.
+fn role_name(role: Role) -> &'static str {
+    match role {
+        Role::Inherited => "inherited",
+        Role::Dim => "dim",
+        Role::Ready => "ready",
+        Role::Partial => "partial",
+        Role::Attention => "attention",
+        Role::Milestone => "milestone",
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Meanings, and the two channels that carry each of them
+// ---------------------------------------------------------------------------
+
+/// What reinforces a meaning, once its first channel has already carried it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Tint {
+    /// A palette role. `Tint::Role(Role::Inherited)` is "no colour at all" —
+    /// the terminal's own foreground.
+    Role(Role),
+    /// The chrome accent, which belongs to a season and never to a state.
+    SeasonalAccent,
+}
+
+/// One meaning the interface conveys, and the two channels that carry it.
+struct Meaning {
+    what: &'static str,
+    /// The channel that carries it *first* — a glyph, a word, or a fill. If
+    /// this is enough on its own, removing all colour loses nothing.
+    first_channel: &'static str,
+    tint: Tint,
+}
+
+/// The design's second-channel table, one row per state.
+const MEANINGS: [Meaning; 12] = [
+    Meaning { what: "affordable now", first_channel: "●", tint: Tint::Role(Role::Ready) },
+    Meaning {
+        what: "partially affordable",
+        first_channel: "◐",
+        tint: Tint::Role(Role::Partial),
+    },
+    Meaning {
+        what: "revealed but not affordable",
+        first_channel: "○",
+        tint: Tint::Role(Role::Dim),
+    },
+    Meaning { what: "owned or done", first_channel: "✓", tint: Tint::Role(Role::Dim) },
+    Meaning {
+        what: "an attention chip",
+        first_channel: "the chip's glyph, its count, and its word",
+        tint: Tint::Role(Role::Attention),
+    },
+    Meaning {
+        what: "a capped store",
+        first_channel: "the word `full`, and a filled bar",
+        tint: Tint::Role(Role::Attention),
+    },
+    Meaning {
+        what: "an armed row",
+        first_channel: "the row expands in place to a consequence summary",
+        tint: Tint::Role(Role::Attention),
+    },
+    Meaning { what: "a milestone", first_channel: "★", tint: Tint::Role(Role::Milestone) },
+    Meaning { what: "a flavour event", first_channel: "·", tint: Tint::Role(Role::Dim) },
+    Meaning {
+        what: "a mechanical event",
+        first_channel: "▪",
+        tint: Tint::Role(Role::Inherited),
+    },
+    Meaning {
+        what: "the clowder's mood",
+        first_channel: "the mood word itself",
+        tint: Tint::Role(Role::Inherited),
+    },
+    Meaning {
+        what: "the season",
+        first_channel: "the season's name in the header",
+        tint: Tint::SeasonalAccent,
+    },
+];
+
+fn meaning(what: &str) -> &'static Meaning {
+    MEANINGS
+        .iter()
+        .find(|m| m.what == what)
+        .unwrap_or_else(|| panic!("no meaning named {what:?} in the second-channel table"))
+}
+
+// ---------------------------------------------------------------------------
+// Reading the palette
+// ---------------------------------------------------------------------------
+
+/// The 24-bit value behind a colour, or a failure explaining why a colour that
+/// is not 24-bit cannot satisfy this leaf.
+fn rgb_of(colour: Color, what: &str) -> (u8, u8, u8) {
+    match colour {
+        Color::Rgb(r, g, b) => (r, g, b),
+        other => panic!(
+            "{what} is {other:?}. A named or indexed colour is whatever the terminal's own \
+             palette happens to hold, so its luminance is unknown — and every claim this leaf \
+             makes about contrast against a near-black and a near-white ground is a claim about \
+             specific values."
+        ),
+    }
+}
+
+/// The 24-bit value a role paints with. Fails loudly for `Inherited`, which is
+/// the one role that must have none.
+fn rgb(role: Role) -> (u8, u8, u8) {
+    let name = role_name(role);
+    match role.color() {
+        Some(colour) => rgb_of(colour, &format!("`{name}`")),
+        None => panic!(
+            "`{name}` returned no colour. Only `inherited` may be absent; every other role is a \
+             value the palette owns."
+        ),
+    }
+}
+
+fn accent(season: Season) -> (u8, u8, u8) {
+    rgb_of(seasonal_accent(season), &format!("the {season:?} accent"))
+}
+
+// ---------------------------------------------------------------------------
+// Colour arithmetic
+// ---------------------------------------------------------------------------
+
+/// Both extremes of ground the design says every value must hold against.
+const NEAR_BLACK: (u8, u8, u8) = (0x00, 0x00, 0x00);
+const NEAR_WHITE: (u8, u8, u8) = (0xFF, 0xFF, 0xFF);
+
+/// The contrast floor for a value that has to be *read* — WCAG's ratio for
+/// large text and graphical objects. Ordinary body text is the terminal's own
+/// foreground and is not clowder's to guarantee; what the palette must clear is
+/// the floor for the glyphs and short words it tints.
+const CONTRAST_FLOOR: f64 = 3.0;
+
+/// The mid-luminance band: neither a pale tint nor a deep shade. The bounds are
+/// generous on purpose — the design's claim is that the whole palette lives
+/// between the extremes, not that it hits a particular number.
+const MID_BAND: (f64, f64) = (0.05, 0.45);
+
+fn to_linear(component: u8) -> f64 {
+    let c = f64::from(component) / 255.0;
+    if c <= 0.04045 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+fn from_linear(value: f64) -> u8 {
+    let v = value.clamp(0.0, 1.0);
+    let s = if v <= 0.003_130_8 { 12.92 * v } else { 1.055 * v.powf(1.0 / 2.4) - 0.055 };
+    (s * 255.0).round() as u8
+}
+
+/// WCAG relative luminance.
+fn luminance((r, g, b): (u8, u8, u8)) -> f64 {
+    0.2126 * to_linear(r) + 0.7152 * to_linear(g) + 0.0722 * to_linear(b)
+}
+
+/// WCAG contrast ratio between two colours.
+fn contrast(a: (u8, u8, u8), b: (u8, u8, u8)) -> f64 {
+    let (la, lb) = (luminance(a), luminance(b));
+    let (hi, lo) = if la >= lb { (la, lb) } else { (lb, la) };
+    (hi + 0.05) / (lo + 0.05)
+}
+
+/// CIE L*a*b*, D65.
+fn lab((r, g, b): (u8, u8, u8)) -> (f64, f64, f64) {
+    let (lr, lg, lb) = (to_linear(r), to_linear(g), to_linear(b));
+    let x = (0.4124 * lr + 0.3576 * lg + 0.1805 * lb) / 0.950_47;
+    let y = 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+    let z = (0.0193 * lr + 0.1192 * lg + 0.9505 * lb) / 1.088_83;
+    let f = |t: f64| if t > 0.008_856 { t.cbrt() } else { 7.787 * t + 16.0 / 116.0 };
+    let (fx, fy, fz) = (f(x), f(y), f(z));
+    (116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz))
+}
+
+/// CIE76 colour difference. Roughly: under 2 is invisible, around 10 is "the
+/// same colour, slightly off", over 25 is unmistakably two colours.
+fn delta_e(a: (u8, u8, u8), b: (u8, u8, u8)) -> f64 {
+    let (l1, a1, b1) = lab(a);
+    let (l2, a2, b2) = lab(b);
+    ((l1 - l2).powi(2) + (a1 - a2).powi(2) + (b1 - b2).powi(2)).sqrt()
+}
+
+/// Distance from grey. A near-grey recedes; a saturated colour competes.
+fn chroma(c: (u8, u8, u8)) -> f64 {
+    let (_, a, b) = lab(c);
+    a.hypot(b)
+}
+
+/// Viénot–Brettel–Mollon dichromacy matrices, applied in linear RGB.
+const PROTANOPIA: [[f64; 3]; 3] = [
+    [0.11238, 0.88762, 0.0],
+    [0.11238, 0.88762, 0.0],
+    [0.00401, -0.00401, 1.0],
+];
+const DEUTERANOPIA: [[f64; 3]; 3] = [
+    [0.29275, 0.70725, 0.0],
+    [0.29275, 0.70725, 0.0],
+    [-0.02234, 0.02234, 1.0],
+];
+
+/// What a dichromat sees where a trichromat sees this colour.
+fn simulate((r, g, b): (u8, u8, u8), m: [[f64; 3]; 3]) -> (u8, u8, u8) {
+    let v = [to_linear(r), to_linear(g), to_linear(b)];
+    let out = |row: [f64; 3]| row[0] * v[0] + row[1] * v[1] + row[2] * v[2];
+    (from_linear(out(m[0])), from_linear(out(m[1])), from_linear(out(m[2])))
+}
+
+/// The smallest difference between any two of a set of colours.
+fn closest_pair(colours: &[(&str, (u8, u8, u8))]) -> (String, f64) {
+    let mut worst = ("".to_string(), f64::INFINITY);
+    for (i, (na, ca)) in colours.iter().enumerate() {
+        for (nb, cb) in colours.iter().skip(i + 1) {
+            let d = delta_e(*ca, *cb);
+            if d < worst.1 {
+                worst = (format!("{na}/{nb}"), d);
+            }
+        }
+    }
+    worst
+}
+
+/// The one correct way to turn a role into a style: a foreground and nothing
+/// else. `None` means "leave the cell alone", which is how clowder paints no
+/// ground.
+fn style_for(role: Role) -> Style {
+    match role.color() {
+        Some(colour) => Style::default().fg(colour),
+        None => Style::default(),
+    }
+}
+
+/// Render a full-area paragraph at an exact size and hand back the buffer.
+fn frame_at(width: u16, height: u16, style: Style) -> ratatui::buffer::Buffer {
+    let mut terminal =
+        Terminal::new(TestBackend::new(width, height)).expect("a test backend always builds");
+    terminal
+        .draw(|f| {
+            let area = f.area();
+            f.render_widget(Paragraph::new("a line of ordinary text").style(style), area);
+        })
+        .expect("drawing into an in-memory backend cannot fail");
+    terminal.backend().buffer().clone()
+}
+
+/// The two sizes the render leaf's breakpoints sit either side of: a frame is a
+/// pure function of size, so a claim about the ground has to hold at both.
+const SIZES: [(u16, u16); 2] = [(80, 24), (120, 40)];
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-001 — the ground belongs to the terminal
+// ---------------------------------------------------------------------------
+
+/// Ordinary text has no colour of clowder's, which is the whole reason a light
+/// terminal and a dark one both work with nothing detected: the contrast in use
+/// is the terminal's own, in either polarity.
+///
+/// @spec TUI-THEME-001
+#[test]
+fn ordinary_text_takes_no_colour_so_the_terminal_supplies_its_own() {
+    assert_eq!(
+        Role::Inherited.color(),
+        None,
+        "`inherited` returned a colour of its own. It is the role for names, counts, costs and \
+         prose — the great majority of the screen — and giving it a value would mean clowder \
+         choosing a foreground for a background it deliberately does not detect."
+    );
+
+    for role in PALETTE_ROLES {
+        assert!(
+            role.color().is_some(),
+            "`{}` has no colour. Only `inherited` may be absent; the other five are what colour \
+             appearing on screen *means*.",
+            role_name(role)
+        );
+    }
+}
+
+/// The sentinel has to survive to the buffer: a frame of ordinary text leaves
+/// every cell at the terminal's own pair, at any size. If anything along the
+/// way substituted a concrete foreground or filled a background, the pane would
+/// stop looking native beside the player's other panes — and would be a guess
+/// about a background clowder never detected.
+///
+/// @spec TUI-THEME-001
+#[test]
+fn a_frame_of_ordinary_text_paints_no_ground_at_any_size() {
+    for (width, height) in SIZES {
+        let buffer = frame_at(width, height, style_for(Role::Inherited));
+        for y in 0..height {
+            for x in 0..width {
+                let cell = buffer.cell((x, y)).expect("every cell of the area exists");
+                assert_eq!(
+                    cell.bg,
+                    Color::Reset,
+                    "cell ({x},{y}) of a {width}x{height} frame had background {:?}. Clowder \
+                     paints no background: the ground is the terminal's, which is what makes a \
+                     light terminal and a dark one both legible.",
+                    cell.bg
+                );
+                assert_eq!(
+                    cell.fg,
+                    Color::Reset,
+                    "cell ({x},{y}) of a {width}x{height} frame had foreground {:?}. Ordinary \
+                     text inherits the terminal's foreground rather than taking a palette value.",
+                    cell.fg
+                );
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-002 — mid-luminance, against both extremes of ground
+// ---------------------------------------------------------------------------
+
+/// The cost of inheriting the ground: every value has to hold against a
+/// near-black *and* a near-white one, because clowder never learns which it is
+/// on. That rules out pale tints and deep shades in the same breath, which is
+/// why the palette is mid-luminance throughout.
+///
+/// @spec TUI-THEME-002
+#[test]
+fn every_state_colour_clears_the_contrast_floor_against_both_extremes_of_ground() {
+    for role in PALETTE_ROLES {
+        let value = rgb(role);
+        let name = role_name(role);
+
+        let on_black = contrast(value, NEAR_BLACK);
+        assert!(
+            on_black >= CONTRAST_FLOOR,
+            "`{name}` (#{:02X}{:02X}{:02X}) is {on_black:.2}:1 against a near-black ground, \
+             below the {CONTRAST_FLOOR}:1 floor. A player in a dark terminal cannot read it.",
+            value.0,
+            value.1,
+            value.2
+        );
+
+        let on_white = contrast(value, NEAR_WHITE);
+        assert!(
+            on_white >= CONTRAST_FLOOR,
+            "`{name}` (#{:02X}{:02X}{:02X}) is {on_white:.2}:1 against a near-white ground, \
+             below the {CONTRAST_FLOOR}:1 floor. A light-terminal player was handed a value \
+             tuned for the other polarity — the exact failure inheriting the ground exists to \
+             avoid.",
+            value.0,
+            value.1,
+            value.2
+        );
+    }
+}
+
+/// The band itself, stated for every value the theme can produce. The seasonal
+/// accents are held to the band but not to the reading floor: they tint inert
+/// chrome rather than anything the player has to read. (Whether TUI-THEME-002's
+/// "every palette value" is meant to reach them is reported as an open
+/// question — at the stated values two of the four fall below 3:1 against a
+/// near-white ground.)
+///
+/// @spec TUI-THEME-002
+#[test]
+fn nothing_in_the_theme_is_a_pale_tint_or_a_deep_shade() {
+    let mut values: Vec<(String, (u8, u8, u8))> =
+        PALETTE_ROLES.iter().map(|r| (role_name(*r).to_string(), rgb(*r))).collect();
+    for season in Season::ALL {
+        values.push((format!("the {season:?} accent"), accent(season)));
+    }
+
+    for (name, value) in values {
+        let l = luminance(value);
+        assert!(
+            l > MID_BAND.0,
+            "{name} (#{:02X}{:02X}{:02X}) has relative luminance {l:.3} — a deep shade, which \
+             disappears into a near-black ground.",
+            value.0,
+            value.1,
+            value.2
+        );
+        assert!(
+            l < MID_BAND.1,
+            "{name} (#{:02X}{:02X}{:02X}) has relative luminance {l:.3} — a pale tint, which \
+             disappears into a near-white ground.",
+            value.0,
+            value.1,
+            value.2
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-003 — colour encodes state, never identity
+// ---------------------------------------------------------------------------
+
+/// The load-bearing decision. Identity is carried by the name sitting right
+/// there; colour is spent on the handful of states a player learns once and
+/// reads everywhere. A vocabulary that grows with the content is a vocabulary
+/// nobody learns.
+///
+/// @spec TUI-THEME-003
+#[test]
+fn the_colour_vocabulary_is_five_states_and_does_not_grow_with_the_content() {
+    // A colour is obtained by naming a *state* — `Role::color` takes nothing
+    // else, which is the type-level half of this spec. What is checkable at
+    // runtime is that the vocabulary is small, fixed, and fully distinguishing.
+    let mut distinct = HashSet::new();
+    for role in PALETTE_ROLES {
+        let value = rgb(role);
+        assert!(
+            distinct.insert(value),
+            "`{}` shares #{:02X}{:02X}{:02X} with another role. Two states that look identical \
+             are one state as far as the player is concerned.",
+            role_name(role),
+            value.0,
+            value.1,
+            value.2
+        );
+    }
+    assert_eq!(
+        distinct.len(),
+        5,
+        "the palette should hold exactly five state colours; the sixth role is the absence of one"
+    );
+
+    for role in ROLES {
+        assert_eq!(
+            role.color(),
+            role.color(),
+            "`{}` answered differently on two calls — a colour must be a function of the state \
+             and of nothing else",
+            role_name(role)
+        );
+    }
+}
+
+/// The guard against the palette quietly acquiring a hue per item. There are
+/// far more resources, structures and ideas than a player could ever learn
+/// colours for, and the theme is the one place that temptation would land.
+///
+/// @spec TUI-THEME-003
+#[test]
+fn the_theme_names_no_item_so_nothing_can_have_a_colour_of_its_own() {
+    /// Every identity type the core exports. None of them belongs in a colour
+    /// decision.
+    const IDENTITY_TYPES: [&str; 15] = [
+        "ResourceId",
+        "StructureId",
+        "SiteId",
+        "DreamLoomId",
+        "JobId",
+        "CraftId",
+        "IdeaId",
+        "RefinementId",
+        "RuleId",
+        "ColonyId",
+        "RiteId",
+        "ArchId",
+        "TraditionId",
+        "AdventureId",
+        "ContentId",
+    ];
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/theme/mod.rs");
+    let source = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
+
+    for identity in IDENTITY_TYPES {
+        assert!(
+            !source.contains(identity),
+            "{} mentions `{identity}`. Colour encodes state, never identity: the moment a \
+             colour can be reached from *which item this is*, the palette has to grow with the \
+             content and stops meaning anything.",
+            path.display()
+        );
+    }
+
+    // The season is the one thing outside the state vocabulary that reaches the
+    // theme, and it reaches only the chrome.
+    assert_eq!(
+        PALETTE_ROLES.iter().map(|r| rgb(*r)).collect::<HashSet<_>>().len(),
+        5,
+        "five state colours, however many items exist"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-004 — six roles, and nothing outside them but the accent
+// ---------------------------------------------------------------------------
+
+/// Everything the theme can put on screen, counted. Five states, four seasons,
+/// and the terminal's own foreground: every colour beyond that dilutes the
+/// signal that colour *is* meaning.
+///
+/// @spec TUI-THEME-004
+#[test]
+fn the_theme_can_produce_nine_colours_and_no_others() {
+    // The compile-time half: `role_name` matches on `Role` with no wildcard, so
+    // a seventh role stops this file building.
+    for role in ROLES {
+        assert!(!role_name(role).is_empty());
+    }
+
+    let mut all = HashSet::new();
+    for role in PALETTE_ROLES {
+        all.insert(rgb(role));
+    }
+    for season in Season::ALL {
+        all.insert(accent(season));
+    }
+
+    assert_eq!(
+        all.len(),
+        9,
+        "the theme should reach exactly nine values — five states and four seasonal accents — \
+         and it reached {}. Each of the nine is a thing the player has to learn.",
+        all.len()
+    );
+
+    assert_eq!(
+        Role::Inherited.color(),
+        None,
+        "the sixth role is the absence of a colour, not a tenth value"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-005 — mood takes no colour
+// ---------------------------------------------------------------------------
+
+/// The word already says it, unambiguously, in a form a screen reader can speak
+/// and no deficiency can compress. Adding a ramp on top would spend a channel
+/// to say nothing new to most players and something unreliable to the rest.
+///
+/// @spec TUI-THEME-005
+#[test]
+fn mood_is_a_word_and_takes_no_colour_at_all() {
+    let mood = meaning("the clowder's mood");
+
+    assert_eq!(
+        mood.tint,
+        Tint::Role(Role::Inherited),
+        "mood took {:?}. Mood is rendered as a word in the terminal's own foreground; a palette \
+         value on it would be a second channel saying the same thing less reliably.",
+        mood.tint
+    );
+    assert_eq!(
+        Role::Inherited.color(),
+        None,
+        "the role mood renders in must carry no colour of its own"
+    );
+
+    let palette: Vec<(u8, u8, u8)> = PALETTE_ROLES.iter().map(|r| rgb(*r)).collect();
+    assert_eq!(palette.len(), 5, "and none of the five is spent on a mood ramp");
+
+    assert!(
+        !mood.first_channel.is_empty(),
+        "mood's only channel is the word itself, so it had better have one"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-006 — focus takes no colour
+// ---------------------------------------------------------------------------
+
+/// Every palette colour is claimed by a state, so there is none spare to spend
+/// on focus. That is the real protection: a focused row's state is whatever its
+/// own marker says, and a focus tint would put two colours in one row saying
+/// different things.
+///
+/// @spec TUI-THEME-006
+#[test]
+fn no_palette_colour_is_left_over_to_be_spent_on_focus() {
+    for role in PALETTE_ROLES {
+        let claimants: Vec<&str> = MEANINGS
+            .iter()
+            .filter(|m| m.tint == Tint::Role(role))
+            .map(|m| m.what)
+            .collect();
+        assert!(
+            !claimants.is_empty(),
+            "`{}` is a palette colour no state claims. A spare role is exactly how a focus tint \
+             gets in — and focus is not a state.",
+            role_name(role)
+        );
+        // And it really is a colour that state is spending.
+        let _ = rgb(role);
+    }
+
+    // The cursor is a glyph, and it collides with no state's channel: a focused
+    // row still shows its own marker beside the cursor.
+    const CURSOR: &str = "▸";
+    for m in &MEANINGS {
+        assert_ne!(
+            m.first_channel, CURSOR,
+            "the cursor glyph is also {:?}'s first channel, so a focused row and that state \
+             would look the same",
+            m.what
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-007 — reverse video inverts the terminal's own pair
+// ---------------------------------------------------------------------------
+
+/// An emphasis that names no colour is the one emphasis that works on a ground
+/// clowder does not own. The buffer keeps the reversal *unresolved* — foreground
+/// and background both left at the terminal's own — so the inversion happens in
+/// whichever polarity the player is actually in.
+///
+/// @spec TUI-THEME-007
+#[test]
+fn reverse_video_leaves_the_pair_for_the_terminal_to_invert() {
+    let emphasis = Style::default().add_modifier(Modifier::REVERSED);
+
+    for (width, height) in SIZES {
+        let buffer = frame_at(width, height, emphasis);
+        for y in 0..height {
+            for x in 0..width {
+                let cell = buffer.cell((x, y)).expect("every cell of the area exists");
+                assert!(
+                    cell.modifier.contains(Modifier::REVERSED),
+                    "cell ({x},{y}) of a {width}x{height} frame lost the reversal"
+                );
+                assert_eq!(
+                    (cell.fg, cell.bg),
+                    (Color::Reset, Color::Reset),
+                    "cell ({x},{y}) of a {width}x{height} frame resolved the reversal to \
+                     ({:?}, {:?}) shell-side. Reverse video has to reach the terminal as a \
+                     swap of *its* pair, or it only works in one polarity.",
+                    cell.fg,
+                    cell.bg
+                );
+            }
+        }
+    }
+
+    // Why the palette cannot supply an emphasis: none of its values is the
+    // terminal's own colour, so a palette-tinted row would be a fixed pair
+    // rather than an inversion of whatever the player is using.
+    for role in PALETTE_ROLES {
+        assert_ne!(
+            role.color(),
+            Some(Color::Reset),
+            "`{}` claims to be the terminal's own colour; it is a fixed value",
+            role_name(role)
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-008 — the pane keeps the season
+// ---------------------------------------------------------------------------
+
+/// A glance tells you where in the year the clowder is, so the four have to be
+/// four — a season that shared an accent with its neighbour would make half the
+/// year unreadable.
+///
+/// @spec TUI-THEME-008
+#[test]
+fn each_season_gives_the_chrome_an_accent_of_its_own() {
+    const EXPECTED: [(Season, (u8, u8, u8)); 4] = [
+        (Season::Spring, (0x7F, 0xA0, 0x5A)),
+        (Season::Summer, (0xC9, 0xA2, 0x27)),
+        (Season::Autumn, (0xB5, 0x71, 0x3C)),
+        (Season::Winter, (0x6E, 0x8B, 0xA8)),
+    ];
+
+    for (season, want) in EXPECTED {
+        let got = accent(season);
+        assert_eq!(
+            got, want,
+            "the {season:?} accent is #{:02X}{:02X}{:02X}, expected #{:02X}{:02X}{:02X}",
+            got.0, got.1, got.2, want.0, want.1, want.2
+        );
+        assert_eq!(
+            seasonal_accent(season),
+            seasonal_accent(season),
+            "the accent must be a function of the season and nothing else"
+        );
+    }
+
+    let distinct: HashSet<(u8, u8, u8)> = Season::ALL.iter().map(|s| accent(*s)).collect();
+    assert_eq!(
+        distinct.len(),
+        4,
+        "two seasons share an accent, so a pane left open across the year stops changing its \
+         light where they meet"
+    );
+
+    // The accent is the season's second channel; the header still names it.
+    assert_eq!(meaning("the season").tint, Tint::SeasonalAccent);
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-009 — the accent never touches anything carrying state
+// ---------------------------------------------------------------------------
+
+/// If the accent could land on something stateful, the player would have to ask
+/// whether a green meant *affordable* or *spring* — whimsy bought with clarity,
+/// which tenet 3 forbids. Only one meaning in the whole interface wears the
+/// accent, and it is the season itself.
+///
+/// @spec TUI-THEME-009
+#[test]
+fn only_the_season_wears_the_seasonal_accent() {
+    let wearers: Vec<&str> =
+        MEANINGS.iter().filter(|m| m.tint == Tint::SeasonalAccent).map(|m| m.what).collect();
+    assert_eq!(
+        wearers,
+        vec!["the season"],
+        "the seasonal accent reached {wearers:?}. It may tint the header rule and the pane \
+         divider and nothing else; anything carrying state that wore it would have two possible \
+         readings."
+    );
+
+    for season in Season::ALL {
+        let a = accent(season);
+        for role in PALETTE_ROLES {
+            let s = rgb(role);
+            assert_ne!(
+                a, s,
+                "the {season:?} accent is exactly `{}` (#{:02X}{:02X}{:02X}). One value cannot \
+                 mean both a season and a state.",
+                role_name(role),
+                s.0,
+                s.1,
+                s.2
+            );
+        }
+    }
+}
+
+/// And the reason confinement has to do all the work: the accents were chosen
+/// from the same mid-luminance band as the states, so several of them sit close
+/// enough to a state colour to be mistaken for it. Nothing about the *values*
+/// keeps a seasonal rule from reading as a state marker — only never putting it
+/// on one does.
+///
+/// @spec TUI-THEME-009
+#[test]
+fn the_accent_is_kept_unambiguous_by_confinement_and_not_by_colour_distance() {
+    let mut nearest = ("".to_string(), f64::INFINITY);
+    for season in Season::ALL {
+        for role in PALETTE_ROLES {
+            let d = delta_e(accent(season), rgb(role));
+            if d < nearest.1 {
+                nearest = (format!("the {season:?} accent and `{}`", role_name(role)), d);
+            }
+        }
+    }
+
+    assert!(
+        nearest.1 < 25.0,
+        "{} differ by ΔE {:.1}, so the accents happen to be separable from the states by eye. \
+         The design does not rely on that and callers must not either: the guarantee is that the \
+         accent only ever touches inert chrome. If the palette has been re-tuned so the two sets \
+         are genuinely far apart, update the design's reasoning before relaxing this.",
+        nearest.0,
+        nearest.1
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-010 — colour is always the second channel
+// ---------------------------------------------------------------------------
+
+/// The actual test of "turn every colour off and the game is still completely
+/// playable": strip the colour column and every meaning must still be told
+/// apart by what is left. Restating the table would prove nothing — what is
+/// asserted is that the non-colour channels are *injective* (no two meanings
+/// look alike without colour) while the colours are not (several meanings share
+/// one), which is precisely why the glyph has to be there first.
+///
+/// @spec TUI-THEME-010
+#[test]
+fn removing_every_colour_loses_no_meaning() {
+    // Every meaning has something other than colour carrying it.
+    for m in &MEANINGS {
+        assert!(
+            !m.first_channel.trim().is_empty(),
+            "{:?} has no glyph, word or fill — colour would be its only channel",
+            m.what
+        );
+    }
+
+    // With colour gone, the channels that remain still tell every meaning apart.
+    let mut seen: Vec<(&str, &str)> = Vec::new();
+    for m in &MEANINGS {
+        if let Some((other, _)) = seen.iter().find(|(_, c)| *c == m.first_channel) {
+            panic!(
+                "{:?} and {other:?} are both carried by {:?}, so with colour removed they are \
+                 the same thing on screen. Colour may only ever reinforce a distinction \
+                 something else already makes.",
+                m.what, m.first_channel
+            );
+        }
+        seen.push((m.what, m.first_channel));
+    }
+
+    // And colour on its own could not have done it: several meanings share one.
+    let distinct_tints: HashSet<&'static str> = MEANINGS
+        .iter()
+        .map(|m| match m.tint {
+            Tint::Role(r) => role_name(r),
+            Tint::SeasonalAccent => "seasonal accent",
+        })
+        .collect();
+    assert!(
+        distinct_tints.len() < MEANINGS.len(),
+        "every meaning has a colour to itself, which is the fifty-hue palette this design \
+         rejects — and it would make the non-colour channel look optional"
+    );
+
+    // The colours the sharing meanings reinforce are real values, so the
+    // sharing is deliberate rather than an unassigned state.
+    for role in PALETTE_ROLES {
+        let _ = rgb(role);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-011 — the glyphs of the hues a deficiency compresses
+// ---------------------------------------------------------------------------
+
+/// The palette's riskiest axis. Ready, partial and attention are the
+/// green-amber-orange run, and a red-green deficiency compresses exactly that
+/// run — so those three states fall entirely to their glyphs. This asserts both
+/// halves: that the glyphs are distinct, and that the colours really do
+/// collapse, which is what makes the glyphs load-bearing rather than a courtesy.
+///
+/// @spec TUI-THEME-011
+#[test]
+fn the_three_states_a_red_green_deficiency_compresses_are_told_apart_by_glyph() {
+    // The glyphs (TUI-NAV-009's markers, TUI-NAV-020's chips).
+    const AFFORDABLE: &str = "●";
+    const PARTIAL: &str = "◐";
+    const ATTENTION_CHIPS: [&str; 4] = ["◦", "!", "★", "~"];
+
+    assert_eq!(AFFORDABLE, meaning("affordable now").first_channel);
+    assert_eq!(PARTIAL, meaning("partially affordable").first_channel);
+
+    assert_ne!(
+        AFFORDABLE, PARTIAL,
+        "affordable and partially affordable share a glyph, so the only thing separating them \
+         is a green from an amber"
+    );
+    for chip in ATTENTION_CHIPS {
+        assert_ne!(
+            chip, AFFORDABLE,
+            "an attention chip uses the affordable marker; with the hues compressed the two are \
+             one appearance"
+        );
+        assert_ne!(
+            chip, PARTIAL,
+            "an attention chip uses the partial marker; with the hues compressed the two are one \
+             appearance"
+        );
+        assert_eq!(
+            chip.chars().count(),
+            1,
+            "{chip:?} is not a single glyph, so it cannot be the thing that carries the state"
+        );
+    }
+    assert_eq!(AFFORDABLE.chars().count(), 1);
+    assert_eq!(PARTIAL.chars().count(), 1);
+
+    // Now the colours, to show why the above matters.
+    let three = [
+        ("ready", rgb(Role::Ready)),
+        ("partial", rgb(Role::Partial)),
+        ("attention", rgb(Role::Attention)),
+    ];
+
+    let (normal_pair, normal) = closest_pair(&three);
+    assert!(
+        normal > 20.0,
+        "with ordinary colour vision {normal_pair} already differ by only ΔE {normal:.1}; these \
+         three states are meant to be plainly distinct to a player who can see them"
+    );
+
+    for (deficiency, matrix) in [("protanopia", PROTANOPIA), ("deuteranopia", DEUTERANOPIA)] {
+        let simulated: Vec<(&str, (u8, u8, u8))> =
+            three.iter().map(|(n, c)| (*n, simulate(*c, matrix))).collect();
+        let (pair, distance) = closest_pair(&simulated);
+        assert!(
+            distance < normal,
+            "under {deficiency} the closest pair ({pair}, ΔE {distance:.1}) is no closer than \
+             under ordinary vision (ΔE {normal:.1}). If this palette no longer compresses, say \
+             so in the design — but the glyph requirement stands either way."
+        );
+        assert!(
+            distance < 20.0,
+            "under {deficiency} the closest pair is {pair} at ΔE {distance:.1}. The point of \
+             this assertion is that these hues *do* collapse, which is why the glyph carries the \
+             state and the colour only reinforces it."
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-012 — truecolor is checked, and nothing is substituted
+// ---------------------------------------------------------------------------
+
+/// Serialises the tests that reach into the process environment. Poisoning is
+/// ignored deliberately: these tests are expected to fail until the palette
+/// exists, and one panicking must not turn the rest into a different failure.
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+/// Sets an environment variable for as long as it is alive.
+struct EnvVar {
+    key: &'static str,
+    previous: Option<OsString>,
+}
+
+impl EnvVar {
+    fn set(key: &'static str, value: Option<&str>) -> Self {
+        let previous = std::env::var_os(key);
+        match value {
+            Some(v) => std::env::set_var(key, v),
+            None => std::env::remove_var(key),
+        }
+        EnvVar { key, previous }
+    }
+}
+
+impl Drop for EnvVar {
+    fn drop(&mut self) {
+        match self.previous.take() {
+            Some(v) => std::env::set_var(self.key, v),
+            None => std::env::remove_var(self.key),
+        }
+    }
+}
+
+/// A terminal that has not been told to advertise RGB — the tmux default —
+/// silently approximates every value, and the player sees a muddy game they
+/// will reasonably assume just looks like that. Detecting it is the whole point
+/// of saying anything at all.
+///
+/// @spec TUI-THEME-012
+#[test]
+fn truecolor_is_read_from_what_the_terminal_advertises() {
+    let _serial = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _term = EnvVar::set("TERM", Some("xterm-256color"));
+
+    {
+        let _c = EnvVar::set("COLORTERM", Some("truecolor"));
+        assert!(
+            truecolor_advertised(),
+            "a terminal advertising COLORTERM=truecolor was not believed, so a correctly \
+             configured player is told about a problem they do not have"
+        );
+    }
+    {
+        let _c = EnvVar::set("COLORTERM", Some("24bit"));
+        assert!(
+            truecolor_advertised(),
+            "COLORTERM=24bit is the other spelling of the same advertisement"
+        );
+    }
+    {
+        let _c = EnvVar::set("COLORTERM", None);
+        assert!(
+            !truecolor_advertised(),
+            "a terminal that advertises nothing was treated as advertising RGB — which is the \
+             case that silently approximates the whole palette"
+        );
+    }
+    {
+        // rxvt set COLORTERM long before 24-bit colour existed; it means
+        // "colour", not "RGB".
+        let _c = EnvVar::set("COLORTERM", Some("rxvt"));
+        assert!(
+            !truecolor_advertised(),
+            "COLORTERM set to something other than truecolor/24bit says only that the terminal \
+             has colour, not that it has 24-bit colour"
+        );
+    }
+}
+
+/// No fallback palette, ever: a reduced scheme is an explicit non-goal, and the
+/// notice exists precisely so the game can go on rendering exactly as designed.
+/// The values must therefore not depend on what was detected.
+///
+/// @spec TUI-THEME-012
+#[test]
+fn the_palette_is_identical_whether_or_not_truecolor_is_advertised() {
+    let _serial = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _term = EnvVar::set("TERM", Some("xterm-256color"));
+
+    let snapshot = || {
+        let roles: Vec<Option<Color>> = ROLES.iter().map(|r| r.color()).collect();
+        let seasons: Vec<Color> = Season::ALL.iter().map(|s| seasonal_accent(*s)).collect();
+        (roles, seasons)
+    };
+
+    let advertised = {
+        let _c = EnvVar::set("COLORTERM", Some("truecolor"));
+        snapshot()
+    };
+    let not_advertised = {
+        let _c = EnvVar::set("COLORTERM", None);
+        snapshot()
+    };
+
+    assert_eq!(
+        advertised, not_advertised,
+        "the theme rendered differently once truecolor was missing. Clowder says so once and \
+         renders unchanged; a substituted palette turns a known limitation back into an \
+         apparent defect, and a low-colour fallback is an explicit non-goal."
+    );
+}
+
+/// Every value is a 24-bit one. An indexed or named colour would be the
+/// terminal's own palette rather than the design's, which is the reduced scheme
+/// the previous test forbids by another route.
+///
+/// @spec TUI-THEME-012
+#[test]
+fn nothing_the_theme_produces_is_a_reduced_palette_value() {
+    for role in PALETTE_ROLES {
+        let colour = role.color().expect("a palette role has a colour");
+        assert!(
+            matches!(colour, Color::Rgb(..)),
+            "`{}` is {colour:?} rather than a 24-bit value",
+            role_name(role)
+        );
+    }
+    for season in Season::ALL {
+        let colour = seasonal_accent(season);
+        assert!(
+            matches!(colour, Color::Rgb(..)),
+            "the {season:?} accent is {colour:?} rather than a 24-bit value"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-013 — the notice lands on the player's own terminal
+// ---------------------------------------------------------------------------
+//
+// These run the real binary, as `tests/loop_order.rs` does, because the claim
+// is about *ordering* between something printed and the terminal being taken
+// over, and that is only observable from outside the process.
+//
+// Two things make the observation safe. The child's stdout and stderr are the
+// same file, so their relative order is real rather than an artefact of two
+// pipes. And the child is put in its own session before exec, so it has no
+// controlling terminal at all: `/dev/tty` cannot be opened, the handover fails,
+// and the developer's own terminal is never put into raw mode. That also
+// sharpens the test — a notice emitted after the handover would never appear.
+
+#[cfg(unix)]
+const NOTICE_WORDS: [&str; 5] = ["truecolor", "true color", "true colour", "24-bit", "24 bit"];
+
+/// Something the player can act on. Whichever of these the notice names, it is
+/// telling them what to set rather than only what is wrong.
+#[cfg(unix)]
+const SETTING_WORDS: [&str; 4] = ["colorterm", "terminal-overrides", "rgb", ":tc"];
+
+/// Every spelling of "switch to the alternate screen". Anything printed after
+/// one of these is erased when the game exits.
+#[cfg(unix)]
+const ALTERNATE_SCREEN: [(&str, &str); 4] = [
+    ("\x1b[?1049h", "enter alternate screen"),
+    ("\x1b[?1049l", "leave alternate screen"),
+    ("\x1b[?1047h", "enter alternate screen (legacy)"),
+    ("\x1b[?47h", "enter alternate screen (legacy)"),
+];
+
+#[cfg(unix)]
+extern "C" {
+    /// POSIX `setsid(2)`. Rust links libc on every unix target, so reaching it
+    /// needs no extra dependency — the same route `runtime::term` takes to
+    /// `signal(2)`.
+    fn setsid() -> i32;
+}
+
+#[cfg(unix)]
+struct TempDir {
+    path: std::path::PathBuf,
+}
+
+#[cfg(unix)]
+impl TempDir {
+    fn new(tag: &str) -> TempDir {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir()
+            .join(format!("clowder-theme-{}-{}-{}", std::process::id(), tag, n));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(&path).expect("a scratch directory should be creatable");
+        TempDir { path }
+    }
+}
+
+#[cfg(unix)]
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
+}
+
+/// Start the real binary against a scratch home, with stdout and stderr sharing
+/// one file so their order is observable, and return everything it wrote.
+#[cfg(unix)]
+fn run_clowder(tag: &str, colorterm: Option<&str>) -> String {
+    use std::os::unix::process::CommandExt;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    let home = TempDir::new(tag);
+    let output_path = home.path.join("clowder-output.txt");
+    let file = std::fs::File::create(&output_path).expect("creating the child's output file");
+    let stderr = file.try_clone().expect("duplicating the output file for stderr");
+
+    let mut command = Command::new(env!("CARGO_BIN_EXE_clowder"));
+    command
+        .env_clear()
+        .env("HOME", &home.path)
+        .env("XDG_DATA_HOME", home.path.join(".local/share"))
+        .env("PATH", "/usr/bin:/bin")
+        .env("TERM", "xterm-256color")
+        .current_dir(&home.path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(file))
+        .stderr(Stdio::from(stderr));
+    if let Some(value) = colorterm {
+        command.env("COLORTERM", value);
+    }
+
+    // SAFETY: `setsid` is async-signal-safe, and the closure does nothing else.
+    // Failing here rather than continuing matters: without a new session the
+    // child would open the developer's own terminal and put it into raw mode.
+    unsafe {
+        command.pre_exec(|| {
+            if setsid() == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+
+    let mut child = command.spawn().expect("spawning the clowder binary");
+
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        match child.try_wait().expect("polling the child") {
+            Some(_) => break,
+            None if Instant::now() >= deadline => {
+                let _ = child.kill();
+                break;
+            }
+            None => std::thread::sleep(Duration::from_millis(20)),
+        }
+    }
+    let _ = child.wait();
+
+    std::fs::read_to_string(&output_path)
+        .map(|s| s.to_string())
+        .unwrap_or_else(|e| panic!("reading the child's output: {e}"))
+}
+
+#[cfg(unix)]
+fn first_notice(output: &str) -> Option<usize> {
+    let lower = output.to_lowercase();
+    NOTICE_WORDS.iter().filter_map(|w| lower.find(w)).min()
+}
+
+/// The difference between a known limitation and an apparent defect is entirely
+/// whether anyone said anything — and saying it inside the alternate screen is
+/// the same as not saying it, because the screen is torn down on the way out
+/// and takes the message with it.
+///
+/// @spec TUI-THEME-012, TUI-THEME-013
+#[cfg(unix)]
+#[test]
+fn a_terminal_without_truecolor_is_told_so_before_the_alternate_screen() {
+    let output = run_clowder("no-truecolor", None);
+
+    let at = first_notice(&output).unwrap_or_else(|| {
+        panic!(
+            "the shell said nothing about truecolor to a terminal that advertises none, so every \
+             value will be silently approximated and the player will assume the game just looks \
+             like that.\n--- child output ---\n{}",
+            output.escape_debug()
+        )
+    });
+
+    let lower = output.to_lowercase();
+    assert!(
+        SETTING_WORDS.iter().any(|w| lower.contains(w)),
+        "the shell mentioned truecolor but named nothing to set, so the player is told they have \
+         a problem and not how to fix it.\n--- child output ---\n{}",
+        output.escape_debug()
+    );
+
+    for (sequence, what) in ALTERNATE_SCREEN {
+        if let Some(screen_at) = output.find(sequence) {
+            assert!(
+                at < screen_at,
+                "the notice was printed after the shell asked the terminal to {what} ({}), so it \
+                 lands on a screen that disappears when the game exits.\n--- child output ---\n{}",
+                sequence.escape_debug(),
+                output.escape_debug()
+            );
+        }
+    }
+}
+
+/// "When the terminal does not advertise truecolor" is a condition, and both
+/// sides of it are the requirement. A player whose terminal is configured
+/// correctly hears nothing: a notice printed unconditionally is noise on every
+/// launch, and noise on every launch is how a pane that lives beside real work
+/// becomes irritating on day three.
+///
+/// Both directions are asserted together, because either alone is satisfiable
+/// by a shell that simply never speaks.
+///
+/// @spec TUI-THEME-012
+#[cfg(unix)]
+#[test]
+fn the_notice_is_said_when_truecolor_is_missing_and_not_otherwise() {
+    let missing = run_clowder("conditional-missing", None);
+    let advertised = run_clowder("conditional-advertised", Some("truecolor"));
+
+    assert!(
+        first_notice(&missing).is_some(),
+        "a terminal advertising no truecolor was told nothing.\n--- child output ---\n{}",
+        missing.escape_debug()
+    );
+    assert_eq!(
+        first_notice(&advertised),
+        None,
+        "a terminal that advertises truecolor was told about truecolor anyway, so the notice is \
+         unconditional and becomes noise on every launch.\n--- child output ---\n{}",
+        advertised.escape_debug()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-014 — a finished row recedes
+// ---------------------------------------------------------------------------
+
+/// Dim is what "done" looks like, and done must not compete with the rows that
+/// can still be acted on. What makes it recede is that it is very nearly grey —
+/// chroma is what pulls the eye, and dim has almost none while every other role
+/// is strongly coloured. It still clears the reading floor, though: a finished
+/// row is revealed, not hidden.
+///
+/// @spec TUI-THEME-014
+#[test]
+fn an_owned_or_completed_row_recedes_without_becoming_unreadable() {
+    assert_eq!(
+        meaning("owned or done").tint,
+        Tint::Role(Role::Dim),
+        "a finished one-shot renders in dim"
+    );
+
+    let dim = rgb(Role::Dim);
+    let dim_chroma = chroma(dim);
+
+    for role in [Role::Ready, Role::Partial, Role::Attention, Role::Milestone] {
+        let other = chroma(rgb(role));
+        assert!(
+            other > dim_chroma * 4.0,
+            "`dim` has chroma {dim_chroma:.1} and `{}` has {other:.1}. Dim has to be plainly the \
+             quieter of the two, or a finished row goes on competing for the eye with the rows \
+             that can still be acted on.",
+            role_name(role)
+        );
+    }
+
+    for ground in [NEAR_BLACK, NEAR_WHITE] {
+        let ratio = contrast(dim, ground);
+        assert!(
+            ratio >= CONTRAST_FLOOR,
+            "`dim` is {ratio:.2}:1 against #{:02X}{:02X}{:02X}, below the {CONTRAST_FLOOR}:1 \
+             floor. Dim means revealed-but-not-actionable, and a row the player cannot read is \
+             not revealed.",
+            ground.0,
+            ground.1,
+            ground.2
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-015 — one colour for everything that wants notice
+// ---------------------------------------------------------------------------
+
+/// The role means "this wants you", wherever it appears. Subdividing it per
+/// surface — one orange for chips, another for capped stores — would make the
+/// player learn three colours for one idea, and would spend the palette on
+/// information the surface already gives them.
+///
+/// @spec TUI-THEME-015
+#[test]
+fn everything_that_wants_notice_wears_the_same_one_colour() {
+    let wants_notice = ["an attention chip", "a capped store", "an armed row"];
+
+    for what in wants_notice {
+        assert_eq!(
+            meaning(what).tint,
+            Tint::Role(Role::Attention),
+            "{what:?} does not use the attention role, so \"this wants you\" has more than one \
+             appearance"
+        );
+    }
+
+    let value = rgb(Role::Attention);
+    let distinct: HashSet<(u8, u8, u8)> = wants_notice
+        .iter()
+        .map(|what| match meaning(what).tint {
+            Tint::Role(role) => rgb(role),
+            Tint::SeasonalAccent => panic!("{what:?} wears the seasonal accent"),
+        })
+        .collect();
+    assert_eq!(
+        distinct,
+        HashSet::from([value]),
+        "a chip, a capped store's tag and an armed row resolved to {} different values",
+        distinct.len()
+    );
+
+    // And there is no second notice-role waiting to be used for the next
+    // surface: `role_name`'s exhaustive match is the guard, and only one of the
+    // six is attention.
+    let notice_roles: Vec<&str> = PALETTE_ROLES
+        .iter()
+        .filter(|r| {
+            MEANINGS
+                .iter()
+                .filter(|m| m.tint == Tint::Role(**r))
+                .any(|m| wants_notice.contains(&m.what))
+        })
+        .map(|r| role_name(*r))
+        .collect();
+    assert_eq!(
+        notice_roles,
+        vec!["attention"],
+        "more than one role is carrying \"this wants you\""
+    );
+}

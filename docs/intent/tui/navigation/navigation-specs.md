@@ -19,8 +19,8 @@
 
 ## Action Model
 
-- [ ] **TUI-NAV-009**: The system shall render each actionable item as a row carrying a glyph-first availability marker (● affordable, ◐ partial, ○ revealed-unaffordable, ✓ owned/done), the flavor name, owned count, and next cost; Teased rows render dimmed with their marker and Hidden content is not rendered.
-- [ ] **TUI-NAV-053**: The system shall take every availability and affordability answer behind a row's marker from a core query rather than computing it shell-side, and shall render a content kind for which the core reports no availability as two-state — present and actionable, or absent — never inventing a Teased or partial state the core did not report.
+- [x] **TUI-NAV-009**: The system shall render each actionable item as a row carrying a glyph-first availability marker (● affordable, ◐ partial, ○ revealed-unaffordable, ✓ owned/done), the flavor name, owned count, and next cost; Teased rows render dimmed with their marker and Hidden content is not rendered.
+- [x] **TUI-NAV-053**: The system shall take every availability and affordability answer behind a row's marker from a core query rather than computing it shell-side, and shall render a content kind for which the core reports no availability as two-state — present and actionable, or absent — never inventing a Teased or partial state the core did not report.
 - [ ] **TUI-NAV-010**: While Enter is held on a row that is not a heavy action, the system shall repeat the focused row's action at no more than ten times per second regardless of the terminal's key-repeat rate, and the cursor shall not move on action.
 - [ ] **TUI-NAV-051**: The system shall commit a heavy action only on a distinct, deliberate second Enter — a held or auto-repeating Enter shall arm the row and go no further, and X shall never commit a heavy action — so no heavy action can be reached by holding a key.
 - [ ] **TUI-NAV-011**: When x is pressed on a focused row that is not a heavy action, the system shall open a count prompt that captures digit input and previews total cost, and on Enter apply the row's command that many times (or pass the count to a count-taking command); Esc cancels with no effect.
@@ -29,7 +29,7 @@
 - [ ] **TUI-NAV-014**: When a command is rejected by the core, the system shall surface the CommandError as a plain-language footer message for a few seconds and shall not open any blocking dialog.
 - [ ] **TUI-NAV-015**: For the heavy actions (GreatMeadowMove, PassItDown, AdoptRule, DeepNap), the first Enter shall arm the row — expanding it in place to a consequence summary computed from current state — and only a second Enter shall commit; arming auto-expires after about eight seconds or on any navigation, and the simulation keeps advancing throughout.
 - [ ] **TUI-NAV-016**: When q is pressed, the system shall save and quit immediately with no confirmation; Ctrl-C shall also save and quit.
-- [ ] **TUI-NAV-039**: The system shall make every player-facing Command variant that belongs to a section reachable as a list row in that section — including the stand-down choice on a declare list and the unassign action on a count row — so that no sectioned command is reachable only through a mnemonic, the palette, or an accelerator key; the two commands belonging to no section (SetSpeed, ObserveSky) are reachable by their global keys instead.
+- [x] **TUI-NAV-039**: The system shall make every player-facing Command variant that belongs to a section reachable as a list row in that section — including the stand-down choice on a declare list and the unassign action on a count row — so that no sectioned command is reachable only through a mnemonic, the palette, or an accelerator key; the two commands belonging to no section (SetSpeed, ObserveSky) are reachable by their global keys instead.
 - [ ] **TUI-NAV-040**: The system shall bind ObserveSky to o from every screen; while no sky-event window is open the key shall be a no-op with a footer note.
 - [ ] **TUI-NAV-041**: On a row whose one-shot action is already owned, the system shall treat Enter, x, and X as no-ops with a footer note; on a revealed row whose command is neither count-taking nor usefully repeatable, x and X shall likewise be no-ops with a footer note.
 - [ ] **TUI-NAV-042**: The system shall ignore a printable key with no binding in the current context and show no footer message, and shall show a footer note only for a key that is bound but not meaningful in the current state.
@@ -48,7 +48,7 @@
 - [ ] **TUI-NAV-021**: The system shall render every UI symbol as a single-width character and shall use no emoji or ambiguous-width glyphs.
 - [ ] **TUI-NAV-022**: The system shall convey affordability, mood, capped-storage, and attention through at least one non-color channel (glyph, word, or fill) so the game is fully playable without color perception.
 - [ ] **TUI-NAV-044**: The system shall clear each attention chip on its own signal — the new-content chip when its badged section is visited, and the away chip when its banner is dismissed or its pinned Journal entry is opened.
-- [ ] **TUI-NAV-049**: The system shall list every revealed resource as an inspectable row in the home section's stores group, keeping the resource sidebar a curated display-only glance rather than the complete table.
+- [x] **TUI-NAV-049**: The system shall list every revealed resource as an inspectable row in the home section's stores group, keeping the resource sidebar a curated display-only glance rather than the complete table.
 
 ## Discoverability
 
@@ -77,7 +77,7 @@
 
 ## Resolved Edge Cases
 
-- [ ] **TUI-NAV-031**: The system shall tag each actionable row's command as count-taking (the count is a command argument — Pounce, Trade, DeepNap) or repeat-N (the shell calls the command N times — Build, Craft, buys); x passes N to a count-taking command and repeat-calls a repeat-N one, an empty or zero count cancels, and repeat-N calls run until one is rejected (partial success intended).
+- [x] **TUI-NAV-031**: The system shall tag each actionable row's command as count-taking (the count is a command argument — Pounce, Trade, DeepNap) or repeat-N (the shell calls the command N times — Build, Craft, buys); x passes N to a count-taking command and repeat-calls a repeat-N one, an empty or zero count cancels, and repeat-N calls run until one is rejected (partial success intended).
 - [ ] **TUI-NAV-032**: When entering a section with no remembered item (or whose remembered item is no longer revealed), the system shall place the cursor on the first Available row, else the first row.
 - [ ] **TUI-NAV-033**: Section cycling (Tab/BackTab, l/h, →/←) shall wrap around the revealed-section ring.
 - [ ] **TUI-NAV-034**: The system shall render the tab bar responsively — full [digit name] labels where they fit, else a compact digit strip that labels the focused and newly-badged tabs — never truncating a name mid-word and never scrolling a tab out of reach; the digit is the stable section identity.

@@ -39,17 +39,33 @@ impl Section {
 
     /// The digit that jumps here. @spec TUI-NAV-005
     pub fn digit(self) -> char {
-        todo!("TUI-NAV-005: the static digit map, 1-9 then 0")
+        let ix = self.index();
+        if ix == Self::ALL.len() - 1 {
+            '0'
+        } else {
+            (b'1' + ix as u8) as char
+        }
     }
 
     /// The section a digit jumps to, if any. @spec TUI-NAV-005
-    pub fn from_digit(_c: char) -> Option<Section> {
-        todo!("TUI-NAV-005: inverse of the static digit map")
+    pub fn from_digit(c: char) -> Option<Section> {
+        Self::ALL.iter().copied().find(|s| s.digit() == c)
     }
 
     /// The tab label. Section names are content, so a tab exists only once one
     /// of its rows is revealed. @spec TUI-NAV-006
     pub fn title(self) -> &'static str {
-        todo!("TUI-NAV-006: section titles")
+        match self {
+            Section::Meadow => "Meadow",
+            Section::Clowder => "Clowder",
+            Section::Ideas => "Ideas",
+            Section::Crafts => "Crafts",
+            Section::Sunbeams => "Sunbeams",
+            Section::Wonders => "Wonders",
+            Section::Friends => "Friends",
+            Section::Sky => "Sky",
+            Section::Dreams => "Dreams",
+            Section::Legacy => "Legacy",
+        }
     }
 }

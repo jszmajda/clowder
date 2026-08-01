@@ -10,9 +10,7 @@
 //! implementation file rather than a copy; see the openQuestions note about
 //! giving the crate a `[lib]` target instead.
 
-#[allow(dead_code)]
-#[path = "../src/runtime/clock.rs"]
-mod clock;
+use clowder_tui::runtime::clock;
 
 use std::time::Duration;
 

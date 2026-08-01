@@ -40,17 +40,9 @@
 //! is the other half of that spec: that what the shell writes is a save the
 //! core can read back.
 
-#[allow(dead_code)]
-#[path = "../src/nav/mod.rs"]
-mod nav;
-
-#[allow(dead_code)]
-#[path = "../src/render/mod.rs"]
-mod render;
-
-#[allow(dead_code)]
-#[path = "../src/runtime/mod.rs"]
-mod runtime;
+use clowder_tui::nav;
+use clowder_tui::render;
+use clowder_tui::runtime;
 
 use std::fs;
 use std::path::{Path, PathBuf};

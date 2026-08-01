@@ -5,6 +5,10 @@ edition.workspace = true
 license.workspace = true
 description = "The ratatui shell for clowder"
 
+[lib]
+name = "clowder_tui"
+path = "src/lib.rs"
+
 [[bin]]
 name = "clowder"
 path = "src/main.rs"

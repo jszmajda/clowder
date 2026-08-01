@@ -140,6 +140,21 @@ pub fn run() -> ExitCode {
         },
     };
 
+    // Said before the handover, so it survives on the player's own scrollback
+    // instead of being wiped with the alternate screen. Rendering is unchanged
+    // — there is no reduced palette to fall back to, by design. Without this,
+    // a tmux that was never configured for RGB approximates every value and
+    // the player reasonably concludes the game just looks like that.
+    // @spec TUI-THEME-012, TUI-THEME-013
+    if !crate::theme::truecolor_advertised() {
+        eprintln!(
+            "This terminal does not advertise 24-bit colour, so clowder's palette \n\
+             will be approximated to the nearest colours it does support.\n\
+             Set COLORTERM=truecolor (and, under tmux, a terminal-overrides entry \n\
+             adding the RGB capability) to see it as designed."
+        );
+    }
+
     // Past every refusal: the terminal may now be taken over (TUI-RUN-001).
     let _guard = match TerminalGuard::enter() {
         Ok(g) => g,

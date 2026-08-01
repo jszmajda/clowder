@@ -27,8 +27,7 @@
 //! running in parallel, and would take the whole harness down if the handler
 //! were missing.
 
-#[path = "../src/runtime/term.rs"]
-mod term;
+use clowder_tui::runtime::term;
 
 /// A signal handler that only records leaves the flag clear until a signal
 /// actually arrives — the loop must not shut down on a process nobody asked to
