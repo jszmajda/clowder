@@ -16,7 +16,7 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use crate::nav::rows::{rows, Row, RowKey, RowKind};
-use crate::nav::{Section, ViewState};
+use crate::nav::{Overlay, Section, ViewState};
 
 pub use layout::{Body, Layout};
 
@@ -28,13 +28,13 @@ const DEFAULT_SECTION: Section = Section::Meadow;
 /// @spec TUI-RENDER-001
 fn row_label(state: &GameState, row: &Row) -> String {
     match &row.key {
-        RowKey::Content(id) => content_name(*id),
+        RowKey::Content(id, _) => content_name(*id),
         RowKey::Resource(r) => humanize(&format!("{r:?}")),
-        RowKey::Colony(c) => humanize(&format!("{c:?}")),
+        RowKey::Colony(c, _) => humanize(&format!("{c:?}")),
         RowKey::Site(s) => humanize(&format!("{s:?}")),
         RowKey::Adventure(Some(a)) => humanize(&format!("{a:?}")),
         RowKey::Adventure(None) => "No Adventure".to_string(),
-        RowKey::Kitten(ix) => {
+        RowKey::Kitten(ix, _) => {
             let name = state.kittens.get(*ix).map(|k| k.name.as_str()).unwrap_or("");
             if name.is_empty() {
                 format!("Kitten {}", ix + 1)
@@ -186,34 +186,50 @@ pub fn frame(
     let section = view.section.unwrap_or(DEFAULT_SECTION);
     let cursor_key = view.focus.get(section.index()).and_then(|k| k.as_ref());
 
-    f.render_widget(Paragraph::new(Line::from(format!("clowder — {}", section.title()))), layout.header);
+    // Each region is drawn by the widget that owns it. This function composes;
+    // it decides nothing about what any region contains.
+    widgets::chrome::header(f, layout.header, state, view);
+    widgets::chrome::tabs(f, layout.tabs, state, view);
 
-    let tabs: Vec<String> = Section::ALL
-        .iter()
-        .filter(|s| !rows(state, **s).is_empty())
-        .map(|s| s.title().to_string())
-        .collect();
-    f.render_widget(Paragraph::new(Line::from(tabs.join("  "))), layout.tabs);
-
-    match layout.body {
-        Body::TooSmall(_) => unreachable!("handled above"),
-        Body::Narrow { sidebar, main } => {
-            draw_sidebar(f, sidebar, state);
-            if view.inspector_wanted {
-                draw_inspector(f, main, state, section, cursor_key);
-            } else {
-                draw_list(f, main, state, section, cursor_key);
-            }
-        }
-        Body::Wide { sidebar, list, inspector } => {
-            draw_sidebar(f, sidebar, state);
-            draw_list(f, list, state, section, cursor_key);
-            draw_inspector(f, inspector, state, section, cursor_key);
-        }
+    // @spec TUI-RENDER-003, TUI-NAV-027
+    if let Some(rect) = layout.banner {
+        widgets::overlays::banner(f, rect, state, view);
     }
 
-    f.render_widget(Paragraph::new(Line::from("")), layout.ticker);
-    f.render_widget(Paragraph::new(Line::from("")), layout.hints);
+    // A full-screen overlay takes the body and nothing else — the chrome keeps
+    // rendering and the sim keeps ticking behind it, so an overlay is never a
+    // demand for attention. @spec TUI-NAV-026, TUI-NAV-025, TUI-NAV-038
+    let body_rect = match layout.body {
+        Body::TooSmall(r) => r,
+        Body::Narrow { sidebar, main } => sidebar.union(main),
+        Body::Wide { sidebar, inspector, .. } => sidebar.union(inspector),
+    };
+    match &view.overlay {
+        Some(Overlay::Journal { .. }) => widgets::overlays::journal(f, body_rect, state, view),
+        Some(Overlay::Help) => widgets::overlays::help(f, body_rect),
+        Some(Overlay::Palette { .. }) => widgets::overlays::palette(f, body_rect, state, view),
+        None => match layout.body {
+            Body::TooSmall(_) => unreachable!("handled above"),
+            Body::Narrow { sidebar, main } => {
+                widgets::chrome::sidebar(f, sidebar, state);
+                // TUI-NAV-035: swapped in over the list, the inspector still
+                // follows the underlying cursor.
+                if view.inspector_wanted {
+                    widgets::inspector::draw(f, main, state, view);
+                } else {
+                    draw_list(f, main, state, section, cursor_key);
+                }
+            }
+            Body::Wide { sidebar, list, inspector } => {
+                widgets::chrome::sidebar(f, sidebar, state);
+                draw_list(f, list, state, section, cursor_key);
+                widgets::inspector::draw(f, inspector, state, view);
+            }
+        },
+    }
+
+    widgets::overlays::ticker(f, layout.ticker, state);
+    widgets::chrome::hints(f, layout.hints, state, view);
 
     layout
 }

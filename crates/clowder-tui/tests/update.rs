@@ -157,25 +157,19 @@ fn find_count_row(state: &GameState, section: Section) -> (RowKey, Command, Comm
 /// even if the row builder's `heavy` flag disagrees with it.
 fn heavy_rows(state: &GameState) -> Vec<(&'static str, Section, RowKey, Command)> {
     let mut out = Vec::new();
-    for (name, section, pred) in [
-        (
-            "GreatMeadowMove",
-            Section::Legacy,
-            &(|c: &Command| matches!(c, Command::GreatMeadowMove)) as &dyn Fn(&Command) -> bool,
-        ),
-        ("PassItDown", Section::Legacy, &|c: &Command| {
-            matches!(c, Command::PassItDown)
-        }),
-        ("AdoptRule", Section::Ideas, &|c: &Command| {
-            matches!(c, Command::AdoptRule(_))
-        }),
-        ("DeepNap", Section::Dreams, &|c: &Command| {
-            matches!(c, Command::DeepNap(_))
-        }),
-    ] {
-        let (key, command) = find_row(state, section, pred);
-        out.push((name, section, key, command));
-    }
+
+    let (key, command) = find_row(state, Section::Legacy, |c| matches!(c, Command::GreatMeadowMove));
+    out.push(("GreatMeadowMove", Section::Legacy, key, command));
+
+    let (key, command) = find_row(state, Section::Legacy, |c| matches!(c, Command::PassItDown));
+    out.push(("PassItDown", Section::Legacy, key, command));
+
+    let (key, command) = find_row(state, Section::Ideas, |c| matches!(c, Command::AdoptRule(_)));
+    out.push(("AdoptRule", Section::Ideas, key, command));
+
+    let (key, command) = find_row(state, Section::Dreams, |c| matches!(c, Command::DeepNap(_)));
+    out.push(("DeepNap", Section::Dreams, key, command));
+
     out
 }
 
@@ -322,7 +316,8 @@ fn an_expired_arming_never_commits() {
     // Age the arming past its expiry without waiting eight real seconds.
     view.armed.as_mut().expect("fixture: armed").expires_at = Instant::now();
 
-    let out = commit_deliberately_or_handled(&mut view, &state);
+    std::thread::sleep(Duration::from_millis(300));
+    let out = update(Action::Activate, &mut view, &state);
 
     assert!(
         !would_fire(&out, command),
@@ -337,13 +332,6 @@ fn an_expired_arming_never_commits() {
         armed.expires_at > Instant::now(),
         "the re-armed row is still carrying its old, already-expired deadline"
     );
-}
-
-/// Like `commit_deliberately`, but tolerates never committing — used where the
-/// point is that a press *cannot* commit.
-fn commit_deliberately_or_handled(view: &mut ViewState, state: &GameState) -> Outcome {
-    std::thread::sleep(Duration::from_millis(300));
-    update(Action::Activate, view, state)
 }
 
 /// A distinct second Enter — a real pause, then a press — commits, and the
@@ -1135,7 +1123,7 @@ fn returning_to_a_section_restores_the_item_even_after_reveals_insert_rows_above
     let index_of = |state: &GameState| {
         rows(state, Section::Meadow)
             .iter()
-            .position(|r| r.key == RowKey::Content(landmark))
+            .position(|r| r.key == RowKey::Content(landmark, ""))
             .expect("fixture: the landmark row must be listed")
     };
     assert!(
@@ -1146,14 +1134,14 @@ fn returning_to_a_section_restores_the_item_even_after_reveals_insert_rows_above
     // The player was on the landmark, then went elsewhere; meanwhile five rows
     // appeared above it.
     let mut view = focused(Section::Legacy, RowKey::Fixed("GreatMeadowMove"));
-    view.focus[Section::Meadow.index()] = Some(RowKey::Content(landmark));
+    view.focus[Section::Meadow.index()] = Some(RowKey::Content(landmark, ""));
 
     update(Action::SectionJump(Section::Meadow), &mut view, &after);
 
     assert_eq!(view.section, Some(Section::Meadow), "the jump did not change section");
     assert_eq!(
         view.focus[Section::Meadow.index()],
-        Some(RowKey::Content(landmark)),
+        Some(RowKey::Content(landmark, "")),
         "coming back landed on a different row than the one left behind; the cursor remembers \
          an item, never a line number"
     );
@@ -1205,13 +1193,13 @@ fn a_first_visit_lands_on_the_first_actionable_row() {
 
     let list = rows(&state, Section::Ideas);
     assert!(
-        matches!(list.first().map(|r| &r.key), Some(RowKey::Content(id)) if state.availability(*id) == Availability::Teased),
+        matches!(list.first().map(|r| &r.key), Some(RowKey::Content(id, "")) if state.availability(*id) == Availability::Teased),
         "fixture: the first row must be a teased one, or the landing rule is not under test"
     );
     let first_available = list
         .iter()
         .find(|r| match r.key {
-            RowKey::Content(id) => state.availability(id) == Availability::Available,
+            RowKey::Content(id, "") => state.availability(id) == Availability::Available,
             _ => false,
         })
         .expect("fixture: something on the list must be actionable")

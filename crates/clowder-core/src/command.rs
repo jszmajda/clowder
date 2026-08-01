@@ -881,7 +881,7 @@ impl GameState {
     }
 
     /// The Silent Sun adventure twist: ceremonies unavailable. @spec SIM-ADV-002
-    fn silent_sun(&self) -> bool {
+    pub(crate) fn silent_sun(&self) -> bool {
         self.active_adventure == Some(AdventureId::SilentSun)
     }
 

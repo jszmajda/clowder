@@ -154,7 +154,7 @@ fn looking_at(key: RowKey) -> ViewState {
 }
 
 fn structure_row(b: StructureId) -> RowKey {
-    RowKey::Content(ContentId::Structure(b))
+    RowKey::Content(ContentId::Structure(b), "")
 }
 
 /// A roster of plain kittens. Their names are empty so that a long roster costs

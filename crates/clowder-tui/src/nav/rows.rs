@@ -19,16 +19,24 @@ use super::section::Section;
 /// equality miss whenever the two were used inconsistently.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RowKey {
-    Content(ContentId),
+    /// A piece of content, tagged where one item carries more than one row
+    /// (an empty tag for the ordinary single-row case) — see `Kitten`.
+    Content(ContentId, &'static str),
     Resource(ResourceId),
-    Colony(ColonyId),
+    /// A colony, tagged by which of its rows this is — see `Kitten`.
+    Colony(ColonyId, &'static str),
     Site(SiteId),
     Adventure(Option<AdventureId>),
     /// A kitten by roster position. The roster is push-only for the life of a
     /// meadow — nothing is ever removed from it, which tenet 1 guarantees —
     /// so position is stable identity. A Move replaces the roster wholesale,
     /// and TUI-NAV-032's fallback covers that. @spec TUI-NAV-008
-    Kitten(usize),
+    ///
+    /// The tag distinguishes the rows a single kitten carries: a key names a
+    /// ROW, not the thing the row is about. Without it the second row of a
+    /// pair can never be focused, remembered, or inspected, because the cursor
+    /// resolves by first match.
+    Kitten(usize, &'static str),
     /// A group header or a fixed row that is not content.
     Fixed(&'static str),
 }
@@ -78,7 +86,26 @@ fn act(command: Command, semantics: CountSemantics) -> RowKind {
 /// it, so a row the cursor can reach is exactly a row that gets drawn. Two
 /// builders would drift the moment either changed.
 /// @spec TUI-NAV-009, TUI-NAV-039, TUI-NAV-031, TUI-NAV-049, TUI-NAV-053
+/// A fixed row exists only where its gate is open. Asking the core keeps the
+/// rule in one place — and keeps a fresh meadow from listing every action the
+/// game will ever offer. @spec TUI-NAV-006, TUI-NAV-053, SIM-ENG-045
+fn gated(state: &GameState, row: Row) -> Option<Row> {
+    let cmd = match &row.kind {
+        RowKind::Act { command, .. } => Some(command),
+        RowKind::Count { increment, .. } => Some(increment),
+        _ => None,
+    };
+    match cmd {
+        Some(c) if !state.command_gate_open(c) => None,
+        _ => Some(row),
+    }
+}
+
 pub fn rows(state: &GameState, section: Section) -> Vec<Row> {
+    rows_ungated(state, section).into_iter().filter_map(|r| gated(state, r)).collect()
+}
+
+fn rows_ungated(state: &GameState, section: Section) -> Vec<Row> {
     match section {
         Section::Meadow => meadow_rows(state),
         Section::Clowder => clowder_rows(state),
@@ -105,7 +132,7 @@ fn meadow_rows(state: &GameState) -> Vec<Row> {
         let id = ContentId::Structure(s);
         if revealed(state, id) {
             out.push(Row {
-                key: RowKey::Content(id),
+                key: RowKey::Content(id, ""),
                 kind: act(Command::Build(s), CountSemantics::RepeatN),
                 heavy: false,
             });
@@ -133,7 +160,7 @@ fn clowder_rows(state: &GameState) -> Vec<Row> {
         let id = ContentId::Job(j);
         if revealed(state, id) {
             out.push(Row {
-                key: RowKey::Content(id),
+                key: RowKey::Content(id, ""),
                 kind: RowKind::Count { increment: Command::AssignJob(j), decrement: Command::UnassignJob(j) },
                 heavy: false,
             });
@@ -141,12 +168,12 @@ fn clowder_rows(state: &GameState) -> Vec<Row> {
     }
     for (ix, _k) in state.kittens.iter().enumerate() {
         out.push(Row {
-            key: RowKey::Kitten(ix),
+            key: RowKey::Kitten(ix, "promote"),
             kind: act(Command::Promote(ix), CountSemantics::Single),
             heavy: false,
         });
         out.push(Row {
-            key: RowKey::Kitten(ix),
+            key: RowKey::Kitten(ix, "elder"),
             kind: act(Command::AppointElder(ix), CountSemantics::Single),
             heavy: false,
         });
@@ -165,19 +192,19 @@ fn ideas_rows(state: &GameState) -> Vec<Row> {
     for i in IdeaId::ALL {
         let id = ContentId::Idea(i);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id), kind: act(Command::ResearchIdea(i), CountSemantics::Single), heavy: false });
+            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::ResearchIdea(i), CountSemantics::Single), heavy: false });
         }
     }
     for r in RefinementId::ALL {
         let id = ContentId::Refinement(r);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id), kind: act(Command::BuyRefinement(r), CountSemantics::Single), heavy: false });
+            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyRefinement(r), CountSemantics::Single), heavy: false });
         }
     }
     for r in RuleId::ALL {
         let id = ContentId::Rule(r);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id), kind: act(Command::AdoptRule(r), CountSemantics::Single), heavy: true });
+            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::AdoptRule(r), CountSemantics::Single), heavy: true });
         }
     }
     out
@@ -188,9 +215,9 @@ fn crafts_rows(state: &GameState) -> Vec<Row> {
     for c in CraftId::ALL {
         let id = ContentId::Craft(c);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id), kind: act(Command::Craft(c), CountSemantics::RepeatN), heavy: false });
+            out.push(Row { key: RowKey::Content(id, "craft"), kind: act(Command::Craft(c), CountSemantics::RepeatN), heavy: false });
             out.push(Row {
-                key: RowKey::Content(id),
+                key: RowKey::Content(id, "tinker"),
                 kind: RowKind::Count { increment: Command::AssignTinkerer(c), decrement: Command::UnassignTinkerer(c) },
                 heavy: false,
             });
@@ -207,7 +234,7 @@ fn sunbeams_rows(state: &GameState) -> Vec<Row> {
     for r in RiteId::ALL {
         let id = ContentId::Rite(r);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id), kind: act(Command::BuyRite(r), CountSemantics::Single), heavy: false });
+            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyRite(r), CountSemantics::Single), heavy: false });
         }
     }
     out.push(Row { key: RowKey::Fixed("Enlighten"), kind: act(Command::Enlighten, CountSemantics::Single), heavy: false });
@@ -219,7 +246,7 @@ fn wonders_rows(state: &GameState) -> Vec<Row> {
     for a in ArchId::ALL {
         let id = ContentId::Arch(a);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id), kind: act(Command::BuyArch(a), CountSemantics::Single), heavy: false });
+            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyArch(a), CountSemantics::Single), heavy: false });
         }
     }
     out.push(Row { key: RowKey::Fixed("RefineStarshard"), kind: act(Command::RefineStarshard, CountSemantics::Single), heavy: false });
@@ -236,11 +263,11 @@ fn friends_rows(state: &GameState) -> Vec<Row> {
             continue;
         }
         out.push(Row {
-            key: RowKey::Colony(c),
+            key: RowKey::Colony(c, "trade"),
             kind: act(Command::Trade(c, 1), CountSemantics::CountTaking),
             heavy: false,
         });
-        out.push(Row { key: RowKey::Colony(c), kind: act(Command::SendPenPal(c), CountSemantics::Single), heavy: false });
+        out.push(Row { key: RowKey::Colony(c, "penpal"), kind: act(Command::SendPenPal(c), CountSemantics::Single), heavy: false });
     }
     out.push(Row { key: RowKey::Fixed("ScoutPicnic"), kind: act(Command::ScoutPicnic, CountSemantics::Single), heavy: false });
     out
@@ -272,7 +299,7 @@ fn dreams_rows(state: &GameState) -> Vec<Row> {
     for id in DreamLoomId::ALL {
         let cid = ContentId::DreamLoom(id);
         if revealed(state, cid) {
-            out.push(Row { key: RowKey::Content(cid), kind: act(Command::BuyDreamLoom(id), CountSemantics::Single), heavy: false });
+            out.push(Row { key: RowKey::Content(cid, ""), kind: act(Command::BuyDreamLoom(id), CountSemantics::Single), heavy: false });
         }
     }
     out
@@ -286,7 +313,7 @@ fn legacy_rows(state: &GameState) -> Vec<Row> {
     for t in TraditionId::ALL {
         let id = ContentId::Tradition(t);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id), kind: act(Command::BuyTradition(t), CountSemantics::Single), heavy: false });
+            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyTradition(t), CountSemantics::Single), heavy: false });
         }
     }
 

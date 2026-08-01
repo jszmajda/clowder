@@ -18,11 +18,11 @@
 
 - [x] **TUI-RENDER-009**: The system shall derive the list's scroll position each frame from the cursor's position, keeping the cursor visible with a margin above and below, rather than storing a scroll offset.
 - [x] **TUI-RENDER-010**: The system shall scroll group headers with the list rather than pinning them.
-- [ ] **TUI-RENDER-011**: When a list is longer than its viewport, the system shall indicate that more rows exist beyond the visible range without spending a column on a scrollbar.
+- [x] **TUI-RENDER-011**: When a list is longer than its viewport, the system shall indicate that more rows exist beyond the visible range without spending a column on a scrollbar.
 
 ## Numbers and Names
 
-- [ ] **TUI-RENDER-012**: The system shall render numbers in the sidebar and list rows compactly to a fixed significant-figure width so columns stay aligned, and shall render them exactly and unabbreviated in the inspector.
+- [x] **TUI-RENDER-012**: The system shall render numbers in the sidebar and list rows compactly to a fixed significant-figure width so columns stay aligned, and shall render them exactly and unabbreviated in the inspector.
 - [x] **TUI-RENDER-013**: The system shall scale a number's displayed precision to its magnitude, showing no trailing decimals that imply precision the value does not carry.
 - [x] **TUI-RENDER-014**: When a name does not fit its column, the system shall shorten it with an explicit ellipsis so the player can see that text was cut, the full name remaining available in the inspector.
 

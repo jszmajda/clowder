@@ -291,3 +291,46 @@ impl GameState {
         n
     }
 }
+
+impl GameState {
+    /// Whether a command's *gate* is open — the precondition that decides
+    /// whether a thing exists for this meadow yet, as distinct from whether it
+    /// is affordable right now.
+    ///
+    /// Exists because a shell needs to know what to *show*, and deciding that
+    /// from the outside means restating rules the command layer already owns.
+    /// A meadow that has met none of this should not be told what is coming:
+    /// progressive reveal is how the game unfolds, and a list that names every
+    /// eventual action on day one spends months of discovery in one glance.
+    ///
+    /// Content-backed actions answer through `availability`; the ones below
+    /// have no content id of their own. `true` for anything unlisted — an
+    /// action with no gate is simply always there. @spec SIM-ENG-045
+    pub fn command_gate_open(&self, cmd: &crate::command::Command) -> bool {
+        use crate::command::Command as C;
+        use crate::state::{ArchId, IdeaId, StructureId};
+        match cmd {
+            C::Bask | C::Reverie | C::Enlighten => !self.silent_sun(),
+            C::HoldParade => self.ideas.contains(&IdeaId::ParadeRoutes),
+            C::ScoutPicnic => self.ideas.contains(&IdeaId::GiftEconomy),
+            C::SummonStarWhale | C::FeedWhale => {
+                self.structures[StructureId::SkyDock.ix()] >= 1
+                    && self.ideas.contains(&IdeaId::SkywardSong)
+            }
+            C::DeepNap(_) => self.ideas.contains(&IdeaId::DeepNapTheory),
+            C::Pounce(_) => self.ideas.contains(&IdeaId::PouncingPractice),
+            C::Rummage => self.ideas.contains(&IdeaId::CouchSpelunking),
+            C::CondenseJar => self.arches_bought.contains(&ArchId::EverdreamArch),
+            C::MakePromise => self.ideas.contains(&IdeaId::NightCourtEtiquette),
+            C::HostJamboree => self.ideas.contains(&IdeaId::TeaCeremonies),
+            C::RefineStarshard | C::RefineEcho => !self.arches_bought.is_empty(),
+            // Deliberately NOT gated on clowder size. A row that vanishes
+            // when the meadow dips below the threshold takes an armed row out
+            // from under the cursor; TUI-NAV-043 wants that commit to fail to
+            // the footer instead, which it can only do if the row is still
+            // there. Reveal gating is for what a meadow has never met, not for
+            // what it momentarily cannot afford.
+            _ => true,
+        }
+    }
+}

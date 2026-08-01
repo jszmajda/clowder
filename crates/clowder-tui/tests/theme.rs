@@ -884,7 +884,7 @@ fn removing_every_colour_loses_no_meaning() {
     // With colour gone, the channels that remain still tell every meaning apart.
     let mut seen: Vec<(&str, &str)> = Vec::new();
     for m in &MEANINGS {
-        if let Some((other, _)) = seen.iter().find(|(_, c)| *c == m.first_channel) {
+        if let Some((other, "")) = seen.iter().find(|(_, c)| *c == m.first_channel) {
             panic!(
                 "{:?} and {other:?} are both carried by {:?}, so with colour removed they are \
                  the same thing on screen. Colour may only ever reinforce a distinction \

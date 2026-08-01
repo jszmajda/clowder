@@ -339,7 +339,7 @@ fn content_keys(state: &GameState) -> Vec<(Section, ContentId)> {
     all_rows(state)
         .into_iter()
         .filter_map(|(s, r)| match r.key {
-            RowKey::Content(id) => Some((s, id)),
+            RowKey::Content(id, _) => Some((s, id)),
             _ => None,
         })
         .collect()
@@ -852,7 +852,7 @@ fn every_content_row_is_actionable() {
     let mut counted = 0;
 
     for (section, row) in all_rows(&state) {
-        if !matches!(row.key, RowKey::Content(_)) {
+        if !matches!(row.key, RowKey::Content(_, _)) {
             continue;
         }
         counted += 1;
