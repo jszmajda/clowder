@@ -920,7 +920,13 @@ fn an_item_the_core_calls_locked_says_so_even_when_the_coffers_are_full() {
     let job = open_job(&free);
     let id = ContentId::Job(job);
 
-    let locked = GameState::new(11); // nobody in the meadow to take it on
+    // One kitten, already at work. The row exists — a job is revealed once
+    // there is a clowder to do it — and there is still nobody free to take
+    // this one on, which is a lock the coffers cannot explain.
+    let mut locked = GameState::new(11);
+    let mut busy = plain_kitten();
+    busy.job = Some(job);
+    locked.kittens = vec![busy];
 
     assert_eq!(
         locked.affordability(id),

@@ -46,6 +46,15 @@ impl GameState {
         (mess_accrual, shortfall)
     }
 
+    /// Raise the roster high-water if the clowder has grown. A ratchet: what
+    /// prestige reveals is having *met* a size, not currently having it.
+    /// @spec SIM-ENG-046
+    pub(crate) fn ratchet_roster(&mut self) {
+        if self.kittens.len() > self.roster_high_water {
+            self.roster_high_water = self.kittens.len();
+        }
+    }
+
     /// The identical simulation step as [`GameState::tick`], but never
     /// journals. This is the core's own non-journaling entry point —
     /// catch-up replay and any other fast-forward (a long absence, a Deep
@@ -78,6 +87,7 @@ impl GameState {
         }
 
         // ---- Phases 2, 2b, 3: everything that moves a stock ----
+        self.ratchet_roster();
         let (mess_accrual, shortfall) = self.resource_phases();
 
         // ---- Phase 4: mood, famine flag & mess recompute ----

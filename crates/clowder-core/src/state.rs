@@ -1050,6 +1050,15 @@ pub struct GameState {
     /// cadence, offline catch-up) — never inside tick(). @spec SIM-ENG-024
     #[serde(default = "default_speed")]
     pub speed: f64,
+    /// The largest the roster has ever been — a ratchet, like the kite
+    /// high-water. Prestige is revealed by *having met* the size it asks for,
+    /// not by currently having it: a gate that un-reveals would take an armed
+    /// row out from under the cursor the moment a kitten wandered off, and
+    /// TUI-NAV-043 wants a commit that is no longer valid to fail to the
+    /// footer instead. Reveal is for what a meadow has never met.
+    /// @spec SIM-ENG-046
+    #[serde(default)]
+    pub roster_high_water: usize,
     /// Permanently revealed content ids. @spec SIM-ENG-023
     #[serde(default)]
     pub revealed: BTreeSet<ContentId>,
@@ -1230,6 +1239,7 @@ impl GameState {
             resources: [0.0; RESOURCE_COUNT],
             structures: [0; STRUCTURE_COUNT],
             journal: crate::journal::Journal::default(),
+            roster_high_water: 0,
             kittens: Vec::new(),
             ideas: BTreeSet::new(),
             pity: 0,
@@ -1904,6 +1914,14 @@ impl GameState {
     /// Advisory display state for a content item. Reveals are sticky
     /// (scanned at the end of each tick's clamp phase).
     // @spec SIM-ENG-023
+    /// The largest roster this meadow has ever held, never less than the one
+    /// in front of you. A ratchet with a floor, like the kite high-water: a
+    /// hand-edited or freshly-built state is judged on what it plainly has,
+    /// and growth is remembered after the fact. @spec SIM-ENG-046
+    pub fn roster_reach(&self) -> usize {
+        self.roster_high_water.max(self.kittens.len())
+    }
+
     pub fn availability(&self, id: ContentId) -> Availability {
         if !id.is_reveal_tracked() {
             return self.two_state_availability(id);
@@ -1956,7 +1974,13 @@ impl GameState {
             }
             ContentId::Arch(_) => self.ideas.contains(&IdeaId::ParadeRoutes),
             ContentId::Refinement(r) => self.ideas.contains(&content::refinement_def(r).gate),
-            ContentId::Rule(r) => !self.rules.contains(&content::rule_def(r).blocks),
+            // House rules are bought with curiosity and live beside the ideas,
+            // so they appear on the same gate: once the meadow can hold what
+            // buys them. @spec SIM-ENG-032, SIM-ENG-044
+            ContentId::Rule(r) => {
+                self.cap(ResourceId::Curiosity) > 0.0
+                    && !self.rules.contains(&content::rule_def(r).blocks)
+            }
             // A Tradition's currency cannot exist before a first Move, so the
             // shop opens with the generation that earns it. Ungated, a fresh
             // meadow would report the whole prestige ladder and its prices —

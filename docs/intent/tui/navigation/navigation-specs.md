@@ -12,7 +12,7 @@
 ## Navigation
 
 - [x] **TUI-NAV-005**: The system shall assign sections to the digits 1–0 by a fixed design-time map that never renumbers; pressing a section's digit jumps to it, and pressing the digit of an unrevealed section is a no-op with a footer note.
-- [ ] **TUI-NAV-006**: The system shall reveal a section's tab only once at least one of its rows is revealed, place it in its fixed digit slot when it appears, and badge a newly appeared tab until it is first visited.
+- [x] **TUI-NAV-006**: The system shall reveal a section's tab only once at least one of its rows is revealed, place it in its fixed digit slot when it appears, and badge a newly appeared tab until it is first visited.
 - [x] **TUI-NAV-007**: Tab/BackTab, l/h, and →/← shall cycle only revealed sections; ↓/↑ and j/k shall move within the focused list; [ and ] shall jump between the list's group headers.
 - [x] **TUI-NAV-008**: The system shall remember each section's focused item by content identity (not list index), so returning to a section restores the same item even after intervening reveals inserted rows.
 - [x] **TUI-NAV-038**: When / is pressed, the system shall open a find-anything palette over all revealed content, narrow its results by substring match as characters are typed, and on Enter move to the matched item's section and focus that item; Esc shall close the palette with no effect.

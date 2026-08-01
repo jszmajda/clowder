@@ -71,6 +71,10 @@ fn rich() -> GameState {
         .chain(IdeaId::ALL.iter().map(|i| ContentId::Idea(*i)))
         .collect::<BTreeSet<_>>();
 
+    // A meadow this size has been played into existence, so its high-water
+    // reflects that: prestige stays revealed when a kitten later wanders off.
+    // @spec SIM-ENG-046
+    s.roster_high_water = MEADOW_MOVE_MIN_KITTENS + 9;
     let mut roster: Vec<Kitten> = (0..MEADOW_MOVE_MIN_KITTENS + 9)
         .map(|i| kitten(&format!("kitten-{i}"), None))
         .collect();
@@ -1189,6 +1193,10 @@ fn a_first_visit_lands_on_the_first_actionable_row() {
     // A meadow where the first thing on the Ideas list is revealed but not yet
     // affordable, and something further down is ready to go.
     let mut state = fresh();
+    // House rules now appear on the same gate the ideas do — once the meadow
+    // can hold what buys them — so the fixture needs that storage for the
+    // section to contain an actionable row at all. @spec SIM-ENG-032
+    state.structures[StructureId::CardboardBox.ix()] = 1;
     state.revealed.insert(ContentId::Idea(IdeaId::ALL[0]));
 
     let list = rows(&state, Section::Ideas);

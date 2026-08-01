@@ -134,6 +134,9 @@ fn every_section_revealed() -> GameState {
     s.discovered = ColonyId::ALL.iter().copied().collect::<BTreeSet<_>>();
     s.generation = 1;
     s.kittens = employed(6);
+    // Prestige reveals on having met the size it asks for, so the ratchet is
+    // what this fixture needs — not a roster it never had.
+    s.roster_high_water = 100;
 
     for section in Section::ALL {
         assert!(
@@ -581,6 +584,9 @@ fn an_empty_chip_cluster_is_what_nothing_needing_you_looks_like() {
     let settled = {
         let mut s = every_section_revealed();
         s.kittens = employed(6);
+    // Prestige reveals on having met the size it asks for, so the ratchet is
+    // what this fixture needs — not a roster it never had.
+    s.roster_high_water = 100;
         s.pending_sky_event = None;
         s
     };

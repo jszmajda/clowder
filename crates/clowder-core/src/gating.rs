@@ -310,7 +310,20 @@ impl GameState {
         use crate::command::Command as C;
         use crate::state::{ArchId, IdeaId, StructureId};
         match cmd {
-            C::Bask | C::Reverie | C::Enlighten => !self.silent_sun(),
+            // The ceremonies need warmth, and warmth needs somewhere to keep
+            // it. Gating on the storage mirrors how ideas gate on curiosity
+            // storage: a section means something once the meadow can hold what
+            // it trades in. (Silent-sun is an adventure that quiets them
+            // temporarily — a different question from whether they exist.)
+            C::Bask | C::Reverie | C::Enlighten => {
+                !self.silent_sun() && self.cap(crate::state::ResourceId::Warmth) > 0.0
+            }
+            // A job wants someone to do it. Before the first kitten there is no
+            // clowder to organise, and listing the work would name every job
+            // the game has before the player has met one cat.
+            C::AssignJob(_) | C::UnassignJob(_) | C::Promote(_) | C::AppointElder(_) => {
+                !self.kittens.is_empty()
+            }
             C::HoldParade => self.ideas.contains(&IdeaId::ParadeRoutes),
             C::ScoutPicnic => self.ideas.contains(&IdeaId::GiftEconomy),
             C::SummonStarWhale | C::FeedWhale => {
@@ -324,12 +337,18 @@ impl GameState {
             C::MakePromise => self.ideas.contains(&IdeaId::NightCourtEtiquette),
             C::HostJamboree => self.ideas.contains(&IdeaId::TeaCeremonies),
             C::RefineStarshard | C::RefineEcho => !self.arches_bought.is_empty(),
-            // Deliberately NOT gated on clowder size. A row that vanishes
-            // when the meadow dips below the threshold takes an armed row out
-            // from under the cursor; TUI-NAV-043 wants that commit to fail to
-            // the footer instead, which it can only do if the row is still
-            // there. Reveal gating is for what a meadow has never met, not for
-            // what it momentarily cannot afford.
+            // Sticky: revealed by having ever MET the size prestige asks for,
+            // never by currently having it. A gate that un-reveals would take
+            // an armed row out from under the cursor the moment a kitten
+            // wandered off, where TUI-NAV-043 wants the commit to fail to the
+            // footer instead. @spec SIM-ENG-046
+            C::GreatMeadowMove | C::PassItDown | C::DeclareAdventure(_) => {
+                self.roster_reach() >= crate::content::MEADOW_MOVE_MIN_KITTENS
+                    || self.generation >= 1
+            }
+            // The ladder is bought with what only a Move can grant, so a meadow
+            // that has never moved has nothing to spend and nothing to see.
+            C::BuyTradition(_) => self.generation >= 1,
             _ => true,
         }
     }
