@@ -1195,7 +1195,7 @@ impl GameState {
         // @spec SIM-DREAM-008
         self.journal.record_away(self.ticks, &report);
 
-        let mut events = vec![Event::Napped { years, report }];
+        let mut events = vec![Event::Napped { years, report: Box::new(report) }];
         if self.distant_dawn && !was_dawn {
             events.push(Event::DistantDawn);
         }

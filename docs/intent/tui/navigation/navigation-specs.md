@@ -19,7 +19,7 @@
 
 ## Action Model
 
-- [x] **TUI-NAV-009**: The system shall render each actionable item as a row carrying a glyph-first availability marker (● affordable, ◐ partial, ○ revealed-unaffordable, ✓ owned/done), the flavor name, owned count, and next cost; Teased rows render dimmed with their marker and Hidden content is not rendered.
+- [ ] **TUI-NAV-009**: The system shall render each actionable item as a row carrying a glyph-first availability marker (● affordable, ◐ partial, ○ revealed-unaffordable, ✓ owned/done), the flavor name, owned count, and next cost; Teased rows render dimmed with their marker and Hidden content is not rendered.
 - [x] **TUI-NAV-053**: The system shall take every availability and affordability answer behind a row's marker from a core query rather than computing it shell-side, and shall render a content kind for which the core reports no availability as two-state — present and actionable, or absent — never inventing a Teased or partial state the core did not report.
 - [ ] **TUI-NAV-010**: While Enter is held on a row that is not a heavy action, the system shall repeat the focused row's action at no more than ten times per second regardless of the terminal's key-repeat rate, and the cursor shall not move on action.
 - [ ] **TUI-NAV-051**: The system shall commit a heavy action only on a distinct, deliberate second Enter — a held or auto-repeating Enter shall arm the row and go no further, and X shall never commit a heavy action — so no heavy action can be reached by holding a key.

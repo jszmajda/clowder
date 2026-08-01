@@ -63,7 +63,9 @@ Each frame compares the two. When wall-clock elapsed exceeds monotonic elapsed b
 
 **Catch-up is paced, never dropped.** A long gap can owe millions of ticks, and running them all in one frame is indistinguishable from a hang. Each frame spends a bounded slice of wall time running ticks and banks the rest, so a big catch-up drains over several frames while the UI stays alive and can say so. The tick count is exact; only its spreading over frames is approximate. Ticks owed are counted in integers, never floats, so a large backlog cannot lose precision.
 
-**A save timestamp names the sim's position, not the wall clock.** Because ticks can be banked, the state in memory may be behind real time — mid-catch-up, deliberately. The saved timestamp is therefore the wall-clock instant the simulation has actually reached: now, minus the real time the banked backlog represents. Stamping a banked save with the current wall clock would tell the next load that the sim is caught up when it is not, and that load would compute its own elapsed from the wrong origin — silently swallowing exactly the interval that was still owed. Back-dating makes the two paths agree: whatever is unspent at save time is simply owed again at load time, once.
+**A save carries its banked ticks as a count.** Because ticks can be banked, the state in memory may be behind real time — mid-catch-up, deliberately. The timestamp is simply the present, and the ticks earned but not yet run are written beside it.
+
+The tempting alternative is to back-date the timestamp so the interval re-derives them, and it is wrong in a way that takes a while to see: the reload reconstructs ticks by multiplying an interval by whatever speed is persisted, so a backlog earned at one speed and saved at another is re-priced by the ratio between them. Earn fast, save slow, and most of it evaporates; the other way round, it multiplies. What the player earned is theirs, so it is stored as what it is.
 
 ## Terminal Lifecycle
 
@@ -127,7 +129,7 @@ One read-only addition, for the same reason the navigation leaf needs its own: t
 | Long catch-up | Time-budgeted ticks per frame, remainder banked | Run every owed tick in one frame; cap and discard the excess | A multi-minute frozen frame reads as a hang; discarding punishes absence |
 | In-process gap cap | The same 365-day cap and `truncated` flag as the load path | No cap while running | One absence rule; the player should not be able to feel whether the process was running |
 | Tick accounting | Integer ticks owed, fractional remainder banked separately | Floating-point tick counter | A large backlog in `f64` loses whole ticks to precision |
-| Save timestamp | The instant the sim has reached — now minus the banked backlog | Stamp the current wall clock | A wall-clock stamp on a banked save tells the next load it is caught up when it is not, silently swallowing the owed interval |
+| Banked ticks across a save | Carried as an explicit count beside a present timestamp | Back-date the timestamp so the interval re-derives them | Re-deriving re-prices the backlog at whatever speed is persisted, losing or conjuring ticks by the ratio between the speed they were earned at and the speed they were saved at |
 | Frame ordering | Commands apply, then ticks run | Ticks first, then commands | A key pressed during the previous wait is older than that wait; it should not have to sit out a catch-up burst |
 | Input handling | Bounded drain per frame; resizes coalesce to the last | Drain everything ready | An unbounded flood starves the sim and the renderer |
 | Unreadable save | Stop with an explanation; leave the file untouched | Treat as corrupt and move aside | Unreadable is not unparseable — the contents are unknown, and touching the file could destroy a good save |

@@ -471,7 +471,6 @@ fn a_fresh_save_stamps_the_current_format_version() {
     let v: serde_json::Value =
         serde_json::from_str(&save_string(&GameState::new(3_110), 7)).unwrap();
     assert_eq!(v["save_version"], SAVE_VERSION, "a freshly written save stamps the current version");
-    assert!(SAVE_VERSION >= 3, "the journal arrived at version 3 and cannot un-arrive");
 }
 
 // @spec SAVE-014

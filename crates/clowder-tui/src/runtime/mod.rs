@@ -286,6 +286,16 @@ impl App {
         reading: clock::Reading,
         input: &[crossterm::event::Event],
     ) -> std::io::Result<()> {
+        // The speed that priced this frame's interval is the one in force
+        // while it elapsed — captured before any command can change it. A
+        // SetSpeed arriving in this frame's input applies from here on, not
+        // retroactively: the interval below predates the keypress. Without
+        // this the whole of a post-suspend catch-up could be re-priced by a
+        // speed change queued in the first frame after waking, which is the
+        // very loss the save seam was fixed to prevent.
+        // @spec TUI-RUN-020
+        let speed_for_this_interval = self.state.speed;
+
         // ---- 1 & 2. input, bounded; commands land BEFORE this frame's ticks --
         // Events arrive as an argument rather than being polled here, for the
         // same reason the clock reading does: a step that reached for a real
@@ -316,7 +326,7 @@ impl App {
                             // Partial success is intended: take as many as you
                             // can afford, stop at the first refusal.
                             for _ in 0..n {
-                                if self.state.apply(cmd.clone()).is_err() {
+                                if self.state.apply(cmd).is_err() {
                                     break;
                                 }
                             }
@@ -338,7 +348,7 @@ impl App {
         // a pane nobody is looking at, a frame with nothing to redraw — none of
         // them stop the clock. Time never depends on what is on screen.
         // @spec TUI-RUN-017, TUI-RUN-025
-        self.clock.observe(reading, self.state.speed);
+        self.clock.observe(reading, speed_for_this_interval);
         let owed = self.clock.take(Self::MAX_TICKS_PER_FRAME);
         for _ in 0..owed {
             self.state.tick();
@@ -375,8 +385,8 @@ impl App {
         Ok(())
     }
 
-    /// Save, using a timestamp naming the instant the *simulation* has
-    /// reached rather than the wall clock. @spec TUI-RUN-027, TUI-RUN-031
+    /// Save at the present instant, carrying the ticks banked but not yet run
+    /// as an explicit count. @spec TUI-RUN-027, TUI-RUN-031, SAVE-017
     pub fn save(&self) -> std::io::Result<()> {
         // The stamp is simply now, and the ticks this session banked but never
         // ran are written alongside it as a count.

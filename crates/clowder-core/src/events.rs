@@ -100,7 +100,7 @@ pub enum Event {
     WhaleFed { contentment: u32 },
     /// A summarized nap report — never a per-tick stream, and the same
     /// `OfflineReport` kind offline absence folds. @spec SIM-DREAM-001, SIM-DREAM-008
-    Napped { years: u32, report: crate::save::OfflineReport },
+    Napped { years: u32, report: Box<crate::save::OfflineReport> },
     DreamLoomBought { id: DreamLoomId },
     DejaVuDay,
     DistantDawn,

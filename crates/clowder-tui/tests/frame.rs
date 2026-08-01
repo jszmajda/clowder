@@ -51,7 +51,6 @@
 //! declared for the same reason, ahead of a frame that will need colour roles.
 
 use clowder_tui::nav;
-use clowder_tui::theme;
 use clowder_tui::render;
 
 use std::collections::BTreeSet;

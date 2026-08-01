@@ -6,6 +6,7 @@
 //! hoped-for. @spec TUI-RENDER-001
 
 pub mod fmt;
+pub mod widgets;
 pub mod layout;
 
 use clowder_core::{content, ContentId, GameState};

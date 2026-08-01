@@ -177,7 +177,7 @@ fn ideas_rows(state: &GameState) -> Vec<Row> {
     for r in RuleId::ALL {
         let id = ContentId::Rule(r);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id), kind: act(Command::AdoptRule(r), CountSemantics::Single), heavy: false });
+            out.push(Row { key: RowKey::Content(id), kind: act(Command::AdoptRule(r), CountSemantics::Single), heavy: true });
         }
     }
     out
@@ -264,7 +264,10 @@ fn dreams_rows(state: &GameState) -> Vec<Row> {
     let mut out = vec![Row {
         key: RowKey::Fixed("DeepNap"),
         kind: act(Command::DeepNap(1), CountSemantics::CountTaking),
-        heavy: false,
+        // TUI-NAV-015 names four heavy actions and this is one: it skips whole
+        // years. `heavy` is the arming contract — false here means a held Enter
+        // would commit it outright.
+        heavy: true,
     }];
     for id in DreamLoomId::ALL {
         let cid = ContentId::DreamLoom(id);

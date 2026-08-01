@@ -90,7 +90,7 @@ fn vocabulary() -> Vec<Event> {
         Event::SiteReached { site: SiteId::FenceTop },
         Event::WhaleSummoned,
         Event::WhaleFed { contentment: 1 },
-        Event::Napped { years: 2, report: clowder_core::OfflineReport::default() },
+        Event::Napped { years: 2, report: Box::new(clowder_core::OfflineReport::default()) },
         Event::DreamLoomBought { id: DreamLoomId::SoftPillow },
         Event::DejaVuDay,
         Event::DistantDawn,

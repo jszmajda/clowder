@@ -170,7 +170,16 @@ impl SessionLock {
             }
         }
         let my_pid = std::process::id();
-        let my_start = process_start_time(my_pid).unwrap_or(0);
+        // If we cannot identify ourselves, we must not write a lock at all:
+        // a recorded start of 0 mismatches every real start time, so every
+        // later launcher would read this LIVE session's lock as stale and
+        // clear it. Refusing is the safe failure; a spurious lockout is
+        // recoverable with --force, a silently cleared live lock is not.
+        let Some(my_start) = process_start_time(my_pid) else {
+            return Err(LockError::Io(std::io::Error::other(
+                "could not identify this process, so a session lock would be unsafe to write",
+            )));
+        };
         let contents = render_lock(my_pid, my_start);
 
         loop {

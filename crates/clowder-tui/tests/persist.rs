@@ -41,7 +41,6 @@
 //! core can read back.
 
 use clowder_tui::nav;
-use clowder_tui::render;
 use clowder_tui::runtime;
 
 use std::fs;
