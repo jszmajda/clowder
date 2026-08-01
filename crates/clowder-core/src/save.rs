@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 /// committed fixtures; a pre-journal save migrates to an empty journal, which
 /// is the honest representation of history it never recorded.
 /// @spec SAVE-013, SAVE-014
-pub const SAVE_VERSION: u32 = 3;
+pub const SAVE_VERSION: u32 = 4;
 /// The shortest absence worth reporting. Public for the same reason the cap
 /// is: a caller deciding whether to surface a report must use this value, not
 /// a copy of it. @spec SAVE-015
@@ -26,6 +26,16 @@ const TICKS_PER_SECOND: u64 = crate::content::TICKS_PER_SECOND;
 pub struct SaveFile {
     pub save_version: u32,
     pub saved_at_unix: u64,
+    /// Ticks the shell had banked but not yet run when this was written.
+    ///
+    /// Carried explicitly because the alternative — back-dating the timestamp
+    /// so the interval re-derives them — silently re-prices the backlog at
+    /// whatever speed happened to be set at save time. Ticks earned at one
+    /// speed and saved at another were being lost or conjured by the ratio
+    /// between them. What the player earned is theirs, so it is stored as
+    /// what it is: a count. @spec SAVE-017
+    #[serde(default)]
+    pub owed_ticks: u64,
     pub state: GameState,
 }
 
@@ -85,13 +95,30 @@ pub struct LoadedGame {
 /// Serialize a save to pretty JSON with a caller-supplied timestamp.
 // @spec SAVE-001, SAVE-011
 pub fn save_string(state: &GameState, saved_at_unix: u64) -> String {
-    let file = SaveFile { save_version: SAVE_VERSION, saved_at_unix, state: state.clone() };
+    save_string_owing(state, saved_at_unix, 0)
+}
+
+/// As [`save_string`], carrying ticks the caller has banked but not yet run.
+/// @spec SAVE-017
+pub fn save_string_owing(state: &GameState, saved_at_unix: u64, owed_ticks: u64) -> String {
+    let file =
+        SaveFile { save_version: SAVE_VERSION, saved_at_unix, owed_ticks, state: state.clone() };
     serde_json::to_string_pretty(&file).expect("GameState serialization is infallible")
 }
 
 /// Atomic write: temp file in the same directory, fsync, rename.
 // @spec SAVE-003
 pub fn write_save(path: &Path, state: &GameState, saved_at_unix: u64) -> std::io::Result<()> {
+    write_save_owing(path, state, saved_at_unix, 0)
+}
+
+/// As [`write_save`], carrying banked-but-unrun ticks. @spec SAVE-017
+pub fn write_save_owing(
+    path: &Path,
+    state: &GameState,
+    saved_at_unix: u64,
+    owed_ticks: u64,
+) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
             std::fs::create_dir_all(parent)?;
@@ -101,7 +128,7 @@ pub fn write_save(path: &Path, state: &GameState, saved_at_unix: u64) -> std::io
     tmp.push(".tmp");
     let tmp = PathBuf::from(tmp);
     let mut file = std::fs::File::create(&tmp)?;
-    file.write_all(save_string(state, saved_at_unix).as_bytes())?;
+    file.write_all(save_string_owing(state, saved_at_unix, owed_ticks).as_bytes())?;
     file.sync_all()?; // without this, a power loss after rename could keep an empty "new" file
     drop(file);
     std::fs::rename(&tmp, path)
@@ -219,7 +246,11 @@ pub fn load_string(s: &str, now_unix: u64) -> Result<LoadedGame, LoadError> {
     let raw_elapsed = now_unix.saturating_sub(file.saved_at_unix);
     let truncated = raw_elapsed > CATCHUP_CAP_SECONDS;
     let elapsed = raw_elapsed.min(CATCHUP_CAP_SECONDS);
-    let ticks_to_replay = ((elapsed * TICKS_PER_SECOND) as f64 * state.speed).round() as u64;
+    // Ticks the previous session had already earned are added as-is — they were
+    // priced when they were earned, and re-deriving them from an interval would
+    // re-price them at whatever speed is set now. @spec SAVE-017
+    let ticks_to_replay =
+        ((elapsed * TICKS_PER_SECOND) as f64 * state.speed).round() as u64 + file.owed_ticks;
     let before = state.resources;
     let mut report = OfflineReport {
         elapsed_seconds: elapsed,

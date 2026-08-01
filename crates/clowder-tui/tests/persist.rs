@@ -415,45 +415,39 @@ fn a_save_with_nothing_banked_is_stamped_with_the_present() {
 }
 
 /// The subtle one. The state in memory is deliberately behind real time —
-/// ninety seconds of ticks are banked and unrun — so the instant the simulation
-/// has *reached* is ninety seconds ago, and that is what the file must say.
+/// ninety seconds of ticks are banked and unrun — so the save must carry those
+/// ticks, or the next load will never run them.
 ///
-/// Stamping the wall clock instead would tell the next load the sim is caught
-/// up when it is not: that load computes its own elapsed from the stamp, finds
-/// nothing owed, and the ninety seconds vanish. Back-dating makes the two paths
-/// agree — whatever is unspent at save time is simply owed again at load time,
-/// once. The assertion is on the *reload*, not on the file's field, because
-/// "the owed interval survives" is the behaviour, and the field is only how.
+/// This previously worked by back-dating the stamp so the interval re-derived
+/// them. That re-priced the backlog at whatever speed was set at save time:
+/// ticks earned fast and saved slow vanished, ticks earned slow and saved fast
+/// were conjured, by the ratio between the two. The count is carried
+/// explicitly now. The assertion is on the reload, because "what was banked is
+/// owed again, exactly once" is the behaviour; the field is only how.
 ///
-/// Reaches through `TickAccumulator::observe`, which belongs to the clock chunk;
-/// the span this test back-dates by is the one `unrun_span` reports.
-///
-/// @spec TUI-RUN-027
+/// @spec TUI-RUN-027, SAVE-017
 #[test]
-fn a_save_taken_mid_catch_up_is_back_dated_by_the_unrun_span() {
+fn a_save_taken_mid_catch_up_owes_exactly_what_it_banked() {
     let dir = TempDir::new("backdated");
     let save = dir.join("save.json");
 
     // Ninety seconds accrue and none of them run — a shutdown mid-backlog.
     let mut clock = TickAccumulator::default();
     clock.observe(steady(Duration::from_secs(90)), 1.0);
-    assert!(clock.backlog() > 0, "fixture: ninety seconds should bank a backlog");
-    assert_eq!(
-        clock.unrun_span(),
-        Duration::from_secs(90),
-        "fixture: the unrun span is the real time the backlog represents"
-    );
+    let banked = clock.backlog();
+    assert!(banked > 0, "fixture: ninety seconds should bank a backlog");
 
     let app = session(save.clone(), clock);
+    let ticks_at_save = app.state.ticks;
     app.save().expect("saving to a writable directory should succeed");
-    let after = now_unix();
 
-    let loaded = clowder_core::read_save(&save, after).expect("the save should load");
-    assert!(
-        (89..=92).contains(&loaded.report.elapsed_seconds),
-        "the next load should be owed the ninety seconds that were never run, but was owed {}s \
-         — a wall-clock stamp would report ~0 and swallow them",
-        loaded.report.elapsed_seconds
+    // Reloaded immediately: no new absence, so the only ticks that run are the
+    // ones that were banked.
+    let loaded = clowder_core::read_save(&save, now_unix()).expect("the save should load");
+    assert_eq!(
+        loaded.state.ticks,
+        ticks_at_save + banked,
+        "the reload must run exactly the {banked} banked ticks — no more, no fewer"
     );
 }
 

@@ -201,21 +201,19 @@ impl App {
     /// Save, using a timestamp naming the instant the *simulation* has
     /// reached rather than the wall clock. @spec TUI-RUN-027, TUI-RUN-031
     pub fn save(&self) -> std::io::Result<()> {
-        // TUI-RUN-027: the stamp names where the *simulation* has reached, not
-        // where the wall clock has. Banked ticks mean the state in memory can
-        // sit legitimately behind real time, and stamping the present on a
-        // banked save would tell the next load it is caught up when it is not
-        // — that load computes its own elapsed from this origin, so the owed
-        // interval would simply vanish. Back-dating hands it forward instead,
-        // to be run exactly once.
+        // The stamp is simply now, and the ticks this session banked but never
+        // ran are written alongside it as a count.
+        //
+        // Back-dating the stamp so the interval re-derives them was the older
+        // scheme, and it quietly re-priced the backlog at whatever speed was
+        // set at save time: ticks earned fast and saved slow were lost, ticks
+        // earned slow and saved fast were conjured, by the ratio between the
+        // two speeds. What the player earned is theirs, so it is stored as
+        // what it is. @spec TUI-RUN-027, SAVE-017
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        let stamp = now.saturating_sub(self.clock.unrun_span().as_secs());
-        // The write itself is the core's atomic temp-and-rename. The error is
-        // returned rather than swallowed: whether a failed save ends the
-        // session is the caller's call, and TUI-RUN-028 says it must not.
-        clowder_core::write_save(&self.save_path, &self.state, stamp)
+        clowder_core::write_save_owing(&self.save_path, &self.state, now, self.clock.backlog())
     }
 }

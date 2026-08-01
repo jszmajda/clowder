@@ -47,5 +47,5 @@
 ## Saving
 
 - [ ] **TUI-RUN-026**: The system shall autosave on a wall-clock interval and on every clean shutdown, using the core's atomic write.
-- [x] **TUI-RUN-027**: The system shall stamp a save with the wall-clock instant the simulation has actually reached — the current instant less the real time any banked backlog represents — so a save taken mid-catch-up does not report itself as caught up and the owed interval is neither lost nor counted twice.
+- [x] **TUI-RUN-027**: The system shall record a save's banked-but-unrun ticks as an explicit count beside the present timestamp, so a save taken mid-catch-up owes exactly the ticks it banked — neither lost nor counted twice, and never re-priced by a speed set after they were earned.
 - [x] **TUI-RUN-028**: When a save fails to write, the system shall report it once, continue playing, and retry at the next cadence, rather than ending the session or retrying continuously.

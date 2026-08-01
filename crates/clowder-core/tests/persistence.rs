@@ -464,11 +464,14 @@ fn a_heavy_journal_does_not_perturb_the_bit_identical_round_trip() {
 
 // @spec SAVE-014
 #[test]
-fn the_save_format_carries_version_three() {
-    assert_eq!(SAVE_VERSION, 3, "the journal's arrival is save_version 3");
+fn a_fresh_save_stamps_the_current_format_version() {
+    // Deliberately not a literal: the property is that what is written matches
+    // what this binary understands, which must hold at every future version.
+    // Migration from each older version is pinned by its own fixture test.
     let v: serde_json::Value =
         serde_json::from_str(&save_string(&GameState::new(3_110), 7)).unwrap();
-    assert_eq!(v["save_version"], 3, "a freshly written save stamps 3");
+    assert_eq!(v["save_version"], SAVE_VERSION, "a freshly written save stamps the current version");
+    assert!(SAVE_VERSION >= 3, "the journal arrived at version 3 and cannot un-arrive");
 }
 
 // @spec SAVE-014
