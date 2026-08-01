@@ -122,6 +122,7 @@ fn session(save_path: PathBuf, clock: TickAccumulator) -> App {
         last_save: Instant::now(),
         prev_layout: None,
         quitting: false,
+        save_failed: false,
     }
 }
 

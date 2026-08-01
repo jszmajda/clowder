@@ -35,6 +35,9 @@ pub struct App {
     /// @spec TUI-RENDER-008
     pub prev_layout: Option<Layout>,
     pub quitting: bool,
+    /// Whether a save failure has already been reported this session, so the
+    /// notice is said once rather than every cadence. @spec TUI-RUN-028
+    pub save_failed: bool,
 }
 
 /// Start up, run the loop, shut down. Returns a non-success code only for a
@@ -176,6 +179,7 @@ pub fn run() -> ExitCode {
         last_save: Instant::now(),
         prev_layout: None,
         quitting: false,
+        save_failed: false,
     };
 
     // Anything said from in here would be printed onto the alternate screen and
@@ -184,8 +188,61 @@ pub fn run() -> ExitCode {
     let mut parting = Vec::new();
     {
         let _guard = _guard;
+        let backend = ratatui::backend::CrosstermBackend::new(std::io::stdout());
+        let mut terminal = match ratatui::Terminal::new(backend) {
+            Ok(t) => Some(t),
+            Err(e) => {
+                parting.push(format!("clowder could not start drawing: {e}"));
+                app.quitting = true;
+                None
+            }
+        };
+
+        // The only place real clocks are read. Both are sampled together so
+        // their difference is meaningful: the wall clock outrunning the
+        // monotonic one is the machine having been suspended.
+        // @spec TUI-RUN-021, TUI-RUN-022
+        let mut last_mono = Instant::now();
+        let mut last_wall = std::time::SystemTime::now();
+
         while !app.quitting && !term::termination_requested() {
-            if let Err(e) = app.step() {
+            let now_mono = Instant::now();
+            let now_wall = std::time::SystemTime::now();
+            let reading = clock::Reading {
+                monotonic: now_mono.duration_since(last_mono),
+                // A backwards correction reads as zero elapsed here; the
+                // accumulator keeps the monotonic figure. @spec TUI-RUN-023
+                wall: now_wall.duration_since(last_wall).unwrap_or_default(),
+            };
+            last_mono = now_mono;
+            last_wall = now_wall;
+
+            // The poll timeout IS the frame cadence; nothing to do means we
+            // wait here. Bounded so a flood cannot starve the frame.
+            let mut input = Vec::new();
+            let mut waited = false;
+            while input.len() < App::MAX_INPUT_EVENTS_PER_FRAME {
+                let timeout =
+                    if waited { std::time::Duration::ZERO } else { App::FRAME_BUDGET };
+                waited = true;
+                match crossterm::event::poll(timeout) {
+                    Ok(true) => match crossterm::event::read() {
+                        Ok(ev) => input.push(ev),
+                        Err(e) => {
+                            parting.push(format!("clowder lost its input: {e}"));
+                            break;
+                        }
+                    },
+                    Ok(false) => break,
+                    Err(e) => {
+                        parting.push(format!("clowder lost its input: {e}"));
+                        break;
+                    }
+                }
+            }
+
+            let Some(t) = terminal.as_mut() else { break };
+            if let Err(e) = app.step(t, reading, &input) {
                 parting.push(format!("clowder stopped: {e}"));
                 break;
             }
@@ -204,13 +261,118 @@ pub fn run() -> ExitCode {
 }
 
 impl App {
+    /// How long a frame waits for input before going round again. The poll
+    /// timeout IS the frame cadence: nothing to do means we wait here.
+    const FRAME_BUDGET: std::time::Duration = std::time::Duration::from_millis(60);
+    /// TUI-RUN-016. A paste or a held key can deliver faster than frames
+    /// retire; past this many the rest waits for the next frame, so a flood
+    /// can never starve the simulation or the renderer.
+    const MAX_INPUT_EVENTS_PER_FRAME: usize = 64;
+    /// TUI-RUN-025. A long catch-up drains across frames rather than blocking
+    /// in one. The count, not a wall-time budget: the accumulator cannot know
+    /// what a tick costs, so the caller chooses.
+    const MAX_TICKS_PER_FRAME: u64 = 2_000;
+
     /// One iteration: poll input, apply commands, advance the sim, autosave if
-    /// due, render. Commands land before the frame's ticks, so a key pressed
-    /// during the preceding wait takes effect at the time it was pressed
-    /// rather than after the elapsed interval.
-    /// @spec TUI-RUN-014, TUI-RUN-015, TUI-RUN-016, TUI-RUN-017
-    pub fn step(&mut self) -> std::io::Result<()> {
-        todo!("TUI-RUN-014..017: the loop body, in order")
+    /// due, render — in that order.
+    ///
+    /// Generic over the backend so the ordering can be tested against an
+    /// in-memory terminal; `reading` is passed in for the same reason, and
+    /// because `run` is the only thing that should be reading real clocks.
+    /// @spec TUI-RUN-014, TUI-RUN-015, TUI-RUN-016, TUI-RUN-017, TUI-RUN-026
+    pub fn step<B: ratatui::backend::Backend>(
+        &mut self,
+        terminal: &mut ratatui::Terminal<B>,
+        reading: clock::Reading,
+        input: &[crossterm::event::Event],
+    ) -> std::io::Result<()> {
+        // ---- 1 & 2. input, bounded; commands land BEFORE this frame's ticks --
+        // Events arrive as an argument rather than being polled here, for the
+        // same reason the clock reading does: a step that reached for a real
+        // terminal could only ever be tested against one. `run` does the
+        // waiting and the reading; this decides what they mean.
+        //
+        // A key pressed during that wait is chronologically older than the time
+        // the wait represents, so it takes effect at the time it was pressed
+        // rather than after the elapsed interval — and never has to sit out a
+        // catch-up burst. @spec TUI-RUN-014, TUI-RUN-015, TUI-RUN-016
+        let mut last_resize = None;
+        for event in input.iter().take(Self::MAX_INPUT_EVENTS_PER_FRAME) {
+            match event {
+                crossterm::event::Event::Key(key) => {
+                    let action = crate::nav::keys::resolve(*key, &self.view);
+                    match crate::nav::update(action, &mut self.view, &self.state) {
+                        crate::nav::Outcome::Handled => {}
+                        crate::nav::Outcome::Quit => self.quitting = true,
+                        crate::nav::Outcome::Apply(cmd) => {
+                            if let Err(e) = self.state.apply(cmd) {
+                                self.view.footer = Some((
+                                    format!("{e:?}"),
+                                    Instant::now() + std::time::Duration::from_secs(4),
+                                ));
+                            }
+                        }
+                        crate::nav::Outcome::Repeat(cmd, n) => {
+                            // Partial success is intended: take as many as you
+                            // can afford, stop at the first refusal.
+                            for _ in 0..n {
+                                if self.state.apply(cmd.clone()).is_err() {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                // Only the final size matters; recomputing layout for every
+                // intermediate width of a drag is wasted work. @spec TUI-RUN-016
+                crossterm::event::Event::Resize(w, h) => last_resize = Some((*w, *h)),
+                _ => {}
+            }
+        }
+        if let Some((w, h)) = last_resize {
+            terminal.resize(ratatui::layout::Rect::new(0, 0, w, h))?;
+        }
+
+        // ---- 3. advance the simulation --------------------------------------
+        // Unconditional, and before any drawing: a terminal too small to draw,
+        // a pane nobody is looking at, a frame with nothing to redraw — none of
+        // them stop the clock. Time never depends on what is on screen.
+        // @spec TUI-RUN-017, TUI-RUN-025
+        self.clock.observe(reading, self.state.speed);
+        let owed = self.clock.take(Self::MAX_TICKS_PER_FRAME);
+        for _ in 0..owed {
+            self.state.tick();
+        }
+
+        // ---- 4. autosave ----------------------------------------------------
+        // @spec TUI-RUN-026, TUI-RUN-028
+        if persist::autosave_due(self.last_save.elapsed()) {
+            match self.save() {
+                Ok(()) => self.save_failed = false,
+                Err(e) => {
+                    // Reported once, then play continues and the next cadence
+                    // tries again. Ending a healthy session over a transient
+                    // disk problem destroys more than the failed write did.
+                    if !self.save_failed {
+                        self.save_failed = true;
+                        self.view.footer = Some((
+                            format!("could not save: {e}"),
+                            Instant::now() + std::time::Duration::from_secs(6),
+                        ));
+                    }
+                }
+            }
+            self.last_save = Instant::now();
+        }
+
+        // ---- 5. render ------------------------------------------------------
+        // @spec TUI-RUN-014
+        let mut used = None;
+        terminal.draw(|f| {
+            used = Some(crate::render::frame(f, &self.state, &self.view, self.prev_layout.as_ref()));
+        })?;
+        self.prev_layout = used;
+        Ok(())
     }
 
     /// Save, using a timestamp naming the instant the *simulation* has
