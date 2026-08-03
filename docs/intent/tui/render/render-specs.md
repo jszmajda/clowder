@@ -18,7 +18,7 @@
 
 - [x] **TUI-RENDER-009**: The system shall derive the list's scroll position each frame from the cursor's position, keeping the cursor visible with a margin above and below, rather than storing a scroll offset.
 - [x] **TUI-RENDER-010**: The system shall scroll group headers with the list rather than pinning them.
-- [ ] **TUI-RENDER-011**: When a list is longer than its viewport, the system shall indicate that more rows exist beyond the visible range without spending a column on a scrollbar.
+- [x] **TUI-RENDER-011**: When a list is longer than its viewport, the system shall indicate that more rows exist beyond the visible range without spending a column on a scrollbar.
 
 ## Numbers and Names
 

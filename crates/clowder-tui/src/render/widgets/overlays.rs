@@ -36,7 +36,59 @@ fn tier_mark(class: EventClass) -> &'static str {
 /// prose (`clowder_core::Event`) — the words here are the shell's own choice
 /// and are not part of the contract.
 fn event_line(event: &Event) -> String {
-    format!("{} {event:?}", tier_mark(event.class()))
+    format!("{} {}", tier_mark(event.class()), event_words(event))
+}
+
+/// An occurrence in words. The core hands over typed data precisely so the
+/// shell can choose how to say it; showing the type's Debug form puts internal
+/// spellings and struct punctuation in front of the player, which is neither
+/// the plain truth nor any kind of delight.
+fn event_words(event: &Event) -> String {
+    use Event as E;
+    match event {
+        E::KittenArrived { name } => format!("{name} wandered in"),
+        E::KittenWanderedOff { name } => format!("{name} is visiting the neighbour's yard"),
+        E::KittenReturned { name } => format!("{name} came home"),
+        E::JobAssigned { name, .. } => format!("{name} took up new work"),
+        E::JobUnassigned { name, .. } => format!("{name} went back to loafing"),
+        E::SeasonChanged { season } => format!("{} arrived", format!("{season:?}").to_lowercase()),
+        E::NewYear { year } => format!("a new year — {year}"),
+        E::StructureBuilt { id, count } => {
+            format!("{} raised (×{count})", clowder_core::content::structure_def(*id).name)
+        }
+        E::IdeaResearched { id } => format!("figured out {}", clowder_core::content::idea_def(*id).name),
+        E::ZoomiesStarted { .. } => "the zoomies!".into(),
+        E::ZoomiesEnded => "the zoomies pass".into(),
+        E::KittenMood { tier } => format!("the clowder is {}", format!("{tier:?}").to_lowercase()),
+        E::Revealed { .. } => "something new looks possible".into(),
+        E::SkyEventVisible => "something bright crossed the sky".into(),
+        E::SpeedChanged { speed } => format!("speed ×{speed}"),
+        E::ElderAppointed { name } => format!("{name} is the Elder now"),
+        E::KittenPromoted { name, .. } => format!("{name} was promoted"),
+        E::ColonyDiscovered { .. } => "a new neighbour found".into(),
+        E::MeadowMoved { generation } => format!("the clowder moved on — generation {generation}"),
+        E::DistantDawn => "a distant dawn".into(),
+        // Everything else says its kind without unpacking its payload: better a
+        // plain noun than a struct dump, and better than inventing prose for
+        // occurrences whose wording nobody has settled.
+        other => {
+            let d = format!("{other:?}");
+            let head = d.split([' ', '{', '(']).next().unwrap_or("something").to_string();
+            spaced_words(&head)
+        }
+    }
+}
+
+/// "PromiseQuieted" -> "promise quieted".
+fn spaced_words(camel: &str) -> String {
+    let mut out = String::new();
+    for (i, c) in camel.chars().enumerate() {
+        if c.is_uppercase() && i > 0 {
+            out.push(' ');
+        }
+        out.extend(c.to_lowercase());
+    }
+    out
 }
 
 /// A wall-clock span, humanized coarsely enough that two spans differing by

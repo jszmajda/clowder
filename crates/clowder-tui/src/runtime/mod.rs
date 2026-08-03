@@ -171,9 +171,19 @@ pub fn run() -> ExitCode {
         return ExitCode::FAILURE;
     }
 
+    let mut view = ViewState::default();
+    // TUI-NAV-024: the cold open is one section with one focused row. Without
+    // this the first thing a player presses does nothing, and the hint bar's
+    // "Enter do" is a promise the game does not keep.
+    crate::nav::update(
+        crate::nav::Action::SectionJump(crate::nav::Section::Meadow),
+        &mut view,
+        &state,
+    );
+
     let mut app = App {
         state,
-        view: ViewState::default(),
+        view,
         clock: TickAccumulator::default(),
         save_path,
         last_save: Instant::now(),
@@ -317,7 +327,7 @@ impl App {
                         crate::nav::Outcome::Apply(cmd) => {
                             if let Err(e) = self.state.apply(cmd) {
                                 self.view.footer = Some((
-                                    format!("{e:?}"),
+                                    crate::nav::plain_error(&e),
                                     Instant::now() + std::time::Duration::from_secs(4),
                                 ));
                             }

@@ -11,9 +11,9 @@ use std::time::{Duration, Instant};
 use clowder_core::{Command, GameState, LockReason};
 
 use super::action::{Action, CountSemantics};
-use super::rows::{rows, Row, RowKey, RowKind};
+use super::rows::{revealed_sections, rows, Row, RowKey, RowKind};
 use super::section::Section;
-use super::view::{ArmedRow, CountPrompt, ViewState};
+use super::view::{ArmedRow, CountPrompt, Overlay, ViewState};
 
 /// What the loop should do with an action once the view has absorbed it.
 #[derive(Debug, Clone, PartialEq)]
@@ -79,7 +79,37 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
         Action::Erase => handle_erase(view),
         Action::Dismiss => handle_dismiss(view),
         Action::Quit => unreachable!("handled above"),
-        _ => Outcome::Handled,
+
+        // @spec TUI-NAV-003
+        Action::ToggleInspector => {
+            view.inspector_wanted = !view.inspector_wanted;
+            Outcome::Handled
+        }
+        // @spec TUI-NAV-026, TUI-NAV-025, TUI-NAV-038
+        Action::OpenJournal => open_overlay(view, Overlay::Journal { anchor: 0 }),
+        Action::OpenHelp => open_overlay(view, Overlay::Help),
+        Action::OpenPalette => {
+            open_overlay(view, Overlay::Palette { query: String::new(), selected: 0 })
+        }
+        // @spec TUI-NAV-040
+        Action::ObserveSky => {
+            if state.pending_sky_event.is_some() {
+                Outcome::Apply(Command::ObserveSky)
+            } else {
+                set_footer(view, "nothing in the sky just now");
+                Outcome::Handled
+            }
+        }
+        // @spec TUI-NAV-028
+        Action::SpeedUp => nudge_speed(view, state, true),
+        Action::SpeedDown => nudge_speed(view, state, false),
+
+        // @spec TUI-NAV-042
+        Action::NotNow(note) => {
+            set_footer(view, note);
+            Outcome::Handled
+        }
+        Action::Ignored => Outcome::Handled,
     }
 }
 
@@ -89,11 +119,118 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
 
 fn handle_navigation(action: Action, view: &mut ViewState, state: &GameState) {
     match action {
-        Action::SectionJump(section) => enter_section(view, state, section),
-        // Cursor movement within a section and group jumps are owned by a
-        // different chunk's tests; only section entry (TUI-NAV-008/032) and
-        // disarm-on-navigation are in scope here.
+        // @spec TUI-NAV-005: the digit of a section with nothing in it yet is
+        // a soft no-op, not a doorway to an empty room.
+        Action::SectionJump(section) => {
+            if revealed_sections(state).contains(&section) {
+                enter_section(view, state, section);
+            } else {
+                set_footer(view, "nothing there yet");
+            }
+        }
+        Action::CursorUp => move_cursor(view, state, -1),
+        Action::CursorDown => move_cursor(view, state, 1),
+        // @spec TUI-NAV-007, TUI-NAV-033
+        Action::SectionNext => cycle_section(view, state, 1),
+        Action::SectionPrev => cycle_section(view, state, -1),
+        // @spec TUI-NAV-007
+        Action::GroupNext => move_to_group(view, state, 1),
+        Action::GroupPrev => move_to_group(view, state, -1),
         _ => {}
+    }
+}
+
+/// Move the cursor by `delta` selectable rows, stopping at either end. Group
+/// headers are skipped: they are signposts, not destinations.
+/// @spec TUI-NAV-002, TUI-NAV-007
+fn move_cursor(view: &mut ViewState, state: &GameState, delta: isize) {
+    let Some(section) = view.section else { return };
+    let list = rows(state, section);
+    let selectable: Vec<&Row> = list.iter().filter(|r| r.selectable()).collect();
+    if selectable.is_empty() {
+        return;
+    }
+    let idx = section.index();
+    let here = view.focus[idx]
+        .as_ref()
+        .and_then(|k| selectable.iter().position(|r| &r.key == k))
+        .unwrap_or(0) as isize;
+    let next = (here + delta).clamp(0, selectable.len() as isize - 1) as usize;
+    view.focus[idx] = Some(selectable[next].key.clone());
+}
+
+/// Step to the next or previous *revealed* section, wrapping around the ring —
+/// so no screen is the end of the road. @spec TUI-NAV-007, TUI-NAV-033
+fn cycle_section(view: &mut ViewState, state: &GameState, delta: isize) {
+    let ring = revealed_sections(state);
+    if ring.is_empty() {
+        return;
+    }
+    let here = view
+        .section
+        .and_then(|s| ring.iter().position(|r| *r == s))
+        .unwrap_or(0) as isize;
+    let n = ring.len() as isize;
+    let next = ((here + delta) % n + n) % n;
+    enter_section(view, state, ring[next as usize]);
+}
+
+/// Jump to the next or previous group header's first selectable row — the
+/// long-list affordance for lists too tall to scroll through a row at a time.
+/// @spec TUI-NAV-007
+fn move_to_group(view: &mut ViewState, state: &GameState, delta: isize) {
+    let Some(section) = view.section else { return };
+    let list = rows(state, section);
+    let idx = section.index();
+    let here = view.focus[idx]
+        .as_ref()
+        .and_then(|k| list.iter().position(|r| &r.key == k))
+        .unwrap_or(0);
+
+    // Every group header's first selectable row, in list order.
+    let heads: Vec<usize> = list
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| matches!(r.kind, RowKind::Group))
+        .filter_map(|(i, _)| list.iter().enumerate().skip(i + 1).find(|(_, r)| r.selectable()).map(|(j, _)| j))
+        .collect();
+    if heads.is_empty() {
+        return;
+    }
+    let target = if delta > 0 {
+        heads.iter().copied().find(|&h| h > here).or_else(|| heads.first().copied())
+    } else {
+        heads.iter().copied().rev().find(|&h| h < here).or_else(|| heads.last().copied())
+    };
+    if let Some(t) = target {
+        view.focus[idx] = Some(list[t].key.clone());
+    }
+}
+
+/// Open an overlay, closing whatever was open. @spec TUI-NAV-052
+fn open_overlay(view: &mut ViewState, overlay: Overlay) -> Outcome {
+    view.overlay = Some(overlay);
+    Outcome::Handled
+}
+
+/// Step one notch along the speed ladder. From a value that is not on the
+/// ladder, the first press snaps to the nearest notch in the pressed
+/// direction; at either end a further press does nothing.
+/// @spec TUI-NAV-028
+fn nudge_speed(view: &mut ViewState, state: &GameState, up: bool) -> Outcome {
+    const LADDER: [f64; 6] = [0.25, 0.5, 1.0, 2.0, 4.0, 8.0];
+    let now = state.speed;
+    let next = if up {
+        LADDER.iter().copied().find(|n| *n > now + 1e-9)
+    } else {
+        LADDER.iter().copied().rev().find(|n| *n < now - 1e-9)
+    };
+    match next {
+        Some(v) => Outcome::Apply(Command::SetSpeed(v)),
+        None => {
+            set_footer(view, if up { "already at the fastest" } else { "already at the slowest" });
+            Outcome::Handled
+        }
     }
 }
 

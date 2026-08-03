@@ -11,17 +11,79 @@ pub mod layout;
 
 use clowder_core::{content, ContentId, GameState};
 use ratatui::layout::Rect;
-use ratatui::text::Line;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use crate::nav::rows::{rows, Row, RowKey, RowKind};
 use crate::nav::{Overlay, Section, ViewState};
+use crate::theme::Role;
 
 pub use layout::{Body, Layout};
 
 /// The section a frame draws when the view state has not chosen one yet.
 const DEFAULT_SECTION: Section = Section::Meadow;
+
+/// A palette role as a style. `None` means the terminal's own foreground —
+/// clowder paints no colour where none is meant. @spec TUI-THEME-001
+fn style_for(role: Role) -> Style {
+    match role.color() {
+        Some(c) => Style::default().fg(c),
+        None => Style::default(),
+    }
+}
+
+/// The glyph-and-role a row wears, taken from the core's answers rather than
+/// worked out here. Glyph first: the marker is legible with every colour
+/// stripped. @spec TUI-NAV-009, TUI-NAV-053, TUI-THEME-014
+fn marker_for(state: &GameState, row: &Row) -> (&'static str, Role) {
+    let RowKey::Content(id, _) = &row.key else {
+        return ("●", Role::Ready);
+    };
+    if state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours) {
+        return ("✓", Role::Dim);
+    }
+    match state.availability(*id) {
+        clowder_core::Availability::Teased => ("○", Role::Dim),
+        _ => {
+            let covered = state.affordability(*id);
+            if covered >= 1.0 {
+                ("●", Role::Ready)
+            } else if covered > 0.0 {
+                ("◐", Role::Partial)
+            } else {
+                ("○", Role::Dim)
+            }
+        }
+    }
+}
+
+/// How many of this the meadow already has, blank where the notion does not
+/// apply. @spec TUI-NAV-009
+fn owned_count(state: &GameState, row: &Row) -> String {
+    match &row.key {
+        RowKey::Content(ContentId::Structure(b), _) => {
+            let n = state.structures[b.ix()];
+            if n > 0 { format!("×{n}") } else { String::new() }
+        }
+        _ => String::new(),
+    }
+}
+
+/// The next copy's price, compactly. @spec TUI-NAV-009, TUI-RENDER-012
+fn next_cost_text(state: &GameState, row: &Row) -> String {
+    let RowKey::Content(id, _) = &row.key else { return String::new() };
+    let costs = state.cost_of_next(*id, 1);
+    match costs.first() {
+        Some((r, amount)) => {
+            // Resource variants are already the player-facing names; lowered
+            // so a cost reads as prose rather than as an identifier.
+            format!("{} {}", fmt::compact(*amount), format!("{r:?}").to_lowercase())
+        }
+        None => String::new(),
+    }
+}
 
 /// A row's stable display name — the content name where the row is content,
 /// or a readable label invented from the row's own fixed key otherwise.
@@ -120,44 +182,65 @@ fn draw_list(f: &mut Frame, area: Rect, state: &GameState, section: Section, cur
     let capacity = area.height as usize;
     let win = window_for(all.len(), cursor, capacity);
 
-    let mut lines: Vec<Line<'static>> = Vec::with_capacity(win.len);
-    for row in all.iter().skip(win.start).take(win.len) {
-        let label = row_label(state, row);
-        let text = match row.kind {
-            RowKind::Group => format!("── {label} ──"),
-            _ => label,
-        };
-        lines.push(Line::from(fmt::fit(&text, area.width as usize)));
+    let mut lines: Vec<Line<'static>> = Vec::with_capacity(win.len + 2);
+    // TUI-RENDER-011: rows scrolled off above need saying too, or a cursor
+    // deep in a long list looks like the top of it.
+    if win.start > 0 {
+        lines.push(Line::from(Span::styled(
+            format!("{} more above", win.start),
+            style_for(Role::Dim),
+        )));
+    }
+    for (i, row) in all.iter().enumerate().skip(win.start).take(win.len) {
+        let focused = i == cursor && row.selectable();
+        lines.push(row_line(state, row, focused, area.width as usize));
     }
     if win.hidden > 0 {
-        lines.push(Line::from(format!("{} more below", win.hidden)));
+        lines.push(Line::from(Span::styled(
+            format!("{} more below", win.hidden),
+            style_for(Role::Dim),
+        )));
     }
 
     f.render_widget(Paragraph::new(lines), area);
 }
 
-/// The sidebar: a handful of always-relevant numbers, never the full content
-/// table — the sidebar's cost must not grow with the resource count either.
-/// @spec TUI-RENDER-012, TUI-RENDER-013, TUI-RENDER-015
-fn draw_sidebar(f: &mut Frame, area: Rect, state: &GameState) {
-    let lines: Vec<Line<'static>> = vec![
-        Line::from(format!("Day {}", state.ticks / content::TICKS_PER_SECOND.max(1))),
-        Line::from(format!("Kittens {}", state.kittens.len())),
-    ];
-    f.render_widget(Paragraph::new(lines), area);
-}
+/// One list row, drawn as the design's anatomy: cursor, availability marker,
+/// name, owned count, next cost.
+///
+/// Colour is the *second* channel throughout — every marker is a distinct
+/// glyph before it is a colour, so the row reads the same to someone who
+/// cannot tell the colours apart. Focus is the cursor glyph plus reverse
+/// video, never a palette colour: the row's colour already says what its
+/// state is, and a second colour would be saying something else at the same
+/// time. @spec TUI-NAV-009, TUI-NAV-021, TUI-NAV-022, TUI-THEME-006, TUI-THEME-014
+fn row_line(state: &GameState, row: &Row, focused: bool, width: usize) -> Line<'static> {
+    let label = row_label(state, row);
+    if matches!(row.kind, RowKind::Group) {
+        return Line::from(Span::styled(
+            fmt::fit(&format!("── {label} ──"), width),
+            style_for(Role::Dim),
+        ));
+    }
 
-/// The inspector: detail on the focused row alone, never the whole list — the
-/// inspector's cost must not grow with the section's row count.
-/// @spec TUI-RENDER-012, TUI-RENDER-015
-fn draw_inspector(f: &mut Frame, area: Rect, state: &GameState, section: Section, cursor_key: Option<&RowKey>) {
-    let all = rows(state, section);
-    let focused = cursor_key.and_then(|k| all.iter().find(|r| &r.key == k));
-    let lines: Vec<Line<'static>> = match focused {
-        Some(row) => vec![Line::from(row_label(state, row))],
-        None => vec![],
-    };
-    f.render_widget(Paragraph::new(lines), area);
+    let (marker, role) = marker_for(state, row);
+    let cursor = if focused { "▸ " } else { "  " };
+    let count = owned_count(state, row);
+    let cost = next_cost_text(state, row);
+
+    // Name gets whatever width the fixed parts leave.
+    let fixed = cursor.len() + 2 + count.len() + cost.len() + 2;
+    let name_w = width.saturating_sub(fixed).max(4);
+    let name = fmt::fit(&label, name_w);
+
+    let text = format!("{cursor}{marker} {name:<name_w$} {count} {cost}");
+    let mut style = style_for(role);
+    if focused {
+        // Reverse the terminal's own pair — works in either polarity, and
+        // needs no colour of its own. @spec TUI-THEME-007
+        style = style.add_modifier(Modifier::REVERSED);
+    }
+    Line::from(Span::styled(fmt::fit(&text, width), style))
 }
 
 /// Draw one frame, returning the layout it used.
@@ -229,7 +312,19 @@ pub fn frame(
     }
 
     widgets::overlays::ticker(f, layout.ticker, state);
-    widgets::chrome::hints(f, layout.hints, state, view);
+    // A footer note takes the hint bar's row while it lasts: it is the reply
+    // to what the player just did, and it belongs where they are already
+    // looking. @spec TUI-NAV-014
+    match view.footer.as_ref().filter(|(_, until)| *until > std::time::Instant::now()) {
+        Some((note, _)) => f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                fmt::fit(note, layout.hints.width as usize),
+                style_for(Role::Attention),
+            ))),
+            layout.hints,
+        ),
+        None => widgets::chrome::hints(f, layout.hints, state, view),
+    }
 
     layout
 }
