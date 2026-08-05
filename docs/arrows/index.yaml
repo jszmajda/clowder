@@ -1,0 +1,243 @@
+schema_version: 2
+last_updated: 2026-08-10
+
+# Grouped by the two crates the HLD's architecture splits on: the headless
+# simulation and the terminal shell. Persistence sits with the sim crate it
+# lives in, though the design tree hangs it off the root.
+taxonomy:
+  sim:
+    - adventures
+    - ceremonies
+    - colonies
+    - cosmic
+    - curiosity
+    - dreamtime
+    - economy
+    - engine
+    - expeditions
+    - kittens
+    - mystic
+    - prestige
+    - persistence
+  tui:
+    - navigation
+    - render
+    - runtime
+    - theme
+
+arrows:
+  sim:
+    status: MAPPED
+    parent: null
+    children: [adventures, ceremonies, colonies, cosmic, curiosity, dreamtime, economy, engine, expeditions, kittens, mystic, prestige]
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: ../intent/sim/sim-design.md
+    next: null
+    drift: null
+  tui:
+    status: MAPPED
+    parent: null
+    children: [navigation, render, runtime, theme]
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: ../intent/tui/tui-design.md
+    next: null
+    drift: null
+  adventures:
+    status: OK
+    parent: sim
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: sim/adventures/adventures.md
+    next: null
+    drift: null
+  ceremonies:
+    status: OK
+    parent: sim
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: sim/ceremonies/ceremonies.md
+    next: null
+    drift: null
+  colonies:
+    status: OK
+    parent: sim
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: sim/colonies/colonies.md
+    next: null
+    drift: null
+  cosmic:
+    status: OK
+    parent: sim
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: sim/cosmic/cosmic.md
+    next: null
+    drift: null
+  curiosity:
+    status: OK
+    parent: sim
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: sim/curiosity/curiosity.md
+    next: null
+    drift: null
+  dreamtime:
+    status: PARTIAL
+    parent: sim
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: sim/dreamtime/dreamtime.md
+    next: "1 spec(s) not yet implemented"
+    drift: null
+  economy:
+    status: OK
+    parent: sim
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: sim/economy/economy.md
+    next: null
+    drift: null
+  engine:
+    status: OK
+    parent: sim
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: sim/engine/engine.md
+    next: null
+    drift: null
+  expeditions:
+    status: OK
+    parent: sim
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: sim/expeditions/expeditions.md
+    next: null
+    drift: null
+  kittens:
+    status: OK
+    parent: sim
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: sim/kittens/kittens.md
+    next: null
+    drift: null
+  mystic:
+    status: OK
+    parent: sim
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: sim/mystic/mystic.md
+    next: null
+    drift: null
+  navigation:
+    status: PARTIAL
+    parent: tui
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: tui/navigation/navigation.md
+    next: "22 spec(s) not yet implemented"
+    drift: null
+  persistence:
+    status: OK
+    parent: null
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: persistence/persistence.md
+    next: null
+    drift: null
+  prestige:
+    status: OK
+    parent: sim
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: sim/prestige/prestige.md
+    next: null
+    drift: null
+  render:
+    status: PARTIAL
+    parent: tui
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: tui/render/render.md
+    next: "1 spec(s) not yet implemented"
+    drift: null
+  runtime:
+    status: OK
+    parent: tui
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: tui/runtime/runtime.md
+    next: null
+    drift: null
+  theme:
+    status: PARTIAL
+    parent: tui
+    sampled: 2026-08-10
+    audited: null
+    audited_sha: null
+    blocks: []
+    blockedBy: []
+    detail: tui/theme/theme.md
+    next: "3 spec(s) not yet implemented"
+    drift: null
+
+unmapped:
+  docs:
+    intent: []
