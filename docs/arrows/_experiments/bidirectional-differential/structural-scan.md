@@ -101,3 +101,21 @@ The standing rule from Addendum 1 holds and now has a sixth instance: a signal i
 a hypothesis until something independent confirms it. Here the independent thing
 was reading the annotation directly, which took under a minute and changed one
 classification out of two.
+
+## Addendum 3 — the re-run, and what it settles
+
+`TUI-RENDER-005` was re-run under the capped extractor: 10 lines instead of 252.
+**The finding survived.** Readers still described the three-way layout
+classification rather than the width band this spec governs.
+
+That settles the question the cap raised. Six of the shell findings came from
+extractions over 90 lines, and the worry was that over-extraction had been
+inflating them generally. At least for the one case tested, it was not — the
+citation really does sit on a classification covering all three bands rather than
+on the branch this spec owns.
+
+So the earlier result was right, and the correction was still worth making. Those
+are compatible: the instrument was faulty *and* the finding was real, and there
+was no way to know which without checking. The audited count stays at what has
+actually been examined rather than being retroactively inflated by a result that
+happened to survive.

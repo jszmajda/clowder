@@ -1,6 +1,6 @@
 # TUI-RENDER-005
 
-**Classification:** `INCONSISTENT-BLIND` · **Action:** `re-run` · **Audited:** 2026-08-10 · **Runs:** 3 per direction
+**Classification:** `B-ONLY-DRIFT` · **Action:** `reconcile-annotation` · **Audited:** 2026-08-10 · **Runs:** 3 per direction · **Extraction:** 10 lines
 
 ## Spec as written
 
@@ -12,8 +12,8 @@
 
 ## What the blind runs found
 
-Invalid — a harness fault, not a project finding. This spec is annotated in five places in its file, one of them a module header, and the extractor walked from that header to the end of the file: readers were handed 252 lines and reconstructed the module rather than the requirement.
+Re-run under the capped extractor — 10 lines shown instead of 252. **The finding survives.** Readers still described the three-way layout classification rather than this spec's particular width band, at 43-50% overlap.
 
 ## Recommendation
 
-Re-run once the extractor caps block size. Recorded rather than dropped so the count of audited specs stays honest — this one has not really been audited.
+So the earlier result was right for the wrong reason, and the correction was still worth making: the citation sits on the classification that covers all three bands, not on the branch this spec governs. Cite the branch.
