@@ -311,7 +311,9 @@
    "TUI-NAV-028",
    "TUI-NAV-051",
    "TUI-NAV-043",
-   "TUI-NAV-010"
+   "TUI-NAV-010",
+   "TUI-NAV-016",
+   "TUI-NAV-049"
   ]
  },
  "persistence": {
@@ -379,7 +381,10 @@
    "TUI-RENDER-014",
    "TUI-RENDER-015"
   ],
-  "audited": []
+  "audited": [
+   "TUI-RENDER-004",
+   "TUI-RENDER-008"
+  ]
  },
  "runtime": {
   "prefix": "TUI-RUN",
@@ -437,6 +442,9 @@
    "TUI-THEME-013",
    "TUI-THEME-014"
   ],
-  "audited": []
+  "audited": [
+   "TUI-THEME-003",
+   "TUI-THEME-007"
+  ]
  }
 }
