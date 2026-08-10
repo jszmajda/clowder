@@ -50,3 +50,27 @@ Misplaced citations *between functions* — a spec cited on a function whose
 conspicuous behaviour belongs to a different requirement. That is the fault the
 differential found in four specs so far, and it is a judgment about what code
 appears to do, which no grep makes. Those still need blind readers.
+
+## Addendum — over-subscribed annotations
+
+Batch five found a sharper version of the placement fault: not a citation in the
+wrong place, but **one place carrying too many citations**. Readers of the clock's
+observation function produced near-identical reconstructions for two different
+specs, because that one function body is cited by five.
+
+Counting them needed two attempts. Keying on "the annotation and the line after
+it" collapsed every annotated struct field onto the `#[serde(default)]` beneath
+it and reported one site carrying 45 specs. Keying on the annotation's own line
+gives **61 single annotations citing three or more specs at once**.
+
+Of those, the module-header ones are legitimate — a file's opening `@spec` line
+listing what the module covers is an index, not a claim about one function. The
+genuine cases are function-level, and the largest are a content accessor (7), and
+five functions carrying five apiece, including the clock observation and the
+loop's step.
+
+That is the third time in this audit a first count has overstated: 72 misplaced
+citations became 2, and 64 over-subscribed sites became 61 of which most are
+benign. The pattern is consistent enough to be worth stating as a rule — a number
+produced by a heuristic scan is a hypothesis, and reporting it before checking is
+how the 44 false markers happened in the first place.

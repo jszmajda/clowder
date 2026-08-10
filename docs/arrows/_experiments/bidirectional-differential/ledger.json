@@ -313,7 +313,9 @@
    "TUI-NAV-043",
    "TUI-NAV-010",
    "TUI-NAV-016",
-   "TUI-NAV-049"
+   "TUI-NAV-049",
+   "TUI-NAV-040",
+   "TUI-NAV-045"
   ]
  },
  "persistence": {
@@ -423,7 +425,11 @@
    "TUI-RUN-028"
   ],
   "audited": [
-   "TUI-RUN-027"
+   "TUI-RUN-027",
+   "TUI-RUN-007",
+   "TUI-RUN-012",
+   "TUI-RUN-018",
+   "TUI-RUN-024"
   ]
  },
  "theme": {
