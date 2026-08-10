@@ -23,7 +23,9 @@
    "SIM-SUN-007",
    "SIM-SUN-008"
   ],
-  "audited": []
+  "audited": [
+   "SIM-SUN-005"
+  ]
  },
  "colonies": {
   "prefix": "SIM-TRADE",
@@ -70,7 +72,9 @@
    "SIM-CUR-011",
    "SIM-CUR-012"
   ],
-  "audited": []
+  "audited": [
+   "SIM-CUR-007"
+  ]
  },
  "dreamtime": {
   "prefix": "SIM-DREAM",
@@ -134,7 +138,9 @@
    "SIM-ECO-043",
    "SIM-ECO-044"
   ],
-  "audited": []
+  "audited": [
+   "SIM-ECO-021"
+  ]
  },
  "engine": {
   "prefix": "SIM-ENG",
@@ -232,7 +238,9 @@
    "SIM-KIT-026",
    "SIM-KIT-027"
   ],
-  "audited": []
+  "audited": [
+   "SIM-KIT-015"
+  ]
  },
  "mystic": {
   "prefix": "SIM-UNI",
@@ -250,7 +258,9 @@
    "SIM-UNI-009",
    "SIM-UNI-010"
   ],
-  "audited": []
+  "audited": [
+   "SIM-UNI-006"
+  ]
  },
  "navigation": {
   "prefix": "TUI-NAV",
@@ -346,7 +356,9 @@
    "SIM-MOVE-013",
    "SIM-MOVE-012"
   ],
-  "audited": []
+  "audited": [
+   "SIM-MOVE-007"
+  ]
  },
  "render": {
   "prefix": "TUI-RENDER",
