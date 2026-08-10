@@ -385,7 +385,9 @@
   ],
   "audited": [
    "TUI-RENDER-004",
-   "TUI-RENDER-008"
+   "TUI-RENDER-008",
+   "TUI-RENDER-009",
+   "TUI-RENDER-013"
   ]
  },
  "runtime": {
@@ -429,7 +431,10 @@
    "TUI-RUN-007",
    "TUI-RUN-012",
    "TUI-RUN-018",
-   "TUI-RUN-024"
+   "TUI-RUN-024",
+   "TUI-RUN-008",
+   "TUI-RUN-014",
+   "TUI-RUN-021"
   ]
  },
  "theme": {

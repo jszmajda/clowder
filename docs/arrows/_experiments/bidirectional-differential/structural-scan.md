@@ -74,3 +74,30 @@ citations became 2, and 64 over-subscribed sites became 61 of which most are
 benign. The pattern is consistent enough to be worth stating as a rule — a number
 produced by a heuristic scan is a hypothesis, and reporting it before checking is
 how the 44 false markers happened in the first place.
+
+## Addendum 2 — the harness can manufacture a finding
+
+Batch six produced a result that looked like the over-subscription pattern and
+was not. `TUI-RENDER-005` is annotated in five places in its file, one of them a
+module header. The extractor walks from an annotation to the end of its enclosing
+item; a module header has no enclosing item, so the walk ran to the end of the
+file and handed the blind readers 252 lines. They reconstructed the module. Of
+course they did.
+
+The extractor now refuses any block over ~90 lines rather than passing it on.
+Past that size the reader is reconstructing a module, not a requirement, and the
+classification means nothing.
+
+`TUI-RENDER-005` is recorded as `INCONSISTENT-BLIND` and left *out* of the audited
+count, rather than dropped quietly — the count should say what has actually been
+examined.
+
+The same check vindicated the batch-five finding it was meant to test:
+`clock.rs:67` really does carry five specs on one annotation line, confirmed by
+reading the source. So the over-subscription pattern is real; one of its two
+claimed instances was mine.
+
+The standing rule from Addendum 1 holds and now has a sixth instance: a signal is
+a hypothesis until something independent confirms it. Here the independent thing
+was reading the annotation directly, which took under a minute and changed one
+classification out of two.
