@@ -184,7 +184,9 @@
    "SIM-ENG-024",
    "SIM-ENG-014"
   ],
-  "audited": []
+  "audited": [
+   "SIM-ENG-030"
+  ]
  },
  "expeditions": {
   "prefix": "SIM-EXP",
@@ -296,7 +298,10 @@
    "TUI-NAV-009",
    "TUI-NAV-014",
    "TUI-NAV-026",
-   "TUI-NAV-028"
+   "TUI-NAV-028",
+   "TUI-NAV-051",
+   "TUI-NAV-043",
+   "TUI-NAV-010"
   ]
  },
  "persistence": {
@@ -319,7 +324,9 @@
    "SAVE-007",
    "SAVE-008"
   ],
-  "audited": []
+  "audited": [
+   "SAVE-006"
+  ]
  },
  "prestige": {
   "prefix": "SIM-MOVE",
@@ -398,7 +405,9 @@
    "TUI-RUN-027",
    "TUI-RUN-028"
   ],
-  "audited": []
+  "audited": [
+   "TUI-RUN-027"
+  ]
  },
  "theme": {
   "prefix": "TUI-THEME",
