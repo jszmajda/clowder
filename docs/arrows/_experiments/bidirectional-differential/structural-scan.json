@@ -1,0 +1,638 @@
+{
+ "tables": [
+  "SIM-ADV-003",
+  "SIM-SUN-005",
+  "SIM-TRADE-003",
+  "SIM-SKY-002",
+  "SIM-CUR-005",
+  "SIM-CUR-010",
+  "SIM-DREAM-006",
+  "SIM-ECO-028",
+  "SIM-ECO-034",
+  "SIM-UNI-005",
+  "SIM-MOVE-010",
+  "TUI-THEME-004"
+ ],
+ "compounds": [
+  "SIM-ADV-001",
+  "SIM-ADV-002",
+  "SIM-SUN-003",
+  "SIM-SUN-006",
+  "SIM-SUN-007",
+  "SIM-TRADE-002",
+  "SIM-TRADE-005",
+  "SIM-TRADE-007",
+  "SIM-SKY-004",
+  "SIM-SKY-007",
+  "SIM-CUR-003",
+  "SIM-CUR-004",
+  "SIM-CUR-006",
+  "SIM-CUR-008",
+  "SIM-DREAM-002",
+  "SIM-DREAM-005",
+  "SIM-ECO-022",
+  "SIM-ECO-024",
+  "SIM-ECO-020",
+  "SIM-ECO-023",
+  "SIM-ECO-025",
+  "SIM-ECO-027",
+  "SIM-ECO-034",
+  "SIM-ECO-038",
+  "SIM-ECO-043",
+  "SIM-ENG-005",
+  "SIM-ENG-008",
+  "SIM-ENG-028",
+  "SIM-ENG-046",
+  "SIM-ENG-012",
+  "SIM-ENG-021",
+  "SIM-ENG-025",
+  "SIM-ENG-023",
+  "SIM-ENG-024",
+  "SIM-ENG-014",
+  "SIM-KIT-008",
+  "SIM-KIT-009",
+  "SIM-KIT-022",
+  "SIM-UNI-003",
+  "SIM-UNI-007",
+  "SIM-UNI-008",
+  "TUI-NAV-001",
+  "TUI-NAV-037",
+  "TUI-NAV-007",
+  "TUI-NAV-038",
+  "TUI-NAV-053",
+  "TUI-NAV-010",
+  "TUI-NAV-051",
+  "TUI-NAV-014",
+  "TUI-NAV-015",
+  "TUI-NAV-016",
+  "TUI-NAV-040",
+  "TUI-NAV-041",
+  "TUI-NAV-042",
+  "TUI-NAV-043",
+  "TUI-NAV-017",
+  "TUI-NAV-021",
+  "TUI-NAV-023",
+  "TUI-NAV-046",
+  "TUI-NAV-026",
+  "TUI-NAV-057",
+  "TUI-NAV-055",
+  "TUI-NAV-056",
+  "TUI-NAV-028",
+  "TUI-NAV-029",
+  "TUI-NAV-030",
+  "TUI-NAV-035",
+  "TUI-NAV-036",
+  "SAVE-004",
+  "SAVE-015",
+  "SAVE-017",
+  "SIM-MOVE-001",
+  "SIM-MOVE-004",
+  "SIM-MOVE-012",
+  "TUI-RENDER-012",
+  "TUI-RUN-002",
+  "TUI-RUN-006",
+  "TUI-RUN-029",
+  "TUI-RUN-011",
+  "TUI-RUN-012",
+  "TUI-RUN-016",
+  "TUI-RUN-020",
+  "TUI-RUN-023",
+  "TUI-RUN-025",
+  "TUI-RUN-030",
+  "TUI-THEME-003",
+  "TUI-THEME-004",
+  "TUI-THEME-012"
+ ],
+ "misplaced": [
+  [
+   "SIM-ADV-002",
+   "crates/clowder-core/src/content.rs",
+   "pub const TIDY_MESS_MULT: f64 = 2.0;"
+  ],
+  [
+   "SIM-ADV-003",
+   "crates/clowder-core/src/content.rs",
+   "pub struct AdventureDef {"
+  ],
+  [
+   "SIM-TRADE-001",
+   "crates/clowder-core/src/content.rs",
+   "pub const TRADE_PEP_PER_CARAVAN: f64 = 50.0;"
+  ],
+  [
+   "SIM-TRADE-004",
+   "crates/clowder-core/src/content.rs",
+   "pub const FOX_MOONSTONE_CHANCE_BASE: f64 = 0.15;"
+  ],
+  [
+   "SIM-TRADE-005",
+   "crates/clowder-core/src/content.rs",
+   "pub const PENPAL_STANDING_PER: f64 = 0.01; // standing warme"
+  ],
+  [
+   "SIM-TRADE-006",
+   "crates/clowder-core/src/content.rs",
+   "pub const PENPAL_STANDING_PER: f64 = 0.01; // standing warme"
+  ],
+  [
+   "SIM-TRADE-007",
+   "crates/clowder-core/src/content.rs",
+   "pub const SCOUT_PEP_COST: f64 = 1000.0;"
+  ],
+  [
+   "SIM-SKY-001",
+   "crates/clowder-core/src/content.rs",
+   "pub struct SiteDef {"
+  ],
+  [
+   "SIM-SKY-004",
+   "crates/clowder-core/src/content.rs",
+   "pub outdoor: bool,"
+  ],
+  [
+   "SIM-SKY-005",
+   "crates/clowder-core/src/content.rs",
+   "pub long_sun_cap: f64,"
+  ],
+  [
+   "SIM-SKY-006",
+   "crates/clowder-core/src/content.rs",
+   "pub const WHALE_SUMMON_CURIOSITY: f64 = 50000.0;"
+  ],
+  [
+   "SIM-SKY-007",
+   "crates/clowder-core/src/content.rs",
+   "pub const WHALE_LULLABY_DREAMCORNS: f64 = 1.0;"
+  ],
+  [
+   "SIM-CUR-008",
+   "crates/clowder-core/src/content.rs",
+   "pub prereqs: &'static [IdeaId],"
+  ],
+  [
+   "SIM-CUR-010",
+   "crates/clowder-core/src/content.rs",
+   "pub struct RefinementDef {"
+  ],
+  [
+   "SIM-CUR-011",
+   "crates/clowder-core/src/content.rs",
+   "pub struct RuleDef {"
+  ],
+  [
+   "SIM-DREAM-001",
+   "crates/clowder-core/src/content.rs",
+   "pub const NAP_BASE_MAX_YEARS: u32 = 100;"
+  ],
+  [
+   "SIM-DREAM-002",
+   "crates/clowder-core/src/content.rs",
+   "pub const NAP_BASE_MAX_YEARS: u32 = 100;"
+  ],
+  [
+   "SIM-DREAM-003",
+   "crates/clowder-core/src/content.rs",
+   "pub const HEAT_DISSIPATION_PER_TICK: f64 = 0.5;"
+  ],
+  [
+   "SIM-DREAM-004",
+   "crates/clowder-core/src/content.rs",
+   "pub const MEMORY_CHEST_DEJA_VU: f64 = 0.01;"
+  ],
+  [
+   "SIM-DREAM-006",
+   "crates/clowder-core/src/content.rs",
+   "pub struct DreamLoomDef {"
+  ],
+  [
+   "SIM-DREAM-007",
+   "crates/clowder-core/src/content.rs",
+   "pub const DISTANT_DAWN_YEAR: u64 = 40000;"
+  ],
+  [
+   "SIM-ECO-001",
+   "crates/clowder-core/src/content.rs",
+   "pub const BASE_CAPS: [f64; RESOURCE_COUNT] = ["
+  ],
+  [
+   "SIM-ECO-027",
+   "crates/clowder-core/src/content.rs",
+   "pub const RUMMAGE_YIELD: f64 = 0.5;"
+  ],
+  [
+   "SIM-ECO-030",
+   "crates/clowder-core/src/content.rs",
+   "pub const BAKERY_MPR_PER_PEP_CAP: f64 = 0.007 / 100.0;"
+  ],
+  [
+   "SIM-ECO-031",
+   "crates/clowder-core/src/content.rs",
+   "pub const PORCH_KITE_PER: f64 = 0.01;"
+  ],
+  [
+   "SIM-ECO-032",
+   "crates/clowder-core/src/content.rs",
+   "pub const DYNAMO_GLOBAL_RATIO: f64 = 0.02; // per active whe"
+  ],
+  [
+   "SIM-ECO-033",
+   "crates/clowder-core/src/content.rs",
+   "pub struct CraftDef {"
+  ],
+  [
+   "SIM-ECO-034",
+   "crates/clowder-core/src/content.rs",
+   "pub struct CraftDef {"
+  ],
+  [
+   "SIM-ECO-035",
+   "crates/clowder-core/src/content.rs",
+   "pub const SUNNING_DECK_WINTER: f64 = 0.75;"
+  ],
+  [
+   "SIM-ECO-037",
+   "crates/clowder-core/src/content.rs",
+   "pub const MESS_DISSIPATION: f64 = 1e-4; // \u00d7 current mess, p"
+  ],
+  [
+   "SIM-ECO-038",
+   "crates/clowder-core/src/content.rs",
+   "pub const MESS_DISSIPATION: f64 = 1e-4; // \u00d7 current mess, p"
+  ],
+  [
+   "SIM-ECO-039",
+   "crates/clowder-core/src/content.rs",
+   "pub const COGWORKS_CONVERT_PER: f64 = 0.02; // of stock, per"
+  ],
+  [
+   "SIM-ECO-043",
+   "crates/clowder-core/src/content.rs",
+   "pub const TINKER_BATCHES_PER_TICK: f64 = 0.0017; // \u00d7 (1 + s"
+  ],
+  [
+   "SIM-ENG-025",
+   "crates/clowder-core/src/content.rs",
+   "pub const SKY_EVENT_CHANCE_PER_LEDGE: f64 = 0.002; // per da"
+  ],
+  [
+   "SIM-ENG-023",
+   "crates/clowder-core/src/content.rs",
+   "pub const REVEAL_FRACTION: f64 = 0.30;"
+  ],
+  [
+   "SIM-EXP-001",
+   "crates/clowder-core/src/content.rs",
+   "pub const POUNCE_PEP_PER_SQUAD: f64 = 100.0;"
+  ],
+  [
+   "SIM-EXP-002",
+   "crates/clowder-core/src/content.rs",
+   "pub const POUNCE_PEP_PER_SQUAD: f64 = 100.0;"
+  ],
+  [
+   "SIM-EXP-003",
+   "crates/clowder-core/src/content.rs",
+   "pub const POUNCE_PEP_PER_SQUAD: f64 = 100.0;"
+  ],
+  [
+   "SIM-KIT-011",
+   "crates/clowder-core/src/content.rs",
+   "pub const CROWDING_RELIEF_DR_LIMIT: f64 = 0.9;"
+  ],
+  [
+   "SIM-KIT-019",
+   "crates/clowder-core/src/content.rs",
+   "pub const SKILL_XP_PER_TICK: f64 = 0.01; // \u00d7 (1 + skill-XP "
+  ],
+  [
+   "SIM-KIT-020",
+   "crates/clowder-core/src/content.rs",
+   "pub const SKILL_XP_PER_TICK: f64 = 0.01; // \u00d7 (1 + skill-XP "
+  ],
+  [
+   "SIM-KIT-021",
+   "crates/clowder-core/src/content.rs",
+   "pub const SKILL_XP_PER_TICK: f64 = 0.01; // \u00d7 (1 + skill-XP "
+  ],
+  [
+   "SIM-KIT-022",
+   "crates/clowder-core/src/content.rs",
+   "pub const SKILL_XP_PER_TICK: f64 = 0.01; // \u00d7 (1 + skill-XP "
+  ],
+  [
+   "SIM-KIT-025",
+   "crates/clowder-core/src/content.rs",
+   "pub const JAMBOREE_PEP: f64 = 800.0;"
+  ],
+  [
+   "SIM-KIT-026",
+   "crates/clowder-core/src/content.rs",
+   "pub const TINKER_BATCHES_PER_TICK: f64 = 0.0017; // \u00d7 (1 + s"
+  ],
+  [
+   "SIM-UNI-001",
+   "crates/clowder-core/src/content.rs",
+   "pub const PARADE_UNICORN_COST: f64 = 2500.0;"
+  ],
+  [
+   "SIM-UNI-003",
+   "crates/clowder-core/src/content.rs",
+   "pub const REFINE_INPUT: f64 = 25.0; // 25 prisms \u2192 1 starsha"
+  ],
+  [
+   "SIM-UNI-004",
+   "crates/clowder-core/src/content.rs",
+   "pub const JAR_RAINBOW_COST: f64 = 10000.0;"
+  ],
+  [
+   "SIM-UNI-005",
+   "crates/clowder-core/src/content.rs",
+   "pub const RAINBOW_SHOWER_AMOUNT: f64 = 5000.0; // a windfall"
+  ],
+  [
+   "SIM-UNI-006",
+   "crates/clowder-core/src/content.rs",
+   "pub const RAINBOW_ARCH_PRISM_DESCENT: f64 = 0.0002; // per d"
+  ],
+  [
+   "SIM-UNI-007",
+   "crates/clowder-core/src/content.rs",
+   "pub const DREAM_DRIFT_PER_ARCH: f64 = 0.000001; // per tick "
+  ],
+  [
+   "SIM-UNI-009",
+   "crates/clowder-core/src/content.rs",
+   "pub const PROMISE_ECHO_COST: f64 = 1.0;"
+  ],
+  [
+   "SIM-UNI-010",
+   "crates/clowder-core/src/content.rs",
+   "pub const PROMISE_ECHO_COST: f64 = 1.0;"
+  ],
+  [
+   "TUI-NAV-001",
+   "crates/clowder-tui/src/nav/mod.rs",
+   "pub mod action;"
+  ],
+  [
+   "TUI-NAV-010",
+   "crates/clowder-tui/src/nav/view.rs",
+   "pub last_repeat: Option<Instant>,"
+  ],
+  [
+   "TUI-NAV-051",
+   "crates/clowder-tui/src/nav/rows.rs",
+   "pub heavy: bool,"
+  ],
+  [
+   "TUI-NAV-015",
+   "crates/clowder-tui/src/nav/rows.rs",
+   "pub heavy: bool,"
+  ],
+  [
+   "TUI-NAV-017",
+   "crates/clowder-tui/src/nav/view.rs",
+   "pub inspector_wanted: bool,"
+  ],
+  [
+   "TUI-NAV-029",
+   "crates/clowder-tui/src/nav/view.rs",
+   "pub inspector_wanted: bool,"
+  ],
+  [
+   "TUI-NAV-036",
+   "crates/clowder-tui/src/nav/view.rs",
+   "pub command: Command,"
+  ],
+  [
+   "SAVE-014",
+   "crates/clowder-core/src/save.rs",
+   "pub const SAVE_VERSION: u32 = 4;"
+  ],
+  [
+   "SAVE-015",
+   "crates/clowder-core/src/save.rs",
+   "pub const MIN_REPORTABLE_ABSENCE_SECONDS: u64 = 60;"
+  ],
+  [
+   "SAVE-016",
+   "crates/clowder-core/src/save.rs",
+   "pub const CATCHUP_CAP_SECONDS: u64 = 365 * 86_400;"
+  ],
+  [
+   "SAVE-013",
+   "crates/clowder-core/src/save.rs",
+   "pub const SAVE_VERSION: u32 = 4;"
+  ],
+  [
+   "SIM-MOVE-001",
+   "crates/clowder-core/src/content.rs",
+   "pub const MEADOW_MOVE_MIN_KITTENS: usize = 71;"
+  ],
+  [
+   "SIM-MOVE-010",
+   "crates/clowder-core/src/content.rs",
+   "pub struct TraditionDef {"
+  ],
+  [
+   "SIM-MOVE-012",
+   "crates/clowder-core/src/content.rs",
+   "pub const WARM_WELCOME_CATNIP: f64 = 50.0;"
+  ],
+  [
+   "TUI-RENDER-001",
+   "crates/clowder-tui/src/render/mod.rs",
+   "pub mod fmt;"
+  ],
+  [
+   "TUI-RENDER-003",
+   "crates/clowder-tui/src/render/layout.rs",
+   "pub banner: Option<Rect>,"
+  ],
+  [
+   "TUI-RENDER-008",
+   "crates/clowder-tui/src/runtime/mod.rs",
+   "pub prev_layout: Option<Layout>,"
+  ],
+  [
+   "TUI-RUN-001",
+   "crates/clowder-tui/src/runtime/mod.rs",
+   "pub mod clock;"
+  ],
+  [
+   "TUI-RUN-028",
+   "crates/clowder-tui/src/runtime/mod.rs",
+   "pub save_failed: bool,"
+  ]
+ ],
+ "genuine_misplaced": [
+  [
+   "SIM-TRADE-001",
+   "colonies",
+   "content.rs",
+   "pub const TRADE_PEP_PER_CARAVAN: f64 = 50.0;"
+  ],
+  [
+   "SIM-TRADE-005",
+   "colonies",
+   "content.rs",
+   "pub const PENPAL_STANDING_PER: f64 = 0.01; // stan"
+  ],
+  [
+   "SIM-TRADE-006",
+   "colonies",
+   "content.rs",
+   "pub const PENPAL_STANDING_PER: f64 = 0.01; // stan"
+  ],
+  [
+   "SIM-SKY-001",
+   "cosmic",
+   "content.rs",
+   "pub struct SiteDef {"
+  ],
+  [
+   "SIM-SKY-004",
+   "cosmic",
+   "content.rs",
+   "pub outdoor: bool,"
+  ],
+  [
+   "SIM-SKY-006",
+   "cosmic",
+   "content.rs",
+   "pub const WHALE_SUMMON_CURIOSITY: f64 = 50000.0;"
+  ],
+  [
+   "SIM-SKY-007",
+   "cosmic",
+   "content.rs",
+   "pub const WHALE_LULLABY_DREAMCORNS: f64 = 1.0;"
+  ],
+  [
+   "SIM-DREAM-001",
+   "dreamtime",
+   "content.rs",
+   "pub const NAP_BASE_MAX_YEARS: u32 = 100;"
+  ],
+  [
+   "SIM-ECO-027",
+   "economy",
+   "content.rs",
+   "pub const RUMMAGE_YIELD: f64 = 0.5;"
+  ],
+  [
+   "SIM-ECO-033",
+   "economy",
+   "content.rs",
+   "pub struct CraftDef {"
+  ],
+  [
+   "SIM-EXP-001",
+   "expeditions",
+   "content.rs",
+   "pub const POUNCE_PEP_PER_SQUAD: f64 = 100.0;"
+  ],
+  [
+   "SIM-KIT-011",
+   "kittens",
+   "content.rs",
+   "pub const CROWDING_RELIEF_DR_LIMIT: f64 = 0.9;"
+  ],
+  [
+   "SIM-KIT-021",
+   "kittens",
+   "content.rs",
+   "pub const SKILL_XP_PER_TICK: f64 = 0.01; // \u00d7 (1 +"
+  ],
+  [
+   "SIM-KIT-025",
+   "kittens",
+   "content.rs",
+   "pub const JAMBOREE_PEP: f64 = 800.0;"
+  ],
+  [
+   "SIM-UNI-001",
+   "mystic",
+   "content.rs",
+   "pub const PARADE_UNICORN_COST: f64 = 2500.0;"
+  ],
+  [
+   "SIM-UNI-003",
+   "mystic",
+   "content.rs",
+   "pub const REFINE_INPUT: f64 = 25.0; // 25 prisms \u2192"
+  ],
+  [
+   "SIM-UNI-004",
+   "mystic",
+   "content.rs",
+   "pub const JAR_RAINBOW_COST: f64 = 10000.0;"
+  ],
+  [
+   "SIM-UNI-009",
+   "mystic",
+   "content.rs",
+   "pub const PROMISE_ECHO_COST: f64 = 1.0;"
+  ],
+  [
+   "TUI-NAV-017",
+   "navigation",
+   "view.rs",
+   "pub inspector_wanted: bool,"
+  ],
+  [
+   "TUI-NAV-029",
+   "navigation",
+   "view.rs",
+   "pub inspector_wanted: bool,"
+  ],
+  [
+   "SAVE-015",
+   "persistence",
+   "save.rs",
+   "pub const MIN_REPORTABLE_ABSENCE_SECONDS: u64 = 60"
+  ],
+  [
+   "SIM-MOVE-012",
+   "prestige",
+   "content.rs",
+   "pub const WARM_WELCOME_CATNIP: f64 = 50.0;"
+  ],
+  [
+   "TUI-RENDER-003",
+   "render",
+   "layout.rs",
+   "pub banner: Option<Rect>,"
+  ],
+  [
+   "TUI-RENDER-008",
+   "render",
+   "mod.rs",
+   "pub prev_layout: Option<Layout>,"
+  ],
+  [
+   "TUI-RUN-001",
+   "runtime",
+   "mod.rs",
+   "pub mod clock;"
+  ],
+  [
+   "TUI-RUN-028",
+   "runtime",
+   "mod.rs",
+   "pub save_failed: bool,"
+  ]
+ ],
+ "orphaned_behaviour": [
+  [
+   "TUI-RENDER-003",
+   "render",
+   "pub banner: Option<Rect>,"
+  ],
+  [
+   "TUI-RUN-028",
+   "runtime",
+   "pub save_failed: bool,"
+  ]
+ ]
+}
