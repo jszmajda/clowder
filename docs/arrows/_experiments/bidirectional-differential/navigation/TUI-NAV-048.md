@@ -1,6 +1,6 @@
 # TUI-NAV-048
 
-**Classification:** `INCONSISTENT-BLIND` · **Action:** `re-run` · **Audited:** 2026-08-10 · **Runs:** 3 per direction · **Extraction:** 3 lines
+**Classification:** `INCONSISTENT-BLIND` · **Action:** `harness-fixed` · **Audited:** 2026-08-10 · **Extraction:** 3 lines
 
 ## Spec as written
 
@@ -8,8 +8,8 @@
 
 ## What the blind runs found
 
-Invalid — harness fault, the mirror of batch six's. The extractor landed on a module's import block and handed the readers three lines of `use` declarations. One reader said so outright rather than confabulating: 'This snippet can't support a reconstruction.'
+Same fault as TUI-NAV-047. All three readers refused rather than confabulating, which is the second time that refusal has correctly signalled a broken harness rather than a broken project.
 
 ## Recommendation
 
-That refusal is worth recording as a property of the method: a blind reader given nothing will sometimes say so. The extractor now skips blocks with fewer than four lines of actual logic. Re-run. Left out of the audited count.
+Left out of the audited count. Re-run once the citation is placed on code rather than a module header.
