@@ -859,3 +859,40 @@ whole, and they are not the same evidence.
 167 of 293 audited. Of the 126 remaining, 107 are runnable and the rest are
 already covered by this pass. At the measured rate the 107 hold about eight real
 findings, for roughly 640 blind sessions.
+
+## Addendum 23 — the rule I was applying without stating it
+
+Batch twenty-three: twelve specs from the economy leaf, nine recovered whole and
+three not. A 25% drift rate against a running average of 65.
+
+That gap is not the economy leaf being better written. It is me, classifying
+more leniently than in earlier batches, and noticing only because the number
+moved far enough to ask why.
+
+### The rule, now stated
+
+**A spec is recovered if the reconstruction contains what the spec requires.**
+Extra content is not drift. When several specs share one function, readers
+return a sentence covering all of them; each spec whose content is in that
+sentence was recovered, and the fact that the reader could not say *which* spec
+they were reading is a separate limitation, recorded separately.
+
+Applied consistently, two verdicts from batch twenty-one were wrong and are
+corrected. Two curiosity specs share one function; all six reconstructions
+returned the union of both; I filed both as drift because neither was attributed
+individually. That was the wrong test. Their content was in the sentence.
+
+### What this costs the headline number
+
+The ~65% drift rate is not a measurement of the specs. It is partly a
+measurement of how strictly I was reading, and I was not reading consistently.
+Under the rule as now stated, the rate is lower than 65% — by how much I cannot
+say without re-reading every batch against the reconstructions, which is a day's
+work for a number whose purpose was only ever to cost the remaining scope.
+
+The four null proxies survive this, because each compared drift *within a single
+classification pass* — crowding against crowding, shared against exclusive —
+so a uniform leniency shift moves both arms together. The conclusion that no
+structural property predicts recovery is unaffected. The absolute rate is
+softer than I stated it, and the scope estimate built on it should be read as
+an upper bound on drift verdicts rather than a measurement.
