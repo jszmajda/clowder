@@ -959,3 +959,44 @@ reads as "the fix did nothing". It was stale prompts — `prep` had refused to
 regenerate them and said so in a line I had filtered out of the output. Checking
 why the fix appeared to fail is what surfaced that the spec had become
 unpreparable, which is the finding.
+
+## Addendum 26 — the double-annotation pattern, found twice and repaired twice
+
+Yesterday's job specs were annotated on both the table that defines them and the
+enum that names them, and every reader described the enum. Searching for the
+shape: 55 specs are annotated on both a type and something else.
+
+That number is not a defect count, and this addendum is careful not to present
+it as one. A spec about a mechanic naturally touches its type *and* its
+behaviour, and most of the 55 are that. What made the job case pathological was
+redundancy — the table annotation already covered the spec, so the enum one
+added nothing but a more attractive extraction target.
+
+One other case in the 55 was already visible in this audit's own records. Four
+layout specs were annotated as a block on the enum their breakpoints choose
+between, and all four had produced reconstructions describing *three layout
+modes* — the enum's shape. Each variant already carried its own spec, and the
+widths that pick between them are annotated inside the function that computes
+them. The blanket annotation named the shape the rule produces as though it were
+the rule.
+
+### Measured, not assumed
+
+Removed the blanket annotation, changed nothing else, re-ran the three affected
+specs blind.
+
+- **The cap-breakpoint spec is now recovered.** Readers describe the breakpoint,
+  the capped width and the hysteresis. Reclassified.
+- **Its two neighbours are not.** Readers moved from describing the enum to
+  describing the dead-band — closer to the deciding code, still not their rule,
+  because their rule sits in a different part of the same function.
+
+That is the ordinary outcome of a repair and it is recorded as such. One in
+three, measured, beats three in three assumed.
+
+### The rule this yields
+
+An annotation belongs on the thing that *decides*, never on the shape the
+decision produces. A type enumerating outcomes will out-compete the function
+choosing between them every time, because it reads as a complete statement on
+its own — which is exactly why it is the wrong anchor.

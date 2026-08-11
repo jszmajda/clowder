@@ -1,19 +1,19 @@
 # TUI-RENDER-005
 
-**Classification:** `B-ONLY-DRIFT` · **Action:** `reconcile-annotation` · **Audited:** 2026-08-10 · **Runs:** 3 per direction · **Extraction:** 10 lines
+**Classification:** `B-ONLY-DRIFT` *(re-measured after a citation repair — unchanged)*
+**Runs:** A=3, B=3 before the repair, B=3 after
 
-## Spec as written
+The blanket annotation on the layout enum was removed this cycle (see
+TUI-RENDER-007). Re-run afterwards, readers moved from describing that enum's
+three modes to describing the dead-band and the cap inside `compute` — closer to
+the code that decides, and still not this spec.
 
-> Between 80 and 99 columns the system shall draw a sidebar and a list, the inspector appearing only in place of the list when the player calls for it.
+The reason is instructive. `compute` holds several breakpoint rules, and the
+extraction reaches the region around the annotation rather than the whole
+function. This spec's rule sits elsewhere in it. Removing a misleading anchor
+moved the readers to a better place; it could not move them to the right one,
+because the right one is a different part of the same function.
 
-## Annotated code
-
-- `crates/clowder-tui/src/render/layout.rs`
-
-## What the blind runs found
-
-Re-run under the capped extractor — 10 lines shown instead of 252. **The finding survives.** Readers still described the three-way layout classification rather than this spec's particular width band, at 43-50% overlap.
-
-## Recommendation
-
-So the earlier result was right for the wrong reason, and the correction was still worth making: the citation sits on the classification that covers all three bands, not on the branch this spec governs. Cite the branch.
+Recorded as unchanged rather than quietly re-filed: a repair that helps one spec
+and not its neighbours is the ordinary outcome, and saying so is the point of
+measuring.

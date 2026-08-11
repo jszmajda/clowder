@@ -1,15 +1,29 @@
-# TUI-RENDER-007
+# TUI-RENDER-007 — the list stops growing
 
-**Classification:** `B-ONLY-DRIFT` · **Action:** `reconcile-annotation` · **Audited:** 2026-08-10 · **Extraction:** 6 lines
+**Classification:** `BD-COHERENT` *(re-measured after a citation repair — was `B-ONLY-DRIFT`)*
+**Runs:** A=3, B=3 before the repair, B=3 after
 
-## Spec as written
+## Before
 
-> At 120 columns and wider the system shall cap the list's width and give the surplus to the inspector, so a row's name and cost never separate further than they can be read together.
+All three readers described a type listing three layout modes. Nothing about a
+cap, a breakpoint, or where surplus width goes. Filed as drift.
 
-## What the blind runs found
+## The repair
 
-Readers described the three-way body resolution rather than the width cap this spec governs.
+Four breakpoint specs were annotated as a block on the enum those breakpoints
+choose between — a clean, self-contained type, which is what the extractor takes
+whenever one is offered. Each variant already carried the spec it serves, and
+the widths that pick between them are annotated inside `compute`, where the rule
+actually lives. The blanket annotation named the shape the rule produces as
+though it were the rule.
 
-## Recommendation
+Removed. Nothing else changed.
 
-Same site and same fault as its siblings: one classification serving four width specs. Cite each branch.
+## After
+
+Readers now describe the cap breakpoint, the capped width, and the hysteresis
+around it. The spec's content is recovered.
+
+This is the second repair in this audit measured rather than assumed, and the
+second time moving an annotation off a declaration and onto the behaviour turned
+a miss into a recovery.

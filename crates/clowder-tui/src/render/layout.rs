@@ -6,7 +6,12 @@
 use ratatui::layout::Rect;
 
 /// The body's horizontal division, chosen by width.
-/// @spec TUI-RENDER-004, TUI-RENDER-005, TUI-RENDER-006, TUI-RENDER-007
+///
+/// Deliberately unannotated as a whole: each variant carries the spec it
+/// serves, and the widths that choose between them are annotated in `compute`,
+/// which is where the rule lives. A blanket annotation here would name this
+/// type as the implementation of four breakpoint specs, and it is the shape
+/// they produce rather than the rule that picks one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Body {
     /// Under 80 columns or 24 rows. Nothing else is drawn — and the sim keeps
