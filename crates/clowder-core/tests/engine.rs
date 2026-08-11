@@ -485,3 +485,32 @@ fn speed_is_clamped_state_that_never_touches_tick_rules() {
     fast.speed = slow.speed;
     assert_eq!(save_string(&slow, 0), save_string(&fast, 0));
 }
+
+/// A non-finite speed is replaced rather than clamped. `f64::clamp` propagates
+/// NaN instead of bounding it, so without the substitution a NaN would reach
+/// the speed field — where it is unserializable, survives no save, and poisons
+/// every interval priced against it afterwards.
+///
+/// Nothing asserted this until the differential noticed the code doing
+/// something the spec did not mention. The guard is right; it was undefended.
+/// @spec SIM-ENG-024
+#[test]
+fn a_speed_that_is_not_a_number_is_replaced_rather_than_clamped() {
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let mut s = GameState::new(11);
+        s.apply(Command::SetSpeed(bad)).expect("setting speed never fails");
+        assert!(
+            s.speed.is_finite(),
+            "SetSpeed({bad}) left speed at {}, which no save can carry and no interval can \
+             be priced against",
+            s.speed
+        );
+        // The bounds the spec names, spelled out here because the constants are
+        // crate-private and this test is deliberately outside the crate.
+        assert!(
+            (0.25..=8.0).contains(&s.speed),
+            "SetSpeed({bad}) left speed at {} — outside the range every other value is held to",
+            s.speed
+        );
+    }
+}

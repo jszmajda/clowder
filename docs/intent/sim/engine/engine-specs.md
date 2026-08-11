@@ -66,7 +66,7 @@
 - [x] **SIM-ENG-025**: Where Stargazing Ledges exist, at each day close the system shall roll a sky event with 0.2% × Ledges probability; the event is auto-observed with probability 1% × Ledges (granting 25 curiosity scaled by curiosity ratios, plus 1 skymap) or else emits a SkyEventVisible event observable by an ObserveSky command until the end of the next day for the same yields; an expired event simply fades.
 - [x] **SIM-ENG-022**: The system shall throttle every converter by its worst-supplied input's satisfaction fraction, scaling all of that converter's inputs and outputs by the same fraction; a fully starved converter idles without error or event spam.
 - [x] **SIM-ENG-023**: The system shall reveal a content item permanently (persisted, emitting a Revealed event) the first time its gate is satisfied and every cost component reaches the reveal fraction (default 30%) of its current price, and shall expose advisory availability — Hidden (unrevealed), Teased (revealed, not actionable), Available (revealed, actionable) — without changing command-layer gating.
-- [x] **SIM-ENG-024**: When SetSpeed is applied, the system shall clamp the value to [0.25, 8], store it in game state, and emit a SpeedChanged event; no tick-internal rule shall read the speed (speed only changes how many ticks the boundary drives).
+- [x] **SIM-ENG-024**: When SetSpeed is applied, the system shall clamp the value to [0.25, 8] — substituting 1.0 for a non-finite value, since clamping propagates NaN rather than bounding it, and a NaN speed is both unserializable and unrecoverable once stored — store it in game state, and emit a SpeedChanged event; no tick-internal rule shall read the speed (speed only changes how many ticks the boundary drives).
 
 ## Flavor Events
 

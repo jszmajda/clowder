@@ -569,3 +569,55 @@ the blind runs are the readers.
 
 One finding in thirteen. At that rate the remaining 139 hold perhaps ten, for
 278 more sessions.
+
+## Addendum 16 — the extractor fix that did not fix it, and a change of reader
+
+### The fix
+
+The extractor now distinguishes an annotation *on* an item from one *inside* a
+body. The first still yields the item. The second yields the statement the
+annotation sits above, extended over following siblings only until there is
+enough to reconstruct from — where before it yielded the whole enclosing
+function.
+
+Measured on the sample's worst case, the extraction fell from about two hundred
+lines to nineteen, and the nineteen begin on the annotated line.
+
+**The reconstruction did not change.** All three readers still described what
+the surrounding code computes rather than what the spec states, because the
+spec describes a value's *definition* and the annotated site *consumes* it. No
+window can make a consumer look like a definition. Scoping was the wrong
+diagnosis for that case; the fix is real and helps elsewhere, and it did not
+help here.
+
+### The reader changed
+
+Mid-tick the blind sessions began returning a usage-limit message instead of a
+reconstruction. Checked first whether any earlier output carried it: none did,
+so no past classification rests on a non-answer.
+
+Sonnet and Haiku both still run, so the method continues on Sonnet — but a
+different reader is a different instrument. Four already-classified specs were
+re-run on it before trusting it. All four kept their classification. Sonnet was
+noisier on one (one run of three inverted "most recently arrived" to "least")
+and better on another, recovering an emitted event that the earlier reader had
+missed in all three runs.
+
+Stable enough to continue, and worth stating that batches from here are read by
+a different model than batches before.
+
+### What the change of reader found
+
+That recovered event came with something neither reader was asked about: both
+models, unanimously, reported the speed command substituting 1.0 for a
+non-finite value. The spec said only "clamp to [0.25, 8]".
+
+The guard is right and necessary — `f64::clamp` propagates NaN rather than
+bounding it, and speed is serialized, so a NaN would reach a save that cannot
+represent it and poison every interval priced against it afterwards. Nothing
+stated it and nothing asserted it, so it could have been simplified away with
+the suite staying green.
+
+Now stated in the spec, with the reason, and asserted for all three non-finite
+values. The same shape as the cap with no requirement: implemented behaviour
+that no one wrote down.
