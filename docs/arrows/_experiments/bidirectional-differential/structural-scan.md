@@ -701,3 +701,39 @@ One ambiguity from 113 specs. The honest reading is not that the technique
 failed but that **the already-audited set holds nothing more** — which is worth
 knowing, because it means the remaining findings, if any, are in the 154 not yet
 run rather than in what has already been read and filed.
+
+## Addendum 19 — a reading error of my own, checked in both directions
+
+Batch twenty: eight specs, five recovered whole, three partial. The trade leaf
+reads well. Its one recurring shape is three specs cited on one resolution
+function, so readers hand back that function whichever spec they were asked
+about — the same imbalance as elsewhere, in its purest form.
+
+One of them nearly became a finding. Two of three readers described the colony
+choice as random where the spec appeared to demand deterministic priority, and
+the code does pick at random within the first tier. Reading the spec in full
+before writing it up: it says "else a random first-tier colony", and states the
+refund too. The apparent divergence was an artifact of the 240-character window
+I had been printing spec text through.
+
+Which raised the real question: **how much of this audit was judged through that
+window?** Thirty-nine of 116 audited specs — a third — are longer than it.
+
+Checked in both directions rather than assumed:
+
+- **Nineteen drift verdicts** on long specs. Their unread tails are additional
+  clauses and rationale, which if anything make a B-side miss more justified,
+  not less. Several records quote tail content, so those were read in full.
+- **Twelve coherent verdicts** on long specs — the likelier error, since
+  coherence judged against a partial spec would miss what the tail asks for. One
+  looked wrong: a spec whose tail requires a conversion the reconstructions
+  seemed not to mention. They mention it. The reconstruction display was
+  truncated too, at 235 characters.
+
+**No verdict needs reversing.** The risk was real and did not materialise, which
+is worth recording as plainly as a defect would have been — the check cost less
+than trusting either answer.
+
+The near-miss did leave one small thing. That spec pins every number it touches
+except the find chance, which it implies with "a quiet day that finds nobody".
+Now named, since its neighbours are.

@@ -14,5 +14,5 @@
 
 ## Discovery
 
-- [x] **SIM-TRADE-007**: When ScoutPicnic is applied after the trade surface (Gift Economy idea) opens and with 1000 pep, the system shall discover the next colony by deterministic prerequisite priority (Foxes need charm ≥ 1500; Deer need ≥ 1 Kite; Owls need ≥ 100 Kites and curiosity cap > 125000; else a random first-tier colony), refunding 950 pep on a quiet day that finds nobody.
+- [x] **SIM-TRADE-007**: When ScoutPicnic is applied after the trade surface (Gift Economy idea) opens and with 1000 pep, the system shall discover the next colony by deterministic prerequisite priority (Foxes need charm ≥ 1500; Deer need ≥ 1 Kite; Owls need ≥ 100 Kites and curiosity cap > 125000; else a random first-tier colony), finding nobody half the time and refunding 950 pep on such a quiet day — the chance is named here because every other number in this spec is.
 - [x] **SIM-TRADE-008**: The system shall discover the first colony free when the trade surface opens, and never undiscover a colony.

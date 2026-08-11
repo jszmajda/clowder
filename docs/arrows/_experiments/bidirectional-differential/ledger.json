@@ -52,7 +52,13 @@
    "SIM-TRADE-008"
   ],
   "audited": [
-   "SIM-TRADE-005"
+   "SIM-TRADE-005",
+   "SIM-TRADE-001",
+   "SIM-TRADE-002",
+   "SIM-TRADE-004",
+   "SIM-TRADE-006",
+   "SIM-TRADE-007",
+   "SIM-TRADE-008"
   ]
  },
  "cosmic": {
@@ -69,7 +75,8 @@
    "SIM-SKY-007"
   ],
   "audited": [
-   "SIM-SKY-005"
+   "SIM-SKY-005",
+   "SIM-SKY-001"
   ]
  },
  "curiosity": {
