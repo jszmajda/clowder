@@ -532,7 +532,9 @@
    "SAVE-016",
    "SAVE-011",
    "SAVE-014",
-   "SAVE-017"
+   "SAVE-017",
+   "SAVE-013",
+   "SAVE-008"
   ]
  },
  "prestige": {
@@ -555,7 +557,16 @@
   ],
   "audited": [
    "SIM-MOVE-007",
-   "SIM-MOVE-008"
+   "SIM-MOVE-008",
+   "SIM-MOVE-001",
+   "SIM-MOVE-002",
+   "SIM-MOVE-003",
+   "SIM-MOVE-004",
+   "SIM-MOVE-006",
+   "SIM-MOVE-009",
+   "SIM-MOVE-011",
+   "SIM-MOVE-013",
+   "SIM-MOVE-012"
   ]
  },
  "render": {

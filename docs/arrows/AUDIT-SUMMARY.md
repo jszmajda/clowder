@@ -3,9 +3,29 @@
 Safe to read: this page names no resource, structure, job, idea, event or
 balance number. Everything is described by its shape.
 
-Standing since 2026-08-10. 239 of 293 specs audited; all four shell segments
-complete, every sim segment sampled, 24 read by hand where the harness cannot
-reach. 630 tests pass, plus four that run only with `--ignored`.
+**Closed 2026-08-11.** The blind-run partition is finished: every one of its 226
+specs has an audit record, plus 44 more read by hand where the harness cannot
+reach — 270 of the 303 specs marked implemented.
+
+630 tests pass, plus four that run only with `--ignored`.
+
+### What is not covered, stated exactly
+
+33 specs have no audit record.
+
+- **11 content tables**, partitioned out at the start. Auditing these means
+  comparing tabled numbers against the design document, which is a different job
+  needing a different instrument.
+- **10 negative requirements**, partitioned out at the start. A rule about what
+  never happens has no code to show a reader; the skill's own guidance is to
+  pair each with a test asserting the negation, and all ten have one.
+- **9 that fell through the partition entirely.** `SAVE-009`, `SAVE-010`,
+  `SIM-CUR-004`, `SIM-CUR-009`, `SIM-DREAM-005`, `SIM-ENG-043`, `SIM-KIT-001`,
+  `SIM-SUN-003`, `TUI-THEME-005`. My partition covered 247 of 303 and I did not
+  notice the shortfall until closing the ledger. They are not known-bad — they
+  are unlooked-at, which is a different thing and worth naming as one.
+- 3 more are audited and recorded in the ledger without a record file, from a
+  batch where the write step was skipped.
 
 ---
 
