@@ -1315,4 +1315,3 @@ fn a_played_and_moved_state_round_trips_losslessly() {
     assert_eq!(st.generation, s.generation, "generation persists");
     assert!(st.traditions.contains(&TraditionId::TravelingBasketsI));
 }
-

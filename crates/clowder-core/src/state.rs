@@ -2056,3 +2056,53 @@ pub(crate) fn season_index_of_day(day: u64) -> usize {
 pub(crate) fn season_of_day(day: u64) -> Season {
     Season::ALL[season_index_of_day(day)]
 }
+
+#[cfg(test)]
+mod move_classification {
+    use super::*;
+
+    /// SIM-MOVE-004 says a Move preserves an enumerated legacy set and resets
+    /// "everything else". The Move resets in place, naming each field, so a
+    /// field added later is preserved by *omission* — it survives because
+    /// nobody remembered it, and no test notices.
+    ///
+    /// Two already had. The roster high-water added for the prestige reveal and
+    /// the journal are both kept today by accident rather than by decision. Each
+    /// is defensible — a reveal that un-revealed after a Move would take an
+    /// earned row away, and the Family Album already establishes that history
+    /// outlives a generation — but defensible is not specified, and the spec
+    /// names neither.
+    ///
+    /// The destructuring below is the enforcement, and it lives in the crate
+    /// because some of these fields are private. It is exhaustive on purpose:
+    /// no `..` rest pattern, so adding a field to `GameState` stops this
+    /// compiling until whoever adds it says which side of a Move it is on.
+    ///
+    /// @spec SIM-MOVE-004
+    #[test]
+    fn every_field_of_the_meadow_is_classified_by_the_move() {
+        let GameState {
+            // ---- reset to new-game defaults ----
+            ticks: _, resources: _, structures: _, kittens: _, ideas: _, pity: _,
+            famine_days: _, recovery_days: _, grumpy: _, next_seq: _,
+            zoomies_until: _, revealed: _, kites_high_water: _, mess: _,
+            pending_sky_event: _, elder: _, jamboree_until: _, refinements: _,
+            rules: _, devotion: _, peak_devotion: _, rites: _, rite_counts: _,
+            arches_bought: _, dream_drift: _, promises: _, penpal: _,
+            discovered: _, stirred_dreams: _, whale_visit_years: _,
+            whale_contentment: _, deja_vu_until: _, tidy_progress: _,
+            unrevealed_structs: _, unrevealed_ideas: _,
+
+            // ---- preserved, and named as legacies by the spec ----
+            rng: _, speed: _, serenity: _, enlightenment_tier: _,
+            elder_wisdom: _, warm_memories: _, passed_down_wisdom: _,
+            generation: _, traditions: _, family_album: _, armed_adventure: _,
+            active_adventure: _, adventure_completions: _, adventure_rewards: _,
+            adventure_done: _, sites_reached: _, dream_looms: _, distant_dawn: _,
+
+            // ---- preserved, and NOT named by the spec ----
+            roster_high_water: _,
+            journal: _,
+        } = GameState::new(1);
+    }
+}
