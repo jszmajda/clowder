@@ -477,3 +477,41 @@ It works: the added field defaults, so a v3 save loads owing nothing. That is
 now pinned by a committed fixture and two tests rather than by inspection.
 `SAVE-014` no longer names a version number, since that is the thing about it
 that will keep changing.
+
+## Addendum 14 — the sim partition, and a correction
+
+Running the extractor over all 175 remaining sim specs — cheap, since it is
+local file processing — leaves 28 it cannot prepare. That set is where every
+shell finding came from, so it was the first place to look.
+
+| Why | Count | What it turned out to be |
+|---|---|---|
+| Annotated region too small | 21 | Short functions and table entries. Harness floor, not a defect. |
+| Annotated region too large | 6 | Genuinely large functions, correctly cited. Harness ceiling. |
+| No `@spec` in source | 1 | A reachability property with no production sink, asserted by two tests. Correct as it stands. |
+
+**No arrow defects.** The shell's citation problems — a spec pointing at the
+wrong file, a marker written as prose, a behaviour cited on a declaration — do
+not replicate here.
+
+### The correction
+
+The obvious story is that the defects concentrate where the process was skipped:
+the shell's loop was hand-written ahead of its tests and says so in its own
+header. Checking the history rather than asserting it, that holds for some of
+them and not others.
+
+The four engine specs with no test, and the save-version spec that went stale,
+both date from the days the shell was being built — the queries added to serve
+it, and the format bump made for it. Consistent.
+
+The twelve short-form spec ids do not. They were introduced on 2026-07-05, in
+commits whose messages say *tests-first*, more than a month before the shell
+existed. They survived a process followed correctly.
+
+That is the more useful conclusion, and it is not the neat one. A careful
+process protects against the defect classes it looks at. Tests-first catches a
+spec nobody asserted. Nothing in it reads a spec *reference*, so nothing
+noticed that a reference was malformed — and a malformed reference is invisible
+to the prefix grep the whole ID scheme exists to serve. Care was never the
+variable there.
