@@ -495,6 +495,10 @@ fn handle_max_affordable(view: &mut ViewState, state: &GameState) -> Outcome {
 // +/- — count rows — TUI-NAV-013
 // ---------------------------------------------------------------------------
 
+/// One worker on or off a count row. The entry point for the behaviour, which
+/// is why the annotation is here rather than on the row field that merely
+/// declares a count row exists.
+/// @spec TUI-NAV-013
 fn handle_increment_decrement(view: &mut ViewState, state: &GameState, up: bool) -> Outcome {
     let Some(row) = current_row(view, state) else {
         return Outcome::Handled;
