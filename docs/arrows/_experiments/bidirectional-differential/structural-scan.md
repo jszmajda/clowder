@@ -1000,3 +1000,40 @@ An annotation belongs on the thing that *decides*, never on the shape the
 decision produces. A type enumerating outcomes will out-compete the function
 choosing between them every time, because it reads as a complete statement on
 its own — which is exactly why it is the wrong anchor.
+
+## Addendum 27 — an architecture claim, tested by example
+
+Batch twenty-five turned up three specs that no blind run could recover because
+they have no site: that a command is atomic, that eight rejection reasons follow
+a precedence, that the core owns the live-versus-replay decision. Each is a
+discipline every handler follows rather than code any one of them contains.
+
+The coverage scan says all three are tested, and they are. Reading the tests:
+one of them checks **one command** in **one rejecting state**.
+
+That is a spot check standing in for a claim about forty commands. A new command
+that mutated something before failing would pass the suite, pass the coverage
+scan, and never appear in this audit — the differential cannot see it either,
+since there is no region to extract.
+
+So the check now walks every variant. Forty commands, each applied to a meadow
+with a little of everything, each required to leave the state bit-identical if
+it returns an error. Thirty-four are rejected there, and a guard fails the test
+if fewer than thirty are, so it cannot quietly become vacuous as gates change.
+
+All forty pass. The claim was true; nothing was enforcing it.
+
+### Why this is the shape to look for
+
+The three defect classes this audit has found each hide somewhere different:
+
+| Class | Found by |
+|---|---|
+| Spec marked done with no test | the coverage scan |
+| Behaviour with no requirement | a blind run naming what the spec omits |
+| **Claim tested by example** | **reading the test a claim points at** |
+
+The third has no detector and probably cannot have one — deciding whether a test
+covers a claim or merely instances it needs both read together. It is also the
+one that leaves the strongest impression of safety: a green suite, a cited test,
+a coverage scan that passes.

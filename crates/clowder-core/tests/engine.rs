@@ -514,3 +514,84 @@ fn a_speed_that_is_not_a_number_is_replaced_rather_than_clamped() {
         );
     }
 }
+
+/// Every command, not one of them.
+///
+/// SIM-ENG-005 is a claim about the whole command layer: each one either fully
+/// applies or returns a typed error having touched nothing, RNG included. The
+/// test above checks that for a single command in a single rejecting state,
+/// which is how a new command that mutates before failing would pass the suite.
+///
+/// This walks every variant. A command that succeeds is not this spec's
+/// business; a command that fails must leave the meadow bit-identical.
+/// @spec SIM-ENG-005
+#[test]
+fn no_rejected_command_of_any_kind_leaves_a_mark() {
+    let every_command = vec![
+        Command::GatherCatnip,
+        Command::Forage,
+        Command::Rummage,
+        Command::Build(StructureId::ALL[0]),
+        Command::AssignJob(JobId::ALL[0]),
+        Command::UnassignJob(JobId::ALL[0]),
+        Command::ResearchIdea(IdeaId::ALL[0]),
+        Command::Craft(CraftId::ALL[0]),
+        Command::ObserveSky,
+        Command::SetSpeed(2.0),
+        Command::Pounce(1),
+        Command::HostJamboree,
+        Command::Promote(0),
+        Command::AppointElder(0),
+        Command::BuyRefinement(RefinementId::ALL[0]),
+        Command::AdoptRule(RuleId::ALL[0]),
+        Command::AssignTinkerer(CraftId::ALL[0]),
+        Command::UnassignTinkerer(CraftId::ALL[0]),
+        Command::Bask,
+        Command::Reverie,
+        Command::BuyRite(RiteId::ALL[0]),
+        Command::Enlighten,
+        Command::HoldParade,
+        Command::BuyArch(ArchId::ALL[0]),
+        Command::RefineStarshard,
+        Command::RefineEcho,
+        Command::CondenseJar,
+        Command::MakePromise,
+        Command::Trade(ColonyId::ALL[0], 1),
+        Command::SendPenPal(ColonyId::ALL[0]),
+        Command::ScoutPicnic,
+        Command::GreatMeadowMove,
+        Command::PassItDown,
+        Command::BuyTradition(TraditionId::ALL[0]),
+        Command::DeclareAdventure(None),
+        Command::LaunchExpedition(SiteId::ALL[0]),
+        Command::SummonStarWhale,
+        Command::FeedWhale,
+        Command::DeepNap(1),
+        Command::BuyDreamLoom(DreamLoomId::ALL[0]),
+    ];
+
+    let mut rejected = 0;
+    for cmd in every_command {
+        let mut s = GameState::new(4242);
+        // A little of everything, so the rejections that fire are the gates and
+        // the prerequisites rather than only "you have nothing".
+        give(&mut s, ResourceId::Catnip, 50.0);
+        give(&mut s, ResourceId::Twigs, 5.0);
+        let snapshot = s.clone();
+
+        if s.apply(cmd.clone()).is_err() {
+            rejected += 1;
+            assert_eq!(
+                s, snapshot,
+                "{cmd:?} was rejected and still changed the meadow — a rejected command must \
+                 be a perfect no-op, RNG state included"
+            );
+        }
+    }
+
+    assert!(
+        rejected >= 30,
+        "only {rejected} of the commands were rejected on a near-empty meadow; this test \
+         proves nothing if most of them succeed"
+    );
+}
