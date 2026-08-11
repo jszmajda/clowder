@@ -154,3 +154,65 @@ The classes now known to be outside the differential's reach:
 
 All four are testable; none by this method. Each wants a test that asserts the
 negation or the property directly, and the citation belongs on that test.
+
+## Addendum 5 — partitioning what is left, and a correction to my own argument
+
+Applying the four blind classes to the 247 unaudited specs:
+
+| Class | Count | of which shell |
+|---|---|---|
+| Content tables | 11 | 1 |
+| True negatives — the requirement *is* that something does not happen | 10 | 4 |
+| Source-level constraints | 0 | 0 |
+| Differential-able | 226 | 48 |
+
+The first cut of this table said **70** negatives. That was wrong: the query
+lumped *rationale* clauses ("so that X") in with true negatives, and a spec
+carrying a rationale clause is perfectly auditable — SIM-ENG-030 proved it,
+coming back coherent on its mechanism with only its "never from a separate
+formula" clause unrecovered. Restricting to specs whose requirement genuinely is
+an absence gives 10.
+
+**This corrects an argument I had been making.** I had been recommending the
+sweep be bounded partly on the grounds that much of what remained could not be
+evaluated by this method. That premise was weak: only 21 of 247 are unreachable.
+The honest case for bounding rests on the hit rate alone — the shell finds
+something roughly two times in three, the sim roughly one in three, and the sim
+is 178 of the 226 remaining differential-able specs.
+
+That is still a case, but it is a different and smaller one than I was making,
+and it is worth saying so rather than letting a convenient number stand.
+
+## Addendum 6 — the method is weakest where the naming is best
+
+`TUI-NAV-001` returned 76% word overlap, above the threshold the skill sets for a
+suspected stripping failure. The guard was right. The implementing function is
+named for the requirement it satisfies, so its identifier alone hands the reader
+the spec's central term.
+
+That is not a code smell — it is good naming, and stripping it would leave
+nothing to reason about. It is a limit of the method: **a function named after
+its requirement will always let a blind reader recover that requirement, and the
+resulting agreement proves nothing.** Coherence and self-documentation are
+indistinguishable from outside.
+
+Fifth blind class, and the most awkward, because it selects against exactly the
+code you want.
+
+## Uncited specs — 10 marked implemented with nothing pointing at them
+
+A sweep for specs marked `[x]` with no `@spec` citation anywhere in `src/`:
+
+| Segment | Count |
+|---|---|
+| curiosity, engine, persistence | 2 each |
+| ceremonies, dreamtime, kittens, theme | 1 each |
+
+These are invisible to the differential, and to any coverage check built on
+grepping `@spec`. A tool that counts citations will report them as fine by
+omission — which is the precise shape of the failure that prompted this audit:
+something claimed done, with no mechanism that could contradict the claim.
+
+Two of them are worth naming: the engine's event-classification bounding rule and
+its speed-journaling exclusion. Both were added late, both are real behaviour,
+and neither is cited anywhere.

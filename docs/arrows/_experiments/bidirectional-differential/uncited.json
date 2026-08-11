@@ -1,0 +1,26 @@
+{
+ "ceremonies": [
+  "SIM-SUN-003"
+ ],
+ "curiosity": [
+  "SIM-CUR-004",
+  "SIM-CUR-009"
+ ],
+ "dreamtime": [
+  "SIM-DREAM-005"
+ ],
+ "engine": [
+  "SIM-ENG-042",
+  "SIM-ENG-043"
+ ],
+ "kittens": [
+  "SIM-KIT-001"
+ ],
+ "persistence": [
+  "SAVE-009",
+  "SAVE-010"
+ ],
+ "theme": [
+  "TUI-THEME-005"
+ ]
+}
