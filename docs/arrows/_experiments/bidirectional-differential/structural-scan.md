@@ -385,3 +385,42 @@ written, and its probes agree with hand-checks on four specs.
 
 It is also cheap enough to run on every commit, and belongs there rather than
 in an experiment folder.
+
+## Addendum 12 — the five module-scope citations, resolved
+
+Addendum 11 split nine specs into four with nothing asserting them and five
+asserted but cited only at module scope. The four became tests and found a core
+defect. The five turned out not to be one category but two.
+
+**Three had a stale "no seam" note.** `persist.rs` explained at length that the
+load-failure policy — no save, a newer save, an unreadable save — had nowhere
+to be observed: `runtime::persist` names the outcomes but no function below
+`runtime::run` produces them, and `run` enters raw mode and loops. True when
+written. The ordering tests in `loop_order.rs` had since built the seam it said
+was missing: a child process running the real binary against a scratch home,
+which observes the whole decision from outside, including what it left on disk.
+
+Three tests added there. Two assert what had never been checked at all — that a
+refused save is byte-identical afterwards with nothing new beside it, and that
+an *unreadable* save is never moved aside the way an unparseable one is. That
+second is the distinction the design leans hardest on, and until now nothing
+observed it.
+
+The third needed care: with no terminal available the binary fails at terminal
+setup, which is *after* the load, so asserting "it kept running" would have made
+the test a test of the harness. It asserts reaching terminal setup instead —
+strictly downstream of the load, so reaching it proves the load did not refuse.
+
+**Two were honest.** `TUI-RUN-002` and `TUI-RUN-003` need a real pty: entering
+raw mode from a test would put the developer's own terminal into raw mode, and
+faking one proves nothing about the real thing. `term.rs` says so plainly and
+has said so all along. The difference between these and the stale notes is not
+candour but currency — a note is only honest while its reason still holds, and
+nothing rereads a note when its blocker is removed.
+
+### Promoted out of the experiment
+
+The scan is now `scripts/spec-test-coverage.py`, with the two pty specs as
+documented exemptions. It exits non-zero on a new gap *and* on a stale
+exemption, so the list cannot rot the way the prose notes did. Current state:
+303 specs marked implemented, 328 asserted by a test, clean.

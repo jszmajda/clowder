@@ -14,21 +14,18 @@
 //! unnecessary; that belongs to `Cargo.toml`, which is another chunk's, and is
 //! reported as an open question rather than fixed here.
 //!
-//! **What has no seam to be tested at, and why.** Three of this chunk's specs
-//! are load-failure policy — TUI-RUN-010 (no save: start fresh, no error),
-//! TUI-RUN-011 (a newer save: refuse, leave it alone), and TUI-RUN-013 (an
-//! unreadable save: stop, leave it untouched). `runtime::persist` declares the
-//! *outcome* of that policy (`StartupRefusal::SaveIsNewer`,
-//! `StartupRefusal::Unreadable`) but no function that produces it: there is no
-//! load entry point anywhere below `runtime::run`, which enters raw mode and
-//! loops. So the distinction the design leans hardest on — unreadable is not
-//! unparseable, and a file we merely could not open must never be moved aside —
-//! has nowhere to be observed. That gap is reported rather than papered over
-//! with a test of `clowder_core`'s own loader, which is not the code that makes
-//! this decision.
+//! **Where the load-failure policy is tested instead.** TUI-RUN-010 (no save:
+//! start fresh, no error), TUI-RUN-011 (a newer save: refuse, leave it alone)
+//! and TUI-RUN-013 (an unreadable save: stop, leave it untouched) are decided
+//! inside `runtime::run`, which enters raw mode and loops — so there is no
+//! function here to call. They are observed from outside instead, in
+//! `loop_order.rs`, by running the real binary against a scratch home and
+//! looking at what it said and what it left on disk. That is also the only
+//! place the distinction this design leans hardest on can be seen: a file that
+//! could not be *read* is never moved aside, where an unparseable one is.
 //!
-//! Note that `clowder_core::read_save` cannot be used unchanged to make it:
-//! it maps *every* non-`NotFound` read error onto `LoadError::Corrupt`, so a
+//! That distinction is why `clowder_core::read_save` cannot make it alone: it
+//! maps *every* non-`NotFound` read error onto `LoadError::Corrupt`, so a
 //! permission error arrives looking exactly like unparseable JSON. Satisfying
 //! TUI-RUN-013 means the shell reads the file itself and only then hands the
 //! contents to `load_string`.

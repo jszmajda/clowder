@@ -1,6 +1,6 @@
 //! The App container and the loop body — `runtime::run` and `runtime::App::step`.
 //!
-//! @spec TUI-RUN-001
+//! @spec TUI-RUN-001, TUI-RUN-010, TUI-RUN-011, TUI-RUN-013
 //!
 //! **How this test reaches the code.** Not by including a module: it runs the
 //! real `clowder` binary as a child process. TUI-RUN-001 is an *ordering*
@@ -357,4 +357,115 @@ fn a_startup_failure_does_not_take_the_terminal_over_in_any_other_way() {
             sequence.escape_debug()
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-010 / -011 / -013 — the load-failure policy itself
+//
+// Not the ordering above, but what the policy decides. These were reported as
+// having no seam: `runtime::persist` names the outcomes but no function below
+// `runtime::run` produces them, and `run` enters raw mode and loops. The seam
+// is the child process — the same one the ordering tests use — which observes
+// the whole decision from outside, including what it left on disk.
+//
+// The distinction the design leans hardest on is here: a file that could not be
+// *read* must never be moved aside, where a file that could not be *parsed*
+// must be (TUI-RUN-012). Nothing observed that until now.
+// ---------------------------------------------------------------------------
+
+/// What is in a directory, sorted, for comparing before against after.
+#[cfg(unix)]
+fn listing(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(dir)
+        .map(|rd| rd.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect())
+        .unwrap_or_default();
+    names.sort();
+    names
+}
+
+/// A meadow nobody has played yet is not an error condition. The shell that
+/// reports "no save found" as a failure has made the first launch look broken.
+/// @spec TUI-RUN-010
+#[cfg(unix)]
+#[test]
+fn no_save_at_all_starts_a_new_game_rather_than_reporting_a_failure() {
+    let home = TempDir::new("no-save");
+    let save = child_save_path(home.path());
+    assert!(!save.exists(), "fixture: this home must start without a save");
+
+    let run = run_clowder(home.path());
+
+    // Two ways to have passed the load, depending on whether the harness has a
+    // terminal to offer: the game is still running at the deadline, or it got
+    // as far as trying to prepare a terminal and said so. Terminal setup is
+    // strictly after the load, so reaching it is proof the load did not refuse.
+    // Asserting only the first would make this test a test of the environment.
+    let got_past_the_load =
+        run.timed_out || run.combined().contains("could not prepare the terminal");
+    assert!(
+        got_past_the_load,
+        "the shell stopped before it ever tried to take a terminal, on a home with no save \
+         — a first launch has nothing to load and that is not a failure.\n{run}"
+    );
+}
+
+/// Refusing is half of it. The other half is that the file the shell refused to
+/// use is still exactly where and what it was: a save from a version this build
+/// cannot read may be one a *later* build can, and the player may simply have
+/// launched the wrong binary.
+/// @spec TUI-RUN-011
+#[cfg(unix)]
+#[test]
+fn a_save_from_the_future_is_left_exactly_as_it_was_found() {
+    let home = TempDir::new("future-untouched");
+    let save = child_save_path(home.path());
+    write_a_save_from_the_future(&save);
+    let before = fs::read(&save).expect("reading the fixture back");
+    let dir = save.parent().expect("the save path has a parent").to_path_buf();
+    let listing_before = listing(&dir);
+
+    let run = run_clowder(home.path());
+    run.expect_refusal();
+
+    assert_eq!(
+        fs::read(&save).expect("the refused save must still be readable"),
+        before,
+        "the shell refused to start and then modified the save anyway.\n{run}"
+    );
+    assert_eq!(
+        listing(&dir),
+        listing_before,
+        "refusing to start left something new beside the save: a save this build cannot \
+         read is not a save this build may move.\n{run}"
+    );
+}
+
+/// The distinction the design leans hardest on. A save that could not be read
+/// tells the shell nothing about its contents — so it cannot be judged
+/// unparseable, and must not be set aside the way an unparseable one is. Moving
+/// a file we never managed to open is destroying evidence about a problem we
+/// have not diagnosed.
+/// @spec TUI-RUN-013
+#[cfg(unix)]
+#[test]
+fn a_save_that_cannot_be_read_is_never_moved_aside() {
+    let home = TempDir::new("unreadable-untouched");
+    let save = child_save_path(home.path());
+    fs::create_dir_all(&save).expect("creating a directory where the save file belongs");
+    let dir = save.parent().expect("the save path has a parent").to_path_buf();
+    let listing_before = listing(&dir);
+
+    let run = run_clowder(home.path());
+    run.expect_refusal();
+
+    assert!(
+        save.is_dir(),
+        "what the shell could not read is no longer where it was.\n{run}"
+    );
+    assert_eq!(
+        listing(&dir),
+        listing_before,
+        "the unreadable save was set aside like an unparseable one — but nothing was ever \
+         read, so nothing is known to be corrupt.\n{run}"
+    );
 }
