@@ -1110,3 +1110,32 @@ safe to default.
 Worth stating because the previous addendum, read alone, invites a sweep that
 removes every wildcard over every growing enum. That would be busywork on the
 safe ones and would bury the two that matter.
+
+## Addendum 30 — the sweep the criterion made cheap
+
+With the criterion sharp — a wildcard over a growing enumeration whose default
+is the *permissive* answer — the sweep is a grep and a read. Thirty-eight
+wildcard arms across both crates.
+
+Thirty-five default conservatively: `None`, `false`, `0.0`, an empty block, an
+error, an `unreachable!`. A new variant falling through any of them is reported
+as absent, unavailable, worth nothing, or refused — the answer that gets
+noticed.
+
+Two return a value that is simply the ordinary case rather than a permission:
+a base rate, a neutral multiplier of 1.0.
+
+One returns `true`, in the shell, deciding which row the cursor prefers to land
+on when a section is entered. It is permissive, and it is fine — a new row kind
+falling through gets landed on slightly more eagerly than it might deserve,
+which is a cosmetic preference and not a gate.
+
+So the gate query was the only one, and it is fixed. Recording the negative
+because it bounds the finding: the codebase defaults conservatively almost
+everywhere, and one permissive default over a growing enum was the exception
+rather than a habit.
+
+Batch twenty-eight, alongside: twelve specs, six recovered whole. The kittens
+leaf reads better than any other — concrete local rules about who is picked and
+what they carry — and the three expedition specs beside them are a formula, an
+event payload, and an absence, none of which survives extraction.

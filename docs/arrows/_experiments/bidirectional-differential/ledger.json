@@ -329,7 +329,10 @@
   "audited": [
    "SIM-EXP-004",
    "SIM-EXP-001",
-   "SIM-EXP-002"
+   "SIM-EXP-002",
+   "SIM-EXP-003",
+   "SIM-EXP-005",
+   "SIM-EXP-006"
   ]
  },
  "kittens": {
@@ -366,7 +369,16 @@
   "audited": [
    "SIM-KIT-015",
    "SIM-KIT-016",
-   "SIM-KIT-006"
+   "SIM-KIT-006",
+   "SIM-KIT-002",
+   "SIM-KIT-003",
+   "SIM-KIT-004",
+   "SIM-KIT-005",
+   "SIM-KIT-007",
+   "SIM-KIT-008",
+   "SIM-KIT-009",
+   "SIM-KIT-010",
+   "SIM-KIT-011"
   ]
  },
  "mystic": {
