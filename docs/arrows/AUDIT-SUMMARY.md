@@ -3,8 +3,9 @@
 Safe to read: this page names no resource, structure, job, idea, event or
 balance number. Everything is described by its shape.
 
-Standing since 2026-08-10. 127 of 293 specs audited; all four shell segments
-complete, every sim segment sampled. 628 tests pass.
+Standing since 2026-08-10. 239 of 293 specs audited; all four shell segments
+complete, every sim segment sampled, 24 read by hand where the harness cannot
+reach. 630 tests pass, plus four that run only with `--ignored`.
 
 ---
 
@@ -64,7 +65,35 @@ Two specs attach the same rate and the same cap to *different quantities*.
 Either one describes both loosely, or there are two mechanics sharing constants.
 Only the design intent separates them.
 
-### 6. Three older questions, still open
+### 6. Two fields a Move keeps because nobody decided
+
+A prestige Move preserves an enumerated legacy set and resets everything else.
+It resets **in place**, naming each field, so a field added later survives by
+*omission*. Two have: the roster high-water added for the prestige reveal, and
+the event journal. Both were added after the spec was written; neither was
+cascaded into it.
+
+Each is defensible — a reveal keyed on having *met* a size should not un-reveal
+after a Move, and the Family Album already establishes that history outlives a
+generation. But an exhaustive enumeration with two fields outside it was settled
+by an omission rather than by anyone. The journal one compounds item 1: if
+absence reports survive Moves, they accumulate across generations too.
+
+A test now destructures the whole state exhaustively, so adding a field will not
+compile until someone puts it on one side or the other. That does not decide
+these two.
+
+### 7. One change to AGENTS.md, made on evidence, easy to revert
+
+Two repairs measured this cycle both came from the same mistake: a spec
+annotated on the *type enumerating outcomes* rather than the code that decides
+between them, and a reader — human or tool — finds the type first every time. I
+added that as a paragraph beside the existing annotation-placement guidance.
+
+It shapes how every future agent annotates, so it wants your yes or no. Nothing
+else in this audit has touched project instructions.
+
+### 8. Three older questions, still open
 
 - Should a stock spent to exactly zero disappear from its list, or stay?
 - Was one panel meant to be per-row, or is "for that row" loose phrasing?
@@ -92,6 +121,25 @@ Nineteen specs and their code were reconciled. In brief:
   whole id scheme exists to serve.
 - A spec cited *nowhere* was invisible to the coverage check, because that check
   looked for a citation before looking for a test.
+
+## Enforcement added where a claim had none
+
+Three claims were true and unenforced. Each is now checked:
+
+- **Every command is atomic on rejection.** The test covering this checked *one*
+  command in one state, standing in for a claim about forty. It now walks every
+  variant; all forty pass, and a guard fails the test if too few are rejected,
+  so it cannot quietly go vacuous.
+- **The random-draw schedule never reorders.** Nothing checked it, and every
+  determinism test compares two runs of the *same build* — which agree whether
+  or not the schedule moved since yesterday. A golden now pins the generator's
+  position. It is `--ignored` on purpose: balance changes move it too, so it is
+  a pre-release check rather than a commit gate, and a failure is notice that
+  existing saves will diverge.
+- **A new action cannot be ungated by accident.** The gate query ended in a
+  wildcard returning "open", so an action added later was visible from its first
+  frame because nobody was asked. The match is now exhaustive; behaviour is
+  identical and adding an action no longer compiles until its gate is decided.
 
 ## What now runs on every commit
 
@@ -125,16 +173,36 @@ This is now predictable without running it. The remaining specs will yield about
 ninety drift verdicts and fifty coherent ones, at roughly one real finding per
 thirteen specs — one per eighty blind sessions.
 
+## Where the findings actually came from
+
+Worth stating plainly, because it changed how the rest of the audit was spent.
+
+| Source | Real findings |
+|---|---|
+| Reading a spec against its test or its code | 6 |
+| A blind reader naming something the spec omits | 2 |
+| The blind runs recovering the wrong thing | 2 |
+
+The blind runs earn their place — they found two behaviours with no requirement
+at all, and nothing else would have. But two thirds of what this audit found
+came from *reading*, prompted by a question the runs raised rather than by their
+verdicts. The last six all came from one question: **does a spec that enumerates
+something have anything checking the enumeration is still complete?**
+
+That question works where the enumeration **grows with content** — a save
+format, a reset list, a draw schedule. It does not work on a fixed pipeline or a
+match the compiler already checks, and a sweep looking for the shape without
+that filter returns mostly noise, as four other structural sweeps did.
+
 ## The remaining scope
 
-166 specs unaudited. Recent yield is about one real finding per thirteen, at six
-blind sessions each — roughly 1,000 sessions for perhaps a dozen findings, of
-which the last several came from *chasing what the harness could not process*
-rather than from the runs themselves.
+54 specs unaudited, 35 of them runnable. At the measured rate that is about
+three real findings for some 210 blind sessions.
 
-My recommendation: bound the blind runs here and spend the remainder on the
-compound specs — around 75 carry several requirements under one id, which cannot
-be marked implemented independently and which a prefix grep cannot separate.
-That is a traceability argument, and it was always the stronger one.
+My recommendation is unchanged and now better evidenced: bound the blind runs,
+and spend what is left on reading enumerated specs against their enforcement.
+The compound specs — around 75 carrying several requirements under one id — are
+still worth splitting for traceability, since seven behaviours under one id
+cannot be marked implemented independently.
 
 Your call; the loop continues either way.
