@@ -10,7 +10,10 @@
    "SIM-ADV-005"
   ],
   "audited": [
-   "SIM-ADV-004"
+   "SIM-ADV-004",
+   "SIM-ADV-001",
+   "SIM-ADV-002",
+   "SIM-ADV-005"
   ]
  },
  "ceremonies": {
@@ -27,7 +30,12 @@
   ],
   "audited": [
    "SIM-SUN-005",
-   "SIM-SUN-006"
+   "SIM-SUN-006",
+   "SIM-SUN-001",
+   "SIM-SUN-002",
+   "SIM-SUN-004",
+   "SIM-SUN-007",
+   "SIM-SUN-008"
   ]
  },
  "colonies": {

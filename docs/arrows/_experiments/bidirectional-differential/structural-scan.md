@@ -621,3 +621,42 @@ the suite staying green.
 Now stated in the spec, with the reason, and asserted for all three non-finite
 values. The same shape as the cap with no requirement: implemented behaviour
 that no one wrote down.
+
+## Addendum 17 — three proxies, none of them predictive
+
+Batch nineteen: eight specs, read by the new model, no new class and no new
+finding. Two recovered whole, six partial in shapes already catalogued.
+
+Its most interesting result is one spec. `SIM-ADV-002` specifies seven distinct
+twists plus a handoff in a single EARS line, and is annotated at ten sites
+across five files. Every annotation is correct. Each reader recovered a
+different twist and none recovered the handoff — because no extraction of any
+one site can yield the other six. That is not a citation defect; it is seven
+requirements wearing one id.
+
+Which raised the obvious question, and the obvious question has now been asked
+three times with the same answer.
+
+| Proposed proxy for "this spec will drift" | Drift rate | Against |
+|---|---|---|
+| Citation crowding (specs sharing a site) | 3.53 vs 3.29 mean | no discrimination |
+| Inline annotation vs annotation on an item | 64% vs 80% | backwards, and noise |
+| Compound spec (2+ clauses or 2+ "shall") | 70% vs 63% | noise |
+
+**No structural property of a spec or its citations predicts whether the blind
+runs will recover it.** Drift sits near 65% throughout. The catalogued causes —
+a negative with no sink, a clause whose other half lives elsewhere, a rationale
+about a change that has not happened, a constraint on a table's values — cut
+across crowding, placement and compoundness alike. The failure is semantic, and
+nothing that counts symbols will find it.
+
+That closes the question of a cheap substitute. There isn't one, and the case
+for bounding the sweep rests where it has rested since Addendum 10: on yield.
+
+### What compoundness is still good for
+
+Splitting `SIM-ADV-002` remains worth doing, and this addendum is careful not to
+argue otherwise. Compoundness does not predict *drift verdicts*; it does make a
+spec untraceable, because seven behaviours under one id cannot be marked
+implemented or not independently, and a prefix grep cannot separate them. That
+is a traceability argument, which is the argument that was always there.
