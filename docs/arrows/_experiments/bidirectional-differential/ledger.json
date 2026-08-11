@@ -470,7 +470,11 @@
    "TUI-RUN-004",
    "TUI-RUN-006",
    "TUI-RUN-009",
-   "TUI-RUN-029"
+   "TUI-RUN-029",
+   "TUI-RUN-015",
+   "TUI-RUN-017",
+   "TUI-RUN-019",
+   "TUI-RUN-022"
   ]
  },
  "theme": {
@@ -493,7 +497,9 @@
    "TUI-THEME-003",
    "TUI-THEME-007",
    "TUI-THEME-006",
-   "TUI-THEME-012"
+   "TUI-THEME-012",
+   "TUI-THEME-001",
+   "TUI-THEME-013"
   ]
  }
 }

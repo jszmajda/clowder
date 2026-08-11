@@ -6,14 +6,17 @@
 //! were shaped with the code in view, so they are deliberately written against
 //! the spec text rather than against what the code happens to do.
 //!
-//! Two of the five specs cannot be honestly covered yet. TUI-RUN-015
-//! (commands land before the frame's ticks) and TUI-RUN-016 (bounded drain,
-//! coalesced resizes) both need input to arrive, and turning a key into a
-//! command is `nav::keys::resolve` + `nav::update`, still `todo!()`. Driving
-//! them would mean asserting against stubs. They are covered when navigation
-//! lands, not before.
+//! `step` takes its events and its clock reading as arguments rather than
+//! reaching for a terminal, which is what makes the frame's ordering and its
+//! input bound observable at all: both are properties of one method that a
+//! signature reaching for real input could only ever assert against itself.
 //!
-//! @spec TUI-RUN-014, TUI-RUN-017, TUI-RUN-026
+//! One clause has no seam even so — that a burst of resizes collapses to the
+//! last. `Terminal::resize` never reaches the backend, and the next `draw`
+//! re-derives the size from it, so the coalescing leaves nothing outside
+//! `step` to observe. It is stated here rather than asserted falsely.
+//!
+//! @spec TUI-RUN-014, TUI-RUN-015, TUI-RUN-016, TUI-RUN-017, TUI-RUN-026
 
 use clowder_tui::nav::ViewState;
 use clowder_tui::runtime::clock::Reading;
@@ -158,4 +161,115 @@ fn a_failed_autosave_does_not_end_the_session() {
     a.step(&mut term, elapsed(2.0), &[]).expect("a failed save must not fail the step");
     assert!(a.state.ticks > before, "the sim kept running through a failed save");
     assert!(a.save_failed, "the failure was noticed, so it can be said once and not again");
+}
+
+// ---------------------------------------------------------------------------
+// The two properties that needed an input seam
+//
+// These were written last. Both specs sat marked implemented while the two
+// files that name them said in prose that they could not be covered — one
+// because `step` exposed no way to inject input, the other because turning a
+// key into a command was still `todo!()`. Both blockers are gone: `step` takes
+// its events and its clock reading as arguments, and navigation resolves. A
+// spec whose only record of coverage is a note explaining the absence of
+// coverage is not covered, whatever the suite's colour.
+// ---------------------------------------------------------------------------
+
+/// A meadow where the first row of the first section is something the player
+/// can act on — the smallest state in which a keypress becomes a command.
+fn actionable() -> GameState {
+    let mut s = GameState::new(4242);
+    for r in clowder_core::ResourceId::ALL {
+        s.resources[r.ix()] = 1.0e9;
+    }
+    s.revealed = clowder_core::StructureId::ALL
+        .iter()
+        .map(|b| clowder_core::ContentId::Structure(*b))
+        .collect();
+    s
+}
+
+fn key(c: crossterm::event::KeyCode) -> crossterm::event::Event {
+    crossterm::event::Event::Key(crossterm::event::KeyEvent::from(c))
+}
+
+/// The frame's commands land before the frame's ticks, and the journal says so:
+/// a command applied first is stamped with the tick the frame opened at, one
+/// applied after the catch-up would carry the tick it closed at.
+///
+/// The gap is what makes this observable — a frame worth twenty ticks stamps
+/// 0 one way and 20 the other. A frame worth none could not tell them apart.
+/// The row has to be one whose command actually emits an event: a command that
+/// journals nothing leaves the ticks' own entries as the only ones in the
+/// window, and those say nothing about when the keypress landed.
+/// @spec TUI-RUN-015
+#[test]
+fn a_frames_commands_are_applied_before_that_frames_ticks() {
+    let mut term = Terminal::new(TestBackend::new(100, 30)).unwrap();
+    let mut a = app(scratch("cmdorder"));
+    a.state = actionable();
+    let section = clowder_tui::nav::rows::revealed_sections(&a.state)[0];
+    a.view.section = Some(section);
+
+    // The first row that builds something: building emits, and emitting is
+    // what puts a stamped entry in the journal.
+    let target = clowder_tui::nav::rows::rows(&a.state, section)
+        .into_iter()
+        .find(|r| matches!(r.key, clowder_tui::nav::RowKey::Content(
+            clowder_core::ContentId::Structure(_), _)))
+        .expect("a meadow with every structure revealed offers at least one to build");
+    a.view.focus[section.index()] = Some(target.key);
+
+    let opened_at = a.state.ticks;
+    a.step(&mut term, elapsed(5.0), &[key(crossterm::event::KeyCode::Enter)])
+        .expect("a step carrying one keypress must not fail");
+
+    assert!(
+        a.state.ticks > opened_at,
+        "the frame ran no ticks, so it cannot say whether the command preceded them"
+    );
+    // Both queues: an entry is filed by whether it is a milestone, which has
+    // nothing to do with when it happened.
+    let earliest = a
+        .state
+        .journal
+        .recent
+        .iter()
+        .chain(a.state.journal.kept.iter())
+        .map(|e| e.tick)
+        .min()
+        .expect("the keypress produced no journal entry — the command never applied");
+    assert_eq!(
+        earliest, opened_at,
+        "the frame's first journalled event is stamped {} but the frame opened at {opened_at}: \
+         the keypress waited out the whole elapsed interval instead of taking effect when it \
+         was pressed",
+        earliest
+    );
+}
+
+/// A flood of input is cut off at the per-frame bound. Parity is the tell: an
+/// odd number of toggles past the bound lands back where it started only if
+/// the drain stopped counting.
+///
+/// The other half of this spec — that a burst of resizes collapses to the last
+/// — has no seam to test through. `Terminal::resize` never reaches the backend,
+/// and the next `draw` re-derives the size from the backend anyway, so nothing
+/// the coalescing does survives to be observed from outside `step`.
+/// @spec TUI-RUN-016
+#[test]
+fn a_flood_of_input_is_bounded_within_one_frame() {
+    let mut term = Terminal::new(TestBackend::new(100, 30)).unwrap();
+    let mut a = app(scratch("flood"));
+    let initial = a.view.inspector_wanted;
+
+    // One past the bound, so an unbounded drain ends on the opposite state.
+    let flood: Vec<_> = (0..65).map(|_| key(crossterm::event::KeyCode::Char(' '))).collect();
+    a.step(&mut term, elapsed(0.5), &flood).expect("a flooded step must not fail");
+
+    assert_eq!(
+        a.view.inspector_wanted, initial,
+        "all 65 toggles were consumed in one frame — an unbounded drain lets input starve \
+         the simulation and the renderer"
+    );
 }

@@ -314,3 +314,74 @@ What remains genuinely unexamined is the sim's 178 differential-able specs, whic
 have returned findings at about one in three against the shell's two in three —
 and where the findings that did appear were mostly of the classes now known to be
 structural rather than local.
+
+## Addendum 10 — a cheap substitute that does not work
+
+Batch fourteen suggested a shortcut: three specs sharing one 47-line function
+produced three identical reconstructions, so perhaps *citation crowding* — how
+many specs share an annotation site — predicts which specs the differential will
+find drift in. If so, a free grep could stand in for six blind sessions.
+
+Tested against the 75 audited specs, both ways of measuring it:
+
+| Metric | Coherent | Drifting | Gap |
+|---|---|---|---|
+| Specs at the spec's most crowded site | 3.29 | 3.53 | +0.24 |
+| Specs at its least crowded site | 1.50 | 1.70 | +0.20 |
+
+**It does not predict.** A gap of two tenths of a spec, on samples of 24 and 43,
+is noise. Crowded citations and clean ones drift at indistinguishable rates.
+
+The reason is visible in hindsight: nearly every spec has at least one crowded
+site, because module headers list many specs at once. The metric saturates and
+stops discriminating. And crowding evidently causes *composite reconstructions*
+without causing *drift* — readers hand back the same summary for three specs, yet
+that summary may still match all three.
+
+Recorded because it was already recommended before it was tested. The shortcut is
+withdrawn; there is no free substitute for the blind runs, and the case for
+bounding the sweep rests on hit rate alone.
+
+## Addendum 11 — what the differential cannot see
+
+TUI-RUN-016 was audited on 2026-08-10 and classified `BD-COHERENT`, action
+`none`: three blind readers recovered both halves of it from the code, and the
+record notes it as a compound spec that reads cleanly anyway. All of that was
+true. It also had no test.
+
+The differential compares EARS against code. LID's arrow runs EARS → Tests →
+Code. The middle term is not in the comparison, so a spec can pass this audit
+at full marks while nothing asserts it — and marked `[x]`, it will read as
+finished from every direction anyone normally looks.
+
+Batch fifteen found two such specs by accident: TUI-RUN-015 and TUI-RUN-016,
+both marked implemented, both named in test-file prose that explained why they
+*could not* be covered — one blocker being a seam that has since been built,
+the other a `todo!()` that has since been filled. Neither note was revisited
+when its reason expired.
+
+### The scan
+
+For every spec marked `[x]`, find its `@spec` citations and ask whether any of
+them attaches to a `#[test]`. Nine do not:
+
+| | Specs | What it means |
+|---|---|---|
+| No test file mentions them at all | `SIM-ENG-042`, `SIM-ENG-044`, `SIM-ENG-045` | Nothing asserts the spec. Exercised only in passing by tests aimed elsewhere. |
+| Named once in a shell fixture comment | `SIM-ENG-046` | Same, plus a citation that points at scaffolding rather than an assertion. |
+| Asserted, but cited only at module scope | `TUI-RUN-002`, `-003`, `-010`, `-011`, `-013` | Coverage is real; traceability is not. A prefix grep for the spec finds a header, not the test. |
+
+The first four are the newest queries in the engine — the layer added while the
+shell was being built, where the tests-first order was inverted under time
+pressure. That the defect concentrates exactly there is the expected shape.
+
+### Why this is worth more than the crowding metric
+
+Addendum 10 proposed citation crowding as a cheap detector and it did not
+predict anything. This one is not a predictor of drift; it is a direct check of
+an arrow invariant — a spec marked implemented should have something asserting
+it. It found two real instances before it was written, which is why it was
+written, and its probes agree with hand-checks on four specs.
+
+It is also cheap enough to run on every commit, and belongs there rather than
+in an experiment folder.

@@ -1,6 +1,6 @@
 //! The App container and the loop body — `runtime::run` and `runtime::App::step`.
 //!
-//! @spec TUI-RUN-001, TUI-RUN-014, TUI-RUN-015, TUI-RUN-016, TUI-RUN-017
+//! @spec TUI-RUN-001
 //!
 //! **How this test reaches the code.** Not by including a module: it runs the
 //! real `clowder` binary as a child process. TUI-RUN-001 is an *ordering*
@@ -27,11 +27,12 @@
 //! about *what* that policy decides — only that whatever it says arrives on an
 //! ordinary screen.
 //!
-//! **What has no seam and is therefore not tested here.** TUI-RUN-014's frame
-//! ordering, TUI-RUN-015's commands-before-ticks, TUI-RUN-016's bounded drain
-//! and resize coalescing, and TUI-RUN-017's advance-regardless-of-render are
-//! all properties of one method — `App::step(&mut self) -> io::Result<()>` —
-//! whose signature exposes none of them:
+//! **What is not tested here.** TUI-RUN-014's frame ordering, TUI-RUN-015's
+//! commands-before-ticks, TUI-RUN-016's bounded drain, and TUI-RUN-017's
+//! advance-regardless-of-render are all properties of one method, `App::step`,
+//! and are asserted in `loop_body.rs` against the events and clock reading it
+//! takes as arguments. They are out of reach *from here* — a child process
+//! observes a whole run, not one frame of it:
 //!
 //! - there is no input source to inject, so a bounded drain has nothing to
 //!   drain and a resize flood has nothing to flood;
