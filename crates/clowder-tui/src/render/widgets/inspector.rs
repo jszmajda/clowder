@@ -3,7 +3,10 @@
 //! The inspector is where whimsy pays for itself: the row shows a flavour name,
 //! and this states the plain mechanical fact behind it. A player must never
 //! lose a decision because a name was cute.
-//! @spec TUI-NAV-017, TUI-NAV-018, TUI-NAV-029, TUI-NAV-047, TUI-NAV-048
+//! Layout is not decided here. TUI-NAV-047's dead-band and TUI-NAV-048's
+//! three-column split are breakpoints, and live in `render::layout` beside the
+//! render specs that state them a second time.
+//! @spec TUI-NAV-017, TUI-NAV-018, TUI-NAV-029
 
 use clowder_core::content;
 use clowder_core::{ContentId, GameState, LockReason, ResourceId};

@@ -45,14 +45,22 @@ const FLOOR_H: u16 = 24;
 const PANE_BREAKPOINT: u16 = 100;
 
 /// Where the list stops growing and hands surplus width to the inspector.
-/// @spec TUI-RENDER-007
+///
+/// The navigation leaf states the same breakpoint from the other side — three
+/// columns, list capped for scannability, surplus to the inspector — so both
+/// are cited here rather than only the one whose folder this file sits in.
+/// @spec TUI-RENDER-007, TUI-NAV-048
 const CAP_BREAKPOINT: u16 = 120;
 
 /// The asymmetric dead-band applied at both breakpoints: a layout is entered
 /// at its boundary and left this many columns below it. Exact width deferred
 /// to measurement (render design, Deferred 2); chosen small enough that the
 /// cap breakpoint's dead-band cannot reach down into the 80-99 range that
-/// TUI-RENDER-005 governs. @spec TUI-RENDER-008
+/// TUI-RENDER-005 governs.
+///
+/// The navigation leaf asks for the same dead-band at the inspector's
+/// breakpoint specifically; one band at every breakpoint satisfies both.
+/// @spec TUI-RENDER-008, TUI-NAV-047
 const DEAD_BAND: u16 = 4;
 
 /// The sidebar's fixed width. Exact value deferred to measurement (render
