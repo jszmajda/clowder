@@ -737,3 +737,50 @@ than trusting either answer.
 The near-miss did leave one small thing. That spec pins every number it touches
 except the find chance, which it implies with "a quiet day that finds nobody".
 Now named, since its neighbours are.
+
+## Addendum 20 — a citation move that worked, and a signal's true hit rate
+
+Batch twenty-one: eight specs, one recovered whole, seven partial in catalogued
+shapes. Two results worth keeping.
+
+### The citation move is measurable
+
+Last cycle a spec about gating structures on a site being reached was cited only
+on the *set* of reached sites — a field. Readers recovered nothing of it, and the
+citation moved to the function that consults that set.
+
+This cycle, all three readers returned the gate dispatch exactly: always,
+idea-gated, site-gated. The half still missing is the absence — that a site is
+never un-reached — which nothing could show.
+
+That is the first repair in this audit whose effect was measured rather than
+assumed. Moving an annotation from a declaration to the behaviour's entry point
+changed a total miss into a clean recovery of everything expressible.
+
+### The unstated-behaviour signal, honestly rated
+
+Readers naming a mechanism the spec does not mention has produced this audit's
+two best findings — a cap with no requirement, and a guard against a non-finite
+value with no requirement. It has now been chased six times.
+
+| | Count |
+|---|---|
+| Real: the behaviour has no requirement anywhere | 2 |
+| Specified, in the leaf that owns it | 4 |
+
+The four were a twist that quiets a group of commands, a soft cap on one
+mechanic, a set of gate costs, and a cost-scaling effect — each stated in a
+sibling leaf and correctly *not* restated where it is consumed. That is the
+layering working, and it reads exactly like a defect until the sibling is found.
+
+**One in three.** Still the best-yielding signal available, and worth chasing
+every time, provided the check is "which leaf owns this?" before the write-up
+rather than after.
+
+### Two specs, one function
+
+The clearest instance yet: two curiosity specs are implemented in a single
+function, and all six reconstructions across both returned the same sentence —
+which is precisely the union of the two specs. The code satisfies each. The
+differential can attribute neither. Where two EARS share one implementation with
+no seam between them, the method has nothing to separate.

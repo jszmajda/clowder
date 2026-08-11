@@ -76,7 +76,12 @@
   ],
   "audited": [
    "SIM-SKY-005",
-   "SIM-SKY-001"
+   "SIM-SKY-001",
+   "SIM-SKY-003",
+   "SIM-SKY-004",
+   "SIM-SKY-008",
+   "SIM-SKY-006",
+   "SIM-SKY-007"
   ]
  },
  "curiosity": {
@@ -96,7 +101,10 @@
   ],
   "audited": [
    "SIM-CUR-007",
-   "SIM-CUR-006"
+   "SIM-CUR-006",
+   "SIM-CUR-001",
+   "SIM-CUR-002",
+   "SIM-CUR-003"
   ]
  },
  "dreamtime": {
