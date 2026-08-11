@@ -515,3 +515,57 @@ spec nobody asserted. Nothing in it reads a spec *reference*, so nothing
 noticed that a reference was malformed — and a malformed reference is invisible
 to the prefix grep the whole ID scheme exists to serve. Care was never the
 variable there.
+
+## Addendum 15 — what the sample says, and what it does not
+
+Thirteen sim specs, one per segment, three blind runs each way.
+
+| Outcome | Count |
+|---|---|
+| Recovered whole | 6 |
+| Partial, in classes already catalogued | 3 |
+| Harness artifact — the reader was shown the wrong code | 3 |
+| A real finding | 1 |
+
+The sim reads far better than the shell did: six of thirteen came back exact,
+formulas and constants and guard clauses included, where the shell rarely
+managed that. The three partials are the familiar shapes — a negative clause, an
+architecture claim no single region can show, a requirement whose second half
+lives at another site.
+
+### The artifact, named precisely
+
+The extractor walks from an annotation to its enclosing item. For an annotation
+on a function that is the function. For an annotation *inside* a body — on the
+one line that computes the thing — it hands the reader the entire surrounding
+function, which is to say everything except the precision the annotation
+carried. One spec in the sample is annotated on exactly the right line and was
+audited against a large reward routine two hundred lines wide.
+
+A second shape: where a spec has several citations of very different sizes, the
+largest dominates what the reader sees. Two of the sample's three artifacts are
+this.
+
+**The tempting conclusion does not hold.** Forty-three drift verdicts across the
+whole audit rest on inline annotations, which looked like grounds to doubt them
+all. Checking rather than asserting: inline-annotated specs drift at 64%,
+item-annotated at 80%. Inline placement does not predict drift, and on fifteen
+item-annotated specs the difference is noise either way. The artifact is real
+case by case and does not show up as a bias in aggregate — so individual
+verdicts want checking before they are acted on, and the aggregate picture of
+saturation stands.
+
+### The real finding
+
+`SIM-SKY-005` — see `cosmic/FINDING-longsun-cap-has-no-spec.md`. An implemented
+behaviour has no EARS, so its annotation went to the nearest plausible id in the
+same leaf, and three readers dutifully reconstructed the wrong mechanic.
+
+It also corrects Addendum 14. That said the sim partition has no citation
+defects, on the strength of a scan that asks whether every spec can be
+*prepared*. This one prepares beautifully. Nothing structural asks whether the
+cited code has anything to do with the spec — that question needs a reader, and
+the blind runs are the readers.
+
+One finding in thirteen. At that rate the remaining 139 hold perhaps ten, for
+278 more sessions.

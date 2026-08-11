@@ -9,7 +9,9 @@
    "SIM-ADV-004",
    "SIM-ADV-005"
   ],
-  "audited": []
+  "audited": [
+   "SIM-ADV-004"
+  ]
  },
  "ceremonies": {
   "prefix": "SIM-SUN",
@@ -24,7 +26,8 @@
    "SIM-SUN-008"
   ],
   "audited": [
-   "SIM-SUN-005"
+   "SIM-SUN-005",
+   "SIM-SUN-006"
   ]
  },
  "colonies": {
@@ -55,7 +58,9 @@
    "SIM-SKY-006",
    "SIM-SKY-007"
   ],
-  "audited": []
+  "audited": [
+   "SIM-SKY-005"
+  ]
  },
  "curiosity": {
   "prefix": "SIM-CUR",
@@ -73,7 +78,8 @@
    "SIM-CUR-012"
   ],
   "audited": [
-   "SIM-CUR-007"
+   "SIM-CUR-007",
+   "SIM-CUR-006"
   ]
  },
  "dreamtime": {
@@ -139,7 +145,8 @@
    "SIM-ECO-044"
   ],
   "audited": [
-   "SIM-ECO-021"
+   "SIM-ECO-021",
+   "SIM-ECO-030"
   ]
  },
  "engine": {
@@ -195,7 +202,8 @@
    "SIM-ENG-042",
    "SIM-ENG-044",
    "SIM-ENG-045",
-   "SIM-ENG-046"
+   "SIM-ENG-046",
+   "SIM-ENG-024"
   ]
  },
  "expeditions": {
@@ -209,7 +217,9 @@
    "SIM-EXP-005",
    "SIM-EXP-006"
   ],
-  "audited": []
+  "audited": [
+   "SIM-EXP-004"
+  ]
  },
  "kittens": {
   "prefix": "SIM-KIT",
@@ -243,7 +253,8 @@
    "SIM-KIT-027"
   ],
   "audited": [
-   "SIM-KIT-015"
+   "SIM-KIT-015",
+   "SIM-KIT-016"
   ]
  },
  "mystic": {
@@ -364,7 +375,8 @@
    "SAVE-008"
   ],
   "audited": [
-   "SAVE-006"
+   "SAVE-006",
+   "SAVE-015"
   ]
  },
  "prestige": {
@@ -386,7 +398,8 @@
    "SIM-MOVE-012"
   ],
   "audited": [
-   "SIM-MOVE-007"
+   "SIM-MOVE-007",
+   "SIM-MOVE-008"
   ]
  },
  "render": {
@@ -520,6 +533,21 @@
    "TUI-THEME-009",
    "TUI-THEME-014",
    "TUI-THEME-010"
+  ]
+ },
+ "dream": {
+  "audited": [
+   "SIM-DREAM-007"
+  ]
+ },
+ "trade": {
+  "audited": [
+   "SIM-TRADE-005"
+  ]
+ },
+ "unicorns": {
+  "audited": [
+   "SIM-UNI-007"
   ]
  }
 }
