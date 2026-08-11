@@ -1,6 +1,6 @@
 # TUI-NAV-012
 
-**Classification:** `INCONSISTENT-BLIND` · **Action:** `re-run` · **Audited:** 2026-08-10 · **Extraction:** 76 lines
+**Classification:** `B-ONLY-DRIFT` · **Action:** `reconcile-annotation` · **Audited:** 2026-08-10 · **Extraction:** 76 lines
 
 ## Spec as written
 
@@ -8,8 +8,8 @@
 
 ## What the blind runs found
 
-Readers described the reducer's top-level dispatch — resolve to one outcome, quit evaluated first — not the repeat-until-rejected behaviour this spec governs. Extraction was 76 lines, under the cap but still the whole reducer entry point.
+Second run, same result: readers described the reducer's quit-first dispatch rather than the repeat-until-rejected behaviour. The extraction is still 76 lines because the citation sits on the reducer's entry point, not on the arm that implements this spec.
 
 ## Recommendation
 
-The 90-line cap is too generous for a large match-based function: the reader sees every arm and reconstructs the dispatch. Re-run with the citation scoped to the specific arm. Left out of the audited count.
+Not a harness fault after all — the citation is genuinely too high in the call graph. Move it to the max-affordable handler. Recorded as a finding rather than re-run again.
