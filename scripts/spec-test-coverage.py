@@ -66,12 +66,22 @@ def main() -> int:
                     break
 
     gaps = sorted(s for s in marked if cited.get(s) and not on_test.get(s))
-    unexpected = [s for s in gaps if s not in EXEMPT]
-    stale = [s for s in EXEMPT if s not in gaps]
+    # A spec with no `@spec` at all is not a milder case of this — it is the
+    # same defect one step further along, and an earlier version of this script
+    # skipped it by testing `cited` first. Nothing traced it in either
+    # direction, so nothing could notice it had stopped being true.
+    uncited = sorted(s for s in marked if not cited.get(s))
+    unexpected = [s for s in gaps + uncited if s not in EXEMPT]
+    stale = [s for s in EXEMPT if s not in gaps and s not in uncited]
 
     print(f"{len(marked)} specs marked implemented, {len(on_test)} asserted by a test")
 
+    for spec in uncited:
+        if spec not in EXEMPT:
+            print(f"  UNCITED  {spec}: marked implemented, no @spec anywhere")
     for spec in unexpected:
+        if spec in uncited:
+            continue
         print(f"  GAP  {spec}: marked implemented, cited on code, asserted by no test")
     for spec in stale:
         print(f"  STALE EXEMPTION  {spec} is covered now and can leave the exempt list")

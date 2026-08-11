@@ -338,7 +338,9 @@
    "TUI-NAV-032",
    "TUI-NAV-033",
    "TUI-NAV-034",
-   "TUI-NAV-013"
+   "TUI-NAV-013",
+   "TUI-NAV-047",
+   "TUI-NAV-048"
   ]
  },
  "persistence": {
@@ -484,7 +486,11 @@
    "TUI-RUN-011",
    "TUI-RUN-013",
    "TUI-RUN-025",
-   "TUI-RUN-030"
+   "TUI-RUN-030",
+   "TUI-RUN-005",
+   "TUI-RUN-026",
+   "TUI-RUN-028",
+   "TUI-RUN-031"
   ]
  },
  "theme": {
@@ -512,7 +518,8 @@
    "TUI-THEME-013",
    "TUI-THEME-002",
    "TUI-THEME-009",
-   "TUI-THEME-014"
+   "TUI-THEME-014",
+   "TUI-THEME-010"
   ]
  }
 }

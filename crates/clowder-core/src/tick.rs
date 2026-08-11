@@ -398,7 +398,7 @@ impl GameState {
         let (deficit, surplus) = self.energy_ratios();
         // Layers 6 (global), 7 (Elder Wisdom), and 8 (the Long Sun) combine
         // multiplicatively into one raw-tier multiplier whose whole non-base
-        // part is dimmed uniformly by the energy deficit — the ENG-021 revision
+        // part is dimmed uniformly by the energy deficit — the SIM-ENG-021 revision
         // that also closes the wave-4 gap where the Long Sun escaped the dimmer.
         // Each layer is 1.0 (skipped) on the common hot path.
         // @spec SIM-ENG-021, SIM-MOVE-007, SIM-SUN-004
@@ -476,7 +476,7 @@ impl GameState {
                 if def.surplus_scaled {
                     flow *= surplus;
                 }
-                // ENG-021 REVISED: the global layers (6+8) now reach raw-tier
+                // SIM-ENG-021 REVISED: the global layers (6+8) now reach raw-tier
                 // STRUCTURE production, not just jobs — except a structure that is
                 // itself a global-production source never amplifies its own
                 // faucet (the Star Basin's stardust). Mystic/transient/luxury
@@ -850,7 +850,7 @@ impl GameState {
         }
 
         // Déjà-vu roll — appended AFTER the mystic rolls, at season boundaries
-        // only (the ENG-018 schedule extension). Guarded so the chest/loom-free
+        // only (the SIM-ENG-018 schedule extension). Guarded so the chest/loom-free
         // hot path draws nothing. On a hit the day pauses production and
         // consumption and gathers reverie (a deterministic RNG draw).
         // @spec SIM-DREAM-004, SIM-ENG-018

@@ -453,7 +453,7 @@ fn content_reveals_stick_and_availability_advises() {
     assert_eq!(s.availability(ContentId::Structure(StructureId::Pantry)), Availability::Hidden);
 }
 
-// @spec SIM-ENG-024
+// @spec SIM-ENG-024, SIM-ENG-043
 #[test]
 fn speed_is_clamped_state_that_never_touches_tick_rules() {
     let mut s = GameState::new(33);
@@ -475,9 +475,11 @@ fn speed_is_clamped_state_that_never_touches_tick_rules() {
     assert_eq!(ev_slow, ev_fast, "speed changes cadence at the boundary, never tick behavior");
 
     // The speed field is the ONE permitted difference. The journals must match
-    // outright: a speed change is never journaled (SIM-ENG-043), because the
-    // journal records what happened in the meadow and speed is the pace it is
-    // watched at. Asserting that here is the only coverage 043 has.
+    // outright: a speed change is never journaled, because the journal records
+    // what happened in the meadow and speed is the pace it is watched at. This
+    // assertion is that spec's only coverage, which is why it is annotated on
+    // the test rather than on any code — a rule about what never happens has no
+    // production sink to point at.
     assert_eq!(slow.journal, fast.journal, "a speed change leaves no trace in the journal");
 
     fast.speed = slow.speed;

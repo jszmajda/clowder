@@ -257,9 +257,13 @@ pub fn run() -> ExitCode {
                 break;
             }
         }
-        // TUI-RUN-026: every clean shutdown saves. A failure does not change the
+        // Every clean shutdown saves, and does not drain the backlog first: the
+        // banked count goes into the save and the next load runs it, so
+        // quitting mid-catch-up costs nothing and waits for nothing.
+        // A failure does not change the
         // exit code — the session is ending either way, and the player is better
         // served by being told than by a status nobody reads.
+        // @spec TUI-RUN-026, TUI-RUN-031
         if let Err(e) = app.save() {
             parting.push(format!("clowder could not save on the way out: {e}"));
         }

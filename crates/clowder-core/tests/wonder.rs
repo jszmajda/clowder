@@ -151,7 +151,7 @@ fn the_long_sun_multiplies_material_production_only() {
     // The bonus itself: long_sun_bonus = limited_dr(unlimited_dr(devotion,
     // 1000)/100, cap), cap = 10 (base; +0.05/tier per Sunstone, none here). It
     // is applied as (1 + bonus) at layer 8 to raw-tier flows — structures too,
-    // per the ENG-021 revision. Before the Long Sun rite the bonus is 0.
+    // per the SIM-ENG-021 revision. Before the Long Sun rite the bonus is 0.
     let devotion = 1.0e6;
     let expected_bonus = limited_dr(unlimited_dr(devotion, 1000.0) / 100.0, 10.0);
 
@@ -683,7 +683,7 @@ fn dreamcorns_are_the_softest_resource_never_spent_but_by_a_promise() {
     assert_eq!(s.stock(ResourceId::Dreamcorns), 10.0, "dreamcorns only ever nap, never leave");
 
     // Dreaming only ever adds dreamcorns (never removes), and never a prism
-    // below one — the floor from UNI-007 holds across a long dream.
+    // below one — the floor from SIM-UNI-007 holds across a long dream.
     let mut s = GameState::new(339);
     s.arches_bought.insert(ArchId::MemoryArch);
     s.dream_drift = 1.5;
@@ -1006,20 +1006,20 @@ fn the_trade_surface_hands_over_the_first_colony_free_and_forever() {
 }
 
 // =====================================================================
-// Cross-wave seams: engine (ENG-021 REVISED), economy (ECO-028),
-// curiosity (CUR-005), and save compatibility.
+// Cross-wave seams: engine (SIM-ENG-021 REVISED), economy (SIM-ECO-028),
+// curiosity (SIM-CUR-005), and save compatibility.
 // =====================================================================
 
 // @spec SIM-ENG-021
 #[test]
 fn the_global_layer_now_reaches_structure_raw_production() {
-    // ENG-021 REVISED: the global layers (6–8) apply to ALL raw-tier material
+    // SIM-ENG-021 REVISED: the global layers (6–8) apply to ALL raw-tier material
     // production — structures and converters, not only jobs. A Catnip Patch's
     // output is multiplied by a built-and-fueled Dynamo Wheel's global ratio.
     //
     // CASCADE FLAG (implementer): this CHANGES prior behavior — produce() must
     // fold `global_mult` into the STRUCTURE loop for raw-tier flows, not only
-    // the jobs loop. (Existing economy_depth.rs ECO-032 tests measure a
+    // the jobs loop. (Existing economy_depth.rs SIM-ECO-032 tests measure a
     // Gardener job and a mystic UnicornMeadow, and the mess/patch test builds no
     // global structure, so none asserts structure-exemption — but re-run them.)
     let mut plain = GameState::new(357);

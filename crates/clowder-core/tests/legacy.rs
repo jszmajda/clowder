@@ -1183,7 +1183,7 @@ fn nap_time_reward_lifts_only_the_master_tier_yield() {
     run_ticks(&mut jr_reward, 1);
     assert!(
         (jr_reward.stock(ResourceId::Twigs) - jr_base.stock(ResourceId::Twigs)).abs() < TOL,
-        "the reward scales only the master tier, per KIT-020"
+        "the reward scales only the master tier, per SIM-KIT-020"
     );
 }
 
@@ -1256,7 +1256,7 @@ fn the_long_sun_layer_eight_is_now_deficit_dimmed_too() {
     run_ticks(&mut lit, 1);
     assert!((lit.stock(ResourceId::Catnip) - p * (1.0 + lsb)).abs() < 1e-9);
 
-    // With an energy deficit (0.25), layer 8's bonus is dimmed — the ENG-021
+    // With an energy deficit (0.25), layer 8's bonus is dimmed — the SIM-ENG-021
     // revision: the Long Sun is now dimmed by the deficit, exactly as layer 6.
     let mut dim = plain.clone();
     dim.rites.insert(RiteId::TheLongSun);
