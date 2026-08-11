@@ -690,3 +690,77 @@ fn the_cap_is_one_rule_measured_in_seconds_of_absence() {
         "the cap bounds seconds of absence, and one rule governs both sides of it"
     );
 }
+
+// =====================================================================
+// Save format v4 — banked ticks become part of the save
+//
+// A v3 save is what the previous build wrote, so a player who has been
+// playing has one. SAVE-013 asks for a committed fixture of every prior
+// version; this is the one that was missing when the version moved.
+// =====================================================================
+
+const V3_FIXTURE_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/save_v3.json");
+
+fn v3_fixture() -> String {
+    fs::read_to_string(V3_FIXTURE_PATH).unwrap_or_else(|e| {
+        panic!("SAVE-013 requires a committed v3 fixture at {V3_FIXTURE_PATH}: {e}")
+    })
+}
+
+/// @spec SAVE-013, SAVE-017
+#[test]
+fn the_v3_fixture_is_committed_and_predates_the_banked_tick_count() {
+    let fixture = v3_fixture();
+    let v: serde_json::Value = serde_json::from_str(&fixture).expect("the v3 fixture is JSON");
+    assert_eq!(v["save_version"], 3, "the fixture is a v3 save, frozen as a historical artifact");
+    assert!(
+        v.get("owed_ticks").is_none(),
+        "a v3 save predates the banked count entirely — that is what makes it the migration case"
+    );
+    let state = v["state"].as_object().expect("a save carries a state object");
+    assert!(
+        state.contains_key("journal"),
+        "and it is v3, not a relabelled v2: the journal that v3 added is present"
+    );
+    assert!(
+        state["ticks"].as_u64().is_some_and(|t| t > 0)
+            && !state["kittens"].as_array().unwrap().is_empty(),
+        "a played meadow, not a fresh game — fidelity needs something to preserve"
+    );
+}
+
+/// A save written before ticks were counted owes none. The field defaults
+/// rather than being derived from the interval, which is the whole point of
+/// SAVE-017: a count that was never written cannot be reconstructed from a
+/// timestamp and a speed, and guessing at it would hand the player ticks they
+/// never earned or take ones they did.
+/// @spec SAVE-013, SAVE-017
+#[test]
+fn a_v3_save_migrates_owing_nothing_with_its_meadow_otherwise_exact() {
+    let fixture = v3_fixture();
+    let before: serde_json::Value = serde_json::from_str(&fixture).unwrap();
+    let saved_at = before["saved_at_unix"].as_u64().expect("the fixture stamps its save time");
+
+    // Loading at the save's own instant replays nothing, so every difference
+    // that shows up is migration rather than physics.
+    let loaded = load_string(&fixture, saved_at).expect("a v3 save loads");
+    assert_eq!(loaded.report.elapsed_seconds, 0, "no time passed");
+    assert_eq!(
+        loaded.state.ticks,
+        before["state"]["ticks"].as_u64().unwrap(),
+        "a save that banked nothing must not advance on load"
+    );
+
+    let resaved: serde_json::Value =
+        serde_json::from_str(&save_string(&loaded.state, saved_at)).unwrap();
+    assert_eq!(resaved["save_version"], SAVE_VERSION, "migrated forward, then stamped current");
+    assert_eq!(resaved["owed_ticks"], 0, "nothing was banked, so nothing is owed");
+
+    for (key, was) in before["state"].as_object().unwrap() {
+        let now = &resaved["state"][key];
+        assert!(
+            json_eq(was, now),
+            "migrating a v3 save changed `{key}`: {was} became {now}"
+        );
+    }
+}

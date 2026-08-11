@@ -424,3 +424,56 @@ The scan is now `scripts/spec-test-coverage.py`, with the two pty specs as
 documented exemptions. It exits non-zero on a new gap *and* on a stale
 exemption, so the list cannot rot the way the prose notes did. Current state:
 303 specs marked implemented, 328 asserted by a test, clean.
+
+## Addendum 13 — a second detector, and why it is not shipping
+
+Batch sixteen found a spec the extractor could not audit at all: `TUI-NAV-013`'s
+only source annotation sat on a one-line field doc declaring that count rows
+exist, while the behaviour lived in a handler whose marker was a plain comment.
+The coverage scan is blind to that — the spec has two tests, so it looks
+covered. This addendum is the attempt to detect the class, and the reason it
+stops at a one-off pass.
+
+### Two rounds of being wrong
+
+The first cut flagged 79 specs as cited only on declarations. Most were
+annotations *inside* function bodies — precise, not misplaced. Excluding those
+left 14. Spot-checking found `SIM-MOVE-006` among them, cited on
+`fn great_meadow_move`, which is exactly right: the detector reads only the line
+carrying `@spec`, and that annotation runs across several lines, so its anchor
+was invisible. Handling continuation lines gave 18.
+
+### Why 18 is not a finding
+
+Read against their spec texts, most of the 18 are correctly annotated. A spec
+that says "define exactly the recipes of the CRAFT table" belongs on the table.
+So does one that says "draw all randomness from a single serializable
+generator", or "define exactly six palette roles", or "count ticks owed as
+integers" — that last is a claim about a representation, and the field's type
+*is* the behaviour.
+
+Two were genuinely misplaced and are moved: the site gate, which was on the set
+of reached sites rather than on the function that consults it, and act-to-the-
+maximum, which was on the action variant and the shell-side cap but never on
+the handler. One more, "use attention for every element that wants notice", has
+no entry point to move to — the requirement is about call sites, and picking one
+would be arbitrary.
+
+Roughly one in nine flagged specs was actionable. The coverage scan's ratio was
+nine in nine. **A structural check cannot tell a spec about a definition from a
+spec about behaviour**; that needs the spec text, which is to say a reader. So
+this stays a one-off pass, and `scripts/` gets no second script.
+
+### What the pass found on the way
+
+Reading eighteen spec texts against their citations turned up something the
+detector was not looking for: `SAVE-014` still said the save carries version 3.
+It carries 4 — the version moved when banked ticks were added and the spec did
+not follow. Worse, `SAVE-013` asks for a committed fixture of *every* prior
+version, and there was none for v3 — which is the version a player who has been
+playing actually has. The migration path a real save would take was untested.
+
+It works: the added field defaults, so a v3 save loads owing nothing. That is
+now pinned by a committed fixture and two tests rather than by inspection.
+`SAVE-014` no longer names a version number, since that is the thing about it
+that will keep changing.

@@ -1,0 +1,478 @@
+{
+ "save_version": 3,
+ "saved_at_unix": 1754000000,
+ "state": {
+  "ticks": 1500,
+  "rng": {
+   "state": 1303416095522158802,
+   "inc": 2885390081777926815
+  },
+  "resources": [
+   200.0,
+   50.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "structures": [
+   1,
+   1,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "kittens": [
+   {
+    "name": "Waffles",
+    "job": null,
+    "location": "Home",
+    "arrived_day": 91,
+    "job_seq": null,
+    "away_seq": null,
+    "skills": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "exp": 0.0,
+    "rank": 0,
+    "trait_id": "Brassy",
+    "tinkering": null
+   }
+  ],
+  "ideas": [],
+  "pity": 0,
+  "famine_days": 0,
+  "recovery_days": 150,
+  "grumpy": false,
+  "next_seq": 0,
+  "zoomies_until": 1531,
+  "speed": 1.0,
+  "roster_high_water": 1,
+  "revealed": [
+   {
+    "Structure": "CatnipPatch"
+   },
+   {
+    "Structure": "CozyCushion"
+   },
+   {
+    "Structure": "CardboardBox"
+   }
+  ],
+  "journal": {
+   "recent": [
+    {
+     "tick": 50,
+     "item": {
+      "Happened": {
+       "ZoomiesStarted": {
+        "until_tick": 171
+       }
+      }
+     }
+    },
+    {
+     "tick": 130,
+     "item": {
+      "Happened": {
+       "Flavor": {
+        "template": 6,
+        "kitten": null
+       }
+      }
+     }
+    },
+    {
+     "tick": 171,
+     "item": {
+      "Happened": "ZoomiesEnded"
+     }
+    },
+    {
+     "tick": 180,
+     "item": {
+      "Happened": {
+       "ZoomiesStarted": {
+        "until_tick": 301
+       }
+      }
+     }
+    },
+    {
+     "tick": 250,
+     "item": {
+      "Happened": {
+       "SeasonChanged": {
+        "season": "Summer"
+       }
+      }
+     }
+    },
+    {
+     "tick": 280,
+     "item": {
+      "Happened": {
+       "Flavor": {
+        "template": 9,
+        "kitten": null
+       }
+      }
+     }
+    },
+    {
+     "tick": 301,
+     "item": {
+      "Happened": "ZoomiesEnded"
+     }
+    },
+    {
+     "tick": 370,
+     "item": {
+      "Happened": {
+       "ZoomiesStarted": {
+        "until_tick": 491
+       }
+      }
+     }
+    },
+    {
+     "tick": 491,
+     "item": {
+      "Happened": "ZoomiesEnded"
+     }
+    },
+    {
+     "tick": 500,
+     "item": {
+      "Happened": {
+       "SeasonChanged": {
+        "season": "Autumn"
+       }
+      }
+     }
+    },
+    {
+     "tick": 750,
+     "item": {
+      "Happened": {
+       "SeasonChanged": {
+        "season": "Winter"
+       }
+      }
+     }
+    },
+    {
+     "tick": 901,
+     "item": {
+      "Happened": {
+       "Revealed": {
+        "id": {
+         "Structure": "CatnipPatch"
+        }
+       }
+      }
+     }
+    },
+    {
+     "tick": 901,
+     "item": {
+      "Happened": {
+       "Revealed": {
+        "id": {
+         "Structure": "CozyCushion"
+        }
+       }
+      }
+     }
+    },
+    {
+     "tick": 901,
+     "item": {
+      "Happened": {
+       "Revealed": {
+        "id": {
+         "Structure": "CardboardBox"
+        }
+       }
+      }
+     }
+    },
+    {
+     "tick": 910,
+     "item": {
+      "Happened": {
+       "KittenArrived": {
+        "name": "Waffles"
+       }
+      }
+     }
+    },
+    {
+     "tick": 960,
+     "item": {
+      "Happened": {
+       "Flavor": {
+        "template": 8,
+        "kitten": null
+       }
+      }
+     }
+    },
+    {
+     "tick": 1000,
+     "item": {
+      "Happened": {
+       "SeasonChanged": {
+        "season": "Spring"
+       }
+      }
+     }
+    },
+    {
+     "tick": 1000,
+     "item": {
+      "Happened": {
+       "NewYear": {
+        "year": 1
+       }
+      }
+     }
+    },
+    {
+     "tick": 1210,
+     "item": {
+      "Happened": {
+       "Flavor": {
+        "template": 5,
+        "kitten": "Waffles"
+       }
+      }
+     }
+    },
+    {
+     "tick": 1250,
+     "item": {
+      "Happened": {
+       "SeasonChanged": {
+        "season": "Summer"
+       }
+      }
+     }
+    },
+    {
+     "tick": 1410,
+     "item": {
+      "Happened": {
+       "ZoomiesStarted": {
+        "until_tick": 1531
+       }
+      }
+     }
+    },
+    {
+     "tick": 1500,
+     "item": {
+      "Happened": {
+       "SeasonChanged": {
+        "season": "Autumn"
+       }
+      }
+     }
+    }
+   ],
+   "kept": [
+    {
+     "tick": 900,
+     "item": {
+      "Happened": {
+       "StructureBuilt": {
+        "id": "CatnipPatch",
+        "count": 1
+       }
+      }
+     }
+    },
+    {
+     "tick": 900,
+     "item": {
+      "Happened": {
+       "StructureBuilt": {
+        "id": "CozyCushion",
+        "count": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  "kites_high_water": 0.0,
+  "mess": 0.0,
+  "pending_sky": null,
+  "elder": null,
+  "jamboree_until": 0,
+  "refinements": [],
+  "rules": [],
+  "devotion": 0.0,
+  "serenity": 0.0,
+  "peak_devotion": 0.0,
+  "enlightenment_tier": 0,
+  "rites": [],
+  "rite_counts": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "arches_bought": [],
+  "dream_drift": 0.0,
+  "promises": [],
+  "penpal": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "discovered": [],
+  "elder_wisdom": 0.0,
+  "warm_memories": 0.0,
+  "passed_down_wisdom": 0.0,
+  "generation": 0,
+  "traditions": [],
+  "family_album": [],
+  "armed_adventure": null,
+  "active_adventure": null,
+  "adventure_completions": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "adventure_rewards": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "adventure_done": false,
+  "tidy_progress": 0,
+  "sites_reached": [],
+  "dream_looms": [],
+  "stirred_dreams": 0.0,
+  "distant_dawn": false,
+  "whale_visit_years": 0,
+  "whale_contentment": 0,
+  "deja_vu_until": 0
+ }
+}

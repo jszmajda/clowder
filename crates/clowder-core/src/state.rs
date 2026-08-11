@@ -1511,6 +1511,10 @@ impl GameState {
             .collect()
     }
 
+    /// Whether a structure's gate is satisfied. A site-gated structure stays
+    /// locked until its site is reached, and a site once reached is never
+    /// un-reached — the field is only ever inserted into.
+    /// @spec SIM-SKY-003
     pub fn structure_unlocked(&self, s: StructureId) -> bool {
         match content::structure_def(s).gate {
             StructureGate::Always => true,

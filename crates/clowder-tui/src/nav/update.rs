@@ -459,6 +459,10 @@ fn handle_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
 // X — max affordable — TUI-NAV-012, TUI-NAV-041, TUI-NAV-051
 // ---------------------------------------------------------------------------
 
+/// Act to the maximum affordable. The entry point for the behaviour, which is
+/// why the annotation is here rather than only on the action variant and the
+/// shell-side cap that this reads.
+/// @spec TUI-NAV-012
 fn handle_max_affordable(view: &mut ViewState, state: &GameState) -> Outcome {
     let Some(row) = current_row(view, state) else {
         return Outcome::Handled;
