@@ -595,3 +595,42 @@ fn no_rejected_command_of_any_kind_leaves_a_mark() {
          proves nothing if most of them succeed"
     );
 }
+
+/// The RNG schedule, pinned.
+///
+/// SIM-ENG-018 fixes the order in which a day boundary consumes draws and says
+/// new subsystems append to it, never reorder it. Nothing enforced that. Every
+/// determinism test here compares two runs of the *same* build, which proves
+/// the generator is deterministic and cannot see a schedule that changed
+/// between builds — and a schedule that changes silently rewrites the future of
+/// every save already on disk.
+///
+/// This pins the generator's position after a fixed run. An inserted draw, a
+/// reordered one, or a changed probability that gates a later draw all move it.
+///
+/// **Ignored on purpose.** It fails for good reasons as well as bad ones: any
+/// balance change that alters how often a roll fires moves this number too, and
+/// during development that is often. Run it deliberately before shipping, with
+/// `--ignored`. A failure is not a bug — it is notice that existing saves will
+/// diverge from where they were heading, which is a thing to decide rather than
+/// discover.
+/// @spec SIM-ENG-018, SIM-ENG-007
+#[test]
+#[ignore = "golden: run before shipping — a change means existing saves diverge"]
+fn the_draw_schedule_has_not_moved() {
+    for (seed, expected) in [(7u64, 11_951_728_235_097_488_807u64), (99, 12_315_264_012_441_656_832)] {
+        let mut s = GameState::new(seed);
+        s.resources[ResourceId::Catnip.ix()] += 5_000.0;
+        for _ in 0..20_000 {
+            s.tick();
+        }
+        let saved: serde_json::Value = serde_json::from_str(&save_string(&s, 0)).unwrap();
+        let actual = saved["state"]["rng"]["state"].as_u64().expect("the rng records a position");
+        assert_eq!(
+            actual, expected,
+            "after 20000 ticks on seed {seed} the generator sits at {actual}, not {expected}: \
+             the draw schedule has moved, so every save already written will play out \
+             differently from here than it would have"
+        );
+    }
+}
