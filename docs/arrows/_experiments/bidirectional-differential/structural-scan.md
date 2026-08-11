@@ -1139,3 +1139,35 @@ Batch twenty-eight, alongside: twelve specs, six recovered whole. The kittens
 leaf reads better than any other — concrete local rules about who is picked and
 what they carry — and the three expedition specs beside them are a formula, an
 event payload, and an absence, none of which survives extraction.
+
+## Addendum 31 — a blind spot that is not a defect class
+
+Batch twenty-nine surfaced a spec whose whole content is *which copy of a value
+gets read*: clocks must take a persisted flag as it stood at the end of the
+previous tick, not a fresh reading. Readers recovered the clocks and not that,
+which is unsurprising — both readings look identical in code, and only the
+surrounding order says which one this is.
+
+Worth asking whether the class hides defects, the way the enumeration class did.
+Searching the specs for it over-fires as usual: twenty-two match a pattern for
+staleness and most are ordinary uses of "before". Three are genuine — carrying
+pre-reset stocks at a ratio read from pre-reset structures, a storage ratchet on
+the highest stock ever held, and the clocks themselves.
+
+**Both of the two I checked in depth are properly enforced**, and enforced in
+precisely the way that catches the error:
+
+- The carry test asserts the *amount* carried, which is only correct if the
+  ratio was read before the reset — computed after, it would be zero and the
+  assertion fails. It then asserts the structures did reset, pinning the order.
+- The ratchet test spends the stock down and asserts the high-water is unmoved.
+
+So this is a blind spot of the *method* rather than a category of defect. The
+distinction matters: the enumeration question was worth turning into a sweep
+because it found six things. This one is worth knowing about when reading a
+drift verdict — a spec of this shape will always read as drift and that says
+nothing about the code — and is not worth a sweep.
+
+Three checks, two negative results, recorded at the same length as a finding
+would be. The instinct that a new blind spot must conceal a new defect is the
+one that produced four null structural proxies earlier in this audit.
