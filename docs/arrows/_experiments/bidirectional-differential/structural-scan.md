@@ -246,3 +246,21 @@ something claimed done, with no mechanism that could contradict the claim.
 Two of them are worth naming: the engine's event-classification bounding rule and
 its speed-journaling exclusion. Both were added late, both are real behaviour,
 and neither is cited anywhere.
+
+## Addendum 7 — cited, but not on anything that behaves
+
+The fixed import filter surfaced a small class worth naming: specs whose *only*
+source citation sits on a module header or import block. Four of them — two in
+navigation, two in theme.
+
+They are not uncited; a grep for the spec id finds them. But the citation points
+at a file's opening doc comment rather than at code that does anything, so
+following it tells a reader which module is involved and nothing more. A coverage
+check counting citations scores them as covered.
+
+One of the four had already been audited from the other direction: its readers
+described the module's role table rather than the requirement, which is exactly
+what a module-header citation would produce. The two methods agree.
+
+This is the smallest finding recorded here, and it was checked before it was
+written down — the count was four when I looked, and four after.
