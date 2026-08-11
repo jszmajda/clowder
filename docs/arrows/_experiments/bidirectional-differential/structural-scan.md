@@ -1072,3 +1072,41 @@ gets added to them without someone looking straight at them.
 That is also why the destructuring test added for the Move is the right
 enforcement and a phase-order test would not be: it fires when the *set* grows,
 which is the moment the drift happens.
+
+## Addendum 29 — a wildcard is dangerous only when its default is permissive
+
+Applying yesterday's refinement — look for enumerations that *grow* — to the
+gate query. `Command` grows every time an action is added, and the match
+deciding whether an action's gate is open ended in `_ => true`.
+
+So a new action was **open by default**. Visible in the shell from its first
+frame, ungated, because nobody was asked. That is the growth-omission shape with
+the worst possible default, and it sits directly underneath the finding already
+pinned about five gates living in this query rather than in the core.
+
+Replaced the wildcard with the remaining variants spelled out, in two groups:
+content-backed actions that defer to `availability`, and actions with genuinely
+no gate. Behaviour is identical — every one of them answered `true` before and
+answers `true` now — and adding an action to `Command` no longer compiles until
+its gate is decided. 630 tests unchanged.
+
+### The wildcard next to it, left alone
+
+The same file has `_ => None` in the closed-form-count query, and it is fine.
+
+A new content kind falling through there reports "no closed form", which is the
+conservative answer and the one the spec already licenses — it says *where* a
+closed form exists. A kind that gained one would silently go unreported, which
+is a missed feature rather than a wrong answer.
+
+That is the distinction, and it matters more than the pattern it refines:
+
+**A wildcard over a growing enumeration is a defect when its default is the
+permissive answer, and ordinary good practice when its default is the
+conservative one.** Open the gate, show the row, grant the permission — those
+must be decided. Withhold the count, report nothing, stay silent — those are
+safe to default.
+
+Worth stating because the previous addendum, read alone, invites a sweep that
+removes every wildcard over every growing enum. That would be busywork on the
+safe ones and would bury the two that matter.

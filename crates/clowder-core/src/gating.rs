@@ -349,7 +349,36 @@ impl GameState {
             // The ladder is bought with what only a Move can grant, so a meadow
             // that has never moved has nothing to spend and nothing to see.
             C::BuyTradition(_) => self.generation >= 1,
-            _ => true,
+
+            // Everything below is deliberately open, and listed rather than
+            // caught by a wildcard. `Command` grows every time an action is
+            // added, and a wildcard would hand each new one an open gate by
+            // default — visible in the shell from the first frame, because
+            // nobody was asked. Spelling them out makes adding an action stop
+            // this compiling until its gate is decided.
+            //
+            // Content-backed actions: `availability` owns their gate, and
+            // answering `true` here defers to it rather than duplicating it.
+            C::Build(_)
+            | C::ResearchIdea(_)
+            | C::Craft(_)
+            | C::BuyRefinement(_)
+            | C::AdoptRule(_)
+            | C::BuyRite(_)
+            | C::BuyArch(_)
+            | C::BuyDreamLoom(_)
+            | C::LaunchExpedition(_) => true,
+
+            // Actions with no gate at all: the meadow can always do these, or
+            // the command layer refuses them for its own reasons.
+            C::GatherCatnip
+            | C::Forage
+            | C::ObserveSky
+            | C::SetSpeed(_)
+            | C::Trade(..)
+            | C::SendPenPal(_)
+            | C::AssignTinkerer(_)
+            | C::UnassignTinkerer(_) => true,
         }
     }
 }
