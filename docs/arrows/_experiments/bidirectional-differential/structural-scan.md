@@ -199,7 +199,37 @@ indistinguishable from outside.
 Fifth blind class, and the most awkward, because it selects against exactly the
 code you want.
 
-## Uncited specs — 10 marked implemented with nothing pointing at them
+## Uncited specs — the count was 10, the answer is 1
+
+**This section originally reported ten specs with nothing pointing at them, and
+called it the most actionable finding of the audit. That was wrong.**
+
+Nine of the ten are cited on *tests*. They are cited there because every one of
+them is a negative requirement or a property — "shall never remove", "no mechanic
+shall reduce", "shall render with no colour", a performance bound, a round-trip
+identity. None has a production sink, so the citation belongs on the test that
+asserts it, which is exactly the convention this audit had already recommended
+two addenda earlier.
+
+So the coverage mechanism was working, and my query was looking in one place
+(`src/`) for citations that correctly live in another (`tests/`).
+
+One spec is genuinely uncited: the engine's milestone-bounding rule. It is
+implemented — the first-copy rule and the demoted calendar turn are both
+instances of it — but only its sibling spec was cited at that site. Now cited at
+both.
+
+That is the seventh time in this audit a first count has overstated, and the
+first time the overstatement had already been reported as a finding rather than
+caught before reporting. The rule from Addendum 1 needs one more clause: check
+where the evidence would live *if the thing were fine*, not only where it would
+live if it were broken.
+
+---
+
+### Original section, retained
+
+
 
 A sweep for specs marked `[x]` with no `@spec` citation anywhere in `src/`:
 

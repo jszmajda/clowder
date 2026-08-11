@@ -115,7 +115,7 @@ impl Event {
     pub fn class(&self) -> EventClass {
         // Only the *first* of a structure is the moment worth keeping; later
         // copies are ordinary. Milestones are permanent, so every one must be
-        // bounded over a playthrough by construction. @spec SIM-ENG-026
+        // bounded over a playthrough by construction. @spec SIM-ENG-026, SIM-ENG-042
         if let Event::StructureBuilt { count, .. } = self {
             return if *count == 1 { EventClass::Milestone } else { EventClass::Mechanical };
         }
@@ -158,6 +158,7 @@ impl Event {
             | Event::Napped { .. }
             // A year turns every ~31 real seconds at the fastest speed; as a
             // milestone it would write permanent entries without bound.
+            // @spec SIM-ENG-042
             | Event::NewYear { .. } => EventClass::Mechanical,
 
             Event::IdeaResearched { .. }
