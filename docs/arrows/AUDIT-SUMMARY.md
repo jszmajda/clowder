@@ -109,13 +109,21 @@ they are not tried again:
 |---|---|
 | Citation crowding predicts drift | No discrimination |
 | Inline vs item annotation predicts drift | Backwards, and noise |
-| Compound specs drift more | Noise |
+| Compound specs drift more | 70% vs 63% — noise |
+| Shared implementation predicts drift | 66% vs 64% — noise |
 | Mine reconstructions for unstated behaviour | One ambiguity from 113 specs |
 
-No structural property of a spec or its citations predicts whether a blind
-reader recovers it. Drift sits near 65% throughout, because the causes are
-semantic — a negative with no sink, a clause whose other half lives elsewhere, a
-constraint on a table's values. Nothing that counts symbols will find them.
+Four independent ways of cutting these specs, each chosen because it looked like
+it should matter, and **every partition drifts at about 65%**. The recovery rate
+is a property of the method, not of the specs: the blind runs recover roughly a
+third of what they are shown, and which third is decided by whether a
+requirement happens to be locally expressible in code. Negatives, clauses whose
+other half lives elsewhere, rationale, and constraints on a table's values are
+not, and they are scattered evenly through every leaf.
+
+This is now predictable without running it. The remaining specs will yield about
+ninety drift verdicts and fifty coherent ones, at roughly one real finding per
+thirteen specs — one per eighty blind sessions.
 
 ## The remaining scope
 

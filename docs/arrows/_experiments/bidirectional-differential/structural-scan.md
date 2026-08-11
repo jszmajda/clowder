@@ -784,3 +784,46 @@ function, and all six reconstructions across both returned the same sentence —
 which is precisely the union of the two specs. The code satisfies each. The
 differential can attribute neither. Where two EARS share one implementation with
 no seam between them, the method has nothing to separate.
+
+## Addendum 21 — the drift rate is a property of the method
+
+Batch twenty-one's clean case — two specs implemented in one function, all six
+reconstructions returning the same sentence — suggested an obvious measure. How
+much of the remaining scope is like that? Of 139 unaudited specs, 87 have every
+annotated function shared with at least one other spec: 62%.
+
+That number is real and it does not mean what it looks like. Tested against the
+audited set, specs whose implementations are shared drift at 66%; specs with a
+function to themselves drift at 64%.
+
+Which makes four:
+
+| Proposed predictor of drift | Drift rate | Against |
+|---|---|---|
+| Citation crowding | 3.53 vs 3.29 mean | — |
+| Inline vs item annotation | 64% | 80% |
+| Compound spec | 70% | 63% |
+| Shared implementation | 66% | 64% |
+
+**Every partition of these specs drifts at about 65%.** Four independent ways of
+cutting them, chosen because each looked like it should matter, and the rate
+does not move.
+
+The conclusion is no longer "no cheap proxy exists". It is that the recovery
+rate is a property of **the method**, not of the specs. The blind runs recover
+roughly a third of what they are shown, and which third is decided by whether a
+requirement's content happens to be locally expressible in code — negatives,
+clauses whose other half lives elsewhere, rationale, constraints on a table's
+values are not, and they are scattered evenly through every leaf.
+
+### What that means for the remaining 139
+
+Running them will produce about ninety drift verdicts and about fifty coherent
+ones, and this is predictable now without running them. The drift verdicts will
+be catalogued non-findings at the rate they have been: roughly one real finding
+per thirteen specs, which is one per eighty blind sessions.
+
+That is the whole of the case for bounding, stated as precisely as the evidence
+allows. It is not that the method is bad — it found things nothing else did. It
+is that its yield is now measurable and its failure mode is understood, and
+neither improves by running more of it.
