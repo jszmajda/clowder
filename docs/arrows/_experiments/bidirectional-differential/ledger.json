@@ -217,7 +217,8 @@
    "SIM-ECO-043",
    "SIM-ECO-040",
    "SIM-ECO-041",
-   "SIM-ECO-042"
+   "SIM-ECO-042",
+   "SIM-ECO-044"
   ]
  },
  "engine": {
@@ -278,7 +279,18 @@
    "SIM-ENG-001",
    "SIM-ENG-007",
    "SIM-ENG-008",
-   "SIM-ENG-010"
+   "SIM-ENG-010",
+   "SIM-ENG-002",
+   "SIM-ENG-003",
+   "SIM-ENG-004",
+   "SIM-ENG-005",
+   "SIM-ENG-006",
+   "SIM-ENG-015",
+   "SIM-ENG-009",
+   "SIM-ENG-026",
+   "SIM-ENG-027",
+   "SIM-ENG-040",
+   "SIM-ENG-029"
   ]
  },
  "expeditions": {

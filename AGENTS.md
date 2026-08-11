@@ -72,4 +72,8 @@ Annotate code and tests with `@spec` comments citing EARS IDs:
 // @spec SIM-RES-001, SIM-RES-002
 ```
 
-Place the annotation at the *entry point of the behavior's implementation graph* — the topmost function or module owning the specified behavior, not every helper. When a behavior spans multiple subsystems (sim core + TUI, for example), annotate at the entry point in each subsystem. Tests follow the same rule: annotate the test that directly exercises the spec, not every inner assertion.
+Place the annotation at the *entry point of the behavior's implementation graph* — the topmost function or module owning the specified behavior, not every helper.
+
+Annotate what **decides**, never the shape the decision produces. A type that enumerates outcomes — the layout modes, the job kinds, the error variants — is not the implementation of the rule that picks between them, even though it names every case the rule can reach. Where both are annotated, the type is the redundant one: it reads as a complete statement on its own, so it is what a reader finds first and what tooling extracts, and the rule itself goes unread. (Two instances of this were found and repaired by measurement; see `docs/arrows/_experiments/bidirectional-differential/structural-scan.md`, Addendum 26.)
+
+When a behavior spans multiple subsystems (sim core + TUI, for example), annotate at the entry point in each subsystem. Tests follow the same rule: annotate the test that directly exercises the spec, not every inner assertion.
