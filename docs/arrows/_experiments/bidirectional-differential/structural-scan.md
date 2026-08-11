@@ -896,3 +896,26 @@ so a uniform leniency shift moves both arms together. The conclusion that no
 structural property predicts recovery is unaffected. The absolute rate is
 softer than I stated it, and the scope estimate built on it should be read as
 an upper bound on drift verdicts rather than a measurement.
+
+## Addendum 24 — how far the rule reaches back
+
+Having stated the rule, the obvious next question is how many earlier verdicts
+it overturns. Thirteen drift records mention a shared or neighbouring site,
+which is where a superset reconstruction would show up.
+
+Re-read against their reconstructions: **two**, both already corrected. The
+other eleven are genuine. Readers described a neighbouring behaviour *instead
+of* the spec's, not *as well as* it — a graph property against an unlock rule, a
+luxury drain against a catnip deduction, a diminishing-returns primitive against
+a dissipation. In each the spec's content is simply absent.
+
+Three are borderline: two layout specs whose pane composition was recovered but
+whose column threshold was not, and a clock spec half of whose guarantee appears
+and half of which is licensed away by a sibling. They stay as filed.
+
+That is deliberate. Re-adjudicating borderline verdicts one at a time, days
+apart, is how the inconsistency arose in the first place; doing more of it to
+fix it would add noise faster than it removes bias. The rule governs from here,
+the two clear errors are corrected, and the headline rate is already flagged as
+an upper bound. That is the accurate state, and it is better than a number
+polished by a second pass no more consistent than the first.
