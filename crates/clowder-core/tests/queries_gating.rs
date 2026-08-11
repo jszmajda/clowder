@@ -550,3 +550,195 @@ fn max_affordable_sits_exactly_on_the_boundary_cost_of_next_draws() {
         n + 1
     );
 }
+
+// ---------------------------------------------------------------------------
+// SIM-ENG-044 / -045 / -046 — the gate, and what it is allowed to say
+// ---------------------------------------------------------------------------
+
+/// A meadow on its first tick has met almost nothing, and almost nothing may
+/// say so. A kind visible from the start would state its whole ladder — every
+/// name in it, and every price — before the player has met any of it.
+///
+/// The jobs a meadow opens with are the exception, and are checked here rather
+/// than excused: the gate is open, so they are present, but only the ones the
+/// meadow actually starts with.
+/// @spec SIM-ENG-044
+#[test]
+fn a_meadow_at_tick_zero_states_nothing_it_has_not_reached() {
+    let s = GameState::new(5);
+    let shown = |all: Vec<ContentId>| -> usize {
+        all.into_iter().filter(|c| s.availability(*c) != Availability::Hidden).count()
+    };
+
+    for (kind, count) in [
+        ("structures", shown(StructureId::ALL.iter().map(|i| ContentId::Structure(*i)).collect())),
+        ("ideas", shown(IdeaId::ALL.iter().map(|i| ContentId::Idea(*i)).collect())),
+        ("crafts", shown(CraftId::ALL.iter().map(|i| ContentId::Craft(*i)).collect())),
+        ("rites", shown(RiteId::ALL.iter().map(|i| ContentId::Rite(*i)).collect())),
+        ("arch upgrades", shown(ArchId::ALL.iter().map(|i| ContentId::Arch(*i)).collect())),
+        ("refinements", shown(RefinementId::ALL.iter().map(|i| ContentId::Refinement(*i)).collect())),
+        ("house rules", shown(RuleId::ALL.iter().map(|i| ContentId::Rule(*i)).collect())),
+        ("traditions", shown(TraditionId::ALL.iter().map(|i| ContentId::Tradition(*i)).collect())),
+        ("dream-loom threads", shown(DreamLoomId::ALL.iter().map(|i| ContentId::DreamLoom(*i)).collect())),
+    ] {
+        assert_eq!(
+            count, 0,
+            "{count} {kind} are visible on a meadow that has not reached them — a kind with \
+             no gate of its own spills its whole table on the first frame"
+        );
+    }
+
+    let jobs = shown(JobId::ALL.iter().map(|i| ContentId::Job(*i)).collect());
+    assert!(
+        jobs > 0 && jobs < JobId::ALL.len(),
+        "a new meadow shows {jobs} of {} jobs: it should show the ones it opens with and \
+         no more",
+        JobId::ALL.len()
+    );
+}
+
+/// The gate query and the command layer must be the same gate. A caller
+/// deciding what to show reads the query; acting on it runs the command. If
+/// they disagree, a row offers something that refuses, or hides something that
+/// would have worked.
+///
+/// Scoped to the actions with no content id of their own — the ones this query
+/// exists for. An action backed by content answers through `availability`.
+/// Five of the fifteen are held out, and the exclusion is a finding rather
+/// than a convenience: see `the_gate_query_authors_rules_the_core_does_not`.
+/// @spec SIM-ENG-045
+#[test]
+fn the_gate_query_and_the_command_layer_agree_on_every_gated_action() {
+    let gated = [
+        ("reverie", Command::Reverie),
+        ("enlighten", Command::Enlighten),
+        ("hold a parade", Command::HoldParade),
+        ("scout a picnic", Command::ScoutPicnic),
+        ("summon", Command::SummonStarWhale),
+        ("feed", Command::FeedWhale),
+        ("rummage", Command::Rummage),
+        ("condense a jar", Command::CondenseJar),
+        ("make a promise", Command::MakePromise),
+        ("host a jamboree", Command::HostJamboree),
+    ];
+
+    let s = GameState::new(5);
+    for (what, cmd) in gated {
+        let open = s.command_gate_open(&cmd);
+        let locked = matches!(s.clone().apply(cmd), Err(CommandError::Locked));
+        assert_eq!(
+            open, !locked,
+            "on a meadow at tick zero the gate query says {what} is {} while the command \
+             layer says {}: one of them is deciding a rule the other owns",
+            if open { "open" } else { "closed" },
+            if locked { "locked" } else { "not locked" }
+        );
+    }
+}
+
+/// And the agreement holds as a gate opens. A query that only ever answered
+/// "closed" on a new meadow would pass the test above without deciding
+/// anything.
+/// @spec SIM-ENG-045
+#[test]
+fn a_gate_opens_for_the_query_and_the_command_layer_together() {
+    let mut s = GameState::new(5);
+    assert!(
+        !s.command_gate_open(&Command::Rummage),
+        "fixture: the gate should start closed, or opening it proves nothing"
+    );
+
+    s.ideas.insert(IdeaId::CouchSpelunking);
+
+    assert!(
+        s.command_gate_open(&Command::Rummage),
+        "the idea that opens this action landed and the gate query did not notice"
+    );
+    assert!(
+        !matches!(s.clone().apply(Command::Rummage), Err(CommandError::Locked)),
+        "the gate query says the action exists for this meadow and the command layer still \
+         refuses it as locked"
+    );
+}
+
+/// The five the test above holds out, pinned so the defect cannot be forgotten
+/// and cannot quietly change shape. Ignored because it fails: it asserts the
+/// behaviour the arrow asks for, not the behaviour there is.
+///
+/// SIM-ENG-045 gives this query a purpose — that a caller deciding what to show
+/// "does not restate rules the command layer already owns". For these five the
+/// query is not restating a core rule; it is authoring one. The core would
+/// refuse each of them for cost, or in the last case not refuse it at all, and
+/// the only thing keeping them off the screen is this query's own opinion.
+///
+/// The last is the sharp one: an `Ok` that mutates nothing is neither of the
+/// two outcomes SIM-ENG-005 allows, and it carries an event announcing a
+/// turning point that did not turn.
+///
+/// Repairing this is a cascade through the segments that own these actions,
+/// not through the engine, so it stops here and is reported rather than fixed.
+/// @spec SIM-ENG-005, SIM-ENG-045
+#[test]
+#[ignore = "known defect: five gates live in the query rather than in the core"]
+fn the_gate_query_authors_rules_the_core_does_not() {
+    let s = GameState::new(5);
+
+    for (what, cmd) in [
+        ("basking", Command::Bask),
+        ("refining a starshard", Command::RefineStarshard),
+        ("refining an echo", Command::RefineEcho),
+        ("moving the meadow", Command::GreatMeadowMove),
+    ] {
+        assert!(
+            matches!(s.clone().apply(cmd), Err(CommandError::Locked)),
+            "{what} is hidden by the gate query but the core does not call it locked: the \
+             reason the player would be given and the reason the core would give differ"
+        );
+    }
+
+    let outcome = s.clone().apply(Command::PassItDown);
+    assert!(
+        matches!(outcome, Err(CommandError::Locked)),
+        "passing it down on a meadow that has met nothing returned {outcome:?}: the core \
+         accepted an action it had nothing to act on, mutated nothing, and reported a \
+         turning point anyway"
+    );
+}
+
+/// Reach is a ratchet. A reveal keyed on the roster of the moment would
+/// un-reveal the moment a kitten wandered off, taking an armed row out from
+/// under the cursor.
+/// @spec SIM-ENG-046
+#[test]
+fn the_roster_reach_never_falls() {
+    let mut s = GameState::new(3);
+    s.kittens = (0..5).map(|i| kitten(&format!("kitten-{i}"))).collect();
+    run_ticks(&mut s, 1);
+    assert_eq!(s.roster_reach(), 5, "a roster of five was never recorded as having been met");
+
+    s.kittens.truncate(2);
+    run_ticks(&mut s, 1);
+    assert_eq!(
+        s.roster_reach(),
+        5,
+        "reach fell to {} when three kittens wandered off; what prestige reveals is having \
+         met a size, not currently having it",
+        s.roster_reach()
+    );
+}
+
+/// The other half of the ratchet: reach is never *below* the roster present,
+/// even in the instant before a tick has recorded the growth.
+/// @spec SIM-ENG-046
+#[test]
+fn the_roster_reach_is_never_below_the_roster_present() {
+    let mut s = GameState::new(3);
+    s.kittens = (0..9).map(|i| kitten(&format!("kitten-{i}"))).collect();
+    assert_eq!(
+        s.roster_reach(),
+        9,
+        "nine kittens are home and reach reports {} — a query that lags the state it \
+         describes would hide a row that is already earned",
+        s.roster_reach()
+    );
+}

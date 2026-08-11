@@ -590,3 +590,88 @@ fn a_replay_inside_a_command_does_not_stream_into_the_journal() {
         years as u64 * 1_000
     );
 }
+
+// ---------------------------------------------------------------------------
+// SIM-ENG-042 — a milestone must be bounded by construction
+//
+// Milestones are kept forever, so a recurring occurrence classed as one grows
+// the save without limit. The rule is a property of the table, and the table is
+// where it can quietly stop holding: a variant added later, classed by whatever
+// its neighbours are classed as, is exactly how this breaks.
+// ---------------------------------------------------------------------------
+
+/// The one variant whose boundedness is a rule rather than a fact about the
+/// kind: a structure can be built any number of times, so only the first can be
+/// the moment worth keeping.
+/// @spec SIM-ENG-042
+#[test]
+fn only_the_first_of_a_structure_is_a_milestone() {
+    let first = Event::StructureBuilt { id: StructureId::CatnipPatch, count: 1 };
+    assert_eq!(
+        first.class(),
+        EventClass::Milestone,
+        "the first of a structure is a turning point and is kept"
+    );
+
+    for count in [2u32, 3, 17, 1_000, u32::MAX] {
+        let later = Event::StructureBuilt { id: StructureId::CatnipPatch, count };
+        assert_eq!(
+            later.class(),
+            EventClass::Mechanical,
+            "copy number {count} is classed as a milestone, and a structure can be built \
+             without limit — the retained journal would grow with every build for the rest \
+             of the playthrough"
+        );
+    }
+}
+
+/// Everything that recurs on a timer. Each of these fires again every day, or
+/// every season, or every time a window opens — none can be kept forever.
+/// @spec SIM-ENG-042
+#[test]
+fn nothing_that_recurs_on_a_timer_is_a_milestone() {
+    let recurring: Vec<(&str, Event)> = vec![
+        ("a season turning", Event::SeasonChanged { season: Season::Spring }),
+        ("a year turning", Event::NewYear { year: 3 }),
+        ("a burst of zoomies", Event::ZoomiesStarted { until_tick: 120 }),
+        ("that burst ending", Event::ZoomiesEnded),
+        ("a change of mood", Event::KittenMood { tier: MoodTier::Content }),
+        ("a moment of flavor", Event::Flavor { template: 0, kitten: None }),
+        ("a day that repeats itself", Event::DejaVuDay),
+        ("a change of pace", Event::SpeedChanged { speed: 4.0 }),
+    ];
+
+    for (what, event) in recurring {
+        assert_ne!(
+            event.class(),
+            EventClass::Milestone,
+            "{what} is classed as a milestone, but it happens again and again — every \
+             occurrence would be retained permanently and the save would grow without bound"
+        );
+    }
+}
+
+/// The consequence, end to end: a long unattended stretch leaves the rolling
+/// window at its capacity and the retained side untouched. Nothing that merely
+/// passes the time is worth keeping forever.
+/// @spec SIM-ENG-042, SIM-ENG-029
+#[test]
+fn time_alone_never_grows_the_retained_side_of_the_journal() {
+    let mut s = GameState::new(99);
+    for _ in 0..200_000 {
+        s.tick();
+    }
+
+    assert!(
+        s.journal.recent.len() <= 1_000,
+        "the rolling window overran its capacity at {} entries",
+        s.journal.recent.len()
+    );
+    assert_eq!(
+        s.journal.kept.len(),
+        0,
+        "twenty thousand days of nobody doing anything left {} permanent entries; only \
+         things the player did or reached should ever be retained",
+        s.journal.kept.len()
+    );
+}

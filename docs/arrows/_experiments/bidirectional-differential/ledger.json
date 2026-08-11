@@ -191,7 +191,11 @@
    "SIM-ENG-014"
   ],
   "audited": [
-   "SIM-ENG-030"
+   "SIM-ENG-030",
+   "SIM-ENG-042",
+   "SIM-ENG-044",
+   "SIM-ENG-045",
+   "SIM-ENG-046"
   ]
  },
  "expeditions": {
