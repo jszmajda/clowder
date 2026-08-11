@@ -104,7 +104,10 @@
    "SIM-CUR-006",
    "SIM-CUR-001",
    "SIM-CUR-002",
-   "SIM-CUR-003"
+   "SIM-CUR-003",
+   "SIM-CUR-008",
+   "SIM-CUR-011",
+   "SIM-CUR-012"
   ]
  },
  "dreamtime": {
@@ -119,7 +122,10 @@
    "SIM-DREAM-008"
   ],
   "audited": [
-   "SIM-DREAM-007"
+   "SIM-DREAM-007",
+   "SIM-DREAM-003",
+   "SIM-DREAM-004",
+   "SIM-DREAM-008"
   ]
  },
  "economy": {
@@ -173,7 +179,9 @@
   ],
   "audited": [
    "SIM-ECO-021",
-   "SIM-ECO-030"
+   "SIM-ECO-030",
+   "SIM-ECO-001",
+   "SIM-ECO-002"
   ]
  },
  "engine": {
