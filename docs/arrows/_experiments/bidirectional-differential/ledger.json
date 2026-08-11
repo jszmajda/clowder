@@ -390,7 +390,9 @@
    "SIM-KIT-022",
    "SIM-KIT-023",
    "SIM-KIT-024",
-   "SIM-KIT-025"
+   "SIM-KIT-025",
+   "SIM-KIT-026",
+   "SIM-KIT-027"
   ]
  },
  "mystic": {
@@ -411,7 +413,14 @@
   ],
   "audited": [
    "SIM-UNI-006",
-   "SIM-UNI-007"
+   "SIM-UNI-007",
+   "SIM-UNI-001",
+   "SIM-UNI-002",
+   "SIM-UNI-003",
+   "SIM-UNI-004",
+   "SIM-UNI-011",
+   "SIM-UNI-009",
+   "SIM-UNI-010"
   ]
  },
  "navigation": {
@@ -520,7 +529,10 @@
    "SAVE-005",
    "SAVE-007",
    "SAVE-012",
-   "SAVE-016"
+   "SAVE-016",
+   "SAVE-011",
+   "SAVE-014",
+   "SAVE-017"
   ]
  },
  "prestige": {
