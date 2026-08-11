@@ -827,3 +827,35 @@ That is the whole of the case for bounding, stated as precisely as the evidence
 allows. It is not that the method is bad — it found things nothing else did. It
 is that its yield is now measurable and its failure mode is understood, and
 neither improves by running more of it.
+
+## Addendum 22 — the twenty-four the harness will never reach
+
+Running the extractor over the whole remaining scope rather than a batch at a
+time: of 131 unaudited specs, 107 can be prepared and **24 cannot**. Their
+annotated regions fall below the floor — a table entry, a two-line function, a
+constant with its doc comment. No reconstruction is possible from four lines of
+code, and asking for one produces a sentence about whatever happens to be
+adjacent.
+
+Those 24 were never going to be audited by waiting for another batch. Read by
+hand instead: does the citation sit where the behaviour is, does the code do
+what the spec says, does a test assert it.
+
+All 24 are clean.
+
+**What that check is and is not.** For a spec naming a formula or a rule it is a
+real check — the code is a few lines and either matches or does not. For one
+defining a table by reference to a design document it confirms the annotation is
+on the table and a test exercises it, and does not re-derive every tabled number
+against the design. Eleven of the 24 are of that second kind. Saying they are
+"audited" means the weaker thing, and the records say so.
+
+That is worth being plain about, because eleven specs marked audited on the
+weaker check will look identical in the ledger to specs a blind run recovered
+whole, and they are not the same evidence.
+
+### Where the scope now stands
+
+167 of 293 audited. Of the 126 remaining, 107 are runnable and the rest are
+already covered by this pass. At the measured rate the 107 hold about eight real
+findings, for roughly 640 blind sessions.

@@ -181,7 +181,19 @@
    "SIM-ECO-021",
    "SIM-ECO-030",
    "SIM-ECO-001",
-   "SIM-ECO-002"
+   "SIM-ECO-002",
+   "SIM-ECO-008",
+   "SIM-ECO-009",
+   "SIM-ECO-010",
+   "SIM-ECO-011",
+   "SIM-ECO-012",
+   "SIM-ECO-013",
+   "SIM-ECO-014",
+   "SIM-ECO-015",
+   "SIM-ECO-016",
+   "SIM-ECO-017",
+   "SIM-ECO-018",
+   "SIM-ECO-024"
   ]
  },
  "engine": {
@@ -238,7 +250,11 @@
    "SIM-ENG-044",
    "SIM-ENG-045",
    "SIM-ENG-046",
-   "SIM-ENG-024"
+   "SIM-ENG-024",
+   "SIM-ENG-001",
+   "SIM-ENG-007",
+   "SIM-ENG-008",
+   "SIM-ENG-010"
   ]
  },
  "expeditions": {
@@ -289,7 +305,8 @@
   ],
   "audited": [
    "SIM-KIT-015",
-   "SIM-KIT-016"
+   "SIM-KIT-016",
+   "SIM-KIT-006"
   ]
  },
  "mystic": {
@@ -412,7 +429,14 @@
   ],
   "audited": [
    "SAVE-006",
-   "SAVE-015"
+   "SAVE-015",
+   "SAVE-001",
+   "SAVE-002",
+   "SAVE-003",
+   "SAVE-005",
+   "SAVE-007",
+   "SAVE-012",
+   "SAVE-016"
   ]
  },
  "prestige": {
