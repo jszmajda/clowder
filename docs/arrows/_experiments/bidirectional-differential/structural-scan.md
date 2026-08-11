@@ -119,3 +119,38 @@ are compatible: the instrument was faulty *and* the finding was real, and there
 was no way to know which without checking. The audited count stays at what has
 actually been examined rather than being retroactively inflated by a result that
 happened to survive.
+
+## Addendum 4 — the mirror fault, and a property worth keeping
+
+Batch six's fault was extraction too large. Batch eight found its mirror: a
+module-header annotation whose walk landed on the *import block*, handing the
+readers three lines of `use` declarations.
+
+One reader refused: *"This snippet can't support a reconstruction: it contains
+only two `use` declarations."* It did not confabulate a requirement from
+imports. That is worth recording as a property of the method rather than a
+curiosity — a blind reader given nothing will sometimes say so, and that refusal
+is a signal the harness is broken, not the project.
+
+The extractor now skips blocks with fewer than four lines of actual logic, as
+well as those over ninety. Both faults share a cause: annotations that sit at
+module level have no enclosing item, and walking from them finds either
+everything or nothing.
+
+## A fourth unannotatable class
+
+`TUI-NAV-021` requires every UI symbol to be single-width, with no emoji or
+ambiguous-width glyphs. That is a constraint on *what characters the source
+contains*, not on what any function does at runtime. No code can testify to it,
+and the readers described the width-fitting helper the citation happens to sit
+on instead.
+
+The classes now known to be outside the differential's reach:
+
+1. Negative requirements — "shall not open a dialog", "shall not pin headers"
+2. Content tables — the table is data; consuming code cannot reconstruct it
+3. Rationale clauses — "never from a separate formula that could diverge"
+4. Source-level constraints — properties of the code's text, not its behaviour
+
+All four are testable; none by this method. Each wants a test that asserts the
+negation or the property directly, and the citation belongs on that test.
