@@ -660,3 +660,44 @@ argue otherwise. Compoundness does not predict *drift verdicts*; it does make a
 spec untraceable, because seven behaviours under one id cannot be marked
 implemented or not independently, and a prefix grep cannot separate them. That
 is a traceability argument, which is the argument that was always there.
+
+## Addendum 18 — mining the reconstructions already paid for
+
+Both real findings this cycle had one signature: every reader named a mechanism
+the spec text does not mention. A cap with no requirement; a guard against a
+non-finite value with no requirement. That is a *semantic* signal, so it escapes
+Addendum 17's conclusion that no structural property predicts anything — and
+113 audited specs already have their reconstructions on disk. Free to ask.
+
+First attempt flagged eighteen specs on plain vocabulary — "allowed", "away",
+"capping" — which is a difference of wording, not of behaviour. Useless.
+
+Narrowing to code-shaped tokens only (CamelCase, SCREAMING_SNAKE, snake_case,
+decimal literals) named by **every** reconstruction and absent from the spec
+text gives seventeen specs. Triaged:
+
+| | Count | What it was |
+|---|---|---|
+| A constant's *name* for a number the spec already gives | 14 | Benign — the spec says "at least 3", the code says `FAMINE_WANDER_DAYS`. |
+| Already-known findings resurfacing | 1 | The breakpoints owned by two leaves. |
+| Reader arithmetic, not code | 1 | A number three readers computed by summing the spec's own tiers; it appears nowhere in the source. |
+| A genuine ambiguity | 1 | Below. |
+
+### The ambiguity
+
+Three readers named a soft cap on one colony's warming that `SIM-TRADE-005` does
+not mention. The number and its rate are stated — in `SIM-TRADE-006`, the spec
+that owns that mechanic, which is the correct place and the same arrangement as
+the twist that four ceremony reconstructions named earlier.
+
+But the two specs attach the same rate and cap to *different quantities*: one to
+a success chance, the other to standing. Either one spec describes both loosely,
+or there are two mechanics sharing constants. Settling it needs the design read
+by someone who knows what it intends, so it is recorded and not called a defect.
+
+### What the mining is worth
+
+One ambiguity from 113 specs. The honest reading is not that the technique
+failed but that **the already-audited set holds nothing more** — which is worth
+knowing, because it means the remaining findings, if any, are in the 154 not yet
+run rather than in what has already been read and filed.

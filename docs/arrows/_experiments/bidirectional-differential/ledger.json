@@ -51,7 +51,9 @@
    "SIM-TRADE-007",
    "SIM-TRADE-008"
   ],
-  "audited": []
+  "audited": [
+   "SIM-TRADE-005"
+  ]
  },
  "cosmic": {
   "prefix": "SIM-SKY",
@@ -101,7 +103,9 @@
    "SIM-DREAM-007",
    "SIM-DREAM-008"
   ],
-  "audited": []
+  "audited": [
+   "SIM-DREAM-007"
+  ]
  },
  "economy": {
   "prefix": "SIM-ECO",
@@ -282,7 +286,8 @@
    "SIM-UNI-010"
   ],
   "audited": [
-   "SIM-UNI-006"
+   "SIM-UNI-006",
+   "SIM-UNI-007"
   ]
  },
  "navigation": {
@@ -541,21 +546,6 @@
    "TUI-THEME-009",
    "TUI-THEME-014",
    "TUI-THEME-010"
-  ]
- },
- "dream": {
-  "audited": [
-   "SIM-DREAM-007"
-  ]
- },
- "trade": {
-  "audited": [
-   "SIM-TRADE-005"
-  ]
- },
- "unicorns": {
-  "audited": [
-   "SIM-UNI-007"
   ]
  }
 }
