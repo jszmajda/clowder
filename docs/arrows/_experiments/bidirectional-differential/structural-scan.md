@@ -264,3 +264,53 @@ what a module-header citation would produce. The two methods agree.
 
 This is the smallest finding recorded here, and it was checked before it was
 written down — the count was four when I looked, and four after.
+
+## Addendum 8 — the sixth blind class, and the list as an artifact
+
+`TUI-RUN-001` requires the save to be resolved and loaded *before* the terminal
+is taken over. Readers of the terminal setup described the terminal setup,
+correctly. An ordering between two phases is not visible from inside either one,
+so no citation on either phase can carry it.
+
+Sixth class: **relational requirements** — a claim about how two components
+stand to each other, where neither contains the relation.
+
+The full list, which is the most transferable thing this audit has produced:
+
+| Class | Why the method cannot reach it | Where the citation belongs |
+|---|---|---|
+| Negative requirements | No code exists for what does not happen | A test asserting the negation |
+| Content tables | The table is data; consuming code cannot reconstruct it | A test comparing table to design |
+| Rationale clauses | Reasons are not behaviour | The design doc, where they already are |
+| Source-level constraints | Properties of the text, not of execution | A test scanning the rendered output |
+| Self-documenting implementations | The identifier restates the spec, so agreement proves nothing | Nowhere — a known limit, not a defect |
+| Relational requirements | Neither component contains the relation | A test observing both |
+
+Five of the six point at the same remedy: the citation belongs on the test, not
+on the code. That is a stronger claim than it looks. It says a meaningful
+fraction of an EARS corpus is verified by tests *by nature* rather than by
+choice, and that a coverage tool grepping `src/` for citations will under-report
+that fraction as a gap — which is exactly the mistake made in this audit's own
+uncited-specs finding, before it was corrected.
+
+## Addendum 9 — saturation
+
+Three consecutive batches have produced no new class of finding. Batch fourteen's
+four results are one clean, one absence, one over-subscription, one relational —
+every category already named and catalogued.
+
+A useful diagnostic appeared in the same batch: three specs whose citations all
+resolve to one 47-line function produced three near-identical reconstructions.
+That is over-subscription visible without any interpretation — when N specs cite
+one body, a blind reader returns the same composite N times, and the specs are
+distinguishable only by whatever the reader happened to emphasise.
+
+The method has saturated. It found six blind classes, five fault patterns, two
+corroborations against independent review, and one genuine behaviour question, in
+roughly its first seventy specs. It has since been re-finding those, at six
+sessions each.
+
+What remains genuinely unexamined is the sim's 178 differential-able specs, which
+have returned findings at about one in three against the shell's two in three —
+and where the findings that did appear were mostly of the classes now known to be
+structural rather than local.
