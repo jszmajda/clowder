@@ -302,7 +302,17 @@
    "SIM-ENG-033",
    "SIM-ENG-011",
    "SIM-ENG-012",
-   "SIM-ENG-013"
+   "SIM-ENG-013",
+   "SIM-ENG-018",
+   "SIM-ENG-016",
+   "SIM-ENG-017",
+   "SIM-ENG-019",
+   "SIM-ENG-020",
+   "SIM-ENG-021",
+   "SIM-ENG-025",
+   "SIM-ENG-022",
+   "SIM-ENG-023",
+   "SIM-ENG-014"
   ]
  },
  "expeditions": {
@@ -317,7 +327,9 @@
    "SIM-EXP-006"
   ],
   "audited": [
-   "SIM-EXP-004"
+   "SIM-EXP-004",
+   "SIM-EXP-001",
+   "SIM-EXP-002"
   ]
  },
  "kittens": {

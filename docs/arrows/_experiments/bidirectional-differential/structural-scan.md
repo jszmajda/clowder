@@ -1037,3 +1037,38 @@ The third has no detector and probably cannot have one — deciding whether a te
 covers a claim or merely instances it needs both read together. It is also the
 one that leaves the strongest impression of safety: a green suite, a cited test,
 a coverage scan that passes.
+
+## Addendum 28 — where the enumerate-and-hand-list shape actually bites
+
+Three findings have now come from one question: a spec enumerates something, the
+code mirrors it in a hand-written list, and nothing checks the two still agree.
+A missing migration fixture, two fields a Move keeps by omission, an unenforced
+draw schedule.
+
+Applying it to the tick pipeline's six-phase order: the test the spec cites
+checks **one adjacency of five** — production before consumption. Two more are
+covered incidentally elsewhere. So the claim is tested by example, exactly like
+the others.
+
+**No test was written for it, and the reason is the useful part.**
+
+The three real findings share something the phase order does not: their
+enumerations **grow**. A save format gains a version each time it changes. A
+Move's reset list gains a line each time state is added. A draw schedule gains
+an entry each time a subsystem rolls dice. Growth is when the list and the spec
+drift apart, because growth is when someone edits one and not the other — and
+all three had drifted exactly that way, each by an addition nobody cascaded.
+
+A six-phase pipeline does not grow. It is six consecutive statements in one
+function, written once, read whole by anyone touching it. A reordering would be
+a deliberate act, not an omission, and the failure mode this shape catches is
+omission.
+
+So the refinement: **look for enumerations that grow with content.** A fixed
+pipeline, a closed set of layout modes, a match over an enum the compiler
+already checks — these look like the same shape and are not, because nothing
+gets added to them without someone looking straight at them.
+
+That is also why the destructuring test added for the Move is the right
+enforcement and a phase-order test would not be: it fires when the *set* grows,
+which is the moment the drift happens.
