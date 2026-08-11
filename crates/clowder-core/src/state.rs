@@ -317,7 +317,10 @@ impl DreamLoomId {
     }
 }
 
-// @spec SIM-ECO-040, SIM-ECO-041, SIM-ECO-042, SIM-ECO-043
+// The jobs themselves — what each yields and what unlocks it — are specified on
+// the table in `content`, where the first four already were. This enum only
+// names them, and an annotation here points a reader at the naming rather than
+// at the rule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum JobId {
     Gardener,

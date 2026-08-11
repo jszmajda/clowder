@@ -919,3 +919,43 @@ fix it would add noise faster than it removes bias. The rule governs from here,
 the two clear errors are corrected, and the headline rate is already flagged as
 an upper bound. That is the accurate state, and it is better than a number
 polished by a second pass no more consistent than the first.
+
+## Addendum 25 — a repair that removed an answer instead of improving one
+
+Batch twenty-four: twelve economy specs, four recovered whole, five partial,
+three that turned into a citation repair.
+
+Those three define a job each — what it yields, what unlocks it. All nine
+reconstructions across them described *an enumeration of job names*. They were
+annotated twice: on the table where the yield and gate live, and on the enum
+that only names the jobs. The extractor took the enum, because a self-contained
+type reads cleanly where a three-line accessor does not.
+
+The four older jobs, written earlier, were annotated on the table alone. The
+four newer ones picked up a second annotation when they were added. That is the
+drift, and it is invisible to every check here — both citations are real, both
+point at related code, and the coverage scan sees a spec with plenty of
+annotation.
+
+### Removing it made the spec unauditable, which is the right answer
+
+With the enum annotation gone the extractor reports no region at all: the
+accessor is below the floor. So the repair did not improve the reconstruction,
+it removed it.
+
+That is still a repair. A blind run that confidently describes the wrong thing
+is worse than no blind run — it produces a verdict, the verdict gets filed, and
+nothing in the record says the reader was looking at the wrong code. Three such
+verdicts would have entered this audit as ordinary drift.
+
+The three are now hand-audited against the table, where the numbers and gates
+match exactly, and they sit beside the four older jobs that were always in that
+category. Consistent, and honestly labelled.
+
+### The near-miss
+
+The first re-run after the change returned identical reconstructions, which
+reads as "the fix did nothing". It was stale prompts — `prep` had refused to
+regenerate them and said so in a line I had filtered out of the output. Checking
+why the fix appeared to fail is what surfaced that the spec had become
+unpreparable, which is the finding.
