@@ -17,7 +17,7 @@ The two-crate split is load-bearing: `clowder-core` never touches the terminal, 
 
 ## Spoiler Policy
 
-Jess (the player-owner) wants to **discover the game's content by playing it**. Agents build this project autonomously through the LID workflow and must not reveal game content in conversation: no resource, structure, job, research, or event names; no balance numbers; no flavor text. Status updates stay structural — system counts, test results, file paths. Check in with Jess only on preference-affecting, non-spoiler aspects (pacing, scope, risk). Phase-boundary reviews resolve against the HLD's ratified tenets (cozy > idle-respect > whimsy-with-clarity) rather than user review; this standing override was granted explicitly, drift risk acknowledged. Everything under `docs/intent/` and `crates/` is spoiler territory for Jess until she has played past it.
+Jess (the player-owner) wants to **discover the game's content by playing it**. Agents build this project autonomously through the LID workflow and must not reveal game content in conversation: no resource, structure, job, research, or event names; no balance numbers; no flavor text. Status updates stay structural — system counts, test results, file paths. Check in with Jess only on preference-affecting, non-spoiler aspects (pacing, scope, risk). Phase-boundary reviews resolve against the HLD's ratified tenets (cozy > idle-respect > whimsy-with-clarity) rather than user review; this standing override was granted explicitly, drift risk acknowledged. The override extends to gaps in a ratified LLD: where an LLD leaves a detail open that its specs need pinned, agents pin it in that LLD, resolved against the same tenets, because Jess wants to be surprised by what the game becomes rather than consulted on it. It does not extend to changing what a feature is, or to anything that crosses a segment boundary; those still stop for Jess. Everything under `docs/intent/` and `crates/` is spoiler territory for Jess until she has played past it.
 
 ## Conventions
 
@@ -77,3 +77,7 @@ Place the annotation at the *entry point of the behavior's implementation graph*
 Annotate what **decides**, never the shape the decision produces. A type that enumerates outcomes — the layout modes, the job kinds, the error variants — is not the implementation of the rule that picks between them, even though it names every case the rule can reach. Where both are annotated, the type is the redundant one: it reads as a complete statement on its own, so it is what a reader finds first and what tooling extracts, and the rule itself goes unread. (Two instances of this were found and repaired by measurement; see `docs/arrows/_experiments/bidirectional-differential/structural-scan.md`, Addendum 26.)
 
 When a behavior spans multiple subsystems (sim core + TUI, for example), annotate at the entry point in each subsystem. Tests follow the same rule: annotate the test that directly exercises the spec, not every inner assertion.
+
+### Papercuts
+
+Maintain `~/src/papercuts.md`, a global log from all Claude sessions with anything that's slowed down development. When you lose time to one mid-session, append the date, symptom, fix, and project. Check this file when tooling fails mysteriously.
