@@ -60,7 +60,7 @@ Derived values (happiness, rates, season) — recomputed from state. Event histo
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. Chunked catch-up with progress reporting (shell callback) if 365-day replays prove slow on real hardware — measure first.
+1. Chunked catch-up with progress reporting (shell callback). Measured: a seven-week absence replays in about 6 s on a release build and in minutes on a debug build, all before the shell draws its first frame, so a long absence reads as a hang; the 365-day cap projects to roughly 40 s on release. This is due next after the TUI shell build-out, as a cascade across this LLD and the runtime LLD (whose in-process drain, TUI-RUN-025, is the likely model).
 2. Save-file compression toggle if saves grow past ~1 MB with roadmap systems — measure first.
 
 ## References
