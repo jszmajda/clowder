@@ -338,11 +338,35 @@ impl App {
                         }
                         crate::nav::Outcome::Repeat(cmd, n) => {
                             // Partial success is intended: take as many as you
-                            // can afford, stop at the first refusal.
+                            // can afford, stop at the first refusal. A run
+                            // rejected reads as Enter's rejection would; done
+                            // any calls first, the footer also says how many
+                            // — and, for a player-typed ×N, of how many, never
+                            // for an X run against the shell-side cap, which
+                            // is not a count the player asked for.
+                            // @spec TUI-NAV-069, TUI-NAV-012
+                            let mut done = 0u32;
+                            let mut rejection = None;
                             for _ in 0..n {
-                                if self.state.apply(cmd).is_err() {
-                                    break;
+                                match self.state.apply(cmd) {
+                                    Ok(_) => done += 1,
+                                    Err(e) => {
+                                        rejection = Some(e);
+                                        break;
+                                    }
                                 }
+                            }
+                            if let Some(e) = rejection {
+                                let why = crate::nav::plain_error(&e);
+                                let message = if done == 0 {
+                                    why
+                                } else if n == crate::nav::update::MAX_AFFORDABLE_CAP {
+                                    format!("{why} — {done} done")
+                                } else {
+                                    format!("{why} — {done} of {n} done")
+                                };
+                                self.view.footer =
+                                    Some((message, Instant::now() + std::time::Duration::from_secs(4)));
                             }
                         }
                     }

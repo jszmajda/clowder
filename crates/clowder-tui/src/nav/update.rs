@@ -44,9 +44,10 @@ const ARM_DURATION: Duration = Duration::from_secs(8);
 /// TUI-NAV-051
 const REPEAT_GATE: Duration = Duration::from_millis(100);
 
-/// The shell-side cap on how many times `X` may repeat-call a command.
-/// @spec TUI-NAV-012
-const MAX_AFFORDABLE_CAP: u32 = 10_000;
+/// The shell-side cap on how many times `X` may repeat-call a command, and on
+/// the count prompt's own count (TUI-NAV-068) — the same cap, so the prompt
+/// always shows the count `X` would have used. @spec TUI-NAV-012, TUI-NAV-068
+pub const MAX_AFFORDABLE_CAP: u32 = 10_000;
 
 /// Fold an action into the view, yielding whatever the core must be told.
 ///
@@ -294,6 +295,14 @@ fn current_row(view: &ViewState, state: &GameState) -> Option<Row> {
     rows(state, section).into_iter().find(|r| r.key == key)
 }
 
+/// The row `key` names, if it is still listed in the current section — never
+/// the cursor's own position. Used to hold a count prompt to the row it was
+/// opened on. @spec TUI-NAV-072
+fn by_key(view: &ViewState, state: &GameState, key: &RowKey) -> Option<Row> {
+    let section = view.section?;
+    rows(state, section).into_iter().find(|r| &r.key == key)
+}
+
 /// Whether `row` is a one-shot the player already owns. @spec TUI-NAV-041
 fn owned_one_shot(state: &GameState, row: &Row) -> bool {
     match &row.key {
@@ -417,12 +426,21 @@ fn activate_heavy(view: &mut ViewState, key: &RowKey, command: Command) -> Outco
 
 /// The count prompt's Enter: sets the count, then either fires/repeats
 /// (ordinary row) or arms (heavy row, i.e. DeepNap). An empty or zero count
-/// cancels with no effect. @spec TUI-NAV-011, TUI-NAV-031, TUI-NAV-036
+/// cancels with no effect. The prompt belongs to the row it was opened on, by
+/// that row's identity, never to whatever the cursor reads by the time Enter
+/// arrives; if that row has left its list since — the sim keeps ticking
+/// under an open prompt — the prompt closes with no effect and says so.
+/// @spec TUI-NAV-011, TUI-NAV-031, TUI-NAV-036, TUI-NAV-072
 fn accept_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
-    let digits = view.prompt.take().expect("checked Some above").digits;
-    let n: u32 = digits.parse().unwrap_or(0);
+    let prompt = view.prompt.take().expect("checked Some above");
+    let n: u32 = prompt.digits.parse().unwrap_or(0);
 
-    let Some(row) = current_row(view, state) else {
+    let Some(row) = prompt
+        .row
+        .as_ref()
+        .and_then(|key| by_key(view, state, key))
+    else {
+        set_footer(view, "that row isn't here anymore.");
         return Outcome::Handled;
     };
 
@@ -545,7 +563,7 @@ fn handle_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
         return Outcome::Handled;
     }
 
-    view.prompt = Some(CountPrompt::default());
+    view.prompt = Some(CountPrompt { digits: String::new(), row: Some(row.key.clone()) });
     Outcome::Handled
 }
 
@@ -585,7 +603,10 @@ fn handle_max_affordable(view: &mut ViewState, state: &GameState) -> Outcome {
             }
         },
         RowKind::Count { increment, .. } => Outcome::Repeat(*increment, MAX_AFFORDABLE_CAP),
-        RowKind::Display | RowKind::Group => Outcome::Handled,
+        RowKind::Display | RowKind::Group => {
+            set_footer(view, "There's no count to set here.");
+            Outcome::Handled
+        }
     }
 }
 
@@ -613,13 +634,21 @@ fn handle_increment_decrement(view: &mut ViewState, state: &GameState, up: bool)
 // The count prompt's own field — TUI-NAV-011, TUI-NAV-037
 // ---------------------------------------------------------------------------
 
-/// The count prompt takes digits only; the palette takes every printable
-/// character, digits and Space included, verbatim into its query.
-/// @spec TUI-NAV-037
+/// The count prompt takes digits only, and only up to the same cap that
+/// bounds `X`: a digit that would carry the count past it is refused, with a
+/// footer note, so the prompt's count never reads higher than `X` would ever
+/// run. The palette takes every printable character, digits and Space
+/// included, verbatim into its query. @spec TUI-NAV-037, TUI-NAV-068
 fn handle_type(view: &mut ViewState, c: char) -> Outcome {
     if let Some(prompt) = view.prompt.as_mut() {
         if c.is_ascii_digit() {
-            prompt.digits.push(c);
+            let candidate = format!("{}{c}", prompt.digits);
+            match candidate.parse::<u64>() {
+                Ok(n) if n <= MAX_AFFORDABLE_CAP as u64 => prompt.digits = candidate,
+                _ => {
+                    set_footer(view, format!("that count goes no higher than {MAX_AFFORDABLE_CAP}"));
+                }
+            }
         }
         return Outcome::Handled;
     }

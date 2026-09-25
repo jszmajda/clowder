@@ -38,8 +38,8 @@ use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
 use clowder_core::{
-    content, ColonyId, Command, ContentId, GameState, IdeaId, JobId, Kitten, KittenTrait, Location,
-    MoodTier, ResourceId, Season, StructureId,
+    content, ArchId, ColonyId, Command, ContentId, GameState, IdeaId, JobId, Kitten, KittenTrait,
+    Location, LockReason, MoodTier, ResourceId, RuleId, Season, StructureId,
 };
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
@@ -1258,7 +1258,7 @@ fn hint_contexts(state: &GameState) -> Vec<(&'static str, ViewState)> {
     });
 
     let mut prompt = focus_on(state, Section::Meadow, repeatable_row(state));
-    prompt.prompt = Some(CountPrompt { digits: "12".to_string() });
+    prompt.prompt = Some(CountPrompt { digits: "12".to_string(), ..Default::default() });
 
     vec![
         ("a plain one-shot row", focus_on(state, Section::Meadow, single_row(state))),
@@ -1357,6 +1357,85 @@ fn the_hint_bar_names_the_keys_the_focused_row_actually_offers() {
     );
 }
 
+/// The count key is named exactly beside the rows `x` opens the count prompt
+/// on — every row tagged count-taking or repeat-N and every count row, unless
+/// the core reports its item as already the player's — and beside no other,
+/// so it never appears where it would only earn a refusal. The max key follows
+/// the same rule for the rows `X` runs on, and so is never named beside a heavy
+/// row: DeepNap's row names the count key alone. Quantified over every row the
+/// game lists, in a meadow that also holds an owned one-shot and an owned
+/// heavy row, with nothing open or armed to take the bar first.
+///
+/// @spec TUI-NAV-074
+#[test]
+fn the_hint_bar_names_x_and_x_max_exactly_beside_the_rows_they_act_on() {
+    let mut state = every_section_revealed();
+    state.arches_bought.insert(ArchId::EverdreamArch);
+    let adopted = RuleId::ALL
+        .into_iter()
+        .find(|r| {
+            let mut s = state.clone();
+            s.rules.insert(*r);
+            s.lock_reason(ContentId::Rule(*r)) == Some(LockReason::AlreadyYours)
+        })
+        .expect("fixture: some rule can be adopted and read back as the player's");
+    state.rules.insert(adopted);
+
+    let (mut count_rows, mut heavy_counted, mut owned_rows) = (0, 0, 0);
+    for section in Section::ALL {
+        for row in rows(&state, section).into_iter().filter(|r| r.selectable()) {
+            let owned = match &row.key {
+                RowKey::Content(id, _) => state.lock_reason(*id) == Some(LockReason::AlreadyYours),
+                _ => false,
+            };
+            let tagged = match &row.kind {
+                RowKind::Act { semantics, .. } => {
+                    matches!(semantics, CountSemantics::CountTaking | CountSemantics::RepeatN)
+                }
+                RowKind::Count { .. } => true,
+                RowKind::Display | RowKind::Group => false,
+            };
+            let x_opens = tagged && !owned;
+            let max_runs = x_opens && !row.heavy;
+            if owned {
+                owned_rows += 1;
+            }
+            if matches!(row.kind, RowKind::Count { .. }) {
+                count_rows += 1;
+            }
+            if x_opens && row.heavy {
+                heavy_counted += 1;
+            }
+
+            let line = hint_line(&state, &focus_on(&state, section, row.key.clone()), WIDE_W);
+            assert_eq!(
+                has_key(&line, "x"),
+                x_opens,
+                "with {:?} focused in {}, the hint bar {} the count key, but x {} the count \
+                 prompt there.\nhint bar: {line:?}",
+                row.key,
+                section.title(),
+                if has_key(&line, "x") { "names" } else { "does not name" },
+                if x_opens { "opens" } else { "does not open" },
+            );
+            assert_eq!(
+                has_key(&line, "X"),
+                max_runs,
+                "with {:?} focused in {}, the hint bar {} the max key, but X {} there — and \
+                 never on a heavy row.\nhint bar: {line:?}",
+                row.key,
+                section.title(),
+                if has_key(&line, "X") { "names" } else { "does not name" },
+                if max_runs { "runs" } else { "does not run" },
+            );
+        }
+    }
+
+    assert!(count_rows > 0, "fixture: no count row is listed");
+    assert!(heavy_counted > 0, "fixture: the heavy DeepNap row is not listed");
+    assert!(owned_rows > 0, "fixture: no row the core reports as the player's is listed");
+}
+
 /// An open field holds the keyboard, so the hint bar speaks for the field and
 /// nothing else: the same line whatever lies beneath it — any kind of focused
 /// row, or an armed heavy row whose own `Enter yes, truly` would otherwise be
@@ -1382,7 +1461,7 @@ fn an_open_field_owns_the_hint_bar_whatever_lies_beneath_it() {
 
     type Opener = fn(&mut ViewState);
     let fields: [(&str, Opener); 2] = [
-        ("the count prompt", |v| v.prompt = Some(CountPrompt { digits: "12".to_string() })),
+        ("the count prompt", |v| v.prompt = Some(CountPrompt { digits: "12".to_string(), ..Default::default() })),
         ("the palette", |v| {
             v.overlay = Some(Overlay::Palette { query: "ab".to_string(), selected: 0 })
         }),

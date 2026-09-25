@@ -17,7 +17,7 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use crate::nav::rows::{rows, Row, RowKey, RowKind};
-use crate::nav::{Overlay, Section, ViewState};
+use crate::nav::{CountPrompt, Overlay, Section, ViewState};
 use crate::theme::Role;
 
 pub use layout::{Body, Layout};
@@ -69,6 +69,47 @@ fn owned_count(state: &GameState, row: &Row) -> String {
         }
         _ => String::new(),
     }
+}
+
+/// What an open count prompt on `row` previews, in the row list's cost slot:
+/// the core's per-component total for taking the count (a repeat-N row), N
+/// times the core's one-unit price (a Pounce or Trade row), or the typed
+/// count alone — DeepNap, a count row, a count row proper, or a row the core
+/// prices no other way — with nothing beyond the typed digits for an empty
+/// or zero count. @spec TUI-NAV-067
+fn count_prompt_preview(state: &GameState, row: &Row, digits: &str) -> String {
+    use crate::nav::CountSemantics;
+
+    let n: u32 = digits.parse().unwrap_or(0);
+    if n == 0 {
+        return format!("×{digits}");
+    }
+
+    let priced: Vec<(clowder_core::ResourceId, f64)> = match &row.kind {
+        RowKind::Act { semantics: CountSemantics::RepeatN, .. } => {
+            let RowKey::Content(id, _) = row.key else { return format!("×{n}") };
+            state.cost_of_next(id, n)
+        }
+        RowKind::Act { command, semantics: CountSemantics::CountTaking } if !row.heavy => {
+            match state.unit_price(command) {
+                Some(unit) => unit.into_iter().map(|(r, each)| (r, each * n as f64)).collect(),
+                None => return format!("×{n}"),
+            }
+        }
+        // DeepNap (heavy count-taking), a count row, and a row Single-tagged
+        // — x never opens on a Single row, so this arm is reached only by a
+        // count row's own `Count` kind. @spec TUI-NAV-067
+        _ => return format!("×{n}"),
+    };
+
+    if priced.is_empty() {
+        return format!("×{n}");
+    }
+    let parts: Vec<String> = priced
+        .iter()
+        .map(|(r, amount)| format!("{} {}", fmt::exact(*amount), format!("{r:?}").to_lowercase()))
+        .collect();
+    format!("×{n}  {}", parts.join(", "))
 }
 
 /// The next copy's price, compactly. @spec TUI-NAV-009, TUI-RENDER-012
@@ -172,12 +213,24 @@ fn window_for(total: usize, cursor: usize, capacity: usize) -> Window {
 }
 
 /// Render one section's rows into a pane, deriving the scroll window from the
-/// cursor. @spec TUI-RENDER-009, TUI-RENDER-010, TUI-RENDER-011, TUI-RENDER-015
-fn draw_list(f: &mut Frame, area: Rect, state: &GameState, section: Section, cursor_key: Option<&RowKey>) {
+/// cursor. An open count prompt's preview draws on the exact row it was
+/// opened on, by that row's identity, never by list position — so a cursor
+/// that has since drifted (or an open prompt whose own row has left the
+/// list) never previews on the wrong line.
+/// @spec TUI-RENDER-009, TUI-RENDER-010, TUI-RENDER-011, TUI-RENDER-015, TUI-NAV-067
+fn draw_list(
+    f: &mut Frame,
+    area: Rect,
+    state: &GameState,
+    section: Section,
+    cursor_key: Option<&RowKey>,
+    prompt: Option<&CountPrompt>,
+) {
     let all = rows(state, section);
     let cursor = cursor_key
         .and_then(|k| all.iter().position(|r| &r.key == k))
         .unwrap_or(0);
+    let prompt_key = prompt.and_then(|p| p.row.as_ref());
 
     let capacity = area.height as usize;
     let win = window_for(all.len(), cursor, capacity);
@@ -193,7 +246,8 @@ fn draw_list(f: &mut Frame, area: Rect, state: &GameState, section: Section, cur
     }
     for (i, row) in all.iter().enumerate().skip(win.start).take(win.len) {
         let focused = i == cursor && row.selectable();
-        lines.push(row_line(state, row, focused, area.width as usize));
+        let on_this_row = prompt.filter(|_| prompt_key == Some(&row.key));
+        lines.push(row_line(state, row, focused, area.width as usize, on_this_row));
     }
     if win.hidden > 0 {
         lines.push(Line::from(Span::styled(
@@ -214,7 +268,13 @@ fn draw_list(f: &mut Frame, area: Rect, state: &GameState, section: Section, cur
 /// video, never a palette colour: the row's colour already says what its
 /// state is, and a second colour would be saying something else at the same
 /// time. @spec TUI-NAV-009, TUI-NAV-021, TUI-NAV-022, TUI-THEME-006, TUI-THEME-014
-fn row_line(state: &GameState, row: &Row, focused: bool, width: usize) -> Line<'static> {
+fn row_line(
+    state: &GameState,
+    row: &Row,
+    focused: bool,
+    width: usize,
+    prompt: Option<&CountPrompt>,
+) -> Line<'static> {
     let label = row_label(state, row);
     if matches!(row.kind, RowKind::Group) {
         return Line::from(Span::styled(
@@ -226,7 +286,10 @@ fn row_line(state: &GameState, row: &Row, focused: bool, width: usize) -> Line<'
     let (marker, role) = marker_for(state, row);
     let cursor = if focused { "▸ " } else { "  " };
     let count = owned_count(state, row);
-    let cost = next_cost_text(state, row);
+    let cost = match prompt {
+        Some(p) => count_prompt_preview(state, row, &p.digits),
+        None => next_cost_text(state, row),
+    };
 
     // Name gets whatever width the fixed parts leave.
     let fixed = cursor.len() + 2 + count.len() + cost.len() + 2;
@@ -300,12 +363,12 @@ pub fn frame(
                 if view.inspector_wanted {
                     widgets::inspector::draw(f, main, state, view);
                 } else {
-                    draw_list(f, main, state, section, cursor_key);
+                    draw_list(f, main, state, section, cursor_key, view.prompt.as_ref());
                 }
             }
             Body::Wide { sidebar, list, inspector } => {
                 widgets::chrome::sidebar(f, sidebar, state);
-                draw_list(f, list, state, section, cursor_key);
+                draw_list(f, list, state, section, cursor_key, view.prompt.as_ref());
                 widgets::inspector::draw(f, inspector, state, view);
             }
         },

@@ -27,6 +27,12 @@ pub enum Overlay {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct CountPrompt {
     pub digits: String,
+    /// The row this prompt was opened on, by identity — never the cursor's
+    /// current position, so the prompt's Enter always reaches the row it was
+    /// opened on, even if the cursor has since moved. `None` only in a
+    /// default-constructed value nothing in this crate opens a prompt from.
+    /// @spec TUI-NAV-072
+    pub row: Option<RowKey>,
 }
 
 /// A heavy row awaiting its second Enter. Advisory only: it reserves nothing,

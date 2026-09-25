@@ -44,6 +44,7 @@
 - [x] **SIM-ENG-038**: The system shall expose the total cost of taking a repeatable action a given number of times from current state, escalation included, so a caller previewing a bulk action does not reimplement the escalation rule outside the core.
 - [x] **SIM-ENG-039**: The system shall expose how far current stock covers an action's next cost as a fraction, so the distinction between partly and not-at-all affordable is drawn by the same rules that gate the action rather than by a caller's own threshold.
 - [x] **SIM-ENG-033**: Where a repeatable action's affordable count has a closed form, the system shall expose that count, so a caller can name it in advance instead of deriving it by attempting the action until it is rejected.
+- [x] **SIM-ENG-047**: The system shall expose the price of one unit, per component, of a command that takes its count as an argument and is priced a fixed amount per unit, n units of it costing exactly n times the price reported, and shall answer nothing for a command priced otherwise, for one that takes no count, and for one the command layer would refuse as locked — so a caller stating such a price reads it from the core rather than from the content tables, and no price of something not yet reached is stated.
 - [x] **SIM-ENG-010**: The system shall emit a KittenMood event only when the mood tier changes (tiers defined in SIM-KIT; entering or leaving Grumpy is a tier change).
 
 ## Zoomies

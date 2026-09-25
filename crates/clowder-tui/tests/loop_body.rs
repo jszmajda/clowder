@@ -290,7 +290,7 @@ fn an_open_field_outlasts_every_timer_while_the_sim_runs_beneath_it() {
             "a count prompt",
             ViewState {
                 section: Some(Section::Meadow),
-                prompt: Some(CountPrompt { digits: "12".to_string() }),
+                prompt: Some(CountPrompt { digits: "12".to_string(), ..Default::default() }),
                 ..ViewState::default()
             },
         ),

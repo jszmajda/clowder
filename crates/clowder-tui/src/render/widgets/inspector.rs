@@ -17,7 +17,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::nav::rows::{rows, RowKey};
+use crate::nav::rows::{rows, RowKey, RowKind};
 use crate::nav::{Section, ViewState};
 use crate::render::fmt;
 
@@ -229,12 +229,23 @@ fn cost_lines(state: &GameState, id: ContentId) -> Vec<String> {
         .collect()
 }
 
+/// The lines describing a fixed-per-unit command's price, one per component:
+/// what one unit needs and what the player has, in each's exact form.
+/// @spec TUI-NAV-073
+fn unit_cost_lines(state: &GameState, unit: &[(ResourceId, f64)]) -> Vec<String> {
+    unit.iter()
+        .map(|(r, need)| {
+            format!("{}: need {}, have {}", resource_label(*r), fmt::exact(*need), fmt::exact(state.stock(*r)))
+        })
+        .collect()
+}
+
 /// The whole of the inspector's content for one row.
 /// @spec TUI-NAV-018
 fn draw_body(f: &mut Frame, area: Rect, state: &GameState, section: Section, key: &RowKey) {
-    if rows(state, section).iter().all(|r| &r.key != key) {
+    let Some(row) = rows(state, section).into_iter().find(|r| &r.key == key) else {
         return;
-    }
+    };
 
     let mut text = full_name(state, key);
 
@@ -256,6 +267,14 @@ fn draw_body(f: &mut Frame, area: Rect, state: &GameState, section: Section, key
             text.push_str("\n\n");
             text.push_str(&lock_sentence(&reason));
         }
+    } else if let RowKind::Act { command, .. } = &row.kind {
+        // A Pounce or Trade row: not content, but still count-taking and
+        // priced — the price of the one unit the core reports, per
+        // component. @spec TUI-NAV-073, SIM-ENG-047
+        if let Some(unit) = state.unit_price(command) {
+            text.push_str("\n\nNext cost:\n");
+            text.push_str(&unit_cost_lines(state, &unit).join("\n"));
+        }
     }
 
     let lines: Vec<Line<'static>> = text.lines().map(|l| Line::from(l.to_string())).collect();
@@ -266,7 +285,9 @@ fn draw_body(f: &mut Frame, area: Rect, state: &GameState, section: Section, key
 /// Flavour name, plain description, exact next cost with have/need per
 /// component, time-to-afford at the current net rate, owned count and effects,
 /// and — for anything not actionable — the plain reason, taken from the core
-/// rather than decided here. @spec TUI-NAV-018
+/// rather than decided here. On a Pounce or Trade row (not content, but still
+/// priced), the next cost is the core's one-unit price instead.
+/// @spec TUI-NAV-018, TUI-NAV-073
 pub fn draw(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     let section = view.section.unwrap_or(DEFAULT_SECTION);
     let Some(key) = view.focus[section.index()].clone() else {

@@ -129,6 +129,51 @@ impl GameState {
         Ok(events)
     }
 
+    /// The price of one unit of a count-taking command whose price is fixed
+    /// per unit — a Pounce (per squad) or a Trade (per caravan, the Star
+    /// Whale's own exchange included) — regardless of the count the command
+    /// happens to carry. Answers nothing for a count-taking command priced
+    /// otherwise (a Deep Nap's price escalates with its length), for a
+    /// command that takes no count, and for a command still locked, decided
+    /// by the same checks `apply` makes before any resource is costed — so a
+    /// caller never states a price for something not yet reached.
+    // @spec SIM-ENG-047
+    pub fn unit_price(&self, cmd: &Command) -> Option<Vec<(ResourceId, f64)>> {
+        match *cmd {
+            Command::Pounce(_) => {
+                if !self.ideas.contains(&IdeaId::PouncingPractice) {
+                    return None;
+                }
+                Some(vec![(ResourceId::Pep, content::POUNCE_PEP_PER_SQUAD)])
+            }
+            Command::Trade(colony, _) => {
+                if colony == ColonyId::StarWhales {
+                    if self.whale_visit_years == 0 {
+                        return None;
+                    }
+                    return Some(vec![(ResourceId::Hushfelt, content::WHALE_HUSHFELT_PER_CARAVAN)]);
+                }
+                if !self.discovered.contains(&colony) {
+                    return None;
+                }
+                let def = content::colony_def(colony);
+                let mut price = vec![
+                    (ResourceId::Pep, content::TRADE_PEP_PER_CARAVAN),
+                    (ResourceId::Shinies, content::TRADE_SHINIES_PER_CARAVAN),
+                ];
+                // A colony may buy in Pep or Shinies itself, which the trade
+                // fee already names — merge rather than list the same
+                // component twice.
+                match price.iter_mut().find(|(r, _)| *r == def.buy.0) {
+                    Some((_, amount)) => *amount += def.buy.1,
+                    None => price.push(def.buy),
+                }
+                Some(price)
+            }
+            _ => None,
+        }
+    }
+
     /// The command dispatch itself, kept apart from journaling so a rejected
     /// command (an `Err` here) never reaches `apply`'s recording step.
     // @spec SIM-ENG-005
@@ -1216,7 +1261,19 @@ impl GameState {
     /// All-or-nothing spend with epsilon-tolerant affordability.
     // @spec SIM-ECO-022
     fn spend(&mut self, costs: &[(ResourceId, f64)]) -> Result<(), CommandError> {
-        let missing: Vec<(ResourceId, f64)> = costs
+        // A cost list may name the same component twice (a colony that buys
+        // in the same resource its trade fee already spends, say) — checked
+        // against the combined total, never against each entry alone, or a
+        // stock short of the true total could slip past two individually
+        // satisfied checks.
+        let mut totals: Vec<(ResourceId, f64)> = Vec::new();
+        for (r, amount) in costs {
+            match totals.iter_mut().find(|(tr, _)| tr == r) {
+                Some((_, total)) => *total += amount,
+                None => totals.push((*r, *amount)),
+            }
+        }
+        let missing: Vec<(ResourceId, f64)> = totals
             .iter()
             .filter(|(r, amount)| self.stock(*r) + EPSILON < *amount)
             .map(|(r, amount)| (*r, amount - self.stock(*r)))

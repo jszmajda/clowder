@@ -165,6 +165,7 @@ fn counting() -> ViewState {
     ViewState {
         prompt: Some(CountPrompt {
             digits: "1".to_string(),
+            ..Default::default()
         }),
         ..bare()
     }
@@ -520,6 +521,49 @@ fn uppercase_is_the_modifier_tier_and_case_is_never_folded() {
         "x and X resolve to the same action; uppercase is the shift tier, and folding case \
          collapses the only modifier the tmux constraint leaves us"
     );
+}
+
+/// The uppercase tier has exactly one member. Caps Lock turns `x` into `X`
+/// already; if any other uppercase letter were bound — an uppercase screen
+/// mnemonic acting as that row's ×max, say — Caps Lock would turn every
+/// mnemonic press into a bulk spend the player never asked for. So on every
+/// screen where the global table is live (bare, with a heavy row armed, under
+/// an unread report's banner), every uppercase letter but `X` is an unbound
+/// key: ignored, with no footer, however the terminal flags the Shift. `X`
+/// itself stays the max key in every one of those contexts.
+///
+/// @spec TUI-NAV-004
+#[test]
+fn x_is_the_only_uppercase_key_and_every_other_capital_is_unbound() {
+    let mut contexts: Vec<(String, ViewState)> = Section::ALL
+        .into_iter()
+        .map(|s| (format!("the {} screen", s.title()), screen(s)))
+        .collect();
+    contexts.push(("a heavy row armed".to_string(), armed()));
+    contexts.push(("an unread report banner".to_string(), banner()));
+
+    for (what, view) in &contexts {
+        for c in 'A'..='Z' {
+            for key in [ch(c), shifted(c)] {
+                let got = resolve(key, view);
+                if c == 'X' {
+                    assert_eq!(
+                        got,
+                        Action::MaxAffordable,
+                        "on {what}, X resolved to {got:?}; it is the uppercase tier's one member"
+                    );
+                } else {
+                    assert_eq!(
+                        got,
+                        Action::Ignored,
+                        "on {what}, uppercase {c:?} resolved to {got:?}. X is the only \
+                         uppercase key; any other capital is unbound and ignored silently, so \
+                         Caps Lock can never turn a mnemonic press into a bulk act"
+                    );
+                }
+            }
+        }
+    }
 }
 
 /// Shift emits a plain printable character — that is the whole reason uppercase

@@ -22,13 +22,15 @@ use std::collections::BTreeSet;
 use clowder_core::content::MEADOW_MOVE_MIN_KITTENS;
 use clowder_core::{
     ArchId, Availability, ColonyId, Command, ContentId, CraftId, GameState, IdeaId, JobId, Kitten,
-    KittenTrait, LockReason, Location, ResourceId, RiteId, StructureId,
+    KittenTrait, LockReason, Location, ResourceId, RiteId, RuleId, StructureId,
 };
 
 use clowder_tui::nav::keys::resolve;
-use clowder_tui::nav::rows::{rows, RowKind};
+use clowder_tui::nav::rows::{rows, Row, RowKind};
+use clowder_tui::nav::update::MAX_AFFORDABLE_CAP;
 use clowder_tui::nav::{
-    update, Action, ArmedRow, Outcome, Overlay, PendingReport, RowKey, Section, ViewState,
+    update, Action, ArmedRow, CountSemantics, Outcome, Overlay, PendingReport, RowKey, Section,
+    ViewState,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -927,6 +929,448 @@ fn x_scales_a_count_row_by_repeat_calling_its_assign() {
 }
 
 // ---------------------------------------------------------------------------
+// Which rows take a count, quantified over every row the game lists
+//
+// The claims below are about *every* row of a kind, so they walk every
+// selectable row of every section rather than one example. A row's class is
+// read from its tag (TUI-NAV-031) and from the core's ownership report — never
+// from a list of commands — so the tests stay the requirement whichever
+// command a later cascade retags.
+// ---------------------------------------------------------------------------
+
+/// Every selectable row of every section, with the section it is in.
+fn every_row(state: &GameState) -> Vec<(Section, Row)> {
+    Section::ALL
+        .into_iter()
+        .flat_map(|section| {
+            rows(state, section)
+                .into_iter()
+                .filter(|r| r.selectable())
+                .map(move |r| (section, r))
+        })
+        .collect()
+}
+
+/// Whether the core reports the row's content item as already the player's.
+fn owned(state: &GameState, row: &Row) -> bool {
+    match &row.key {
+        RowKey::Content(id, _) => state.lock_reason(*id) == Some(LockReason::AlreadyYours),
+        _ => false,
+    }
+}
+
+/// Whether `x` opens the count prompt on this row: a row tagged count-taking or
+/// repeat-N, or a count row, that the core does not report as already the
+/// player's. @spec TUI-NAV-011
+fn opens_prompt(state: &GameState, row: &Row) -> bool {
+    !owned(state, row)
+        && match &row.kind {
+            RowKind::Act { semantics, .. } => {
+                matches!(semantics, CountSemantics::CountTaking | CountSemantics::RepeatN)
+            }
+            RowKind::Count { .. } => true,
+            RowKind::Display | RowKind::Group => false,
+        }
+}
+
+/// Whether the row is count-taking.
+fn is_count_taking(row: &Row) -> bool {
+    matches!(row.kind, RowKind::Act { semantics: CountSemantics::CountTaking, .. })
+}
+
+/// What a count prompt's Enter with a count of `n` asks of the core on a row
+/// that does not arm: the count passed once to a count-taking command, or a
+/// repeat-N command or a count row's assign called `n` times. @spec TUI-NAV-070
+fn accepted(row: &Row, n: u32) -> Outcome {
+    match &row.kind {
+        RowKind::Act { command, semantics: CountSemantics::CountTaking } => {
+            Outcome::Apply(with_count(*command, n))
+        }
+        RowKind::Act { command, semantics: CountSemantics::RepeatN } => Outcome::Repeat(*command, n),
+        RowKind::Count { increment, .. } => Outcome::Repeat(*increment, n),
+        other => panic!("fixture: {:?} is not a row the count prompt opens on ({other:?})", row.key),
+    }
+}
+
+/// One unit of the row's action: what each call of an `X` run carries.
+/// @spec TUI-NAV-012
+fn one_unit(row: &Row) -> Command {
+    match &row.kind {
+        RowKind::Act { command, semantics: CountSemantics::CountTaking } => with_count(*command, 1),
+        RowKind::Act { command, .. } => *command,
+        RowKind::Count { increment, .. } => *increment,
+        other => panic!("fixture: {:?} has no action to scale ({other:?})", row.key),
+    }
+}
+
+/// The command a row would put through the core on Enter, if it has one.
+fn row_command(row: &Row) -> Option<Command> {
+    match &row.kind {
+        RowKind::Act { command, .. } => Some(*command),
+        RowKind::Count { increment, .. } => Some(*increment),
+        RowKind::Display | RowKind::Group => None,
+    }
+}
+
+/// Open the count prompt on `row` the way a player does, and type `digits`.
+fn open_and_type(
+    section: Section,
+    row: &Row,
+    digits: &str,
+    state: &GameState,
+) -> ViewState {
+    let mut view = focused(section, row.key.clone());
+    let out = update(Action::CountPrompt, &mut view, state);
+    assert_eq!(out, Outcome::Handled, "x on {:?} asked the core for something", row.key);
+    assert!(view.prompt.is_some(), "x on {:?} opened no count prompt", row.key);
+    for c in digits.chars() {
+        update(Action::Type(c), &mut view, state);
+    }
+    view
+}
+
+/// `rich()`, with one heavy rule already adopted — so an owned heavy row is
+/// on the list alongside the owned one-shot `rich()` already carries.
+fn rich_with_an_adopted_rule() -> GameState {
+    let base = rich();
+    for r in RuleId::ALL {
+        let mut s = base.clone();
+        s.rules.insert(r);
+        let id = ContentId::Rule(r);
+        let listed = rows(&s, Section::Ideas)
+            .iter()
+            .any(|row| row.key == RowKey::Content(id, "") && row.heavy);
+        if listed && s.lock_reason(id) == Some(LockReason::AlreadyYours) {
+            return s;
+        }
+    }
+    panic!("fixture: no rule can be adopted and still be listed as an owned heavy row");
+}
+
+/// `x` opens the count prompt on every row whose command takes a count or is
+/// repeated N times, and on every count row — the heavy DeepNap row among them
+/// — unless the core reports the row's item as already the player's; on every
+/// other row it opens nothing. Wherever it opens, Esc closes it with no effect:
+/// nothing fires, nothing arms, and the cursor stays where it was.
+///
+/// @spec TUI-NAV-011
+#[test]
+fn x_opens_the_count_prompt_on_exactly_the_rows_that_take_a_count() {
+    let state = rich_with_an_adopted_rule();
+    let (mut repeat_n, mut count_taking, mut count_rows, mut heavy) = (0, 0, 0, 0);
+
+    for (section, row) in every_row(&state) {
+        let mut view = focused(section, row.key.clone());
+        let out = update(Action::CountPrompt, &mut view, &state);
+        assert_eq!(
+            commands_of(&out),
+            None,
+            "x on {:?} put a command through the core; x only opens a prompt",
+            row.key
+        );
+
+        if !opens_prompt(&state, &row) {
+            assert!(
+                view.prompt.is_none(),
+                "x opened a count prompt on {:?}, a row that takes no count (or is already the \
+                 player's)",
+                row.key
+            );
+            continue;
+        }
+
+        assert!(
+            view.prompt.is_some(),
+            "x on {:?} opened no count prompt; every row tagged count-taking or repeat-N, and \
+             every count row, takes one",
+            row.key
+        );
+        assert_eq!(
+            view.prompt.as_ref().map(|p| p.digits.as_str()),
+            Some(""),
+            "the count prompt on {:?} opened with something already typed",
+            row.key
+        );
+        assert!(view.armed.is_none(), "x on {:?} armed the row", row.key);
+        match &row.kind {
+            RowKind::Count { .. } => count_rows += 1,
+            _ if row.heavy => heavy += 1,
+            _ if is_count_taking(&row) => count_taking += 1,
+            _ => repeat_n += 1,
+        }
+
+        // Esc closes it, and nothing else changes.
+        update(Action::Type('5'), &mut view, &state);
+        let out = update(Action::Dismiss, &mut view, &state);
+        assert_eq!(out, Outcome::Handled, "Esc on the count prompt over {:?} acted", row.key);
+        assert!(view.prompt.is_none(), "Esc left the count prompt over {:?} open", row.key);
+        assert!(view.armed.is_none(), "Esc on the count prompt over {:?} armed it", row.key);
+        assert!(
+            view.footer.is_none(),
+            "Esc on the count prompt over {:?} left a footer note; closing is no effect",
+            row.key
+        );
+        assert_eq!(
+            view.focus[section.index()].as_ref(),
+            Some(&row.key),
+            "Esc on the count prompt moved the cursor off {:?}",
+            row.key
+        );
+    }
+
+    assert!(repeat_n > 0, "fixture: no repeat-N row was listed");
+    assert!(count_taking > 0, "fixture: no ordinary count-taking row was listed");
+    assert!(count_rows > 0, "fixture: no count row was listed");
+    assert!(heavy > 0, "fixture: the heavy DeepNap row was not listed");
+}
+
+/// The prompt's Enter with a nonzero count does what the row takes a count as:
+/// passes it once to a count-taking command, calls a repeat-N command or a
+/// count row's assign that many times — the core arbitrating each call — and on
+/// DeepNap, arms the row with the counted command instead of firing.
+///
+/// @spec TUI-NAV-070
+#[test]
+fn the_count_prompts_enter_does_what_each_row_takes_a_count_as() {
+    let state = rich();
+    let mut seen = 0;
+
+    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| opens_prompt(&state, r)) {
+        seen += 1;
+        let mut view = open_and_type(section, &row, "6", &state);
+        let out = update(Action::Activate, &mut view, &state);
+        assert!(view.prompt.is_none(), "the count prompt over {:?} stayed open", row.key);
+
+        if row.heavy {
+            assert_eq!(
+                out,
+                Outcome::Handled,
+                "the prompt's Enter on the heavy {:?} fired; it arms, and a distinct Enter commits",
+                row.key
+            );
+            let armed = view.armed.as_ref().unwrap_or_else(|| {
+                panic!("the prompt's Enter on the heavy {:?} armed nothing", row.key)
+            });
+            assert_eq!(armed.key, row.key, "the prompt's Enter armed a different row");
+            assert_eq!(
+                Some(armed.command),
+                row_command(&row).map(|c| with_count(c, 6)),
+                "the armed {:?} does not carry the typed count",
+                row.key
+            );
+        } else {
+            assert_eq!(
+                out,
+                accepted(&row, 6),
+                "×6 on {:?} did not ask the core for what that row takes a count as",
+                row.key
+            );
+            assert!(view.armed.is_none(), "×6 on the ordinary {:?} armed it", row.key);
+        }
+    }
+    assert!(seen > 0, "fixture: no row opens the count prompt");
+}
+
+/// The count prompt makes no affordability pre-check. With the stores empty,
+/// every row it opens on — Teased and unaffordable ones included — opens it
+/// exactly as a rich meadow's does, and its Enter attempts the count, leaving
+/// the core to accept or reject it.
+///
+/// @spec TUI-NAV-071
+#[test]
+fn the_count_prompt_opens_and_attempts_on_rows_the_stock_cannot_cover() {
+    let mut state = rich();
+    for r in ResourceId::ALL {
+        state.resources[r.ix()] = 0.0;
+    }
+
+    let teased = every_row(&state).into_iter().any(|(_, r)| match &r.key {
+        RowKey::Content(id, _) => state.availability(*id) == Availability::Teased,
+        _ => false,
+    });
+    assert!(teased, "fixture: with the stores empty, some listed row should be Teased");
+
+    let mut seen = 0;
+    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| opens_prompt(&state, r)) {
+        seen += 1;
+        let mut view = focused(section, row.key.clone());
+        update(Action::CountPrompt, &mut view, &state);
+        assert!(
+            view.prompt.is_some(),
+            "x on {:?} opened no count prompt with the stores empty; the prompt makes no \
+             affordability pre-check",
+            row.key
+        );
+        assert!(
+            view.footer.is_none(),
+            "x on the unaffordable {:?} left a footer note; the core, not the shell, says what is \
+             short — and only once the count is attempted",
+            row.key
+        );
+        update(Action::Type('3'), &mut view, &state);
+        let out = update(Action::Activate, &mut view, &state);
+        if row.heavy {
+            assert!(
+                view.armed.as_ref().is_some_and(|a| a.key == row.key),
+                "the prompt's Enter on the unaffordable heavy {:?} did not arm it; arming \
+                 reserves nothing and pre-checks nothing",
+                row.key
+            );
+        } else {
+            assert_eq!(
+                out,
+                accepted(&row, 3),
+                "×3 on the unaffordable {:?} was not attempted; the core is the single arbiter",
+                row.key
+            );
+        }
+    }
+    assert!(seen > 0, "fixture: no row opens the count prompt");
+}
+
+/// An open prompt belongs to the row it was opened on, by that row's identity.
+/// Whatever the focus reads by the time Enter is pressed — modelled here by
+/// moving it to another row of the same section beneath the open prompt — the
+/// prompt's Enter acts on its own row, never on another.
+///
+/// @spec TUI-NAV-072
+#[test]
+fn an_open_count_prompt_acts_only_on_the_row_it_was_opened_on() {
+    let state = rich();
+    let mut seen = 0;
+
+    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| opens_prompt(&state, r)) {
+        let Some(other) = rows(&state, section)
+            .into_iter()
+            .find(|r| r.selectable() && r.key != row.key && row_command(r) != row_command(&row))
+        else {
+            continue;
+        };
+        seen += 1;
+
+        let mut view = open_and_type(section, &row, "4", &state);
+        view.focus[section.index()] = Some(other.key.clone());
+        let out = update(Action::Activate, &mut view, &state);
+
+        if let Some(theirs) = row_command(&other) {
+            assert!(
+                !would_fire(&out, theirs) && !would_fire(&out, with_count(theirs, 4)),
+                "the prompt opened on {:?} acted on {:?} instead",
+                row.key,
+                other.key
+            );
+        }
+        if row.heavy {
+            let armed = view.armed.as_ref().unwrap_or_else(|| {
+                panic!("the prompt opened on the heavy {:?} armed nothing", row.key)
+            });
+            assert_eq!(
+                armed.key, row.key,
+                "the prompt opened on {:?} armed {:?}; it belongs to its own row",
+                row.key, armed.key
+            );
+        } else {
+            assert_eq!(
+                out,
+                accepted(&row, 4),
+                "the prompt opened on {:?} did not act on that row once the focus read {:?}",
+                row.key,
+                other.key
+            );
+        }
+    }
+    assert!(seen > 0, "fixture: no section holds a prompt row beside another row");
+}
+
+/// The sim keeps ticking under an open prompt, and a section's rows are
+/// re-derived from state every frame, so the prompt's row can leave its list
+/// before Enter is pressed. Then the prompt closes with no effect — nothing
+/// fires, nothing arms — and a footer note says the row has gone. Modelled by
+/// pressing Enter against a meadow in which the row is not listed.
+///
+/// @spec TUI-NAV-072
+#[test]
+fn a_count_prompt_whose_row_has_left_its_list_closes_with_no_effect_and_says_so() {
+    let state = rich();
+    let gone = fresh();
+    let (mut repeat_n, mut count_taking, mut count_rows, mut heavy) = (0, 0, 0, 0);
+
+    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| opens_prompt(&state, r)) {
+        if rows(&gone, section).iter().any(|r| r.key == row.key) {
+            continue;
+        }
+        match &row.kind {
+            RowKind::Count { .. } => count_rows += 1,
+            _ if row.heavy => heavy += 1,
+            _ if is_count_taking(&row) => count_taking += 1,
+            _ => repeat_n += 1,
+        }
+
+        let mut view = open_and_type(section, &row, "4", &state);
+        let out = update(Action::Activate, &mut view, &gone);
+
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "Enter on a prompt whose row {:?} is no longer listed asked the core for something",
+            row.key
+        );
+        assert!(view.prompt.is_none(), "the prompt over the vanished {:?} stayed open", row.key);
+        assert!(view.armed.is_none(), "the prompt over the vanished {:?} armed a row", row.key);
+        assert_footer_says_something_plain(
+            &view,
+            &format!("Enter on a prompt whose row {:?} has left its list", row.key),
+        );
+    }
+
+    assert!(repeat_n > 0, "fixture: no repeat-N row leaves its list in a fresh meadow");
+    assert!(count_taking > 0, "fixture: no count-taking row leaves its list in a fresh meadow");
+    assert!(count_rows > 0, "fixture: no count row leaves its list in a fresh meadow");
+    assert!(heavy > 0, "fixture: the DeepNap row does not leave its list in a fresh meadow");
+}
+
+/// `X` runs on every row that is not heavy, not already the player's, and
+/// takes a count or is repeated N times, and on every count row — one unit per
+/// call: a repeat-N command as it stands, a count-taking command with a count
+/// of one, a count row's assign — repeatedly, not as a single call.
+///
+/// @spec TUI-NAV-012
+#[test]
+fn x_max_runs_every_row_that_takes_a_count_one_unit_per_call() {
+    let state = rich();
+    let (mut count_taking, mut seen) = (0, 0);
+
+    for (section, row) in every_row(&state)
+        .into_iter()
+        .filter(|(_, r)| opens_prompt(&state, r) && !r.heavy)
+    {
+        seen += 1;
+        if is_count_taking(&row) {
+            count_taking += 1;
+        }
+        let mut view = focused(section, row.key.clone());
+        let out = update(Action::MaxAffordable, &mut view, &state);
+
+        assert_eq!(
+            commands_of(&out),
+            Some(one_unit(&row)),
+            "X on {:?} yielded {out:?}; each call of an X run carries one unit of the row's \
+             action — a count-taking command with a count of one",
+            row.key
+        );
+        assert!(
+            !matches!(out, Outcome::Apply(_)),
+            "X on {:?} asked for a single call; X applies the action repeatedly until the core \
+             rejects it or the cap is reached",
+            row.key
+        );
+        assert!(view.prompt.is_none() && view.armed.is_none(), "X on {:?} opened or armed", row.key);
+    }
+    assert!(seen > 0, "fixture: no row X runs on is listed");
+    assert!(count_taking > 0, "fixture: no count-taking row X runs on is listed");
+}
+
+// ---------------------------------------------------------------------------
 // TUI-NAV-041 — no-ops that say so
 // ---------------------------------------------------------------------------
 
@@ -1030,6 +1474,121 @@ fn a_footer_note_never_swallows_the_next_key() {
          a dialog wearing a footer's clothes"
     );
     assert!(view.overlay.is_none(), "a footer note put an overlay on screen");
+}
+
+/// Every row `x` or `X` does not act on says why, and the three reasons are
+/// three different notes:
+///
+/// * a row whose item the core reports as already the player's answers Enter,
+///   `x` and `X` alike with a note that it is theirs — checked before anything
+///   else the key would do, so an owned heavy row never arms, and `X` on it
+///   does not fall through to the heavy-row note;
+/// * a row tagged single, or a display-only row with no command, answers `x`
+///   and `X` with a note that there is nothing to count;
+/// * `X` on a heavy row of any tag, DeepNap included, answers instead that the
+///   row takes a deliberate Enter, not `X` — a note that there is nothing to
+///   count would be untrue of DeepNap.
+///
+/// Quantified over every row the game lists in a meadow holding an owned
+/// one-shot and an owned heavy row.
+///
+/// @spec TUI-NAV-041
+#[test]
+fn x_and_x_max_say_why_on_every_row_they_do_not_act_on() {
+    let state = rich_with_an_adopted_rule();
+    let mut owned_notes: BTreeSet<String> = BTreeSet::new();
+    let mut nothing_notes: BTreeSet<String> = BTreeSet::new();
+    let mut deliberate_notes: BTreeSet<String> = BTreeSet::new();
+    let (mut owned_heavy, mut display, mut heavy_single, mut heavy_counted) = (0, 0, 0, 0);
+
+    let note = |view: &ViewState| view.footer.as_ref().map(|(m, _)| m.clone()).unwrap_or_default();
+
+    for (section, row) in every_row(&state) {
+        let what = format!("{:?}", row.key);
+
+        if owned(&state, &row) {
+            if row.heavy {
+                owned_heavy += 1;
+            }
+            for action in [Action::Activate, Action::CountPrompt, Action::MaxAffordable] {
+                let mut view = focused(section, row.key.clone());
+                let out = update(action.clone(), &mut view, &state);
+                assert_eq!(
+                    commands_of(&out),
+                    None,
+                    "{action:?} on {what}, which the core reports as already the player's, put a \
+                     command through the core"
+                );
+                assert!(view.armed.is_none(), "{action:?} on the owned {what} armed it");
+                assert!(view.prompt.is_none(), "{action:?} on the owned {what} opened a prompt");
+                assert_footer_says_something_plain(&view, &format!("{action:?} on the owned {what}"));
+                owned_notes.insert(note(&view));
+            }
+            continue;
+        }
+
+        let nothing_to_count = matches!(
+            row.kind,
+            RowKind::Act { semantics: CountSemantics::Single, .. } | RowKind::Display
+        );
+        if matches!(row.kind, RowKind::Display) {
+            display += 1;
+        }
+
+        if nothing_to_count {
+            let mut view = focused(section, row.key.clone());
+            let out = update(Action::CountPrompt, &mut view, &state);
+            assert_eq!(commands_of(&out), None, "x on {what}, which has nothing to count, acted");
+            assert!(view.prompt.is_none(), "x on {what} opened a count prompt");
+            assert!(view.armed.is_none(), "x on {what} armed it");
+            assert_footer_says_something_plain(&view, &format!("x on {what}"));
+            nothing_notes.insert(note(&view));
+        }
+
+        let mut view = focused(section, row.key.clone());
+        let out = update(Action::MaxAffordable, &mut view, &state);
+        if row.heavy {
+            if nothing_to_count {
+                heavy_single += 1;
+            } else {
+                heavy_counted += 1;
+            }
+            assert_eq!(commands_of(&out), None, "X on the heavy {what} put a command through");
+            assert!(view.armed.is_none(), "X on the heavy {what} armed it");
+            assert!(view.prompt.is_none(), "X on the heavy {what} opened a prompt");
+            assert_footer_says_something_plain(&view, &format!("X on the heavy {what}"));
+            let said = note(&view);
+            assert!(
+                said.contains("Enter"),
+                "X on the heavy {what} said {said:?}; the note is that the row takes a \
+                 deliberate Enter, not X"
+            );
+            deliberate_notes.insert(said);
+        } else if nothing_to_count {
+            assert_eq!(commands_of(&out), None, "X on {what}, which has nothing to count, acted");
+            assert!(view.prompt.is_none() && view.armed.is_none(), "X on {what} opened or armed");
+            assert_footer_says_something_plain(&view, &format!("X on {what}"));
+            nothing_notes.insert(note(&view));
+        }
+    }
+
+    assert!(owned_heavy > 0, "fixture: no owned heavy row is listed");
+    assert!(display > 0, "fixture: no display-only row is listed");
+    assert!(heavy_single > 0, "fixture: no heavy single row is listed");
+    assert!(heavy_counted > 0, "fixture: the heavy DeepNap row is not listed");
+
+    for (a_name, a, b_name, b) in [
+        ("already the player's", &owned_notes, "nothing to count", &nothing_notes),
+        ("already the player's", &owned_notes, "takes a deliberate Enter", &deliberate_notes),
+        ("nothing to count", &nothing_notes, "takes a deliberate Enter", &deliberate_notes),
+    ] {
+        let shared: Vec<&String> = a.intersection(b).collect();
+        assert!(
+            shared.is_empty(),
+            "the note for {a_name:?} and the note for {b_name:?} read the same ({shared:?}); \
+             three different reasons are three different notes"
+        );
+    }
 }
 
 fn assert_footer_says_something_plain(view: &ViewState, context: &str) {
@@ -1502,7 +2061,12 @@ fn the_palette_takes_every_printable_character_into_its_query() {
 /// character in the count, and not a footer note either: a key with nothing to
 /// mean in its context is silent (TUI-NAV-042), and a count is digits only.
 ///
-/// @spec TUI-NAV-037
+/// A digit that would carry the count past the shell-side cap is the one
+/// exception (TUI-NAV-068): it is refused with a footer note rather than
+/// silently ignored, so once the accumulating count reaches the cap the rest
+/// of this run's digits are checked against that instead.
+///
+/// @spec TUI-NAV-037, TUI-NAV-068
 #[test]
 fn the_count_prompt_takes_the_digits_and_silently_ignores_every_other_printable() {
     let state = rich();
@@ -1517,26 +2081,47 @@ fn the_count_prompt_takes_the_digits_and_silently_ignores_every_other_printable(
         );
 
         let mut expected = String::new();
+        // Once a digit is refused for carrying the count past the cap, the
+        // refusal's footer note stands (nothing past this point clears it)
+        // — an ignored non-digit key does not clear a footer any more than
+        // a taken digit does — so every remaining key in this single
+        // ascending pass over the printable range is checked against that,
+        // not against silence. @spec TUI-NAV-068
+        let mut past_cap = false;
         for c in ' '..='~' {
             let out = press_char(c, &mut view, &state);
-            if c.is_ascii_digit() {
-                expected.push(c);
+            if c.is_ascii_digit() && !past_cap {
+                let candidate = format!("{expected}{c}");
+                if candidate.parse::<u64>().is_ok_and(|n| n <= MAX_AFFORDABLE_CAP as u64) {
+                    expected = candidate;
+                } else {
+                    past_cap = true;
+                }
             }
             assert_eq!(out, Outcome::Handled, "on {}, {c:?} in the count prompt told the core {out:?}", row.what);
             assert_eq!(
                 prompt_digits(&view),
                 Some(expected.clone()),
                 "on {}, after {c:?} the count read {:?}; the count prompt takes the digits 0–9 \
-                 and ignores every other printable character and Space",
+                 up to the cap and ignores every other printable character and Space",
                 row.what,
                 prompt_digits(&view)
             );
-            assert!(
-                view.footer.is_none(),
-                "on {}, {c:?} in the count prompt earned a footer note; a key with nothing to \
-                 mean there is silent",
-                row.what
-            );
+            if past_cap {
+                assert!(
+                    view.footer.is_some(),
+                    "on {}, past the cap, {c:?} in the count prompt left no footer note \
+                     (TUI-NAV-068)",
+                    row.what
+                );
+            } else {
+                assert!(
+                    view.footer.is_none(),
+                    "on {}, {c:?} in the count prompt earned a footer note; a key with nothing to \
+                     mean there is silent",
+                    row.what
+                );
+            }
             assert!(view.overlay.is_none(), "on {}, {c:?} in the count prompt opened an overlay", row.what);
             assert_eq!(view.section, Some(row.section), "on {}, {c:?} in the count prompt moved the section", row.what);
             assert_eq!(view.focus[row.section.index()].as_ref(), Some(&row.key), "on {}, {c:?} moved the cursor", row.what);

@@ -8,7 +8,7 @@
 use clowder_core::{GameState, Location, MoodTier, ResourceId};
 use ratatui::{layout::Rect, text::Line, widgets::Paragraph, Frame};
 
-use crate::nav::rows::{rows, RowKind};
+use crate::nav::rows::{rows, Row, RowKey, RowKind};
 use crate::nav::{Overlay, Section, ViewState};
 use crate::render::fmt;
 
@@ -226,11 +226,11 @@ pub fn sidebar(f: &mut Frame, area: Rect, state: &GameState) {
 // Hint bar
 // ---------------------------------------------------------------------------
 
-/// The focused row's kind, if any row is focused in the current section.
-fn focused_kind(state: &GameState, view: &ViewState) -> Option<RowKind> {
+/// The focused row, if any row is focused in the current section.
+fn focused_row(state: &GameState, view: &ViewState) -> Option<Row> {
     let section = view.section.unwrap_or(Section::Meadow);
     let key = view.focus[section.index()].as_ref()?;
-    rows(state, section).into_iter().find(|r| &r.key == key).map(|r| r.kind)
+    rows(state, section).into_iter().find(|r| &r.key == key)
 }
 
 /// Context keys, most-relevant-first, always ending with the help key. Drops
@@ -239,7 +239,8 @@ fn focused_kind(state: &GameState, view: &ViewState) -> Option<RowKind> {
 /// A field (the count prompt, or the palette) holds the keyboard, so it owns
 /// this line too — in place of *any* other context's, an armed row's beneath
 /// it included, since the field is what the next Enter actually reaches.
-/// @spec TUI-NAV-023, TUI-NAV-024, TUI-NAV-045, TUI-NAV-046, TUI-NAV-066
+/// @spec TUI-NAV-023, TUI-NAV-024, TUI-NAV-045, TUI-NAV-046, TUI-NAV-066,
+/// TUI-NAV-074
 pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     const HELP: &str = "? help";
 
@@ -250,25 +251,49 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     } else if view.armed.is_some() {
         vec!["Enter yes, truly", "Esc not today"]
     } else {
-        match focused_kind(state, view) {
-            Some(RowKind::Act { semantics, .. }) => {
-                use crate::nav::CountSemantics;
-                match semantics {
-                    CountSemantics::Single => {
-                        vec!["↑↓ choose", "Enter do", "Space details", "Tab next"]
-                    }
-                    CountSemantics::RepeatN => {
-                        vec!["Enter build", "x amount", "X max", "Space details", "↑↓ choose", "Tab next"]
-                    }
-                    CountSemantics::CountTaking => {
-                        vec!["Enter do", "x amount", "X max", "Space details", "↑↓ choose", "Tab next"]
+        // x opens the count prompt, and X runs to the maximum affordable,
+        // exactly on the rows TUI-NAV-011 and TUI-NAV-012 name: a row tagged
+        // count-taking or repeat-N, or a count row — X withheld on a heavy
+        // one, since it never commits — and neither key named at all once
+        // the core reports the row's item as already the player's.
+        // @spec TUI-NAV-023, TUI-NAV-074
+        let plain = vec!["↑↓ choose", "Enter do", "Space details", "Tab next"];
+        match focused_row(state, view) {
+            Some(row) => {
+                let owned = match &row.key {
+                    RowKey::Content(id, _) => state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours),
+                    _ => false,
+                };
+                if owned {
+                    plain
+                } else {
+                    match &row.kind {
+                        RowKind::Act { semantics, .. } => {
+                            use crate::nav::CountSemantics;
+                            match semantics {
+                                CountSemantics::Single => plain,
+                                CountSemantics::RepeatN if row.heavy => {
+                                    vec!["Enter build", "x amount", "Space details", "↑↓ choose", "Tab next"]
+                                }
+                                CountSemantics::RepeatN => {
+                                    vec!["Enter build", "x amount", "X max", "Space details", "↑↓ choose", "Tab next"]
+                                }
+                                CountSemantics::CountTaking if row.heavy => {
+                                    vec!["Enter do", "x amount", "Space details", "↑↓ choose", "Tab next"]
+                                }
+                                CountSemantics::CountTaking => {
+                                    vec!["Enter do", "x amount", "X max", "Space details", "↑↓ choose", "Tab next"]
+                                }
+                            }
+                        }
+                        RowKind::Count { .. } => {
+                            vec!["+ assign", "- unassign", "x amount", "X max", "↑↓ choose", "Space details", "Tab next"]
+                        }
+                        RowKind::Display | RowKind::Group => plain,
                     }
                 }
             }
-            Some(RowKind::Count { .. }) => {
-                vec!["+ assign", "- unassign", "↑↓ choose", "Space details", "Tab next"]
-            }
-            _ => vec!["↑↓ choose", "Enter do", "Space details", "Tab next"],
+            None => plain,
         }
     };
 
