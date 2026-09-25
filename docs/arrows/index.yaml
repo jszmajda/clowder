@@ -1,9 +1,15 @@
 schema_version: 2
-last_updated: 2026-08-10
+last_updated: 2026-09-24
 
 # Grouped by the two crates the HLD's architecture splits on: the headless
 # simulation and the terminal shell. Persistence sits with the sim crate it
 # lives in, though the design tree hangs it off the root.
+#
+# blocks/blockedBy carry build order only as the design docs state it: the sim
+# edges are the sim sub-HLD's Build Waves (each wave blocked by the one before;
+# no edges inferred within a wave), and the tui edges are the tui sub-HLD's
+# stated leaf order plus navigation's declared dependency on the engine's
+# queries. A segment is ready when every segment in its blockedBy is OK.
 taxonomy:
   sim:
     - adventures
@@ -56,8 +62,8 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
-    blockedBy: []
+    blocks: [cosmic, dreamtime]
+    blockedBy: [ceremonies, colonies, mystic]
     detail: sim/adventures/adventures.md
     next: null
     drift: null
@@ -67,8 +73,8 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
-    blockedBy: []
+    blocks: [adventures, prestige]
+    blockedBy: [curiosity, expeditions, kittens]
     detail: sim/ceremonies/ceremonies.md
     next: null
     drift: null
@@ -78,8 +84,8 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
-    blockedBy: []
+    blocks: [adventures, prestige]
+    blockedBy: [curiosity, expeditions, kittens]
     detail: sim/colonies/colonies.md
     next: null
     drift: null
@@ -90,7 +96,7 @@ arrows:
     audited: null
     audited_sha: null
     blocks: []
-    blockedBy: []
+    blockedBy: [adventures, prestige]
     detail: sim/cosmic/cosmic.md
     next: null
     drift: null
@@ -100,21 +106,21 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
-    blockedBy: []
+    blocks: [ceremonies, colonies, mystic]
+    blockedBy: [economy]
     detail: sim/curiosity/curiosity.md
     next: null
     drift: null
   dreamtime:
-    status: PARTIAL
+    status: OK
     parent: sim
     sampled: 2026-08-10
     audited: null
     audited_sha: null
     blocks: []
-    blockedBy: []
+    blockedBy: [adventures, prestige]
     detail: sim/dreamtime/dreamtime.md
-    next: "1 spec(s) not yet implemented"
+    next: null
     drift: null
   economy:
     status: OK
@@ -122,8 +128,8 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
-    blockedBy: []
+    blocks: [curiosity, expeditions, kittens]
+    blockedBy: [engine]
     detail: sim/economy/economy.md
     next: null
     drift: null
@@ -133,7 +139,7 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
+    blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md
     next: null
@@ -144,8 +150,8 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
-    blockedBy: []
+    blocks: [ceremonies, colonies, mystic]
+    blockedBy: [economy]
     detail: sim/expeditions/expeditions.md
     next: null
     drift: null
@@ -155,8 +161,8 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
-    blockedBy: []
+    blocks: [ceremonies, colonies, mystic]
+    blockedBy: [economy]
     detail: sim/kittens/kittens.md
     next: null
     drift: null
@@ -166,8 +172,8 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
-    blockedBy: []
+    blocks: [adventures, prestige]
+    blockedBy: [curiosity, expeditions, kittens]
     detail: sim/mystic/mystic.md
     next: null
     drift: null
@@ -177,8 +183,8 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
-    blockedBy: []
+    blocks: [render, runtime]
+    blockedBy: [engine]
     detail: tui/navigation/navigation.md
     next: "22 spec(s) not yet implemented"
     drift: null
@@ -188,8 +194,8 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
-    blockedBy: []
+    blocks: [runtime]
+    blockedBy: [engine]
     detail: persistence/persistence.md
     next: null
     drift: null
@@ -199,8 +205,8 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
-    blockedBy: []
+    blocks: [cosmic, dreamtime]
+    blockedBy: [ceremonies, colonies, mystic]
     detail: sim/prestige/prestige.md
     next: null
     drift: null
@@ -211,7 +217,7 @@ arrows:
     audited: null
     audited_sha: null
     blocks: []
-    blockedBy: []
+    blockedBy: [navigation, runtime, theme]
     detail: tui/render/render.md
     next: "1 spec(s) not yet implemented"
     drift: null
@@ -221,8 +227,8 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
-    blockedBy: []
+    blocks: [render]
+    blockedBy: [navigation, persistence]
     detail: tui/runtime/runtime.md
     next: null
     drift: null
@@ -232,7 +238,7 @@ arrows:
     sampled: 2026-08-10
     audited: null
     audited_sha: null
-    blocks: []
+    blocks: [render]
     blockedBy: []
     detail: tui/theme/theme.md
     next: "3 spec(s) not yet implemented"

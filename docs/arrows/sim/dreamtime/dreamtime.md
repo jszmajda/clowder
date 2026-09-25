@@ -4,7 +4,7 @@ Dreamtime is clowder's time layer, reimagined as *napping*: a well-rested clowde
 
 ## Status
 
-**PARTIAL** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 7 of 8 active specs implemented.
+**OK** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 8 of 8 active specs implemented.
 
 ## References
 
@@ -36,9 +36,9 @@ Dreamtime is clowder's time layer, reimagined as *napping*: a well-rested clowde
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-DREAM-001 – SIM-DREAM-008 | 7 | 0 | 1 |
+| All | SIM-DREAM-001 – SIM-DREAM-008 | 8 | 0 | 0 |
 
-**Summary:** 7 of 8 active specs implemented; gaps below.
+**Summary:** 8 of 8 active specs implemented.
 
 ## Key Findings
 
@@ -48,5 +48,4 @@ they have not been verified against the code by this overlay.
 
 ## Work Required
 
-### Must Fix
-1. `SIM-DREAM-001` not implemented
+None recorded — every active spec is marked implemented.
