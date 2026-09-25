@@ -92,4 +92,10 @@ pub struct ViewState {
     /// When the last Enter-driven action fired, for the ~10/s repeat limit.
     /// @spec TUI-NAV-010
     pub last_repeat: Option<Instant>,
+    /// Set the instant a field's Enter acts on the row beneath it (fires,
+    /// repeats, or jumps). While set, a held or auto-repeating continuation of
+    /// that same press is swallowed rather than acting again; only a
+    /// genuinely distinct Enter — judged the same way a heavy row's commit
+    /// is — clears it and reaches the row. @spec TUI-NAV-061
+    pub field_guard: bool,
 }

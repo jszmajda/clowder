@@ -5,6 +5,7 @@
 
 pub mod action;
 pub mod keys;
+pub mod palette;
 pub mod rows;
 pub mod section;
 pub mod update;

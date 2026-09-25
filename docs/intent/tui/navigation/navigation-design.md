@@ -43,7 +43,7 @@ Why a cursor is the backbone: 53 structures + 59 ideas + 35 refinements cannot b
 | `X` | Focused row's action × max affordable |
 | `+` / `=` | Increment on count rows (assign a worker/tinkerer) — Enter synonym there |
 | `-` / `Backspace` | Decrement on count rows (unassign) |
-| `/` | Find-anything palette over revealed content; `Enter` jumps to the hit |
+| `/` | Find-anything palette over revealed content; `Enter` jumps to the top result |
 | `e` | Journal overlay: full event scrollback + pinned offline/nap reports |
 | `o` | Observe the sky (`ObserveSky`) — meaningful while the `!sky` chip shows; else a footer whisper |
 | `<` / `>` | Game speed down / up one notch on the ladder 0.25 → 0.5 → 1 → 2 → 4 → 8 (`SetSpeed`); current speed is always in the header |
@@ -56,10 +56,16 @@ Why a cursor is the backbone: 53 structures + 59 ideas + 35 refinements cannot b
 
 | Key | Action |
 |---|---|
-| printable chars / digits | Enter the field — global single-key bindings are suspended, which is how digits stop being section-jumps while typing |
-| `Backspace` | Edit |
-| `Enter` | Accept |
+| any printable char / `Space` (palette) | Typed into the query — letters, digits, symbols, and `Space` alike |
+| digits `0`–`9` (count prompt) | Typed into the count |
+| any other printable char / `Space` (count prompt) | Nothing — no text and no footer, as for any key with no binding in its context; a count is digits only, so there is nothing else for these keys to mean |
+| `Backspace` | Delete the last character (nothing on an empty field) — never the global decrement |
+| `↑` `↓` `←` `→`, `Tab` / `BackTab` | Nothing — the field holds the keyboard, so the cursor and section beneath it stay put |
+| `Enter` | The field's own — the count prompt applies ×N (or cancels on an empty or zero count); the palette jumps to its top result, or does nothing with no query or no match. The press is spent on the field: the row beneath is reached only through the field's own act (the count prompt's ×N), never as a plain `Enter` on it; an armed row beneath is never committed by it; and holding it on never acts on the row the field returns to |
 | `Esc` | Cancel; nothing happened |
+| `Ctrl-C` | Emergency quit, as everywhere |
+
+In both fields every global single-key binding is suspended, which is how digits stop being section-jumps while typing. The palette is a field under this table, not a full-screen overlay: it captures the speed keys and `q` as query text, where the Journal and help keep them live. A field never expires — it waits, the sim ticking beneath it, until `Esc` closes it or an `Enter` the field acts on does: the count prompt's `Enter` always closes it, the palette's only when there is a result to jump to. Walking away mid-type blocks nothing and loses nothing. While a field is open the hint bar shows that field's keys, even over an armed row beneath it, because the field is what `Enter` will reach.
 
 ### Per-screen mnemonics (shown in the hint bar; each mirrors a visible row)
 
@@ -158,6 +164,9 @@ The only possible actions teach the backbone. As surface grows, the hint bar ada
 - kitten focused: `p promote · n name Elder · Space details`
 - armed row: `Enter yes, truly · Esc not today`
 - count prompt: `digits amount · Enter go · Esc never mind`
+- palette: `type to find · Enter go · Esc never mind`
+
+An open field's line wins over every other context, an armed row's included, since the field holds the keyboard.
 
 The first time a count-taking row is focused, the hint bar surfaces `x amount` — the speed layer is taught lazily, at the moment of relevance. `?` shows the complete key map and glyph legend. There is no manual; the hint bar and `?` are the manual.
 
@@ -184,6 +193,10 @@ A self-probe of this leaf's own gaps; each is pinned so an implementer never gue
 - **Count semantics.** Each row's command is tagged *count-taking* (Pounce, Trade, DeepNap — the count is a real argument: squads, caravans, years) or *repeat-N* (Build, Craft, buys — the shell calls the command N times). `x` passes N to a count-taking command and repeat-calls a repeat-N one. An empty count or `0` cancels. For repeat-N, calls run until one is rejected — partial success is intended (you build as many as you can afford; the core's per-call all-or-nothing keeps each build clean). For count-taking, N is passed through and the core clamps or rejects.
 - **The DeepNap sequence is:** `x` → type years → `Enter` sets the count *and arms* the row (showing "nap N years: costs S starshards, wakes in year Y" from real state) → a second `Enter` commits. So the count prompt's Enter arms; the following Enter fires.
 - **Armed rows are advisory UI only.** The second Enter re-runs the *real* command through the core, which re-validates against current state — so if the clowder dropped below 71 kittens between arming and committing the Move, the commit simply fails to the footer. Arming another heavy row (or any navigation) disarms the first.
+- **Palette results.** The palette's universe is the section lists themselves. A result is an *item* — the thing a row is about — in a revealed section's list. Most items carry one row; some carry several adjacent rows in their section (a craft's make row and its tinkerer count row, a kitten's promote and Elder rows, a colony's trade and pen-pal rows), and such an item is one result. Every item with a selectable row in a revealed section is a result — content, the fixed action rows, the stores rows, kittens, colonies, sites, and the declare-list rows alike — and nothing else is: group headers are never results, and an item with no row (Hidden content, an undiscovered colony, a gated action) is never one. So Teased items are in, because Teased rows are listed, and a kind the core reports only as present or absent (TUI-NAV-053) is in exactly when present. Drawing from the lists means every result lands somewhere and nothing the cursor can reach is missing. Each result shows the name its rows display, beside its section's digit, and each item is its own result — two items sharing a name are never merged, so neither silently vanishes from the list. The results are re-derived from current state as the sim ticks beneath the open palette, so they always match what the sections would show now, and `Enter` takes the top result as listed at the moment of the press.
+- **Palette matching and order.** The query matches as typed, spaces included, and every comparison ignores case. A result matches when its name contains the query. Matches rank by closeness — a name equal to the query, then names beginning with it, then names containing it elsewhere — with ties in tab-bar order, then list order. A query that is empty or nothing but spaces is no query: it lists every result in tab-bar then list order and aims at nothing, since a stray `Space` is not a search. The list is drawn from its top, so the result `Enter` takes is always the first one shown and always on screen, however many follow it.
+- **Palette pick.** `Enter` closes the palette, moves to the top result's section, and focuses that item's first row there — it performs no row action. With no query or no match, `Enter` does nothing and the palette stays open as typed: there is no aimed result, and a jump the player did not aim is a surprise, not a shortcut; `Esc` is the way out. The jump is navigation, so it does what any other move does: it disarms an armed row, dismisses the report banner, and counts as a visit to the section it lands in. It moves the cursor, not the layout — with the narrow-mode inspector swapped in, the swap stays and shows the landed row, as it follows every other cursor move.
+- **A field's accepting Enter** is spent on the field — the count prompt's ×N, the palette's jump. A held or auto-repeating continuation of that press never acts on the row the field returns to; that row acts again only on a distinct Enter, judged as a heavy row's commit is (TUI-NAV-051). The reason is the one that stops repeat at arming: key-repeat is a machine typing, not a player deciding, and without this a held Enter after a palette jump would start buying whatever it landed on.
 - **Cursor landing on a section's first visit** (no identity memory yet): the first *Available* (actionable) row, else the first row. If a remembered item has since become Hidden (e.g. structures reset by a Move), the cursor falls back to the same rule.
 - **`l`/`h`/Tab/BackTab wrap around** the revealed-section ring (last → first, first → last).
 - **Tab bar overflow.** Ten revealed tabs with names do not fit 80 columns, so the tab bar is width-responsive: full `[N Name]` when it fits, else a compact digit strip (`1 2 3̶ 4 …` with the focused and `★`-badged tabs labelled) — never truncated mid-name, never scrolled off. Section names are only ever shown where they fit; the digit is the stable identity.
@@ -210,6 +223,9 @@ The shell renders from existing surface except for these read-only additions, wh
 | Section addressing | Digits `1`–`0`, statically pre-assigned | Unlock-order numbering; letter-per-tab; Tab-cycling only | Static map kills the renumbering hazard forever; cycling alone is O(n) travel |
 | Modifier substitute | Uppercase as the shift tier (`x`→`X`) | Chord emulation | Shift emits plain printable chars — tmux-safe by construction |
 | Count entry | `x` prompt captures digits; `X` = max | Vim count-prefix (`10Enter`) | Prefix digits collide with section jumps, the higher-value use |
+| Palette pick | `Enter` takes the top-ranked result (equal name, then prefix, then substring); the palette keeps the count prompt's field keys, arrows included | Arrow-key selection among results | One key contract for both fields; typing more is always the way to a given item, and the ranking puts the likeliest aim first where the player can see it. The palette only accelerates — every item stays reachable in its own section (TUI-NAV-039) |
+| Palette scope | Every item in a revealed section's list, one result per item | Content definitions only; one result per row | Fixed actions, kittens, and stores are things a player looks for too, and a universe read from the lists can never offer a result that lands nowhere or miss one the cursor reaches; one result per row would list a multi-row item twice under one name |
+| Palette jump under the narrow-mode swap | The swap stays, showing the landed row | Returning to the list view | The jump moves the cursor, not the layout; the player chose the swap, and it already follows every cursor move (TUI-NAV-035) |
 | Repeat | Hold Enter, cursor stays; **rate-limited to ~10/s**; never reaches a heavy row | OS key-repeat verbatim; a `.` repeat key; letting repeat commit an armed row | Uniform across machines; no new concept (player choice: rate-limit). Repeat must stop at arming, or holding Enter on the heaviest row in the game commits it in a tenth of a second — the confirm exists to make that press deliberate |
 | hjkl | Full hjkl — h/l section prev/next, j/k cursor | j/k only; none | Player's choice; arrows/Tab still work, so nothing depends on the letters |
 | Big-action confirm | Inline armed-row, second Enter, auto-disarm ~8s | Blocking modal; type-the-word; long-press | Modal violates idle-respect; terminals have no key-release for long-press; the armed row shows real consequences and expires harmlessly |

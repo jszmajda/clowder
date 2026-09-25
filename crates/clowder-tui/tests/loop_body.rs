@@ -273,3 +273,71 @@ fn a_flood_of_input_is_bounded_within_one_frame() {
          the simulation and the renderer"
     );
 }
+
+/// A field never expires. Opened and then walked away from, it is still open —
+/// with exactly what was typed in it — after the simulation has run on beneath
+/// it for hours of game time and the wall clock has passed every timer the
+/// shell keeps (an armed row's ~8s, a footer note's few seconds). Walking away
+/// mid-type blocks nothing and loses nothing.
+///
+/// @spec TUI-NAV-060
+#[test]
+fn an_open_field_outlasts_every_timer_while_the_sim_runs_beneath_it() {
+    use clowder_tui::nav::{CountPrompt, Overlay, Section};
+
+    let fields: [(&str, ViewState); 2] = [
+        (
+            "a count prompt",
+            ViewState {
+                section: Some(Section::Meadow),
+                prompt: Some(CountPrompt { digits: "12".to_string() }),
+                ..ViewState::default()
+            },
+        ),
+        (
+            "the palette",
+            ViewState {
+                section: Some(Section::Meadow),
+                overlay: Some(Overlay::Palette { query: "ab c".to_string(), selected: 0 }),
+                ..ViewState::default()
+            },
+        ),
+    ];
+
+    let mut apps: Vec<(&str, App, Terminal<TestBackend>)> = fields
+        .into_iter()
+        .enumerate()
+        .map(|(i, (what, view))| {
+            let mut a = app(scratch(&format!("field-timer-{i}")));
+            a.view = view;
+            (what, a, Terminal::new(TestBackend::new(100, 30)).unwrap())
+        })
+        .collect();
+    let before: Vec<u64> = apps.iter().map(|(_, a, _)| a.state.ticks).collect();
+
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_millis(9_000) {
+        for (_, a, term) in apps.iter_mut() {
+            a.step(term, elapsed(600.0), &[]).expect("a step with a field open must not fail");
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
+
+    for ((what, a, _), ticks_before) in apps.iter().zip(before) {
+        assert!(
+            a.state.ticks > ticks_before,
+            "fixture: the simulation did not advance beneath {what}"
+        );
+        assert!(!a.quitting, "{what} was left open and the session ended");
+    }
+    assert_eq!(
+        apps[0].1.view.prompt.as_ref().map(|p| p.digits.as_str()),
+        Some("12"),
+        "a count prompt left open closed or lost its digits on its own; a field never expires"
+    );
+    assert!(
+        matches!(&apps[1].1.view.overlay, Some(Overlay::Palette { query, .. }) if query == "ab c"),
+        "the palette left open closed or lost its query on its own ({:?}); a field never expires",
+        apps[1].1.view.overlay
+    );
+}

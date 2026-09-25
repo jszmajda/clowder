@@ -48,7 +48,7 @@ use ratatui::Terminal;
 
 use clowder_tui::nav::rows::{rows, Row, RowKey, RowKind};
 use clowder_tui::nav::{
-    ArmedRow, CountPrompt, CountSemantics, PendingReport, Section, SeenMark, ViewState,
+    ArmedRow, CountPrompt, CountSemantics, Overlay, PendingReport, Section, SeenMark, ViewState,
 };
 use clowder_tui::render::layout::{compute, Body};
 use clowder_tui::render::widgets::{chrome, overlays};
@@ -163,10 +163,7 @@ fn all_caught_up(state: &GameState) -> [SeenMark; 10] {
 /// A view over a state with nothing outstanding: every section seen, no report
 /// unread, no prompt, no overlay, no armed row.
 fn calm_view(state: &GameState) -> ViewState {
-    let mut v = ViewState::default();
-    v.section = Some(Section::Meadow);
-    v.seen = all_caught_up(state);
-    v
+    ViewState { section: Some(Section::Meadow), seen: all_caught_up(state), ..Default::default() }
 }
 
 /// A view focused on one row of one section, with nothing else outstanding.
@@ -845,7 +842,8 @@ fn each_chip_clears_on_its_own_signal_and_leaves_the_others_alone() {
         (state.clone(), v)
     };
 
-    let cases: [(&str, (char, &str), (GameState, ViewState)); 4] = [
+    type Case<'a> = (&'a str, (char, &'a str), (GameState, ViewState));
+    let cases: [Case; 4] = [
         ("every idle kitten was given work", IDLE, assigned),
         ("the sky was observed", SKY, observed),
         ("the section with new content was visited", NEW, visited),
@@ -1357,6 +1355,74 @@ fn the_hint_bar_names_the_keys_the_focused_row_actually_offers() {
         "the focused row's command is neither count-taking nor usefully repeatable, so `x` there \
          is a no-op with a footer note — and the hint bar offered it anyway: {plain:?}"
     );
+}
+
+/// An open field holds the keyboard, so the hint bar speaks for the field and
+/// nothing else: the same line whatever lies beneath it — any kind of focused
+/// row, or an armed heavy row whose own `Enter yes, truly` would otherwise be
+/// the most urgent thing on screen. The field is what Enter will reach, so an
+/// armed row's line under an open field would be a promise the next Enter does
+/// not keep. The palette's line names typing to find, Enter, and Esc.
+///
+/// @spec TUI-NAV-066
+#[test]
+fn an_open_field_owns_the_hint_bar_whatever_lies_beneath_it() {
+    let state = every_section_revealed();
+
+    let beneath: Vec<(&str, ViewState)> = hint_contexts(&state)
+        .into_iter()
+        .filter(|(_, v)| v.prompt.is_none())
+        .collect();
+    assert!(
+        beneath.iter().any(|(_, v)| v.armed.is_some()),
+        "fixture: one of the contexts beneath the field is an armed heavy row"
+    );
+    let bare_lines: Vec<(&str, String)> =
+        beneath.iter().map(|(what, v)| (*what, hint_line(&state, v, WIDE_W))).collect();
+
+    type Opener = fn(&mut ViewState);
+    let fields: [(&str, Opener); 2] = [
+        ("the count prompt", |v| v.prompt = Some(CountPrompt { digits: "12".to_string() })),
+        ("the palette", |v| {
+            v.overlay = Some(Overlay::Palette { query: "ab".to_string(), selected: 0 })
+        }),
+    ];
+
+    for (field, open) in fields {
+        let lines: Vec<(&str, String)> = beneath
+            .iter()
+            .map(|(what, v)| {
+                let mut v = v.clone();
+                open(&mut v);
+                (*what, hint_line(&state, &v, WIDE_W))
+            })
+            .collect();
+
+        let (first_what, first) = &lines[0];
+        for (what, line) in &lines[1..] {
+            assert_eq!(
+                line, first,
+                "with {field} open, the hint bar over {what} differs from the one over \
+                 {first_what}; while a field is open the bar shows the field's own keys in place \
+                 of any other context's"
+            );
+        }
+        for (what, bare) in &bare_lines {
+            assert_ne!(
+                first, bare,
+                "with {field} open, the hint bar still reads as it does over {what} with nothing \
+                 open; the field's keys replace the context's"
+            );
+        }
+        assert!(has_key(first, "Enter"), "with {field} open, the hint bar does not name Enter: {first:?}");
+        assert!(has_key(first, "Esc"), "with {field} open, the hint bar does not name Esc: {first:?}");
+        if field == "the palette" {
+            assert!(
+                says(first, "type") && says(first, "find"),
+                "with the palette open, the hint bar does not say that typing finds: {first:?}"
+            );
+        }
+    }
 }
 
 /// When the keys will not fit, the least relevant go first and the help key

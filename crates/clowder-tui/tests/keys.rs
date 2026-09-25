@@ -962,6 +962,35 @@ fn enter_accepts_backspace_edits_and_esc_cancels_a_field() {
     }
 }
 
+/// The keys that move the cursor or the section mean nothing inside a field —
+/// not motion, and not a footer whisper either: the field holds the keyboard,
+/// so the row beneath it cannot be walked out from under the player's typing.
+///
+/// @spec TUI-NAV-059
+#[test]
+fn arrows_tab_and_backtab_resolve_to_nothing_inside_a_field() {
+    for (label, view) in [("a count prompt", counting()), ("the palette", palette())] {
+        for code in [
+            KeyCode::Up,
+            KeyCode::Down,
+            KeyCode::Left,
+            KeyCode::Right,
+            KeyCode::Tab,
+            KeyCode::BackTab,
+        ] {
+            let got = resolve(k(code), &view);
+            assert_eq!(
+                got,
+                Action::Ignored,
+                "with {label} open, {code:?} resolves to {got:?}; the arrows, Tab and BackTab do \
+                 nothing while a field holds the keyboard"
+            );
+        }
+        let got = resolve(with(KeyCode::BackTab, KeyModifiers::SHIFT), &view);
+        assert_eq!(got, Action::Ignored, "with {label} open, Shift-BackTab resolves to {got:?}");
+    }
+}
+
 // ---------------------------------------------------------------------------
 // TUI-NAV-052 — a full-screen overlay
 // ---------------------------------------------------------------------------

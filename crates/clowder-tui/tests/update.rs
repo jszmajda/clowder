@@ -25,10 +25,12 @@ use clowder_core::{
     KittenTrait, LockReason, Location, ResourceId, RiteId, StructureId,
 };
 
+use clowder_tui::nav::keys::resolve;
 use clowder_tui::nav::rows::{rows, RowKind};
 use clowder_tui::nav::{
-    update, Action, ArmedRow, Outcome, Overlay, RowKey, Section, ViewState,
+    update, Action, ArmedRow, Outcome, Overlay, PendingReport, RowKey, Section, ViewState,
 };
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -119,8 +121,7 @@ fn fresh() -> GameState {
 /// A view sitting in `section` with `key` focused. Constructed rather than
 /// navigated to, so a test of arming is not also a test of the landing rule.
 fn focused(section: Section, key: RowKey) -> ViewState {
-    let mut v = ViewState::default();
-    v.section = Some(section);
+    let mut v = ViewState { section: Some(section), ..Default::default() };
     v.focus[section.index()] = Some(key);
     v
 }
@@ -1311,4 +1312,756 @@ fn the_cursor_never_lands_on_an_unselectable_row() {
             );
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// The two fields — TUI-NAV-037, TUI-NAV-038, TUI-NAV-058, TUI-NAV-059,
+// TUI-NAV-060, TUI-NAV-061, TUI-NAV-064, TUI-NAV-065
+//
+// A field (the count prompt, or the palette) holds the keyboard. These tests
+// drive it the way a player does — a key resolved against the view, then folded
+// in — because the claims are about what a *keypress* does while a field is
+// open, and a test that fed the reducer hand-picked actions could pass with the
+// key map and the reducer disagreeing about what the key meant.
+//
+// The palette's ranking and its result set are `tests/palette.rs`'s to pin; the
+// tests here need only that a structure's own name aims the palette at
+// *something*, and read where the jump landed rather than predicting it.
+// ---------------------------------------------------------------------------
+
+fn key(code: KeyCode) -> KeyEvent {
+    KeyEvent::new(code, KeyModifiers::NONE)
+}
+
+/// One keypress as the player makes it: resolved against the view, then folded.
+fn press(k: KeyEvent, view: &mut ViewState, state: &GameState) -> Outcome {
+    let action = resolve(k, view);
+    update(action, view, state)
+}
+
+fn press_char(c: char, view: &mut ViewState, state: &GameState) -> Outcome {
+    press(key(KeyCode::Char(c)), view, state)
+}
+
+fn type_text(text: &str, view: &mut ViewState, state: &GameState) {
+    for c in text.chars() {
+        press_char(c, view, state);
+    }
+}
+
+fn palette_query(view: &ViewState) -> Option<String> {
+    match &view.overlay {
+        Some(Overlay::Palette { query, .. }) => Some(query.clone()),
+        _ => None,
+    }
+}
+
+fn prompt_digits(view: &ViewState) -> Option<String> {
+    view.prompt.as_ref().map(|p| p.digits.clone())
+}
+
+/// Everything the view holds, as text, less the time of the last Enter. That
+/// one field is bookkeeping for telling a held key from a fresh press — no
+/// player can see it — so "nothing happened" is asserted over everything else.
+fn observable(view: &ViewState) -> String {
+    let mut v = view.clone();
+    v.last_repeat = None;
+    format!("{v:?}")
+}
+
+/// A name the palette is certain to find: a revealed structure's own.
+fn structure_name(ix: usize) -> String {
+    clowder_core::content::structure_def(StructureId::ALL[ix]).name.to_string()
+}
+
+/// A query no name in the game contains.
+const NO_MATCH: &str = "~~~~";
+
+/// The same command, carrying a typed count where it takes one.
+fn with_count(command: Command, n: u32) -> Command {
+    match command {
+        Command::Pounce(_) => Command::Pounce(n),
+        Command::Trade(colony, _) => Command::Trade(colony, n),
+        Command::DeepNap(_) => Command::DeepNap(n),
+        other => other,
+    }
+}
+
+/// A row the count prompt opens on.
+struct Countable {
+    what: &'static str,
+    section: Section,
+    key: RowKey,
+    /// What a plain Enter on the row asks for — the row's primary action.
+    primary: Command,
+    count_taking: bool,
+    heavy: bool,
+}
+
+/// Every kind of row `x` opens a count prompt on: repeat-N rows, count-taking
+/// rows (the heavy one included), and `+`/`-` count rows — so a claim about
+/// "the count prompt" is quantified over every row it can sit on.
+fn countable_rows(state: &GameState) -> Vec<Countable> {
+    let mut out = Vec::new();
+    for (what, section, count_taking, heavy, pred) in [
+        ("a repeat-N build row", Section::Meadow, false, false, (|c: &Command| matches!(c, Command::Build(_))) as fn(&Command) -> bool),
+        ("a repeat-N craft row", Section::Crafts, false, false, |c: &Command| matches!(c, Command::Craft(_))),
+        ("a count-taking row", Section::Clowder, true, false, |c: &Command| matches!(c, Command::Pounce(_))),
+        ("a count-taking trade row", Section::Friends, true, false, |c: &Command| matches!(c, Command::Trade(..))),
+        ("the heavy count-taking nap row", Section::Dreams, true, true, |c: &Command| matches!(c, Command::DeepNap(_))),
+    ] {
+        let (key, primary) = find_row(state, section, pred);
+        out.push(Countable { what, section, key, primary, count_taking, heavy });
+    }
+    for (what, section) in [("a job count row", Section::Clowder), ("a tinkerer count row", Section::Crafts)] {
+        let (key, increment, _) = find_count_row(state, section);
+        out.push(Countable { what, section, key, primary: increment, count_taking: false, heavy: false });
+    }
+    out
+}
+
+/// Hold Enter: a stream of presses far denser than any terminal's key repeat,
+/// every one of which must be spent on nothing.
+fn hold_enter(view: &mut ViewState, state: &GameState, what: &str) {
+    let start = Instant::now();
+    let mut presses = 0u32;
+    while start.elapsed() < Duration::from_millis(400) {
+        presses += 1;
+        let out = press(key(KeyCode::Enter), view, state);
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "{what}: the Enter that accepted the field was still held, and auto-repeat press \
+             {presses} ({:?} in) told the core {out:?}. Key-repeat is a machine typing, not a \
+             player deciding — a held Enter after a field must not start acting on the row the \
+             field returned to",
+            start.elapsed()
+        );
+    }
+    assert!(
+        presses > 50,
+        "fixture: only {presses} presses in 400ms — too sparse to model a held key"
+    );
+}
+
+/// A distinct Enter: a real pause with no key in it, then one press. Escalates
+/// rather than guessing the threshold, as `commit_deliberately` does.
+fn act_deliberately(view: &mut ViewState, state: &GameState) -> Outcome {
+    for _ in 0..4 {
+        std::thread::sleep(Duration::from_millis(300));
+        let out = press(key(KeyCode::Enter), view, state);
+        if out != Outcome::Handled {
+            return out;
+        }
+    }
+    Outcome::Handled
+}
+
+/// The palette's query is the player's typing, verbatim: every printable
+/// character lands in it — letters, digits, symbols, and Space — and none of
+/// them reaches its global meaning or tells the core anything.
+///
+/// @spec TUI-NAV-037
+#[test]
+fn the_palette_takes_every_printable_character_into_its_query() {
+    let state = rich();
+    let (row, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
+
+    for c in ' '..='~' {
+        let mut view = focused(Section::Meadow, row.clone());
+        press_char('/', &mut view, &state);
+        assert_eq!(palette_query(&view).as_deref(), Some(""), "fixture: / opens an empty palette");
+
+        let out = press_char(c, &mut view, &state);
+        assert_eq!(out, Outcome::Handled, "typing {c:?} into the palette told the core {out:?}");
+        assert_eq!(
+            palette_query(&view),
+            Some(c.to_string()),
+            "{c:?} typed into the palette did not land in its query; the palette takes every \
+             printable character, digits and Space included, as query text"
+        );
+        assert_eq!(view.section, Some(Section::Meadow), "{c:?} typed into the palette moved the section");
+        assert_eq!(view.focus[Section::Meadow.index()].as_ref(), Some(&row), "{c:?} moved the cursor");
+        assert!(view.prompt.is_none(), "{c:?} typed into the palette opened a count prompt");
+        assert!(view.footer.is_none(), "{c:?} typed into the palette earned a footer note");
+    }
+
+    let everything: String = (' '..='~').collect();
+    let mut view = focused(Section::Meadow, row);
+    press_char('/', &mut view, &state);
+    type_text(&everything, &mut view, &state);
+    assert_eq!(
+        palette_query(&view),
+        Some(everything),
+        "the query must be exactly what was typed, in order, spaces and all"
+    );
+}
+
+/// The count prompt's field is a number: the ten digits type into it, and
+/// every other printable key — Space included — does nothing at all. Not a
+/// character in the count, and not a footer note either: a key with nothing to
+/// mean in its context is silent (TUI-NAV-042), and a count is digits only.
+///
+/// @spec TUI-NAV-037
+#[test]
+fn the_count_prompt_takes_the_digits_and_silently_ignores_every_other_printable() {
+    let state = rich();
+    for row in countable_rows(&state) {
+        let mut view = focused(row.section, row.key.clone());
+        press_char('x', &mut view, &state);
+        assert_eq!(
+            prompt_digits(&view).as_deref(),
+            Some(""),
+            "fixture: x on {} opens an empty count prompt",
+            row.what
+        );
+
+        let mut expected = String::new();
+        for c in ' '..='~' {
+            let out = press_char(c, &mut view, &state);
+            if c.is_ascii_digit() {
+                expected.push(c);
+            }
+            assert_eq!(out, Outcome::Handled, "on {}, {c:?} in the count prompt told the core {out:?}", row.what);
+            assert_eq!(
+                prompt_digits(&view),
+                Some(expected.clone()),
+                "on {}, after {c:?} the count read {:?}; the count prompt takes the digits 0–9 \
+                 and ignores every other printable character and Space",
+                row.what,
+                prompt_digits(&view)
+            );
+            assert!(
+                view.footer.is_none(),
+                "on {}, {c:?} in the count prompt earned a footer note; a key with nothing to \
+                 mean there is silent",
+                row.what
+            );
+            assert!(view.overlay.is_none(), "on {}, {c:?} in the count prompt opened an overlay", row.what);
+            assert_eq!(view.section, Some(row.section), "on {}, {c:?} in the count prompt moved the section", row.what);
+            assert_eq!(view.focus[row.section.index()].as_ref(), Some(&row.key), "on {}, {c:?} moved the cursor", row.what);
+        }
+    }
+}
+
+/// The count prompt's Enter reaches the row beneath only as the field directs
+/// — ×N, or nothing for an empty or zero count — and never as the row's own
+/// primary action.
+///
+/// @spec TUI-NAV-037
+#[test]
+fn the_count_prompts_enter_reaches_the_row_only_as_its_count() {
+    let state = rich();
+    for row in countable_rows(&state) {
+        for typed in ["", "0", "00", "3", "12"] {
+            let mut view = focused(row.section, row.key.clone());
+            press_char('x', &mut view, &state);
+            type_text(typed, &mut view, &state);
+            let out = press(key(KeyCode::Enter), &mut view, &state);
+
+            let n: u32 = typed.parse().unwrap_or(0);
+            let expected = if n == 0 || (row.count_taking && row.heavy) {
+                Outcome::Handled
+            } else if row.count_taking {
+                Outcome::Apply(with_count(row.primary, n))
+            } else {
+                Outcome::Repeat(row.primary, n)
+            };
+            assert_eq!(
+                out, expected,
+                "on {} with {typed:?} typed, the count prompt's Enter asked for {out:?}; the \
+                 field's Enter reaches the row only as its own acceptance directs — ×N, or \
+                 nothing on an empty or zero count",
+                row.what
+            );
+        }
+    }
+}
+
+/// An armed heavy row can sit beneath an open field — arm, then `x` on the nap
+/// row, or arm and then `/`. The field's Enter goes to the field, so it can
+/// never be the second Enter that commits the row beneath. The armed row's
+/// last press is set well in the past, so a commit here would count as
+/// deliberate: only the field's claim on Enter stands between it and the core.
+///
+/// @spec TUI-NAV-037
+#[test]
+fn enter_in_a_field_never_commits_an_armed_row_beneath_it() {
+    let state = rich();
+    let aimed = structure_name(0);
+
+    for (name, section, key_, command) in heavy_rows(&state) {
+        for query in ["", "   ", NO_MATCH, aimed.as_str()] {
+            let mut view = focused(section, key_.clone());
+            update(Action::Activate, &mut view, &state);
+            assert!(view.armed.is_some(), "fixture: the first Enter arms the {name} row");
+            press_char('/', &mut view, &state);
+            assert!(palette_query(&view).is_some(), "fixture: / opens the palette over an armed row");
+            type_text(query, &mut view, &state);
+            view.last_repeat = None;
+
+            let out = press(key(KeyCode::Enter), &mut view, &state);
+            assert!(
+                !matches!(out, Outcome::Apply(_) | Outcome::Repeat(..)),
+                "with the palette open over the armed {name} row and {query:?} typed, Enter \
+                 asked the core for {out:?} (the armed command is {command:?}); the palette's \
+                 Enter is the palette's, and never commits the row beneath it"
+            );
+        }
+    }
+
+    // The nap row is the one heavy row `x` opens a count prompt on.
+    let (nap, _) = find_row(&state, Section::Dreams, |c| matches!(c, Command::DeepNap(_)));
+    for typed in ["", "0", "3"] {
+        let mut view = focused(Section::Dreams, nap.clone());
+        update(Action::Activate, &mut view, &state);
+        assert!(view.armed.is_some(), "fixture: the first Enter arms the nap row");
+        press_char('x', &mut view, &state);
+        assert!(view.prompt.is_some(), "fixture: x opens a count prompt over the armed nap row");
+        type_text(typed, &mut view, &state);
+        view.last_repeat = None;
+
+        let out = press(key(KeyCode::Enter), &mut view, &state);
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "with a count prompt over the armed nap row and {typed:?} typed, Enter asked the core \
+             for {out:?}; the count prompt's Enter sets the count and arms, and never commits"
+        );
+    }
+}
+
+/// Esc closes the field and nothing happened: the view is exactly what it was
+/// before the field opened — including an armed row beneath, which Esc on the
+/// field must not take with it, since the field is the topmost transient.
+///
+/// @spec TUI-NAV-037, TUI-NAV-038, TUI-NAV-030
+#[test]
+fn esc_closes_a_field_and_leaves_everything_as_it_was() {
+    let state = rich();
+    let (build, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
+
+    let mut beneath: Vec<(String, ViewState)> =
+        vec![("an ordinary row".to_string(), focused(Section::Meadow, build))];
+    for (name, section, key_, _) in heavy_rows(&state) {
+        let mut v = focused(section, key_);
+        update(Action::Activate, &mut v, &state);
+        assert!(v.armed.is_some(), "fixture: the first Enter arms the {name} row");
+        beneath.push((format!("the armed {name} row"), v));
+    }
+
+    for (what, before) in &beneath {
+        let mut view = before.clone();
+        press_char('/', &mut view, &state);
+        type_text("ab 1q", &mut view, &state);
+        let out = press(key(KeyCode::Esc), &mut view, &state);
+        assert_eq!(out, Outcome::Handled, "Esc on the palette over {what} told the core {out:?}");
+        assert_eq!(
+            observable(&view),
+            observable(before),
+            "Esc on the palette over {what} did not leave the view as it was before the palette \
+             opened; Esc cancels a field with no effect"
+        );
+    }
+
+    for row in countable_rows(&state) {
+        let before = focused(row.section, row.key.clone());
+        let mut view = before.clone();
+        press_char('x', &mut view, &state);
+        type_text("12", &mut view, &state);
+        let out = press(key(KeyCode::Esc), &mut view, &state);
+        assert_eq!(out, Outcome::Handled, "Esc on the count prompt over {} told the core {out:?}", row.what);
+        assert_eq!(
+            observable(&view),
+            observable(&before),
+            "Esc on the count prompt over {} did not leave the view as it was",
+            row.what
+        );
+    }
+
+    let (nap, _) = find_row(&state, Section::Dreams, |c| matches!(c, Command::DeepNap(_)));
+    let mut before = focused(Section::Dreams, nap);
+    update(Action::Activate, &mut before, &state);
+    let mut view = before.clone();
+    press_char('x', &mut view, &state);
+    type_text("3", &mut view, &state);
+    press(key(KeyCode::Esc), &mut view, &state);
+    assert_eq!(
+        observable(&view),
+        observable(&before),
+        "Esc on a count prompt over the armed nap row did not leave the armed row as it was"
+    );
+}
+
+/// Backspace inside a field edits the field: it deletes the last character,
+/// does nothing on an empty field, and never fires its global meaning — which
+/// on a count row is "unassign one". The count row is the fixture on purpose:
+/// it is the one row where a leaked Backspace would change the game.
+///
+/// @spec TUI-NAV-058
+#[test]
+fn backspace_in_a_field_deletes_its_last_character_and_never_decrements() {
+    let state = rich();
+    let (count_key, _, decrement) = find_count_row(&state, Section::Clowder);
+
+    let mut view = focused(Section::Clowder, count_key.clone());
+    press_char('x', &mut view, &state);
+    type_text("123", &mut view, &state);
+    assert_eq!(prompt_digits(&view).as_deref(), Some("123"), "fixture: the count reads 123");
+    for expected in ["12", "1", "", ""] {
+        let out = press(key(KeyCode::Backspace), &mut view, &state);
+        assert!(!would_fire(&out, decrement), "Backspace in the count prompt unassigned a worker");
+        assert_eq!(out, Outcome::Handled, "Backspace in the count prompt told the core {out:?}");
+        assert_eq!(
+            prompt_digits(&view).as_deref(),
+            Some(expected),
+            "Backspace in the count prompt should leave {expected:?}; it deletes the last \
+             character, and on an empty field does nothing (the prompt stays open)"
+        );
+    }
+
+    let mut view = focused(Section::Clowder, count_key.clone());
+    press_char('/', &mut view, &state);
+    type_text("ab c", &mut view, &state);
+    assert_eq!(
+        palette_query(&view).as_deref(),
+        Some("ab c"),
+        "the typed query did not reach the palette (TUI-NAV-037), so there is nothing to erase"
+    );
+    for expected in ["ab ", "ab", "a", "", ""] {
+        let out = press(key(KeyCode::Backspace), &mut view, &state);
+        assert!(!would_fire(&out, decrement), "Backspace in the palette unassigned a worker");
+        assert_eq!(out, Outcome::Handled, "Backspace in the palette told the core {out:?}");
+        assert_eq!(
+            palette_query(&view).as_deref(),
+            Some(expected),
+            "Backspace in the palette should leave {expected:?}; it deletes the last character, \
+             and on an empty field does nothing (the palette stays open)"
+        );
+    }
+
+    for field in ['x', '/'] {
+        let mut view = focused(Section::Clowder, count_key.clone());
+        press_char(field, &mut view, &state);
+        let before = observable(&view);
+        let out = press(key(KeyCode::Backspace), &mut view, &state);
+        assert_eq!(out, Outcome::Handled);
+        assert_eq!(
+            observable(&view),
+            before,
+            "Backspace on an empty field (opened with {field:?}) changed something; on an empty \
+             field it does nothing"
+        );
+    }
+}
+
+/// The field holds the keyboard, so the keys that would move the cursor or the
+/// section do nothing while it is open: the row the field will act on stays
+/// the row under it.
+///
+/// @spec TUI-NAV-059
+#[test]
+fn arrows_tab_and_backtab_move_nothing_beneath_a_field() {
+    let state = rich();
+    let builds: Vec<RowKey> = rows(&state, Section::Meadow)
+        .into_iter()
+        .filter(|r| matches!(r.kind, RowKind::Act { command: Command::Build(_), .. }))
+        .map(|r| r.key)
+        .collect();
+    assert!(builds.len() > 4, "fixture: the Meadow lists rows above and below the cursor");
+    let middle = builds[builds.len() / 2].clone();
+
+    for (field, opener, typed) in [("the count prompt", 'x', "4"), ("the palette", '/', "ab")] {
+        let mut view = focused(Section::Meadow, middle.clone());
+        press_char(opener, &mut view, &state);
+        type_text(typed, &mut view, &state);
+        let text = |v: &ViewState| prompt_digits(v).or_else(|| palette_query(v));
+        let before = text(&view);
+        assert!(before.is_some(), "fixture: {field} is open");
+
+        for code in [KeyCode::Up, KeyCode::Down, KeyCode::Left, KeyCode::Right, KeyCode::Tab, KeyCode::BackTab] {
+            let out = press(key(code), &mut view, &state);
+            assert_eq!(out, Outcome::Handled, "{code:?} with {field} open told the core {out:?}");
+            assert_eq!(view.section, Some(Section::Meadow), "{code:?} with {field} open moved the section");
+            assert_eq!(
+                view.focus[Section::Meadow.index()].as_ref(),
+                Some(&middle),
+                "{code:?} with {field} open moved the list cursor beneath it"
+            );
+            assert_eq!(text(&view), before, "{code:?} with {field} open changed or closed the field");
+            assert!(view.footer.is_none(), "{code:?} with {field} open earned a footer note");
+        }
+    }
+}
+
+/// The count prompt's Enter always closes it — applying the count, or
+/// cancelling on an empty or zero one. It never leaves the player in a field
+/// that Enter could not get them out of.
+///
+/// @spec TUI-NAV-060
+#[test]
+fn the_count_prompts_enter_always_closes_it() {
+    let state = rich();
+    for row in countable_rows(&state) {
+        for typed in ["", "0", "00", "4", "12"] {
+            let mut view = focused(row.section, row.key.clone());
+            press_char('x', &mut view, &state);
+            type_text(typed, &mut view, &state);
+            press(key(KeyCode::Enter), &mut view, &state);
+            assert!(
+                view.prompt.is_none(),
+                "on {} with {typed:?} typed, the count prompt's Enter left it open",
+                row.what
+            );
+        }
+    }
+}
+
+/// The palette's Enter closes it only when there is a result to jump to. With
+/// no query, a blank one, or one that matches nothing, the palette stays open —
+/// the player's way out is Esc.
+///
+/// @spec TUI-NAV-060, TUI-NAV-064
+#[test]
+fn the_palettes_enter_closes_it_only_when_there_is_a_result_to_jump_to() {
+    let state = rich();
+    let (build, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
+
+    for ix in 0..5 {
+        let aimed = structure_name(ix);
+        let mut view = focused(Section::Meadow, build.clone());
+        press_char('/', &mut view, &state);
+        type_text(&aimed, &mut view, &state);
+        press(key(KeyCode::Enter), &mut view, &state);
+        assert!(
+            view.overlay.is_none(),
+            "Enter with the query {aimed:?} — a revealed structure's own name — left the palette \
+             open; with a result to jump to, Enter closes it"
+        );
+    }
+
+    for query in ["", " ", "   ", NO_MATCH] {
+        let mut view = focused(Section::Meadow, build.clone());
+        press_char('/', &mut view, &state);
+        type_text(query, &mut view, &state);
+        press(key(KeyCode::Enter), &mut view, &state);
+        assert_eq!(
+            palette_query(&view).as_deref(),
+            Some(query),
+            "Enter with the query {query:?} closed the palette or changed its query; with no \
+             result to jump to it stays open, as typed"
+        );
+    }
+}
+
+/// With nothing aimed at — no query, only spaces, or no match — the palette's
+/// Enter does nothing at all. Not a jump the player did not aim, not the row
+/// beneath's action, not a commit of an armed row: nothing.
+///
+/// @spec TUI-NAV-064
+#[test]
+fn the_palettes_enter_with_nothing_aimed_at_does_nothing() {
+    let state = rich();
+    let (build, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
+    let (count_key, _, _) = find_count_row(&state, Section::Clowder);
+
+    let mut beneath: Vec<(String, ViewState)> = vec![
+        ("an ordinary row".to_string(), focused(Section::Meadow, build)),
+        ("a count row".to_string(), focused(Section::Clowder, count_key)),
+    ];
+    for (name, section, key_, _) in heavy_rows(&state) {
+        let mut v = focused(section, key_);
+        update(Action::Activate, &mut v, &state);
+        beneath.push((format!("the armed {name} row"), v));
+    }
+
+    for (what, context) in &beneath {
+        for query in ["", " ", "    ", NO_MATCH, "#%^~"] {
+            let mut view = context.clone();
+            press_char('/', &mut view, &state);
+            type_text(query, &mut view, &state);
+            view.last_repeat = None;
+            let before = observable(&view);
+
+            let out = press(key(KeyCode::Enter), &mut view, &state);
+            assert_eq!(
+                out,
+                Outcome::Handled,
+                "over {what}, Enter in the palette with {query:?} asked the core for {out:?}; \
+                 with nothing aimed at, Enter does nothing"
+            );
+            assert_eq!(
+                observable(&view),
+                before,
+                "over {what}, Enter in the palette with {query:?} changed the view; with nothing \
+                 aimed at, the palette stays open with its query as typed and nothing else moves"
+            );
+        }
+    }
+}
+
+/// The Enter that accepts a field is spent on the field. If the key is still
+/// held, its auto-repeat must not start acting on the row the field returns to
+/// — only a distinct Enter does, judged as a heavy row's commit is.
+///
+/// Quantified over every row kind the count prompt opens on, and over the row
+/// a palette jump lands on.
+///
+/// @spec TUI-NAV-061
+#[test]
+fn a_held_enter_after_a_field_accepts_never_acts_on_the_row_beneath() {
+    let state = rich();
+
+    for row in countable_rows(&state) {
+        let mut view = focused(row.section, row.key.clone());
+        press_char('x', &mut view, &state);
+        type_text("3", &mut view, &state);
+        press(key(KeyCode::Enter), &mut view, &state);
+        assert!(view.prompt.is_none(), "fixture: the count prompt's Enter accepted the count");
+
+        hold_enter(&mut view, &state, &format!("after ×3 on {}", row.what));
+
+        let expected = if row.heavy {
+            Outcome::Apply(with_count(row.primary, 3))
+        } else {
+            Outcome::Apply(row.primary)
+        };
+        let out = act_deliberately(&mut view, &state);
+        assert_eq!(
+            out, expected,
+            "after ×3 on {} and a held Enter, a distinct Enter must act on the row again",
+            row.what
+        );
+    }
+
+    // Start on a count row so the row beneath the palette is one Enter would
+    // act on, and jump to a structure's row.
+    let (count_key, _, _) = find_count_row(&state, Section::Clowder);
+    let mut view = focused(Section::Clowder, count_key);
+    press_char('/', &mut view, &state);
+    type_text(&structure_name(3), &mut view, &state);
+    let out = press(key(KeyCode::Enter), &mut view, &state);
+    assert_eq!(out, Outcome::Handled, "the palette's Enter asked the core for {out:?}");
+    assert!(view.overlay.is_none(), "the palette's Enter did not jump (TUI-NAV-038)");
+
+    let section = view.section.expect("the jump landed in a section");
+    let landed_key = view.focus[section.index()].clone().expect("the jump focused a row");
+    let landed = rows(&state, section)
+        .into_iter()
+        .find(|r| r.key == landed_key)
+        .expect("the jump focused a row that is on the list");
+    assert!(!landed.heavy, "fixture: the jump lands on an ordinary row");
+    let primary = match landed.kind {
+        RowKind::Act { command, .. } => command,
+        RowKind::Count { increment, .. } => increment,
+        other => panic!("fixture: the jump landed on a row Enter does nothing on ({other:?})"),
+    };
+
+    hold_enter(&mut view, &state, "after a palette jump");
+    let out = act_deliberately(&mut view, &state);
+    assert_eq!(
+        out,
+        Outcome::Apply(primary),
+        "after a palette jump and a held Enter, a distinct Enter must act on the landed row"
+    );
+}
+
+/// The palette's jump is navigation, with everything navigation does: it
+/// disarms an armed row, dismisses the report banner, and counts as a visit to
+/// the section it lands in. It moves the cursor and not the layout, so whether
+/// the player had asked for the inspector is untouched.
+///
+/// @spec TUI-NAV-065
+#[test]
+fn the_palettes_jump_is_navigation_and_leaves_the_layout_alone() {
+    let state = rich();
+    let aimed = structure_name(2);
+
+    for inspector_wanted in [false, true] {
+        let (move_key, _) = move_row(&state);
+        let mut view = focused(Section::Legacy, move_key);
+        view.inspector_wanted = inspector_wanted;
+        view.reports = vec![PendingReport { entry: 0, dismissed: false }];
+        update(Action::Activate, &mut view, &state);
+        assert!(view.armed.is_some(), "fixture: the Move row is armed");
+
+        press_char('/', &mut view, &state);
+        type_text(&aimed, &mut view, &state);
+        press(key(KeyCode::Enter), &mut view, &state);
+        assert!(view.overlay.is_none(), "the palette's Enter did not jump (TUI-NAV-038)");
+        let landed = view.section.expect("the jump landed in a section");
+        assert_ne!(landed, Section::Legacy, "fixture: a structure's name lands outside Legacy");
+
+        assert!(
+            view.armed.is_none(),
+            "the palette's jump left the Move row armed; the jump is navigation, and any \
+             navigation disarms"
+        );
+        assert!(
+            view.reports.iter().all(|r| r.dismissed),
+            "the palette's jump left the report banner up; the jump is navigation, and the first \
+             navigation dismisses the banner"
+        );
+        assert!(
+            view.seen[landed.index()].visited,
+            "the palette's jump did not count as a visit to {}",
+            landed.title()
+        );
+        assert_eq!(
+            view.seen[landed.index()].revealed_at_last_visit,
+            rows(&state, landed).len(),
+            "the palette's jump visited {} without catching its watermark up to what it lists",
+            landed.title()
+        );
+        assert_eq!(
+            view.inspector_wanted, inspector_wanted,
+            "the palette's jump changed whether the inspector is asked for; it moves the cursor, \
+             not the layout"
+        );
+    }
+}
+
+/// `/` opens the palette from a screen with no prompt or overlay open — an
+/// armed row is neither — and nowhere else: inside a count prompt it is just a
+/// non-digit, inside the Journal or help it is unbound, and inside the palette
+/// it is a character of the query.
+///
+/// @spec TUI-NAV-038
+#[test]
+fn slash_opens_the_palette_only_where_no_prompt_or_overlay_is_open() {
+    let state = rich();
+    let (build, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
+
+    let mut view = focused(Section::Meadow, build.clone());
+    let out = press_char('/', &mut view, &state);
+    assert_eq!(out, Outcome::Handled);
+    assert_eq!(palette_query(&view).as_deref(), Some(""), "/ on a bare screen must open an empty palette");
+
+    let (move_key, _) = move_row(&state);
+    let mut view = focused(Section::Legacy, move_key);
+    update(Action::Activate, &mut view, &state);
+    press_char('/', &mut view, &state);
+    assert_eq!(palette_query(&view).as_deref(), Some(""), "/ beside an armed row must open the palette");
+
+    let mut view = focused(Section::Meadow, build.clone());
+    press_char('x', &mut view, &state);
+    press_char('/', &mut view, &state);
+    assert!(view.overlay.is_none(), "/ inside a count prompt opened the palette");
+    assert_eq!(prompt_digits(&view).as_deref(), Some(""), "/ inside a count prompt changed or closed it");
+
+    for overlay in [Overlay::Journal { anchor: 0 }, Overlay::Help] {
+        let mut view = focused(Section::Meadow, build.clone());
+        view.overlay = Some(overlay.clone());
+        press_char('/', &mut view, &state);
+        assert_eq!(view.overlay, Some(overlay.clone()), "/ inside {overlay:?} replaced it");
+    }
+
+    let mut view = focused(Section::Meadow, build);
+    press_char('/', &mut view, &state);
+    press_char('/', &mut view, &state);
+    assert_eq!(
+        palette_query(&view).as_deref(),
+        Some("/"),
+        "/ inside the palette must be a character of the query, not a re-open"
+    );
 }

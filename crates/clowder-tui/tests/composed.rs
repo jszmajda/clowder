@@ -68,7 +68,7 @@ use ratatui::layout::Rect;
 use ratatui::{Frame, Terminal};
 
 use clowder_tui::nav::rows::rows;
-use clowder_tui::nav::{Overlay, PendingReport, RowKey, Section, SeenMark, ViewState};
+use clowder_tui::nav::{update, Action, Overlay, PendingReport, RowKey, Section, SeenMark, ViewState};
 use clowder_tui::render;
 use clowder_tui::render::layout::{Body, Layout};
 use clowder_tui::render::widgets::inspector::Placement;
@@ -208,8 +208,7 @@ fn far_row() -> RowKey {
 /// No report is pending here: an unread one takes a row from the body
 /// (TUI-RENDER-003), and the banner has its own tests below.
 fn looking_at(state: &GameState, key: RowKey) -> ViewState {
-    let mut v = ViewState::default();
-    v.section = Some(Section::Meadow);
+    let mut v = ViewState { section: Some(Section::Meadow), ..Default::default() };
     v.focus[Section::Meadow.index()] = Some(key);
     v.seen[Section::Meadow.index()] =
         SeenMark { visited: true, revealed_at_last_visit: rows(state, Section::Meadow).len() };
@@ -752,6 +751,54 @@ fn the_swapped_inspector_follows_the_underlying_cursor() {
         region_text(&far.buffer, main),
         "the cursor moved under the swapped inspector and the inspector said the same thing; \
          it follows the cursor, so the player can browse inspected items"
+    );
+}
+
+/// A palette jump moves the cursor, not the layout. Taken from inside the
+/// narrow-mode swap, it leaves the swap in place — and the swapped inspector,
+/// following the cursor as it follows every other move, shows the row the jump
+/// landed on. The player chose the swap; a jump that quietly returned them to
+/// the list would be undoing a choice they did not ask to undo.
+///
+/// @spec TUI-NAV-065
+#[test]
+fn a_palette_jump_inside_the_narrow_swap_keeps_the_swap_on_the_landed_row() {
+    let state = settled();
+    let target = StructureId::ALL[44];
+
+    let mut view = inspecting(&state, near_row());
+    update(Action::OpenPalette, &mut view, &state);
+    for c in structure_def(target).name.chars() {
+        update(Action::Type(c), &mut view, &state);
+    }
+    update(Action::Activate, &mut view, &state);
+
+    assert!(view.overlay.is_none(), "the palette's Enter did not jump (TUI-NAV-038)");
+    assert_eq!(
+        view.focus[Section::Meadow.index()],
+        Some(far_row()),
+        "fixture: the structure's own name aims the palette at its row"
+    );
+    assert!(
+        view.inspector_wanted,
+        "the palette's jump dropped the inspector the player had swapped in; it moves the \
+         cursor, not the layout"
+    );
+
+    let jumped = cold(&state, &view, FLOOR_W, FLOOR_H);
+    let main = main_rect(&jumped.layout);
+    let expected = cold(&state, &inspecting(&state, far_row()), FLOOR_W, FLOOR_H);
+    let listing = cold(&state, &looking_at(&state, far_row()), FLOOR_W, FLOOR_H);
+    assert_eq!(
+        region_text(&jumped.buffer, main),
+        region_text(&expected.buffer, main_rect(&expected.layout)),
+        "after a palette jump inside the swap, the list's space does not show the swapped \
+         inspector on the landed row"
+    );
+    assert_ne!(
+        region_text(&jumped.buffer, main),
+        region_text(&listing.buffer, main_rect(&listing.layout)),
+        "after a palette jump inside the swap, the list came back; the swap stays"
     );
 }
 

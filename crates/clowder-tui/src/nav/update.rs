@@ -4,16 +4,19 @@
 //! Key resolution is deliberately state-light — it answers "what did the
 //! player ask for", not "what happens". This is where the two meet, because
 //! the answer depends on the focused row, and rows come from game state.
-//! @spec TUI-NAV-002, TUI-NAV-011, TUI-NAV-015, TUI-NAV-041, TUI-NAV-051
+//! @spec TUI-NAV-002, TUI-NAV-011, TUI-NAV-015, TUI-NAV-037, TUI-NAV-038,
+//! TUI-NAV-041, TUI-NAV-051, TUI-NAV-058, TUI-NAV-060, TUI-NAV-061,
+//! TUI-NAV-064, TUI-NAV-065
 
 use std::time::{Duration, Instant};
 
 use clowder_core::{Command, GameState, LockReason};
 
 use super::action::{Action, CountSemantics};
+use super::palette;
 use super::rows::{revealed_sections, rows, Row, RowKey, RowKind};
 use super::section::Section;
-use super::view::{ArmedRow, CountPrompt, Overlay, ViewState};
+use super::view::{ArmedRow, CountPrompt, Overlay, SeenMark, ViewState};
 
 /// What the loop should do with an action once the view has absorbed it.
 #[derive(Debug, Clone, PartialEq)]
@@ -64,9 +67,11 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
         | Action::SectionJump(_)
         | Action::GroupNext
         | Action::GroupPrev => {
-            // Any navigation silently disarms whatever was armed.
-            // @spec TUI-NAV-015
+            // Any navigation silently disarms whatever was armed, and ends any
+            // field-accept guard still standing over the row it left.
+            // @spec TUI-NAV-015, TUI-NAV-061
             view.armed = None;
+            view.field_guard = false;
             handle_navigation(action, view, state);
             Outcome::Handled
         }
@@ -235,12 +240,24 @@ fn nudge_speed(view: &mut ViewState, state: &GameState, up: bool) -> Outcome {
 }
 
 /// Enter `section`, restoring the remembered item by identity, or landing on
-/// the first actionable row, or the first row at all. @spec TUI-NAV-008,
-/// TUI-NAV-032
+/// the first actionable row, or the first row at all. This is navigation's one
+/// shared doorway — every path that changes `view.section` runs through it —
+/// so it is also where a visit marks the section seen and dismisses whatever
+/// report banner is currently showing, the same for a section cycle, a digit
+/// jump, or a palette landing. @spec TUI-NAV-008, TUI-NAV-032
 fn enter_section(view: &mut ViewState, state: &GameState, section: Section) {
     view.section = Some(section);
     let list = rows(state, section);
     let idx = section.index();
+
+    // A visit marks the section seen and clears its new-content watermark,
+    // and dismisses the one report banner currently showing — the first
+    // still-undismissed entry in the newest-first queue; the rest stays
+    // pending for its own turn.
+    view.seen[idx] = SeenMark { visited: true, revealed_at_last_visit: list.len() };
+    if let Some(r) = view.reports.iter_mut().find(|r| !r.dismissed) {
+        r.dismissed = true;
+    }
 
     let remembered_still_present = view.focus[idx]
         .as_ref()
@@ -294,11 +311,35 @@ fn set_footer(view: &mut ViewState, message: impl Into<String>) {
 // ---------------------------------------------------------------------------
 
 fn handle_activate(view: &mut ViewState, state: &GameState) -> Outcome {
+    // A field's accepting Enter is spent on the field; a held or
+    // auto-repeating continuation of that same press must not also act on
+    // the row it returns to — only a genuinely distinct later Enter does, the
+    // guard renewing on every press so a continuous hold never wears it down.
+    // @spec TUI-NAV-061
+    if view.field_guard {
+        let now = Instant::now();
+        let distinct =
+            view.last_repeat.is_none_or(|last| now.duration_since(last) >= REPEAT_GATE);
+        if !distinct {
+            view.last_repeat = Some(now);
+            return Outcome::Handled;
+        }
+        // A real gap: the guard has done its job, and this Enter is free to
+        // act on the row beneath — decided below, from the unchanged
+        // `last_repeat` this same distinctness check just read.
+        view.field_guard = false;
+    }
+
     // The count prompt's Enter sets the count and, on a heavy row, arms it;
     // on an ordinary row it fires (or repeat-fires) at once. @spec TUI-NAV-011,
     // TUI-NAV-036
     if view.prompt.is_some() {
         return accept_count_prompt(view, state);
+    }
+    // The palette's Enter jumps to its top result, or does nothing with none
+    // to aim at. @spec TUI-NAV-038, TUI-NAV-060, TUI-NAV-064, TUI-NAV-065
+    if matches!(view.overlay, Some(Overlay::Palette { .. })) {
+        return accept_palette(view, state);
     }
 
     let Some(row) = current_row(view, state) else {
@@ -356,7 +397,7 @@ fn activate_heavy(view: &mut ViewState, key: &RowKey, command: Command) -> Outco
         let armed_command = view.armed.as_ref().expect("checked Some above").command;
         let distinct = view
             .last_repeat
-            .map_or(true, |last| now.duration_since(last) >= REPEAT_GATE);
+            .is_none_or(|last| now.duration_since(last) >= REPEAT_GATE);
         view.last_repeat = Some(now);
 
         if distinct {
@@ -386,6 +427,11 @@ fn accept_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
     };
 
     if n == 0 {
+        // A cancel is still an Enter the field spends on itself: the guard
+        // must stand so a held or auto-repeating continuation of this same
+        // press cannot fall through and act on the row beneath.
+        // @spec TUI-NAV-060, TUI-NAV-061
+        guard_after_field(view);
         return Outcome::Handled;
     }
 
@@ -402,15 +448,63 @@ fn accept_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
                     view.last_repeat = Some(Instant::now());
                     Outcome::Handled
                 } else {
+                    guard_after_field(view);
                     Outcome::Apply(counted)
                 }
             }
-            CountSemantics::RepeatN => Outcome::Repeat(*command, n),
+            CountSemantics::RepeatN => {
+                guard_after_field(view);
+                Outcome::Repeat(*command, n)
+            }
             CountSemantics::Single => Outcome::Handled,
         },
-        RowKind::Count { increment, .. } => Outcome::Repeat(*increment, n),
+        RowKind::Count { increment, .. } => {
+            guard_after_field(view);
+            Outcome::Repeat(*increment, n)
+        }
         RowKind::Display | RowKind::Group => Outcome::Handled,
     }
+}
+
+/// The palette's Enter: with a result to jump to, close it and land the
+/// cursor there — the jump is navigation, so it disarms, dismisses the report
+/// banner, and counts as a visit to the section it lands in, the same as any
+/// other move; it never performs a row action. With nothing aimed at (no
+/// query, one of only spaces, or no match), the palette stays open exactly as
+/// typed. @spec TUI-NAV-038, TUI-NAV-060, TUI-NAV-064, TUI-NAV-065
+fn accept_palette(view: &mut ViewState, state: &GameState) -> Outcome {
+    let Some(Overlay::Palette { query, .. }) = &view.overlay else {
+        return Outcome::Handled;
+    };
+    // A blank query (empty, or nothing but spaces) aims at nothing — it lists
+    // every result without searching, so Enter must not jump the way a real
+    // aimed match does. @spec TUI-NAV-064
+    if query.chars().all(|c| c == ' ') {
+        return Outcome::Handled;
+    }
+    let Some(top) = palette::results(state, query).into_iter().next() else {
+        return Outcome::Handled;
+    };
+    let (section, key) = (top.section, top.key);
+
+    view.overlay = None;
+    view.armed = None;
+    // The landing is navigation like any other, so it runs through the same
+    // shared doorway that marks the section seen and dismisses the showing
+    // report banner. @spec TUI-NAV-065
+    enter_section(view, state, section);
+    view.focus[section.index()] = Some(key);
+
+    guard_after_field(view);
+    Outcome::Handled
+}
+
+/// Guard the row a field just acted on: the continuation of the very Enter
+/// that accepted the field must not also act on the row it returns to.
+/// @spec TUI-NAV-061
+fn guard_after_field(view: &mut ViewState) {
+    view.field_guard = true;
+    view.last_repeat = Some(Instant::now());
 }
 
 /// Substitute a typed count into a count-taking command, keeping every other
@@ -519,6 +613,9 @@ fn handle_increment_decrement(view: &mut ViewState, state: &GameState, up: bool)
 // The count prompt's own field — TUI-NAV-011, TUI-NAV-037
 // ---------------------------------------------------------------------------
 
+/// The count prompt takes digits only; the palette takes every printable
+/// character, digits and Space included, verbatim into its query.
+/// @spec TUI-NAV-037
 fn handle_type(view: &mut ViewState, c: char) -> Outcome {
     if let Some(prompt) = view.prompt.as_mut() {
         if c.is_ascii_digit() {
@@ -526,12 +623,22 @@ fn handle_type(view: &mut ViewState, c: char) -> Outcome {
         }
         return Outcome::Handled;
     }
+    if let Some(Overlay::Palette { query, .. }) = view.overlay.as_mut() {
+        query.push(c);
+    }
     Outcome::Handled
 }
 
+/// Backspace deletes the open field's last character, doing nothing on an
+/// empty field and never reaching a row's own global meaning.
+/// @spec TUI-NAV-058
 fn handle_erase(view: &mut ViewState) -> Outcome {
     if let Some(prompt) = view.prompt.as_mut() {
         prompt.digits.pop();
+        return Outcome::Handled;
+    }
+    if let Some(Overlay::Palette { query, .. }) = view.overlay.as_mut() {
+        query.pop();
     }
     Outcome::Handled
 }
@@ -540,14 +647,19 @@ fn handle_erase(view: &mut ViewState) -> Outcome {
 // Esc — TUI-NAV-030
 // ---------------------------------------------------------------------------
 
+/// Closes only the topmost transient: a field (the count prompt, or the
+/// palette — a field under this rule, not a full-screen overlay) first, then
+/// any other overlay, then an armed row, then nothing further — so Esc over a
+/// field open above an armed row closes only the field, leaving the row
+/// beneath it exactly as armed. @spec TUI-NAV-030, TUI-NAV-037
 fn handle_dismiss(view: &mut ViewState) -> Outcome {
     if view.prompt.take().is_some() {
         return Outcome::Handled;
     }
-    if view.armed.take().is_some() {
+    if view.overlay.take().is_some() {
         return Outcome::Handled;
     }
-    if view.overlay.take().is_some() {
+    if view.armed.take().is_some() {
         return Outcome::Handled;
     }
     Outcome::Handled

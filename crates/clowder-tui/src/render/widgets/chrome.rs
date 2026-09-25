@@ -9,7 +9,7 @@ use clowder_core::{GameState, Location, MoodTier, ResourceId};
 use ratatui::{layout::Rect, text::Line, widgets::Paragraph, Frame};
 
 use crate::nav::rows::{rows, RowKind};
-use crate::nav::{Section, ViewState};
+use crate::nav::{Overlay, Section, ViewState};
 use crate::render::fmt;
 
 // ---------------------------------------------------------------------------
@@ -235,14 +235,20 @@ fn focused_kind(state: &GameState, view: &ViewState) -> Option<RowKind> {
 
 /// Context keys, most-relevant-first, always ending with the help key. Drops
 /// the least relevant first when the width runs out.
-/// @spec TUI-NAV-023, TUI-NAV-024, TUI-NAV-045, TUI-NAV-046
+///
+/// A field (the count prompt, or the palette) holds the keyboard, so it owns
+/// this line too — in place of *any* other context's, an armed row's beneath
+/// it included, since the field is what the next Enter actually reaches.
+/// @spec TUI-NAV-023, TUI-NAV-024, TUI-NAV-045, TUI-NAV-046, TUI-NAV-066
 pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     const HELP: &str = "? help";
 
-    let items: Vec<&str> = if view.armed.is_some() {
-        vec!["Enter yes, truly", "Esc not today"]
-    } else if view.prompt.is_some() {
+    let items: Vec<&str> = if view.prompt.is_some() {
         vec!["digits amount", "Enter go", "Esc never mind"]
+    } else if matches!(view.overlay, Some(Overlay::Palette { .. })) {
+        vec!["type to find", "Enter jump", "Esc close"]
+    } else if view.armed.is_some() {
+        vec!["Enter yes, truly", "Esc not today"]
     } else {
         match focused_kind(state, view) {
             Some(RowKind::Act { semantics, .. }) => {

@@ -6,11 +6,7 @@
 //! obligation, and this game does not issue those.
 //! @spec TUI-NAV-026, TUI-NAV-027, TUI-NAV-038, TUI-NAV-050, TUI-NAV-055, TUI-NAV-056, TUI-NAV-057
 
-use clowder_core::{
-    Availability, ArchId, ContentId, CraftId, DreamLoomId, Event, EventClass, GameState, IdeaId,
-    JobId, JournalItem, OfflineReport, RefinementId, ResourceId, RiteId, RuleId, StructureId,
-    TraditionId,
-};
+use clowder_core::{Event, EventClass, GameState, JournalItem, OfflineReport, ResourceId};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
@@ -241,44 +237,22 @@ pub fn help(f: &mut Frame, area: Rect) {
     f.render_widget(Paragraph::new(lines), area);
 }
 
-/// Every kind of content the palette can find, whether or not it happens to
-/// be revealed right now — filtered to revealed content below.
-/// @spec TUI-NAV-038
-fn all_content_ids() -> Vec<ContentId> {
-    let mut ids = Vec::new();
-    ids.extend(StructureId::ALL.into_iter().map(ContentId::Structure));
-    ids.extend(IdeaId::ALL.into_iter().map(ContentId::Idea));
-    ids.extend(CraftId::ALL.into_iter().map(ContentId::Craft));
-    ids.extend(JobId::ALL.into_iter().map(ContentId::Job));
-    ids.extend(RiteId::ALL.into_iter().map(ContentId::Rite));
-    ids.extend(ArchId::ALL.into_iter().map(ContentId::Arch));
-    ids.extend(RefinementId::ALL.into_iter().map(ContentId::Refinement));
-    ids.extend(RuleId::ALL.into_iter().map(ContentId::Rule));
-    ids.extend(TraditionId::ALL.into_iter().map(ContentId::Tradition));
-    ids.extend(DreamLoomId::ALL.into_iter().map(ContentId::DreamLoom));
-    ids
-}
-
-/// Find-anything over revealed content, narrowing by substring as characters
-/// arrive. @spec TUI-NAV-038
+/// Find-anything over the sections' own lists, narrowing by substring as
+/// characters arrive, drawn from the top so the result Enter takes is always
+/// the first line and always on screen. @spec TUI-NAV-038, TUI-NAV-062,
+/// TUI-NAV-063
 pub fn palette(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     let query = match &view.overlay {
-        Some(Overlay::Palette { query, .. }) => query.clone(),
-        _ => String::new(),
+        Some(Overlay::Palette { query, .. }) => query.as_str(),
+        _ => "",
     };
-    let needle = query.to_lowercase();
-
-    let mut names: Vec<String> = all_content_ids()
-        .into_iter()
-        .filter(|id| state.availability(*id) != Availability::Hidden)
-        .map(|id| crate::render::content_name(id))
-        .filter(|name| needle.is_empty() || name.to_lowercase().contains(&needle))
-        .collect();
-    names.sort();
-    names.dedup();
 
     let mut lines = vec![Line::raw(format!("Find: {query}"))];
-    lines.extend(names.into_iter().map(Line::raw));
+    lines.extend(
+        crate::nav::palette::results(state, query)
+            .into_iter()
+            .map(|r| Line::raw(format!("[{}] {}", r.section.digit(), r.name))),
+    );
     let height = area.height as usize;
     lines.truncate(height);
     f.render_widget(Paragraph::new(lines), area);
