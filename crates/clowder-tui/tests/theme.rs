@@ -789,6 +789,292 @@ fn each_season_gives_the_chrome_an_accent_of_its_own() {
     assert_eq!(meaning("the season").tint, Tint::SeasonalAccent);
 }
 
+/// Every accent a season can give, so a cell can be checked for wearing any of
+/// them — the snapshot's own season's or another's.
+fn all_accents() -> [Color; 4] {
+    Season::ALL.map(seasonal_accent)
+}
+
+/// A meadow on a chosen day, with a list long enough to scroll and a store
+/// sidebar with something in it, so every region of a frame draws something
+/// that could, wrongly, wear the accent.
+fn meadow_on_day(day: u64) -> clowder_core::GameState {
+    use clowder_core::{content, ContentId, GameState, ResourceId, StructureId};
+    let mut s = GameState::new(11);
+    s.ticks = day * content::TICKS_PER_DAY;
+    s.revealed = StructureId::ALL.iter().map(|b| ContentId::Structure(*b)).collect();
+    for r in ResourceId::ALL {
+        s.resources[r.ix()] = 1_234.0;
+    }
+    for b in StructureId::ALL.iter().take(6) {
+        s.structures[b.ix()] = 2;
+    }
+    s
+}
+
+/// The views a chrome check is made over: the list with its cursor near the
+/// top and deep in its scroll, the inspector asked for (a swap below 100
+/// columns, a pane above), and a full-screen overlay over the body.
+fn chrome_views() -> Vec<(&'static str, clowder_tui::nav::ViewState)> {
+    use clowder_core::{ContentId, StructureId};
+    use clowder_tui::nav::{Overlay, RowKey, Section, ViewState};
+    let at = |i: usize| {
+        let mut v = ViewState { section: Some(Section::Meadow), ..Default::default() };
+        v.focus[Section::Meadow.index()] =
+            Some(RowKey::Content(ContentId::Structure(StructureId::ALL[i]), ""));
+        v
+    };
+    vec![
+        ("the list", at(4)),
+        ("the list scrolled", at(44)),
+        ("the inspector asked for", ViewState { inspector_wanted: true, ..at(4) }),
+        ("help open", ViewState { overlay: Some(Overlay::Help), ..at(4) }),
+    ]
+}
+
+/// Sizes either side of both layout breakpoints: one divider below 100
+/// columns, two at 100 and wider.
+const CHROME_SIZES: [(u16, u16); 8] =
+    [(80, 24), (90, 24), (99, 24), (100, 30), (110, 30), (119, 40), (120, 40), (150, 50)];
+
+/// Draw one frame into `term` after `prev`, returning its cells and layout.
+fn draw_frame(
+    term: &mut Terminal<TestBackend>,
+    state: &clowder_core::GameState,
+    view: &clowder_tui::nav::ViewState,
+    prev: Option<&clowder_tui::render::layout::Layout>,
+) -> (ratatui::buffer::Buffer, clowder_tui::render::layout::Layout) {
+    let mut layout = None;
+    term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, view, prev)))
+        .expect("drawing into an in-memory backend cannot fail");
+    (term.backend().buffer().clone(), layout.expect("frame returns the layout it used"))
+}
+
+/// The cells a frame's pane dividers occupy (TUI-RENDER-016): each body row
+/// of the list's space's edge column facing the sidebar, and, where the
+/// inspector is a pane of its own, of its edge column facing the inspector —
+/// and none while a full-screen overlay takes the body.
+fn divider_cells(
+    layout: &clowder_tui::render::layout::Layout,
+    view: &clowder_tui::nav::ViewState,
+) -> HashSet<(u16, u16)> {
+    use clowder_tui::render::layout::Body;
+    if view.overlay.is_some() {
+        return HashSet::new();
+    }
+    let (space, columns) = match layout.body {
+        Body::Narrow { main, .. } => (main, vec![main.x]),
+        Body::Wide { list, .. } => (list, vec![list.x, list.right() - 1]),
+        Body::TooSmall(_) => return HashSet::new(),
+    };
+    columns.into_iter().flat_map(|x| (space.y..space.bottom()).map(move |y| (x, y))).collect()
+}
+
+/// The claim at one frame: the header rule's underline, on every header cell,
+/// wears `accent` while each character above it keeps the colour the header
+/// widget gives it alone; every divider cell wears `accent`; and no other
+/// cell's foreground, background or underline wears any season's accent.
+#[track_caller]
+fn assert_only_the_chrome_wears(
+    buf: &ratatui::buffer::Buffer,
+    layout: &clowder_tui::render::layout::Layout,
+    state: &clowder_core::GameState,
+    view: &clowder_tui::nav::ViewState,
+    accent: Color,
+    what: &str,
+) {
+    let (w, h) = (buf.area.width, buf.area.height);
+    let accents = all_accents();
+    let dividers = divider_cells(layout, view);
+
+    let mut alone = Terminal::new(TestBackend::new(w, 1)).expect("a test backend always builds");
+    alone
+        .draw(|f| {
+            let area = f.area();
+            clowder_tui::render::widgets::chrome::header(f, area, state, view);
+        })
+        .expect("drawing into an in-memory backend cannot fail");
+    let alone = alone.backend().buffer().clone();
+
+    for y in 0..h {
+        for x in 0..w {
+            let cell = buf.cell((x, y)).expect("every cell of the area exists");
+            if y == layout.header.y {
+                let own = alone.cell((x, 0)).expect("header cell drawn alone");
+                assert!(
+                    cell.modifier.contains(Modifier::UNDERLINED) && cell.underline_color == accent,
+                    "{w}x{h} with {what}: header column {x} (`{}`) has underline {} in {:?}; the \
+                     header rule runs beneath every header cell in the snapshot's season's \
+                     accent {accent:?}",
+                    cell.symbol(),
+                    cell.modifier.contains(Modifier::UNDERLINED),
+                    cell.underline_color
+                );
+                assert_eq!(
+                    (cell.fg, cell.bg),
+                    (own.fg, own.bg),
+                    "{w}x{h} with {what}: header column {x} (`{}`) is drawn in {:?} on {:?}, \
+                     but the header gives it {:?} on {:?}. The accent colours the underline \
+                     alone; every character above it keeps its own colour.",
+                    cell.symbol(),
+                    cell.fg,
+                    cell.bg,
+                    own.fg,
+                    own.bg
+                );
+                continue;
+            }
+            if dividers.contains(&(x, y)) {
+                assert_eq!(
+                    cell.fg, accent,
+                    "{w}x{h} with {what}: the divider cell ({x},{y}) (`{}`) is drawn in {:?}, \
+                     not the snapshot's season's accent {accent:?}",
+                    cell.symbol(),
+                    cell.fg
+                );
+                continue;
+            }
+            for (part, colour) in
+                [("foreground", cell.fg), ("background", cell.bg), ("underline", cell.underline_color)]
+            {
+                assert!(
+                    !accents.contains(&colour),
+                    "{w}x{h} with {what}: `{}` at ({x},{y}) wears a seasonal accent ({colour:?}) \
+                     as its {part}. The accent is the header rule's and the pane dividers' and \
+                     nothing else's.",
+                    cell.symbol()
+                );
+            }
+        }
+    }
+}
+
+/// The header rule and every pane divider wear the accent of the season the
+/// drawn snapshot holds — for each of the four seasons, and for a snapshot
+/// the core holds in a season its calendar day is not in, so the accent is
+/// the snapshot's season and not one worked out from the date. On the rule
+/// the accent is the underline's colour alone, every character above it
+/// keeping the colour the header gives it; and no other cell of the frame —
+/// foreground, background or underline — wears any season's accent. At every
+/// size either side of both breakpoints, with the list, the inspector asked
+/// for, and a full-screen overlay (which leaves no divider to wear it).
+///
+/// @spec TUI-THEME-008
+#[test]
+fn the_rule_and_every_divider_wear_the_snapshots_season_and_nothing_else_does() {
+    use clowder_core::{content, AdventureId};
+
+    let mut snapshots: Vec<(String, clowder_core::GameState, Season)> = Season::ALL
+        .iter()
+        .enumerate()
+        .map(|(i, season)| {
+            let s = meadow_on_day(i as u64 * content::DAYS_PER_SEASON + 3);
+            (format!("{season:?}"), s, *season)
+        })
+        .collect();
+    let held = {
+        let mut s = meadow_on_day(3);
+        s.active_adventure = Some(AdventureId::LongWinter);
+        s
+    };
+    snapshots.push(("a season held by the core".to_string(), held, Season::Winter));
+
+    for (name, state, season) in &snapshots {
+        assert_eq!(state.season(), *season, "fixture: the {name} snapshot holds {season:?}");
+        let accent = seasonal_accent(*season);
+        for (w, h) in CHROME_SIZES {
+            for (what, view) in chrome_views() {
+                let mut term =
+                    Terminal::new(TestBackend::new(w, h)).expect("a test backend always builds");
+                let (buf, layout) = draw_frame(&mut term, state, &view, None);
+                assert_only_the_chrome_wears(
+                    &buf,
+                    &layout,
+                    state,
+                    &view,
+                    accent,
+                    &format!("{what} in the {name} snapshot"),
+                );
+            }
+        }
+    }
+    // The held snapshot's calendar day is in a different season from the one
+    // it holds, so an accent read off the date would fail above.
+    assert_ne!(
+        meadow_on_day(3).season(),
+        Season::Winter,
+        "fixture: the held snapshot's calendar season differs from the season it holds"
+    );
+}
+
+/// At each of the four turns of the year, the frame that draws the first
+/// snapshot of the new season draws the new season's accent on every chrome
+/// cell — on the same frame as the header's season word changes, with no cell
+/// still wearing the old accent or anything between the two — and that frame,
+/// drawn straight after the old season's, is cell for cell the frame the new
+/// snapshot draws cold: no blend, because nothing about the frame before
+/// reaches it. The frame after that is the same again.
+///
+/// @spec TUI-THEME-008
+#[test]
+fn the_accent_turns_on_the_frame_the_season_word_does_with_no_blend() {
+    use clowder_core::content;
+
+    let word = |season: Season| -> String { format!("{season:?}").chars().take(3).collect() };
+    let view = chrome_views().remove(0).1;
+
+    for turn in 1..=4u64 {
+        let boundary = turn * content::DAYS_PER_SEASON;
+        let mut before = meadow_on_day(boundary);
+        before.ticks -= 1;
+        let after = meadow_on_day(boundary);
+        let (old, new) = (before.season(), after.season());
+        assert_ne!(old, new, "fixture: turn {turn} crosses a season boundary");
+        let (old_accent, new_accent) = (seasonal_accent(old), seasonal_accent(new));
+
+        for (w, h) in [(80, 24), (130, 40)] {
+            let mut term = Terminal::new(TestBackend::new(w, h)).expect("a test backend always builds");
+            let (buf_old, layout_old) = draw_frame(&mut term, &before, &view, None);
+            let header_old: String = (0..w).map(|x| buf_old.cell((x, 0)).expect("cell").symbol()).collect();
+            assert!(header_old.contains(&word(old)), "fixture: the header names {old:?}: {header_old:?}");
+            assert_only_the_chrome_wears(&buf_old, &layout_old, &before, &view, old_accent, "the last frame of a season");
+
+            let (buf_new, layout_new) = draw_frame(&mut term, &after, &view, Some(&layout_old));
+            let header_new: String = (0..w).map(|x| buf_new.cell((x, 0)).expect("cell").symbol()).collect();
+            assert!(
+                header_new.contains(&word(new)) && !header_new.contains(&word(old)),
+                "fixture: the first frame of the new season names {new:?} and not {old:?}: {header_new:?}"
+            );
+            assert_only_the_chrome_wears(&buf_new, &layout_new, &after, &view, new_accent, "the first frame of a season");
+            for y in 0..h {
+                for x in 0..w {
+                    let c = buf_new.cell((x, y)).expect("cell");
+                    assert!(
+                        c.fg != old_accent && c.underline_color != old_accent,
+                        "{w}x{h}: at turn {turn}, ({x},{y}) still wears the old season's accent \
+                         on the frame the header names the new one"
+                    );
+                }
+            }
+
+            let mut fresh = Terminal::new(TestBackend::new(w, h)).expect("a test backend always builds");
+            let (cold, _) = draw_frame(&mut fresh, &after, &view, None);
+            assert_eq!(
+                buf_new, cold,
+                "{w}x{h}: at turn {turn}, the first frame of the new season drawn after the old \
+                 one differs from the frame the new snapshot draws cold — the accent carried \
+                 something over from the frame before"
+            );
+            let (again, _) = draw_frame(&mut term, &after, &view, Some(&layout_new));
+            assert_eq!(
+                again, cold,
+                "{w}x{h}: at turn {turn}, the frame after the turn changed again with the \
+                 snapshot unchanged — the accent is still moving"
+            );
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // TUI-THEME-009 — the accent never touches anything carrying state
 // ---------------------------------------------------------------------------

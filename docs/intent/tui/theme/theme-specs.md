@@ -15,7 +15,7 @@
 
 ## The Seasonal Accent
 
-- [ ] **TUI-THEME-008**: The system shall tint the inert chrome — the header rule and the pane divider — with an accent chosen by the current season, so the pane's colour tracks the year.
+- [x] **TUI-THEME-008**: The system shall draw the inert chrome — the header rule and every pane divider (TUI-RENDER-016), and nothing else — in the accent of the season held by the snapshot the frame draws, changing on the same frame as the header's season word with no blend across the turn, and on the header rule colouring the underline alone so every character above it keeps its own colour, so the pane's chrome tracks the year.
 - [x] **TUI-THEME-009**: The system shall apply the seasonal accent to no element that carries state, so no colour is ever ambiguous between a state and a season.
 
 ## Colour as the Second Channel

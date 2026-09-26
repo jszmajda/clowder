@@ -3,7 +3,7 @@
 //!
 //! @spec TUI-NAV-019, TUI-NAV-020, TUI-NAV-021, TUI-NAV-022, TUI-NAV-023,
 //! TUI-NAV-024, TUI-NAV-025, TUI-NAV-034, TUI-NAV-044, TUI-NAV-045, TUI-NAV-054,
-//! TUI-NAV-086, TUI-THEME-011, TUI-THEME-015
+//! TUI-NAV-086, TUI-THEME-011, TUI-THEME-015, TUI-RENDER-016
 //!
 //! **The contract these tests are made of.** The chrome's job is to be quiet.
 //! An empty attention cluster means nothing needs you, and that only works if
@@ -1429,6 +1429,157 @@ fn the_header_draws_the_first_step_that_fits_at_every_width() {
             assert_eq!(step, 4, "fixture: long figures should shed facts at the floor width");
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RENDER-016 — the header rule, drawn in place beneath the header
+//
+// The rule is the header row's bottom edge, and it is an underline rather than
+// a row: every cell of the header row carries it — facts, chips, the blank
+// columns between them, the padding — at every width step the header takes,
+// and it changes nothing a cell already shows. The oracle for "nothing" is the
+// header widget drawn alone into a row of the same width: each cell of the
+// composed header row must hold that cell's symbol in that cell's colours,
+// its modifiers differing by the underline and nothing else. The rule is drawn
+// in place, so the frame's regions are exactly the layout algebra's.
+// ---------------------------------------------------------------------------
+
+/// Draw one whole frame, cold, and return its cells and the layout it used.
+fn composed_frame(
+    state: &GameState,
+    view: &ViewState,
+    w: u16,
+    h: u16,
+) -> (Buffer, clowder_tui::render::layout::Layout) {
+    let mut term = terminal(w, h);
+    let mut layout = None;
+    term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, view, None)))
+        .expect("TestBackend is infallible");
+    (term.backend().buffer().clone(), layout.expect("frame returns the layout it used"))
+}
+
+/// Every cell of the header row wears the rule's underline — at the floor, on
+/// both sides of both layout breakpoints, wide, and on both sides of every
+/// change of step between the floor and wide — for every combination of live chips with one- and two-digit counts, and for figures
+/// long enough to shed facts at the floor — so every width step TUI-NAV-086
+/// takes inside a real frame is reached. No cell's symbol, foreground,
+/// background or other modifier differs from what the header widget draws
+/// there on its own, and the frame's regions are the layout algebra's own, so
+/// the rule took no row and resized nothing.
+///
+/// @spec TUI-RENDER-016
+#[test]
+fn the_header_rule_underlines_every_header_cell_at_every_width_step_and_changes_nothing_else() {
+    use ratatui::style::Modifier;
+
+    let big = {
+        let (mut s, v) = live_chips_fixture([true, true, true, true], 20, 9);
+        s.generation = 12_345;
+        s.ticks = 1_234_567_890 * content::TICKS_PER_DAY;
+        s.pending_sky_event = Some(s.ticks + 5);
+        s.kittens.extend(employed(12_209));
+        s.speed = 0.25;
+        (s, v)
+    };
+    type Case = ([bool; 4], (usize, usize), (GameState, ViewState));
+    let mut cases: Vec<Case> = Vec::new();
+    for (idle, new) in [(3usize, 2usize), (12, 3)] {
+        for mask in 0u8..16 {
+            let live = [mask & 1 != 0, mask & 2 != 0, mask & 4 != 0, mask & 8 != 0];
+            let counts = (if live[0] { idle } else { 0 }, if live[2] { new } else { 0 });
+            cases.push((live, counts, live_chips_fixture(live, idle, new)));
+        }
+    }
+    cases.push(([true; 4], (20, 9), big));
+
+    let mut steps_seen: BTreeSet<usize> = BTreeSet::new();
+    for (live, counts, (state, view)) in &cases {
+        let (live, counts) = (*live, *counts);
+        // Every width at which the header changes step, and the width either
+        // side of it, plus the floor, both layout breakpoints and wide: each
+        // step is drawn at its own narrowest and widest width in the sweep.
+        let step_at = |w: u16| pinned_header(state, live, counts, w as usize).map(|(s, _)| s);
+        let widths: BTreeSet<u16> = (FLOOR_W..=WIDE_W)
+            .filter(|&w| {
+                w == FLOOR_W
+                    || w == WIDE_W
+                    || [99, 100, 119, 120, 150].contains(&w)
+                    || step_at(w) != step_at(w - 1)
+                    || step_at(w) != step_at(w + 1)
+            })
+            .collect();
+        let banner = view.reports.iter().any(|r| !r.dismissed);
+
+        for w in widths {
+            let (step, _) = pinned_header(state, live, counts, w as usize)
+                .unwrap_or_else(|| panic!("fixture: some step of the header fits {w} columns"));
+            steps_seen.insert(step);
+
+            let (buf, layout) = composed_frame(state, view, w, FLOOR_H);
+            assert_eq!(
+                layout,
+                compute(Rect::new(0, 0, w, FLOOR_H), None, banner),
+                "at {w}x{FLOOR_H} with chips {live:?} live, the frame's regions are not the \
+                 layout algebra's: the header rule is drawn in place and adds no row"
+            );
+
+            let mut alone_term = terminal(w, 1);
+            alone_term
+                .draw(|f| {
+                    let area = f.area();
+                    chrome::header(f, area, state, view);
+                })
+                .expect("TestBackend is infallible");
+            let alone = alone_term.backend().buffer();
+            let line = region_lines(&buf, layout.header).concat();
+
+            for x in 0..w {
+                let got = buf.cell((x, layout.header.y)).expect("header cell");
+                let want = alone.cell((x, 0)).expect("header cell drawn alone");
+                assert!(
+                    got.modifier.contains(Modifier::UNDERLINED),
+                    "at width {w} (step {step}) with chips {live:?} live, header column {x} \
+                     (`{}`) carries no underline. The header rule runs beneath every cell of \
+                     the header row — facts, chips, the blanks between, the padding.\n\
+                     line: {line:?}",
+                    got.symbol()
+                );
+                assert_eq!(
+                    got.symbol(),
+                    want.symbol(),
+                    "at width {w} (step {step}), header column {x} holds `{}` where the header \
+                     draws `{}`: an underline is a mark beneath a character, never a character",
+                    got.symbol(),
+                    want.symbol()
+                );
+                assert_eq!(
+                    (got.fg, got.bg),
+                    (want.fg, want.bg),
+                    "at width {w} (step {step}) with chips {live:?} live, header column {x} \
+                     (`{}`) is drawn in {:?} on {:?}, but the header draws it in {:?} on {:?}. \
+                     The rule changes no character's colour.\nline: {line:?}",
+                    got.symbol(),
+                    got.fg,
+                    got.bg,
+                    want.fg,
+                    want.bg
+                );
+                assert_eq!(
+                    got.modifier.difference(Modifier::UNDERLINED),
+                    want.modifier.difference(Modifier::UNDERLINED),
+                    "at width {w} (step {step}), header column {x} (`{}`) gained or lost an \
+                     emphasis other than the rule's underline",
+                    got.symbol()
+                );
+            }
+        }
+    }
+
+    assert_eq!(
+        steps_seen,
+        BTreeSet::from([1, 2, 3, 4]),
+        "fixture: the sweep should reach every width step the header takes inside a frame"
+    );
 }
 
 // ---------------------------------------------------------------------------

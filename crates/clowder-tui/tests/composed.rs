@@ -654,13 +654,16 @@ fn the_frame_places_the_inspector_where_its_widget_says_it_goes() {
                     });
                 }
                 Placement::Swapped => {
+                    // The swap draws into the space the pane divider
+                    // (TUI-RENDER-016) leaves, not the full list rect.
+                    let space = left_by_dividers(&d.layout);
                     assert_region_is(
                         &d,
-                        main,
+                        space,
                         size,
                         "inspector swapped in over the list",
                         "inspector::draw",
-                        |f| inspector::draw(f, main, &state, &view),
+                        |f| inspector::draw(f, space, &state, &view),
                     );
                 }
                 Placement::Absent => {
@@ -695,8 +698,10 @@ fn the_swapped_inspector_takes_the_lists_space_and_nothing_else() {
     let main = main_rect(&swapped.layout);
     let view = inspecting(&state, near_row());
 
-    assert_region_is(&swapped, main, size, "swapped inspector", "inspector::draw", |f| {
-        inspector::draw(f, main, &state, &view)
+    // The swap draws into the space the pane divider (TUI-RENDER-016) leaves.
+    let space = left_by_dividers(&swapped.layout);
+    assert_region_is(&swapped, space, size, "swapped inspector", "inspector::draw", |f| {
+        inspector::draw(f, space, &state, &view)
     });
 
     assert_ne!(
@@ -741,12 +746,14 @@ fn the_swapped_inspector_follows_the_underlying_cursor() {
     let near = cold(&state, &near_view, FLOOR_W, FLOOR_H);
     let far = cold(&state, &far_view, FLOOR_W, FLOOR_H);
     let main = main_rect(&near.layout);
+    // The swap draws into the space the pane divider (TUI-RENDER-016) leaves.
+    let space = left_by_dividers(&near.layout);
 
-    assert_region_is(&near, main, size, "swapped inspector", "inspector::draw", |f| {
-        inspector::draw(f, main, &state, &near_view)
+    assert_region_is(&near, space, size, "swapped inspector", "inspector::draw", |f| {
+        inspector::draw(f, space, &state, &near_view)
     });
-    assert_region_is(&far, main, size, "swapped inspector", "inspector::draw", |f| {
-        inspector::draw(f, main, &state, &far_view)
+    assert_region_is(&far, space, size, "swapped inspector", "inspector::draw", |f| {
+        inspector::draw(f, space, &state, &far_view)
     });
     assert_ne!(
         region_text(&near.buffer, main),
@@ -1172,5 +1179,402 @@ fn the_same_inputs_compose_the_same_frame() {
             "{w}x{h}: two frames from identical inputs must be identical"
         );
         assert_eq!(first.layout, second.layout, "{w}x{h}: and so must the layouts they used");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RENDER-016 — the pane dividers
+//
+// Side-by-side panes are parted by one column of `│` at each boundary, and
+// each column comes out of the list's space: its edge facing the sidebar at
+// every width, and its edge facing the inspector as well wherever the
+// inspector is a pane of its own. So the layout's rectangles are unchanged —
+// the dividers live *inside* the list's rectangle — and whatever the list's
+// space holds is fitted to what the dividers leave of it. Where a full-screen
+// overlay takes the body there are no side-by-side panes, and so no divider.
+//
+// "The panes it separates" are the body's panes, so a divider runs from the
+// body's first row to its last and stands on no other row: not the header,
+// the tab bar, the banner row, the ticker or the hint bar.
+// ---------------------------------------------------------------------------
+
+/// The one glyph a divider is drawn from: the single-width light vertical.
+const DIVIDER: &str = "│";
+
+/// The columns a layout's dividers stand in: the list's space's edge facing
+/// the sidebar, and where the inspector is a pane of its own, its edge facing
+/// the inspector. Derived from whichever layout the frame reports drawing, so
+/// a dead-band frame is held to the layout it actually drew.
+fn divider_columns(l: &Layout) -> Vec<u16> {
+    match l.body {
+        Body::Narrow { main, .. } => vec![main.x],
+        Body::Wide { list, .. } => vec![list.x, list.right() - 1],
+        Body::TooSmall(r) => panic!("this claim needs a supported size, not {r:?}"),
+    }
+}
+
+/// What the dividers leave of the list's space.
+fn left_by_dividers(l: &Layout) -> Rect {
+    match l.body {
+        Body::Narrow { main, .. } => Rect::new(main.x + 1, main.y, main.width - 1, main.height),
+        Body::Wide { list, .. } => Rect::new(list.x + 1, list.y, list.width - 2, list.height),
+        Body::TooSmall(r) => panic!("this claim needs a supported size, not {r:?}"),
+    }
+}
+
+/// A meadow far enough along that a heavy row with a consequence summary is
+/// listed, alongside everything `settled` already has.
+fn far_along() -> GameState {
+    let mut s = settled();
+    s.ideas = clowder_core::IdeaId::ALL.iter().copied().collect::<BTreeSet<_>>();
+    s.revealed.extend(clowder_core::IdeaId::ALL.iter().map(|i| ContentId::Idea(*i)));
+    s.discovered = clowder_core::ColonyId::ALL.iter().copied().collect::<BTreeSet<_>>();
+    s.peak_devotion = 1.0e9;
+    s.generation = 1;
+    s.roster_high_water = 100;
+    s
+}
+
+/// A view with a heavy row armed — so the list's space draws an armed row's
+/// expansion beneath it — in whichever section lists one whose arming the
+/// frame expands.
+fn armed_view(state: &GameState) -> ViewState {
+    use clowder_tui::nav::rows::RowKind;
+    let (section, key, command) = Section::ALL
+        .iter()
+        .find_map(|s| {
+            rows(state, *s).into_iter().find_map(|r| match r.kind {
+                RowKind::Act { command: c @ clowder_core::Command::PassItDown, .. } => {
+                    Some((*s, r.key, c))
+                }
+                _ => None,
+            })
+        })
+        .expect("fixture: some section lists a heavy row with a consequence summary");
+    let mut v = ViewState { section: Some(section), ..Default::default() };
+    v.focus[section.index()] = Some(key.clone());
+    v.armed = Some(clowder_tui::nav::ArmedRow {
+        key,
+        command,
+        expires_at: std::time::Instant::now() + std::time::Duration::from_secs(3_600),
+    });
+    v
+}
+
+/// A view with a count prompt open on the focused row, digits typed.
+fn prompting(state: &GameState, key: RowKey, wanted: bool) -> ViewState {
+    ViewState {
+        inspector_wanted: wanted,
+        prompt: Some(clowder_tui::nav::CountPrompt { digits: "12".to_string(), row: Some(key.clone()) }),
+        ..looking_at(state, key)
+    }
+}
+
+/// Every view whose list's space this section's tests draw: the list at the
+/// top and deep in its scroll (so both overflow notes are drawn), the list
+/// with a focused row in reverse video, a prompt's preview, an armed row's
+/// expansion, the inspector swapped in over it, and a banner taking a body
+/// row.
+fn list_space_views(state: &GameState) -> Vec<(&'static str, ViewState)> {
+    vec![
+        ("the list near its top", looking_at(state, near_row())),
+        ("the list deep in its scroll", looking_at(state, far_row())),
+        ("the list with a prompt open", prompting(state, near_row(), false)),
+        ("the list with a row armed", armed_view(state)),
+        ("the inspector asked for", inspecting(state, near_row())),
+        ("the inspector asked for with a prompt open", prompting(state, far_row(), true)),
+        ("a banner showing", returning(state)),
+    ]
+}
+
+/// The claim at one frame: a `│` in every body row of each divider column
+/// with nothing else in the cell; no divider glyph at those columns on any
+/// row outside the body; and no full-height `│` column anywhere else in the
+/// body.
+#[track_caller]
+fn assert_dividers_stand(d: &Drawn, what: &str) {
+    use ratatui::style::{Color, Modifier};
+
+    let area = d.buffer.area;
+    let (w, h) = (area.width, area.height);
+    let body = main_rect(&d.layout);
+    let columns = divider_columns(&d.layout);
+
+    for &x in &columns {
+        for y in 0..h {
+            let cell = d.buffer.cell((x, y)).expect("cell");
+            if (body.y..body.bottom()).contains(&y) {
+                assert_eq!(
+                    cell.symbol(),
+                    DIVIDER,
+                    "at {w}x{h} with {what}, the divider at column {x} is broken at row {y} by \
+                     `{}`: a divider runs the full height of the panes it parts.\n body:\n{}",
+                    cell.symbol(),
+                    region_text(&d.buffer, sidebar_rect(&d.layout).union(body)),
+                );
+                assert_eq!(
+                    (cell.modifier, cell.bg),
+                    (Modifier::empty(), Color::Reset),
+                    "at {w}x{h} with {what}, the divider cell ({x},{y}) carries {:?} on {:?}. \
+                     Its cells hold the glyph and nothing else: a focused row's reverse video, \
+                     an armed row's expansion and the list's position indicator all end at the \
+                     width the dividers leave.",
+                    cell.modifier,
+                    cell.bg
+                );
+            } else {
+                assert_ne!(
+                    cell.symbol(),
+                    DIVIDER,
+                    "at {w}x{h} with {what}, a divider glyph stands at ({x},{y}), outside the \
+                     body's panes: a divider stands on no row but the panes' own — never the \
+                     header, tab bar, banner, ticker or hint bar"
+                );
+            }
+        }
+    }
+
+    for x in (0..w).filter(|x| !columns.contains(x)) {
+        let full = (body.y..body.bottom())
+            .all(|y| d.buffer.cell((x, y)).is_some_and(|c| c.symbol() == DIVIDER));
+        assert!(
+            !full,
+            "at {w}x{h} with {what}, column {x} is a full-height divider, but the dividers are \
+             taken from the list's space at its edges ({columns:?}) and stand nowhere else"
+        );
+    }
+}
+
+/// At every width from the floor to well past both breakpoints, at two
+/// heights, with every kind of content in the list's space: one divider where
+/// the inspector swaps over the list (80–99), two where it is a pane of its
+/// own (100 and wider), each a `│` in every body row of the list's edge
+/// column facing its neighbour, with nothing else in the cell, on no row
+/// outside the body, and no full-height divider anywhere else. The frame's
+/// regions are the layout algebra's own — the dividers are drawn in place and
+/// resize nothing.
+///
+/// @spec TUI-RENDER-016
+#[test]
+fn a_divider_stands_at_each_boundary_between_side_by_side_panes_and_nowhere_else() {
+    let state = far_along();
+    let views = list_space_views(&state);
+
+    for h in [FLOOR_H, 40] {
+        for w in FLOOR_W..=160 {
+            for (what, view) in &views {
+                let d = cold(&state, view, w, h);
+                let banner = view.reports.iter().any(|r| !r.dismissed);
+                assert_eq!(
+                    d.layout,
+                    render::layout::compute(Rect::new(0, 0, w, h), None, banner),
+                    "at {w}x{h} with {what}, the frame's regions are not the layout algebra's: \
+                     the dividers are taken from inside the list's space and resize nothing"
+                );
+                let expected = if w < 100 { 1 } else { 2 };
+                assert_eq!(
+                    divider_columns(&d.layout).len(),
+                    expected,
+                    "fixture: a cold frame at {w} columns has {expected} pane boundary(ies)"
+                );
+                assert_dividers_stand(&d, what);
+            }
+        }
+    }
+}
+
+/// Within a breakpoint's dead-band the divider follows whichever layout is
+/// drawn: sweeping the width down from wide and back up, frame after frame,
+/// each frame's dividers are the ones its own reported layout calls for —
+/// two while the inspector is still a pane below 100 columns, one once it
+/// swaps — and the layout is the algebra's for that width and that previous
+/// layout.
+///
+/// @spec TUI-RENDER-016
+#[test]
+fn inside_a_dead_band_the_dividers_follow_the_layout_on_screen() {
+    let state = far_along();
+    let view = looking_at(&state, near_row());
+    let mut widths: Vec<u16> = (FLOOR_W..=130).rev().collect();
+    widths.extend(FLOOR_W..=130);
+
+    let mut prev: Option<Layout> = None;
+    let mut wide_below_breakpoint = false;
+    for w in widths {
+        let mut term = terminal(w, FLOOR_H);
+        let d = draw(&mut term, &state, &view, prev.as_ref());
+        assert_eq!(
+            d.layout,
+            render::layout::compute(Rect::new(0, 0, w, FLOOR_H), prev.as_ref(), false),
+            "at {w}x{FLOOR_H} after {prev:?}, the frame's regions are not the layout algebra's"
+        );
+        if w < 100 && matches!(d.layout.body, Body::Wide { .. }) {
+            wide_below_breakpoint = true;
+        }
+        assert_dividers_stand(&d, "the width swept through a dead-band");
+        prev = Some(d.layout);
+    }
+    assert!(
+        wide_below_breakpoint,
+        "fixture: the downward sweep should keep the inspector's pane below 100 columns"
+    );
+}
+
+/// Whatever holds the list's space fits its lines to the width the dividers
+/// leave, rather than being drawn at full width and cut by them.
+///
+/// Where the inspector swaps in over the list, the space the dividers leave is
+/// exactly the inspector widget's drawing into that narrower rectangle. For the
+/// list, two frames whose dividers leave the same width — one divider at a
+/// narrow width `n`, two at `n + 21` where the inspector is a pane — draw the
+/// same list at the same height, so what the dividers leave must match cell
+/// for cell, reverse video and colours included; and in each the leading
+/// column of a focused row is its cursor glyph and of an overflow note its
+/// first digit, so neither edge was cut. Checked at every narrow width that
+/// has a wide partner, at two heights, for the list at its top and deep in its
+/// scroll, with a prompt's preview, and with a row armed.
+///
+/// @spec TUI-RENDER-016
+#[test]
+fn whatever_holds_the_lists_space_fits_its_lines_to_the_width_the_dividers_leave() {
+    let state = far_along();
+
+    // The swapped inspector.
+    for h in [FLOOR_H, 40] {
+        for w in FLOOR_W..100 {
+            for view in [
+                inspecting(&state, near_row()),
+                inspecting(&state, far_row()),
+                prompting(&state, far_row(), true),
+            ] {
+                let d = cold(&state, &view, w, h);
+                let space = left_by_dividers(&d.layout);
+                let alone = widget_alone(w, h, |f| inspector::draw(f, space, &state, &view));
+                assert!(has_content(&alone, space), "fixture: the inspector has something to say");
+                assert_eq!(
+                    region_lines(&d.buffer, space),
+                    region_lines(&alone, space),
+                    "at {w}x{h}, the inspector swapped in over the list is not the inspector \
+                     drawn into the width its divider leaves ({space:?}).\n composed:\n{}\n \
+                     inspector alone:\n{}",
+                    region_text(&d.buffer, space),
+                    region_text(&alone, space),
+                );
+            }
+        }
+    }
+
+    // The list.
+    let list_views = [
+        ("the list near its top", looking_at(&state, near_row())),
+        ("the list deep in its scroll", looking_at(&state, far_row())),
+        ("the list with a prompt open", prompting(&state, near_row(), false)),
+        ("the list with a row armed", armed_view(&state)),
+    ];
+    for h in [FLOOR_H, 40] {
+        for n in FLOOR_W..=98 {
+            let wide = n + 21;
+            for (what, view) in &list_views {
+                let a = cold(&state, view, n, h);
+                let b = cold(&state, view, wide, h);
+                assert!(matches!(a.layout.body, Body::Narrow { .. }), "fixture: {n} is narrow");
+                assert!(matches!(b.layout.body, Body::Wide { .. }), "fixture: {wide} has a pane");
+                let (sa, sb) = (left_by_dividers(&a.layout), left_by_dividers(&b.layout));
+                assert_eq!(
+                    (sa.width, sa.height),
+                    (sb.width, sb.height),
+                    "fixture: {n} and {wide} columns leave the list the same space"
+                );
+
+                let cells = |d: &Drawn, s: Rect| -> Vec<Vec<ratatui::buffer::Cell>> {
+                    (s.y..s.bottom())
+                        .map(|y| (s.x..s.right()).map(|x| d.buffer.cell((x, y)).expect("cell").clone()).collect())
+                        .collect()
+                };
+                assert_eq!(
+                    cells(&a, sa),
+                    cells(&b, sb),
+                    "with {what} at height {h}, the list drawn at {n} columns (one divider) and \
+                     at {wide} (two) differs within the {} columns both leave it: the list is \
+                     fitted to the width the dividers leave, not drawn full width and cut.\n \
+                     at {n}:\n{}\n at {wide}:\n{}",
+                    sa.width,
+                    region_text(&a.buffer, sa),
+                    region_text(&b.buffer, sb),
+                );
+
+                for (d, s, at) in [(&a, sa, n), (&b, sb, wide)] {
+                    let lines = region_lines(&d.buffer, s);
+                    let focused = lines
+                        .iter()
+                        .find(|l| l.contains('▸'))
+                        .unwrap_or_else(|| panic!("fixture: {what} at {at} shows the cursor"));
+                    assert!(
+                        focused.starts_with('▸'),
+                        "with {what} at {at}x{h}, the focused row does not begin at the first \
+                         column the divider leaves: {focused:?}"
+                    );
+                    for note in lines.iter().filter(|l| l.contains("more above") || l.contains("more below")) {
+                        assert!(
+                            note.starts_with(|c: char| c.is_ascii_digit()),
+                            "with {what} at {at}x{h}, the list's position indicator lost its \
+                             leading column to a divider: {note:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Where a full-screen overlay takes the body there are no side-by-side
+/// panes, so there is no divider: at every width from the floor to past both
+/// breakpoints, for each overlay, some region of the body is exactly the
+/// overlay's own drawing — nothing cuts through its text — and no body column
+/// is a full-height `│`.
+///
+/// @spec TUI-RENDER-016
+#[test]
+fn no_divider_cuts_through_a_full_screen_overlay() {
+    let state = far_along();
+    let overlays_open = [
+        ("the Journal", Overlay::Journal { anchor: 0 }),
+        ("help", Overlay::Help),
+        ("the palette", Overlay::Palette { query: probe(StructureId::ALL[7]), selected: 0 }),
+    ];
+
+    for h in [FLOOR_H, 40] {
+        for w in FLOOR_W..=160 {
+            for (what, overlay) in &overlays_open {
+                for base in [looking_at(&state, near_row()), inspecting(&state, near_row())] {
+                    let view = ViewState { overlay: Some(overlay.clone()), ..base };
+                    let d = cold(&state, &view, w, h);
+                    let size = (w, h);
+                    match overlay {
+                        Overlay::Journal { .. } => assert_some_region_is(&d, size, what, "overlays::journal", |f, r| {
+                            overlays::journal(f, r, &state, &view)
+                        }),
+                        Overlay::Help => assert_some_region_is(&d, size, what, "overlays::help", |f, r| {
+                            overlays::help(f, r)
+                        }),
+                        Overlay::Palette { .. } => assert_some_region_is(&d, size, what, "overlays::palette", |f, r| {
+                            overlays::palette(f, r, &state, &view)
+                        }),
+                    }
+                    let body = sidebar_rect(&d.layout).union(main_rect(&d.layout));
+                    let body = pane_rect(&d.layout).map_or(body, |p| body.union(p));
+                    for x in body.x..body.right() {
+                        let full = (body.y..body.bottom())
+                            .all(|y| d.buffer.cell((x, y)).is_some_and(|c| c.symbol() == DIVIDER));
+                        assert!(
+                            !full,
+                            "at {w}x{h} with {what} open, column {x} is a full-height divider \
+                             through the overlay; an overlay takes the body and there are no \
+                             panes for a divider to part"
+                        );
+                    }
+                }
+            }
+        }
     }
 }

@@ -394,8 +394,12 @@ fn the_inspector_call_survives_a_round_trip_through_the_pane_and_the_card() {
                 Body::Narrow { main, .. } => main,
                 other => panic!("fixture: 80×24 draws the narrow layout, drew {other:?}"),
             };
-            let shown = region(t.backend().buffer(), main);
-            let alone = inspector_alone(80, 24, main, &a.state, &a.view);
+            // The pane divider (TUI-RENDER-016) is taken from the main
+            // pane's edge facing the sidebar, so the swap draws into what it
+            // leaves, not the raw layout rect.
+            let space = Rect::new(main.x + 1, main.y, main.width - 1, main.height);
+            let shown = region(t.backend().buffer(), space);
+            let alone = inspector_alone(80, 24, space, &a.state, &a.view);
             if wanted {
                 assert_eq!(
                     shown, alone,

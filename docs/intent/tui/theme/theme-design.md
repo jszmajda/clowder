@@ -36,7 +36,7 @@ Six roles. Every value sits in a mid-luminance band so it clears the contrast fl
 | Role | Value | Carries |
 |---|---|---|
 | *(inherited)* | terminal foreground | All ordinary text — names, counts, costs, prose |
-| `dim` | `#7C7873` | Revealed but not actionable, owned and done, flavour events, chrome rules, spent hints |
+| `dim` | `#7C7873` | Revealed but not actionable, owned and done, flavour events, a list's group-header rules, spent hints |
 | `ready` | `#3E8E5A` | ● affordable now |
 | `partial` | `#A8802F` | ◐ partially affordable |
 | `attention` | `#C0663A` | Each attention chip whole, the `full` tag on a capped store, an armed row's expansion beneath it — and nothing else |
@@ -60,7 +60,7 @@ Nothing else wears `attention`. A footer note — the reply to a key just presse
 
 ## The Signature: the Pane Keeps the Season
 
-One deliberate flourish, and it comes from the subject rather than from decoration. The game tracks a season, and the chrome's accent — the header rule and the pane divider, nothing else — drifts with it across the year.
+One deliberate flourish, and it comes from the subject rather than from decoration. The game tracks a season, and the chrome's accent — the header rule and the pane dividers (render leaf: The Frame, Horizontal Layout), nothing else — drifts with it across the year.
 
 | Season | Accent |
 |---|---|
@@ -72,6 +72,12 @@ One deliberate flourish, and it comes from the subject rather than from decorati
 A glance tells you where in the year the clowder is before you have read a word, and a pane left open for weeks slowly changes its light. It is the one thing in this theme that exists because it is lovely rather than because it is necessary.
 
 It is safe precisely because it is confined. **The seasonal accent never touches a colour that carries state.** If it tinted affordability, the player would have to ask whether green meant *affordable* or *spring* — the exact whimsy-over-clarity failure tenet 3 forbids. Inert chrome has no meaning to compete with, so the drift is free.
+
+The accent is the season of the snapshot the frame draws, so it turns on the same frame as the header's season word, with no blend across the turn. A blend would need a frame to remember what it drew before, which no frame does, and a rule still wearing the old season beside the new season's name would be the one place the pane said two things about the year.
+
+On the header rule the accent colours the underline alone. The facts and chips above it keep their own colours — a chip's glyph and word stay `attention` — so the accent sits beneath state without touching it. A terminal that does not colour underlines draws the rule in each cell's own colour, or draws none, and nothing is substituted: the season's name in the header already says everything the accent says.
+
+Autumn's accent sits near `attention` in hue, and it is safe for the same reason the confinement is. The accent is only ever a line — an underline or a column of `│` — always present, always in the same places. `attention` is only ever worn by glyphs and words, and it appears only when something wants the player. The glance reads orange *appearing*; a line that never comes or goes gives it nothing to rule out.
 
 ## Colour Is Always the Second Channel
 
@@ -119,6 +125,7 @@ Both rules hold whatever values the palette settles on (Deferred 1). Retuning th
 | Palette size | Six roles | A fuller set with per-tier ramps | Every added colour dilutes the signal that colour *is* meaning |
 | Mood rendering | A word, no colour | A five-step colour ramp | The word already says it unambiguously; a ramp adds a channel that fails for some players and says nothing new to the rest |
 | Seasonal accent | Chrome only, never state colours | Tint the whole palette seasonally; no seasonal element | Confined, it is free delight; on state colours it would make the player ask whether a colour meant affordability or season |
+| Accent at a season's turn | Changes on the frame the season word changes, with no blend | A gradual blend between the two seasons' accents | A blend needs the frame to remember what it drew, and while it ran the rule would disagree with the season's name beside it |
 | Luminance range | Mid-band throughout | Full range, tuned per background | The consequence of inheriting the ground; also pushes toward the calm the glance contract wants |
 | Focus emphasis | Cursor glyph, and reverse where more is needed | A focus colour | A focus tint would put a second, unrelated colour in a row whose marker is already saying something |
 | Where an armed row wears `attention` | On its expansion beneath it; none on its own line, whose marker keeps its availability colour | Tint the whole line, marker included; tint the line around a marker left in its availability colour | An orange `●` or `◐` is the same appearance as a green `●` or an amber `◐` to a red-green deficiency, so a tinted marker would put affordability in doubt; a line tinted around its marker carries two colours saying different things, the arrangement focus is kept off the palette to avoid; the expansion is the arming's own mark and says nothing else |
@@ -131,7 +138,7 @@ Both rules hold whatever values the palette settles on (Deferred 1). Retuning th
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. The exact hex values want checking against real terminals — several popular themes use low-contrast backgrounds that a mid-luminance palette could sit too close to. The *roles* and their separation are the design; the six values are a starting point to verify on a real pane, alongside the render leaf's other measurements.
+1. The exact hex values want checking against real terminals — several popular themes use low-contrast backgrounds that a mid-luminance palette could sit too close to. The *roles* and their separation are the design; the six values and the four seasonal accents are a starting point to verify on a real pane, alongside the render leaf's other measurements.
 2. Whether `●` and `◐` stay distinct enough. They are the affordable/partial pair, whose colours are the ones a red-green deficiency compresses hardest, so the whole distinction falls to the glyph — and the two differ only by fill. That is a real difference rather than a colour one, but half-filled glyphs render unevenly across fonts, and this wants checking on a real pane before it is trusted. The glyphs belong to the navigation leaf; changing them is a cascade there, not a decision here.
 3. Whether `dim` needs to be a true colour at all, or whether the terminal's own dim attribute serves better. The attribute inherits the user's theme and is arguably more native; it is also inconsistently implemented across terminals, which is what makes this worth testing rather than deciding now.
 

@@ -228,11 +228,14 @@ fn region_lines(buf: &Buffer, rect: Rect) -> Vec<String> {
         .collect()
 }
 
-/// The rectangle the list — or the swapped-in inspector — is drawn in.
+/// The rectangle the list — or the swapped-in inspector — is drawn in: the
+/// list's space with its pane divider(s) (TUI-RENDER-016) set aside, since
+/// the divider is inert chrome wearing the season's accent, never the list's
+/// or the inspector's own content.
 fn list_rect(l: &Layout) -> Rect {
     match l.body {
-        Body::Narrow { main, .. } => main,
-        Body::Wide { list, .. } => list,
+        Body::Narrow { main, .. } => Rect::new(main.x + 1, main.y, main.width - 1, main.height),
+        Body::Wide { list, .. } => Rect::new(list.x + 1, list.y, list.width - 2, list.height),
         Body::TooSmall(r) => panic!("fixture: {r:?} is below the floor"),
     }
 }

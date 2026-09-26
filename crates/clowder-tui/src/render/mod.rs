@@ -18,7 +18,7 @@ use ratatui::Frame;
 
 use crate::nav::rows::{rows, Row, RowKey, RowKind};
 use crate::nav::{ArmedRow, CountPrompt, Overlay, Section, ViewState};
-use crate::theme::Role;
+use crate::theme::{self, Role};
 
 pub use layout::{Body, Layout};
 
@@ -406,6 +406,36 @@ fn row_line(
     Line::from(Span::styled(fmt::fit(&text, width), style))
 }
 
+/// The space a narrow body's single pane leaves once its divider — taken
+/// from its edge facing the sidebar — is set aside, so whatever draws there
+/// fits its lines to that width rather than being drawn full width and cut.
+fn left_of_divider(main: Rect) -> Rect {
+    Rect::new(main.x + 1, main.y, main.width.saturating_sub(1), main.height)
+}
+
+/// The list's space once both its dividers — taken from its edges facing the
+/// sidebar and the inspector — are set aside.
+fn left_between_dividers(list: Rect) -> Rect {
+    Rect::new(list.x + 1, list.y, list.width.saturating_sub(2), list.height)
+}
+
+/// Draw a pane divider — a `│` in the season's accent, and nothing else in
+/// its cells — down each named column, the panes' rows only. Taken from the
+/// list's space rather than given a column of its own, so the layout algebra
+/// is untouched.
+fn draw_dividers(f: &mut Frame, columns: &[u16], top: u16, height: u16, season: clowder_core::Season) {
+    let accent = theme::seasonal_accent(season);
+    let buf = f.buffer_mut();
+    for &x in columns {
+        for y in top..top + height {
+            if let Some(cell) = buf.cell_mut((x, y)) {
+                cell.set_symbol("│");
+                cell.set_style(Style::default().fg(accent));
+            }
+        }
+    }
+}
+
 /// Draw one frame, returning the layout it used.
 ///
 /// The layout must escape: the breakpoints' dead-band is a function of the
@@ -435,6 +465,14 @@ pub fn frame(
     // Each region is drawn by the widget that owns it. This function composes;
     // it decides nothing about what any region contains.
     widgets::chrome::header(f, layout.header, state, view);
+    // The header rule: the row's bottom edge, drawn in place rather than
+    // given a row of its own, in the snapshot's season's accent — the
+    // underline alone, so every character above it keeps the colour the
+    // header gave it. @spec TUI-RENDER-016, TUI-THEME-008
+    f.buffer_mut().set_style(
+        layout.header,
+        Style::default().add_modifier(Modifier::UNDERLINED).underline_color(theme::seasonal_accent(state.season())),
+    );
     widgets::chrome::tabs(f, layout.tabs, state, view);
 
     // @spec TUI-RENDER-003, TUI-NAV-027
@@ -454,27 +492,32 @@ pub fn frame(
         Some(Overlay::Journal { .. }) => widgets::overlays::journal(f, body_rect, state, view),
         Some(Overlay::Help) => widgets::overlays::help(f, body_rect),
         Some(Overlay::Palette { .. }) => widgets::overlays::palette(f, body_rect, state, view),
+        // @spec TUI-RENDER-016
         None => match layout.body {
             Body::TooSmall(_) => unreachable!("handled above"),
             Body::Narrow { sidebar, main } => {
                 widgets::chrome::sidebar(f, sidebar, state);
+                let space = left_of_divider(main);
                 // TUI-NAV-035: swapped in over the list, the inspector still
                 // follows the underlying cursor.
                 if view.inspector_wanted {
-                    widgets::inspector::draw(f, main, state, view);
+                    widgets::inspector::draw(f, space, state, view);
                 } else {
-                    draw_list(f, main, state, section, cursor_key, view.prompt.as_ref(), view.armed.as_ref());
+                    draw_list(f, space, state, section, cursor_key, view.prompt.as_ref(), view.armed.as_ref());
                 }
+                draw_dividers(f, &[main.x], main.y, main.height, state.season());
             }
             Body::Wide { sidebar, list, inspector } => {
                 widgets::chrome::sidebar(f, sidebar, state);
-                draw_list(f, list, state, section, cursor_key, view.prompt.as_ref(), view.armed.as_ref());
+                let space = left_between_dividers(list);
+                draw_list(f, space, state, section, cursor_key, view.prompt.as_ref(), view.armed.as_ref());
                 // TUI-NAV-035's count-prompt substitution belongs to the
                 // narrow-mode swap alone — "while the inspector holds the
                 // list's space" — so the persistent pane never loses its next
                 // cost or lock reason to an open prompt on the same row.
                 let pane_view = ViewState { prompt: None, ..view.clone() };
                 widgets::inspector::draw(f, inspector, state, &pane_view);
+                draw_dividers(f, &[list.x, list.right() - 1], list.y, list.height, state.season());
             }
         },
     }

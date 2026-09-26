@@ -267,11 +267,13 @@ fn content_lines(buf: &Buffer, rect: Rect) -> Vec<String> {
     lines
 }
 
-/// The pane the list is drawn into, whichever layout the width chose.
+/// The pane the list is drawn into, whichever layout the width chose — with
+/// its pane divider (TUI-RENDER-016) set aside, since the divider is inert
+/// chrome on the pane's edge column, not a row of the list's own content.
 fn list_rect(l: &Layout) -> Rect {
     match l.body {
-        Body::Narrow { main, .. } => main,
-        Body::Wide { list, .. } => list,
+        Body::Narrow { main, .. } => Rect::new(main.x + 1, main.y, main.width - 1, main.height),
+        Body::Wide { list, .. } => Rect::new(list.x + 1, list.y, list.width - 2, list.height),
         Body::TooSmall(_) => panic!("this test needs a terminal at or above the 80x24 floor"),
     }
 }

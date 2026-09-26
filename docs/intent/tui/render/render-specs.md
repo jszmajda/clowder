@@ -6,6 +6,7 @@
 - [x] **TUI-RENDER-002**: The system shall lay the frame out as a header row, a tab-bar row, a body, a ticker of one or more rows, and a hint-bar row, with the body taking whatever height the chrome leaves so the regions always sum to the terminal's height.
 - [x] **TUI-RENDER-003**: When an offline banner is present, the system shall take its row from the body rather than adding a row to the frame.
 - [x] **TUI-RENDER-004**: Where the terminal is narrower than 80 columns or shorter than 24 rows, the system shall draw only the too-small card, while the simulation continues to advance.
+- [x] **TUI-RENDER-016**: The system shall draw the header rule as an underline across every cell of the header row at every width step the header takes, changing no character's colour; and shall draw a pane divider — one column of the single-width `│`, running the full height of the panes it separates and no other row — at each boundary between side-by-side panes, taken from the list's space on its edge facing the sidebar and, where the inspector is a pane of its own, on its edge facing the inspector, whatever occupies the list's space, with that space fitting its lines to the width the dividers leave and nothing else drawn in a divider's cells; both in place, adding no row to the frame and changing no region's size, and no divider where a full-screen overlay takes the body.
 
 ## Horizontal Layout
 

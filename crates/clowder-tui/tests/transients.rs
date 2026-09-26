@@ -196,9 +196,13 @@ fn retire_showing(v: &mut ViewState) {
     }
 }
 
+/// The space the swap draws into — the narrow body's one pane, with its
+/// pane divider (TUI-RENDER-016) set aside, since the divider is inert
+/// chrome on the pane's edge column facing the sidebar, never the swap's own
+/// content.
 fn main_rect(a: &App) -> Rect {
     match a.prev_layout.expect("a step drew a frame").body {
-        Body::Narrow { main, .. } => main,
+        Body::Narrow { main, .. } => Rect::new(main.x + 1, main.y, main.width - 1, main.height),
         other => panic!("fixture: expected the narrow layout, drew {other:?}"),
     }
 }

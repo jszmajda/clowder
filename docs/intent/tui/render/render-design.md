@@ -33,6 +33,8 @@ Vertically the frame is fixed furniture around a flexible body:
 
 Body height is `height − 3 − T`, where `T` is the ticker's rows — one at the floor, and more only where width allows the navigation leaf's wider log. A formula rather than a table of sizes, so no arithmetic drifts as the chrome changes. At the 80×24 floor `T` is 1 and the body is 20 rows. When the offline banner is present it takes one row from the body rather than adding to the frame, so the body absorbs every variation and the frame always sums to the terminal's height.
 
+The **header rule** is drawn in place rather than given a row, so it never enters the formula. It is the header row's bottom edge: an underline across every cell of the header row, whatever the header draws in them — facts, chips, the blank columns between, the padding — at every width step the header takes (TUI-NAV-086). An underline is a mark beneath a cell's character rather than a character, so the rule changes no glyph or word on the row, and each keeps the colour it would wear without the rule. A terminal that draws no underlines shows no rule, and nothing is substituted for it: the rule carries no information the header's words do not. Its colour belongs to the theme leaf.
+
 Horizontally the body divides by width:
 
 | Width | Body |
@@ -43,6 +45,10 @@ Horizontally the body divides by width:
 | ≥ 120 | sidebar │ list (capped) │ inspector, extra width going to the inspector |
 
 The sidebar is a fixed width; the list takes what it needs up to a cap; the inspector absorbs the remainder. Capping the list is deliberate — a row stretched across 150 columns puts its name and its cost so far apart that reading one line becomes a saccade, and the width is better spent on the inspector, which has genuinely more to say.
+
+Side-by-side panes are separated by a **pane divider**: one column of `│`, the single-width light vertical box-drawing glyph, running the full height of the panes it separates. Each divider is taken from the list's space, on the edge that faces the neighbouring pane — the sidebar's side at every width, and the inspector's side as well where the inspector is a pane of its own — so 80 – 99 columns draw one divider and 100 columns and wider draw two. Whatever occupies the list's space fits its lines to the width the dividers leave, and the layout's widths are otherwise unchanged. The list gives the column because the sidebar's fixed width and the inspector's minimum are sized to what those panes hold, while the list's rows already shorten with an ellipsis the inspector resolves (Numbers and Names).
+
+The divider belongs to the layout on screen. While the narrow-mode swap puts the inspector in over the list, the divider stays, taken from the same space; within a breakpoint's dead-band it follows whichever layout is drawn; and where a full-screen overlay takes the body there are no side-by-side panes and so no divider, and nothing cuts through the overlay's text. It spans the panes' rows only — never the banner row above them, the ticker, or the hint bar. Its cells hold the glyph and nothing else: a focused row's reverse video, an armed row's expansion, and the list's position indicator all end at the width the dividers leave. Its colour belongs to the theme leaf.
 
 ## Breakpoints
 
@@ -82,6 +88,8 @@ Whether frames run at a fixed cadence or only when something changed is deferred
 |---|---|---|---|
 | Frame derivation | Pure function of snapshot, view state, and size | Incremental/dirty-region drawing; cached widget state | Testable at exact sizes without a terminal, which is what makes the size-dependent navigation specs verifiable; leaves the optimisation available later |
 | Chrome height | Body is `height − 4`; chrome is constant | Per-breakpoint row tables | A formula cannot drift out of sync as chrome changes; the banner takes from the body rather than growing the frame |
+| Header rule | An underline across the header row's cells, drawn in place | A rule row of its own beneath the header | A row of its own costs the body a row at the 80×24 floor, where the body is already 20 rows; the underline marks the same edge for no space and leaves the frame's algebra untouched |
+| Pane divider | One `│` column at each boundary between side-by-side panes, taken from the list's space | Taking the column from the sidebar or the inspector; a blank gutter column | The sidebar's fixed width and the inspector's minimum are sized to their contents, while the list's rows already shorten legibly; a blank column separates the panes less plainly and leaves the chrome's accent nothing to sit on |
 | Wide layout | Cap the list, give surplus to the inspector | Let the list grow; add a fourth column | A row stretched across 150 columns separates name from cost by a saccade; the inspector has more to say |
 | Scroll position | Derived from the cursor each frame | Stored scroll offset | Stored offset can disagree with the cursor after a reveal or a resize; deriving it cannot |
 | Group headers | Scroll with the list | Pin the current group | Pinning costs a permanent body row for what `[` / `]` already provides |
