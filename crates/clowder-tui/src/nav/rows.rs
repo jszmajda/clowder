@@ -342,6 +342,29 @@ pub fn revealed_sections(state: &GameState) -> Vec<Section> {
     Section::ALL.into_iter().filter(|s| !rows(state, *s).is_empty()).collect()
 }
 
+/// Whether `section` lists at least one row the cursor can land on — a group
+/// header never counting. This, not "has any row at all", is what earns a
+/// section its tab: a section that lists only headers has nothing in it for
+/// the player to do yet. @spec TUI-NAV-006
+pub fn lists_selectable(state: &GameState, section: Section) -> bool {
+    rows(state, section).iter().any(|r| r.selectable())
+}
+
+/// Whether `section` currently wears a tab: it lists a selectable row, or it
+/// holds `focus` — a section emptied while the player stands in it keeps its
+/// tab for as long as focus stays there, and loses it the moment focus moves
+/// on. @spec TUI-NAV-006, TUI-NAV-085
+pub fn has_tab(state: &GameState, focus: Option<Section>, section: Section) -> bool {
+    lists_selectable(state, section) || Some(section) == focus
+}
+
+/// Every section that currently wears a tab, in digit order — what the tab
+/// bar draws and what a section cycle rings over. @spec TUI-NAV-006,
+/// TUI-NAV-085
+pub fn tab_sections(state: &GameState, focus: Option<Section>) -> Vec<Section> {
+    Section::ALL.into_iter().filter(|s| has_tab(state, focus, *s)).collect()
+}
+
 /// Whether `key` names a row still listed anywhere — every section, not only
 /// the one it last lived in, since an arming carries no section of its own
 /// and a row's identity is unique across the whole app. Used to end an

@@ -180,14 +180,12 @@ pub fn run() -> ExitCode {
     }
 
     let mut view = ViewState::default();
-    // TUI-NAV-024: the cold open is one section with one focused row. Without
-    // this the first thing a player presses does nothing, and the hint bar's
-    // "Enter do" is a promise the game does not keep.
-    crate::nav::update(
-        crate::nav::Action::SectionJump(crate::nav::Section::Meadow),
-        &mut view,
-        &state,
-    );
+    // TUI-NAV-024: the cold open is one section with one focused row, and
+    // whatever the load already found showing counts as known rather than
+    // freshly arrived. Without this the first thing a player presses does
+    // nothing, and the hint bar's "Enter do" is a promise the game does not
+    // keep.
+    crate::nav::opening(&mut view, &state);
     // TUI-NAV-027: exactly where the core kept a catch-up report, never from
     // a span the shell judges on its own.
     if let Some(loaded) = &loaded_game {
@@ -431,6 +429,13 @@ impl App {
         // of input, so it takes effect the moment the row leaves rather than
         // waiting for a key that may never come. @spec TUI-NAV-076
         crate::nav::expire_unlisted_arming(&mut self.view, &self.state);
+        // A tick or a command can just as well change which tabs the bar
+        // shows; the badge that answers has to notice the same way, every
+        // frame, with no key required. @spec TUI-NAV-006
+        crate::nav::reset_hidden_tabs(&mut self.view, &self.state);
+        // And a row can return to a focused, emptied section the same way —
+        // the cursor lands on it without waiting for a key. @spec TUI-NAV-085
+        crate::nav::relist_focus(&mut self.view, &self.state);
 
         // ---- 4. autosave ----------------------------------------------------
         // @spec TUI-RUN-026, TUI-RUN-028

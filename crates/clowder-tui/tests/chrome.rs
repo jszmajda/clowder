@@ -1061,6 +1061,90 @@ fn a_capped_store_says_so_in_words_and_not_only_in_colour() {
 }
 
 // ---------------------------------------------------------------------------
+// TUI-NAV-006 — which sections have a tab, and where
+// ---------------------------------------------------------------------------
+
+/// The digits the tab bar draws, in the order drawn. Section names hold no
+/// digits, so every digit on the bar is a tab.
+fn tab_digits(state: &GameState, view: &ViewState) -> Vec<char> {
+    tab_line(state, view, WIDE_W).chars().filter(char::is_ascii_digit).collect()
+}
+
+/// Meadows spanning the reveal: a new game, where every section but home
+/// lists nothing; a young meadow with a clowder to organise; one far along,
+/// where every section lists something; and one far along with the sky's
+/// rows gated shut.
+fn reveal_corpus() -> Vec<(&'static str, GameState)> {
+    let new_game = GameState::new(3);
+
+    let mut young = GameState::new(3);
+    young.kittens = employed(2);
+
+    let far = every_section_revealed();
+
+    let mut quiet_sky = every_section_revealed();
+    quiet_sky.ideas.remove(&IdeaId::SkywardLonging);
+    quiet_sky.ideas.remove(&IdeaId::SkywardSong);
+
+    vec![
+        ("a new game", new_game),
+        ("a young meadow", young),
+        ("a meadow far along", far),
+        ("a meadow far along with a quiet sky", quiet_sky),
+    ]
+}
+
+/// A section has its tab exactly while it lists at least one selectable row —
+/// a group header never counting — or is the section in focus, re-derived
+/// from the state and focus handed in; the bar lists the tabs in digit order,
+/// 1 through 9 and then 0, each at its own digit. Asserted for every section,
+/// with every section in focus in turn, across meadows where most sections
+/// list nothing and where every one does.
+///
+/// @spec TUI-NAV-006
+#[test]
+fn a_section_has_its_tab_exactly_while_it_lists_a_selectable_row_or_holds_focus() {
+    let mut focus_kept_an_empty_tab = false;
+    let mut an_unfocused_section_had_none = false;
+
+    for (what, state) in reveal_corpus() {
+        for focus in Section::ALL {
+            let mut view = calm_view(&state);
+            view.section = Some(focus);
+
+            let expected: Vec<char> = Section::ALL
+                .into_iter()
+                .filter(|s| {
+                    let lists = rows(&state, *s).iter().any(|r| r.selectable());
+                    if !lists && *s == focus {
+                        focus_kept_an_empty_tab = true;
+                    }
+                    if !lists && *s != focus {
+                        an_unfocused_section_had_none = true;
+                    }
+                    lists || *s == focus
+                })
+                .map(Section::digit)
+                .collect();
+
+            let drawn = tab_digits(&state, &view);
+            assert_eq!(
+                drawn,
+                expected,
+                "in {what} with the {} section in focus, the tab bar draws the tabs {drawn:?}; a \
+                 section has its tab while it lists a selectable row or holds focus, in digit \
+                 order 1–9 then 0.\ntab bar: {:?}",
+                focus.title(),
+                tab_line(&state, &view, WIDE_W)
+            );
+        }
+    }
+
+    assert!(focus_kept_an_empty_tab, "fixture: some case focuses a section that lists nothing");
+    assert!(an_unfocused_section_had_none, "fixture: some case has a section with no tab");
+}
+
+// ---------------------------------------------------------------------------
 // TUI-NAV-034 — the responsive tab bar
 // ---------------------------------------------------------------------------
 

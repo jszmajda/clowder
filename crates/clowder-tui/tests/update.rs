@@ -22,7 +22,7 @@ use std::collections::BTreeSet;
 use clowder_core::content::MEADOW_MOVE_MIN_KITTENS;
 use clowder_core::{
     ArchId, Availability, ColonyId, Command, ContentId, CraftId, GameState, IdeaId, JobId, Kitten,
-    KittenTrait, LockReason, Location, ResourceId, RiteId, RuleId, StructureId,
+    KittenTrait, LockReason, Location, ResourceId, RiteId, RuleId, SiteId, StructureId,
 };
 
 use clowder_tui::nav::keys::resolve;
@@ -2523,6 +2523,153 @@ fn assert_footer_says_something_plain(view: &ViewState, context: &str) {
         "{context} left a footer note lasting {left:?}; TUI-NAV-014 asks for a few seconds — \
          long enough to read, short enough to forget"
     );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-085 — a focused section with nothing listed
+// ---------------------------------------------------------------------------
+
+/// A young meadow whose Sky lists nothing: every site already reached, and the
+/// sky's summoning row gated shut. Nothing else about it matters here.
+fn sky_emptied() -> GameState {
+    let mut s = fresh();
+    s.ideas.insert(IdeaId::SkywardLonging);
+    s.sites_reached = SiteId::ALL.into_iter().collect();
+    assert!(
+        rows(&s, Section::Sky).iter().all(|r| !r.selectable()),
+        "fixture: the Sky lists no selectable row"
+    );
+    s
+}
+
+/// The views a player can be standing in with the Sky in focus and nothing
+/// listed there: the cursor remembering the row that left, or remembering
+/// nothing; a report banner showing or not; the inspector called for or not.
+/// No field or full-screen overlay holds the keyboard in any of them.
+fn standing_in_an_empty_sky() -> Vec<(String, ViewState)> {
+    let mut out = Vec::new();
+    for memory in [Some(RowKey::Site(SiteId::ALL[0])), None] {
+        for banner in [false, true] {
+            for inspector in [false, true] {
+                let mut v = ViewState { section: Some(Section::Sky), ..Default::default() };
+                v.focus[Section::Sky.index()] = memory.clone();
+                if banner {
+                    v.reports = vec![PendingReport { entry: 0, dismissed: false }];
+                }
+                v.inspector_wanted = inspector;
+                out.push((
+                    format!("memory={memory:?} banner={banner} inspector={inspector}"),
+                    v,
+                ));
+            }
+        }
+    }
+    out
+}
+
+/// The view as a string with its footer set aside: everything a key could
+/// change besides the note it leaves.
+fn all_but_the_footer(view: &ViewState) -> String {
+    let mut v = view.clone();
+    v.footer = None;
+    format!("{v:?}")
+}
+
+/// With the section in focus listing nothing and no field or full-screen
+/// overlay holding the keyboard, every row key — Enter, x, X, + and =, - and
+/// Backspace — finds no row, asks the core for nothing, changes nothing, and
+/// leaves one footer note, the same for each key: a bound key that cannot act
+/// now says so rather than reading as a lost keypress.
+///
+/// @spec TUI-NAV-085
+#[test]
+fn with_nothing_listed_every_row_key_leaves_one_note_and_does_nothing_else() {
+    let state = sky_emptied();
+    let row_keys: [(&str, KeyEvent); 7] = [
+        ("Enter", key(KeyCode::Enter)),
+        ("x", key(KeyCode::Char('x'))),
+        ("X", KeyEvent::new(KeyCode::Char('X'), KeyModifiers::SHIFT)),
+        ("+", key(KeyCode::Char('+'))),
+        ("=", key(KeyCode::Char('='))),
+        ("-", key(KeyCode::Char('-'))),
+        ("Backspace", key(KeyCode::Backspace)),
+    ];
+
+    let mut notes: BTreeSet<String> = BTreeSet::new();
+    for (context, view) in standing_in_an_empty_sky() {
+        for (name, k) in row_keys {
+            let mut v = view.clone();
+            let before = all_but_the_footer(&v);
+            let out = press(k, &mut v, &state);
+
+            assert_eq!(
+                out,
+                Outcome::Handled,
+                "{name} in an empty focused section ({context}) asked the core for {out:?}; there \
+                 is no row for it to act on"
+            );
+            assert_eq!(
+                all_but_the_footer(&v),
+                before,
+                "{name} in an empty focused section ({context}) changed the view; it finds no row \
+                 and does nothing but leave its note"
+            );
+            assert_footer_says_something_plain(
+                &v,
+                &format!("{name} in an empty focused section ({context})"),
+            );
+            let (note, _) = v.footer.clone().expect("checked just above");
+            notes.insert(note);
+        }
+    }
+    assert_eq!(
+        notes.len(),
+        1,
+        "the row keys in an empty focused section left different notes, {notes:?}; they find the \
+         same nothing and say the same thing"
+    );
+}
+
+/// The emptied section in focus keeps its tab, so its own digit answers as
+/// any tabbed section's does — a visit to the section in focus, with no
+/// refusal note — and, being a navigation key, it retires the showing report
+/// banner as the Meadow's own digit does in the Meadow.
+///
+/// @spec TUI-NAV-085
+#[test]
+fn the_empty_focused_sections_own_digit_is_a_visit_not_a_refusal() {
+    let state = sky_emptied();
+    for (context, view) in standing_in_an_empty_sky() {
+        let mut v = view.clone();
+        let out = press_char(Section::Sky.digit(), &mut v, &state);
+
+        assert_eq!(out, Outcome::Handled, "the Sky's digit asked the core for {out:?} ({context})");
+        assert_eq!(
+            v.section,
+            Some(Section::Sky),
+            "the Sky's own digit, pressed in the emptied Sky, left it for {:?} ({context})",
+            v.section
+        );
+        assert!(
+            v.footer.is_none(),
+            "the Sky's own digit, pressed while the Sky holds focus with its tab shown, answered \
+             with the no-tab note {:?} ({context}); a section in focus has its tab, and its digit \
+             is a visit",
+            v.footer.as_ref().map(|(m, _)| m)
+        );
+
+        // The Meadow's digit in the Meadow: the same press on a section that
+        // lists rows, for the banner's answer to be measured against.
+        let mut home = view.clone();
+        home.section = Some(Section::Meadow);
+        press_char(Section::Meadow.digit(), &mut home, &state);
+        assert_eq!(
+            format!("{:?}", v.reports),
+            format!("{:?}", home.reports),
+            "the Sky's own digit left the report queue differently from any tabbed section's own \
+             digit ({context})"
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------

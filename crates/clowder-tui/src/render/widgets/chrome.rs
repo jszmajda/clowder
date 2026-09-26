@@ -9,7 +9,7 @@ use clowder_core::{GameState, Location, MoodTier, ResourceId};
 use ratatui::{layout::Rect, text::Line, widgets::Paragraph, Frame};
 
 use crate::nav::mnemonics::{self, MnemonicKind};
-use crate::nav::rows::{rows, Row, RowKey, RowKind};
+use crate::nav::rows::{rows, tab_sections, Row, RowKey, RowKind};
 use crate::nav::{Overlay, Section, ViewState};
 use crate::render::fmt;
 
@@ -139,12 +139,13 @@ pub fn header(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
 // Tab bar
 // ---------------------------------------------------------------------------
 
-/// Revealed sections with their digits; a badge on one not yet visited.
-/// Width-responsive: full labels where they fit, else a compact digit strip —
-/// never a name truncated mid-word, never a tab scrolled out of reach.
-/// @spec TUI-NAV-006, TUI-NAV-034
+/// Sections that list a selectable row, or hold focus, with their digits; a
+/// badge on one not yet visited since it last appeared. Width-responsive:
+/// full labels where they fit, else a compact digit strip — never a name
+/// truncated mid-word, never a tab scrolled out of reach.
+/// @spec TUI-NAV-006, TUI-NAV-034, TUI-NAV-085
 pub fn tabs(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
-    let revealed: Vec<Section> = Section::ALL.into_iter().filter(|s| !rows(state, *s).is_empty()).collect();
+    let revealed: Vec<Section> = tab_sections(state, view.section);
     let focused = view.section;
 
     let mark = |s: Section| if !view.seen[s.index()].visited { "★" } else { "" };

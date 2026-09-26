@@ -17,7 +17,9 @@ pub use action::{Action, CountSemantics};
 pub use reports::{queue_command_reports, queue_load_report};
 pub use rows::{row_still_listed, Row, RowKey, RowKind};
 pub use section::Section;
-pub use update::{dismiss, expire_unlisted_arming, update, Outcome};
+pub use update::{
+    dismiss, expire_unlisted_arming, opening, relist_focus, reset_hidden_tabs, update, Outcome,
+};
 pub use view::{ArmedRow, CountPrompt, Overlay, PendingReport, SeenMark, ViewState};
 
 /// A command rejection in words a player can act on.

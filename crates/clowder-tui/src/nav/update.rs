@@ -15,7 +15,7 @@ use clowder_core::{Command, GameState, LockReason};
 use super::action::{Action, CountSemantics};
 use super::mnemonics;
 use super::palette;
-use super::rows::{revealed_sections, rows, Row, RowKey, RowKind};
+use super::rows::{has_tab, lists_selectable, rows, tab_sections, Row, RowKey, RowKind};
 use super::section::Section;
 use super::view::{ArmedRow, CountPrompt, Overlay, SeenMark, ViewState};
 
@@ -151,6 +151,44 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
 }
 
 // ---------------------------------------------------------------------------
+// Opening a sitting
+// ---------------------------------------------------------------------------
+
+/// Runs once, before a sitting's first frame — a new game or a load, either
+/// one. Enters the Meadow as a visit (TUI-NAV-024, TUI-NAV-032's landing
+/// rule), and takes every tab the load found already showing as known: each
+/// such section is marked seen at its current row count, the same mark a
+/// real visit leaves, so nothing present at the opening sits behind a badge
+/// or counts toward the new-content chip. Only a tab that *appears* after
+/// this moment is new. Not itself a navigation key, so it retires no report
+/// banner — a load's own report is queued separately and stays unread until
+/// the returning player actually looks. @spec TUI-NAV-024, TUI-NAV-006
+pub fn opening(view: &mut ViewState, state: &GameState) {
+    for section in Section::ALL {
+        if lists_selectable(state, section) {
+            let idx = section.index();
+            view.seen[idx] = SeenMark { visited: true, revealed_at_last_visit: rows(state, section).len() };
+        }
+    }
+    enter_section(view, state, Section::Meadow);
+}
+
+/// A tab's badge (TUI-NAV-006) tracks whether its section has been visited
+/// *since it last appeared*, not merely once ever: a tab that leaves the bar
+/// and returns is new information again, so its section's watermark is
+/// cleared the moment the tab leaves — ready to badge again the moment a row
+/// brings it back. Called every frame, independent of input, the same as
+/// `expire_unlisted_arming`: the tab bar can change with no key pressed at
+/// all, and the badge has to notice the moment it does. @spec TUI-NAV-006
+pub fn reset_hidden_tabs(view: &mut ViewState, state: &GameState) {
+    for section in Section::ALL {
+        if !has_tab(state, view.section, section) {
+            view.seen[section.index()].visited = false;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Navigation
 // ---------------------------------------------------------------------------
 
@@ -159,7 +197,7 @@ fn handle_navigation(action: Action, view: &mut ViewState, state: &GameState) {
         // @spec TUI-NAV-005: the digit of a section with nothing in it yet is
         // a soft no-op, not a doorway to an empty room.
         Action::SectionJump(section) => {
-            if revealed_sections(state).contains(&section) {
+            if has_tab(state, view.section, section) {
                 enter_section(view, state, section);
             } else {
                 set_footer(view, "nothing there yet");
@@ -199,7 +237,7 @@ fn move_cursor(view: &mut ViewState, state: &GameState, delta: isize) {
 /// Step to the next or previous *revealed* section, wrapping around the ring —
 /// so no screen is the end of the road. @spec TUI-NAV-007, TUI-NAV-033
 fn cycle_section(view: &mut ViewState, state: &GameState, delta: isize) {
-    let ring = revealed_sections(state);
+    let ring = tab_sections(state, view.section);
     if ring.is_empty() {
         return;
     }
@@ -288,22 +326,48 @@ fn enter_section(view: &mut ViewState, state: &GameState, section: Section) {
 
     // A visit marks the section seen and clears its new-content watermark.
     view.seen[idx] = SeenMark { visited: true, revealed_at_last_visit: list.len() };
+    view.focus[idx] = landing_for(state, &list, view.focus[idx].as_ref());
+}
 
+/// The remembered row if it is still one of `list`'s selectable rows, or
+/// else the first selectable one that is available, or else — nothing on
+/// the list is affordable — simply the first selectable row: a section is
+/// never entered with no cursor at all. @spec TUI-NAV-008, TUI-NAV-032
+fn landing_for(state: &GameState, list: &[Row], remembered: Option<&RowKey>) -> Option<RowKey> {
+    let remembered_still_present =
+        remembered.is_some_and(|k| list.iter().any(|r| r.selectable() && &r.key == k));
+    if remembered_still_present {
+        return remembered.cloned();
+    }
+    list.iter()
+        .find(|r| r.selectable() && is_available(state, r))
+        .or_else(|| list.iter().find(|r| r.selectable()))
+        .map(|r| r.key.clone())
+}
+
+/// While the section in focus lists no selectable row, TUI-NAV-085 keeps the
+/// cursor's memory exactly as it was, so the same row is recognised if it
+/// returns. The moment a selectable row is listed there again, the cursor
+/// lands on it the same way entering the section would — the remembered row
+/// if it is one of them, or the landing rule otherwise. Called every frame,
+/// independent of input, since a row can return from a tick or a loaded
+/// command with no key pressed at all; a section actually left and
+/// re-entered lands through `enter_section`, the ordinary doorway, and never
+/// reaches here. @spec TUI-NAV-085, TUI-NAV-008, TUI-NAV-032
+pub fn relist_focus(view: &mut ViewState, state: &GameState) {
+    let Some(section) = view.section else { return };
+    let idx = section.index();
+    let list = rows(state, section);
+    if !list.iter().any(|r| r.selectable()) {
+        return;
+    }
     let remembered_still_present = view.focus[idx]
         .as_ref()
         .is_some_and(|k| list.iter().any(|r| r.selectable() && &r.key == k));
-
     if remembered_still_present {
         return;
     }
-
-    let landing = list
-        .iter()
-        .find(|r| r.selectable() && is_available(state, r))
-        .or_else(|| list.iter().find(|r| r.selectable()))
-        .map(|r| r.key.clone());
-
-    view.focus[idx] = landing;
+    view.focus[idx] = landing_for(state, &list, view.focus[idx].as_ref());
 }
 
 /// Retires the one report banner currently showing — the first still-
@@ -353,6 +417,15 @@ fn set_footer(view: &mut ViewState, message: impl Into<String>) {
     view.footer = Some((message.into(), Instant::now() + FOOTER_DURATION));
 }
 
+/// Enter, x, X, +/=, and -/Backspace all resolve to "the row under the
+/// cursor"; with the focused section listing none, each of them finds
+/// nothing and says so the same way, rather than reading as a lost keypress.
+/// @spec TUI-NAV-085
+fn no_row_to_act_on(view: &mut ViewState) -> Outcome {
+    set_footer(view, "there's nothing here to act on");
+    Outcome::Handled
+}
+
 // ---------------------------------------------------------------------------
 // Activate (Enter) — TUI-NAV-002, TUI-NAV-015, TUI-NAV-051, TUI-NAV-036
 // ---------------------------------------------------------------------------
@@ -390,7 +463,7 @@ fn handle_activate(view: &mut ViewState, state: &GameState) -> Outcome {
     }
 
     let Some(row) = current_row(view, state) else {
-        return Outcome::Handled;
+        return no_row_to_act_on(view);
     };
     activate_row(view, state, &row)
 }
@@ -609,7 +682,7 @@ fn counted_command(command: Command, n: u32) -> Command {
 
 fn handle_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
     let Some(row) = current_row(view, state) else {
-        return Outcome::Handled;
+        return no_row_to_act_on(view);
     };
 
     if owned_one_shot(state, &row) {
@@ -644,7 +717,7 @@ fn handle_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
 /// @spec TUI-NAV-012
 fn handle_max_affordable(view: &mut ViewState, state: &GameState) -> Outcome {
     let Some(row) = current_row(view, state) else {
-        return Outcome::Handled;
+        return no_row_to_act_on(view);
     };
 
     if owned_one_shot(state, &row) {
@@ -687,7 +760,7 @@ fn handle_max_affordable(view: &mut ViewState, state: &GameState) -> Outcome {
 /// @spec TUI-NAV-013
 fn handle_increment_decrement(view: &mut ViewState, state: &GameState, up: bool) -> Outcome {
     let Some(row) = current_row(view, state) else {
-        return Outcome::Handled;
+        return no_row_to_act_on(view);
     };
     match &row.kind {
         RowKind::Count { increment, decrement } => {

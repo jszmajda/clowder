@@ -52,8 +52,9 @@ impl Section {
         Self::ALL.iter().copied().find(|s| s.digit() == c)
     }
 
-    /// The tab label. Section names are content, so a tab exists only once one
-    /// of its rows is revealed. @spec TUI-NAV-006
+    /// The tab label. Section names are content, so a tab exists only while
+    /// the section lists a selectable row, or while the player is standing in
+    /// it. @spec TUI-NAV-006, TUI-NAV-085
     pub fn title(self) -> &'static str {
         match self {
             Section::Meadow => "Meadow",
