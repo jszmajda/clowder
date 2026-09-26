@@ -839,25 +839,28 @@ pub fn expire_unlisted_arming(view: &mut ViewState, state: &GameState) {
 /// palette — a field under this rule, not a full-screen overlay) first, then
 /// any other overlay, then an armed row, then nothing further — so Esc over a
 /// field open above an armed row closes only the field, leaving the row
-/// beneath it exactly as armed. Called from within `update`, which has no
-/// terminal width to judge the narrow-mode swap by, so it never reaches past
-/// an armed row; `dismiss` below is the width-aware version the loop actually
+/// beneath it exactly as armed. Called from within `update`, which holds no
+/// drawn layout to judge the narrow-mode swap by, so it never reaches past an
+/// armed row; `dismiss` below is the layout-aware version the loop actually
 /// runs Esc through, and reduces to exactly this over a field, overlay, or
 /// armed row. @spec TUI-NAV-030, TUI-NAV-037
 fn handle_dismiss(view: &mut ViewState) -> Outcome {
-    dismiss(view, u16::MAX)
+    dismiss(view, false)
 }
 
 /// Esc's full order of topmost transients, the report banner included: a
 /// field, then any other overlay, then an armed row, then — only once none of
 /// those are open — the narrow-mode inspector swap, and last the report
 /// banner showing. The swap is not a field or an overlay in `ViewState`'s own
-/// terms; whether it is even in effect depends on the terminal's width, which
-/// only the caller holding a real (or test) terminal has, which is why this
-/// takes `width` where the reducer's other actions do not. A pane at any
-/// width is not a swap and Esc never touches it — there is nothing above the
-/// banner there to close. @spec TUI-NAV-017, TUI-NAV-030, TUI-NAV-083
-pub fn dismiss(view: &mut ViewState, width: u16) -> Outcome {
+/// terms; whether it is even in effect is judged by the layout the previous
+/// frame actually drew — `narrow_on_screen` — rather than the terminal's raw
+/// width, so a resize sitting inside the breakpoint's dead-band (TUI-NAV-047)
+/// keeps whichever layout is already on screen; only the caller holding that
+/// drawn layout can say, which is why this takes `narrow_on_screen` where the
+/// reducer's other actions do not. A pane at any width is not a swap and Esc
+/// never touches it — there is nothing above the banner there to close.
+/// @spec TUI-NAV-017, TUI-NAV-030, TUI-NAV-047, TUI-NAV-083
+pub fn dismiss(view: &mut ViewState, narrow_on_screen: bool) -> Outcome {
     if view.prompt.take().is_some() {
         return Outcome::Handled;
     }
@@ -872,8 +875,7 @@ pub fn dismiss(view: &mut ViewState, width: u16) -> Outcome {
     if view.armed.take().is_some() {
         return Outcome::Handled;
     }
-    use crate::render::widgets::inspector::{placement, Placement};
-    if placement(width, view.inspector_wanted) == Placement::Swapped {
+    if narrow_on_screen && view.inspector_wanted {
         view.inspector_wanted = false;
         return Outcome::Handled;
     }

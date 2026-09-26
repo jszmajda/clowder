@@ -332,11 +332,15 @@ impl App {
         // rather than after the elapsed interval — and never has to sit out a
         // catch-up burst. @spec TUI-RUN-014, TUI-RUN-015, TUI-RUN-016
         let mut last_resize = None;
-        // The width Esc judges the narrow-mode inspector swap by (TUI-NAV-083)
-        // — read once per frame, before any resize this frame's own events
-        // apply, exactly as every other per-frame decision reads the width
+        // Whether Esc finds the narrow-mode inspector swap on screen
+        // (TUI-NAV-030, TUI-NAV-083) is judged by the layout the previous
+        // frame actually drew — dead-band (TUI-NAV-047) already folded in by
+        // that frame's own `layout::compute` — never by this frame's raw
+        // width, and read once, before any resize this frame's own events
+        // apply, exactly as every other per-frame decision reads the layout
         // that was in force when the key arrived. @spec TUI-NAV-017
-        let width = terminal.size().map(|s| s.width).unwrap_or(u16::MAX);
+        let narrow_on_screen =
+            matches!(self.prev_layout.map(|l| l.body), Some(crate::render::Body::Narrow { .. }));
         for event in input.iter().take(Self::MAX_INPUT_EVENTS_PER_FRAME) {
             match event {
                 crossterm::event::Event::Key(key) => {
@@ -347,7 +351,7 @@ impl App {
                     // loop holds; every other action reaches `update` as
                     // before. @spec TUI-NAV-083
                     if action == crate::nav::Action::Dismiss {
-                        crate::nav::dismiss(&mut self.view, width);
+                        crate::nav::dismiss(&mut self.view, narrow_on_screen);
                         continue;
                     }
                     match crate::nav::update(action, &mut self.view, &self.state) {

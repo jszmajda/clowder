@@ -97,8 +97,10 @@ fn owned_count(state: &GameState, row: &Row) -> String {
 /// times the core's one-unit price (a Pounce or Trade row), or the typed
 /// count alone — DeepNap, a count row, a count row proper, or a row the core
 /// prices no other way — with nothing beyond the typed digits for an empty
-/// or zero count. @spec TUI-NAV-067
-fn count_prompt_preview(state: &GameState, row: &Row, digits: &str) -> String {
+/// or zero count. Shared with the narrow-mode swap (TUI-NAV-035), which reads
+/// the cost the same way the list does.
+/// @spec TUI-NAV-067
+pub(crate) fn count_prompt_preview(state: &GameState, row: &Row, digits: &str) -> String {
     use crate::nav::CountSemantics;
 
     let n: u32 = digits.parse().unwrap_or(0);
@@ -465,7 +467,12 @@ pub fn frame(
             Body::Wide { sidebar, list, inspector } => {
                 widgets::chrome::sidebar(f, sidebar, state);
                 draw_list(f, list, state, section, cursor_key, view.prompt.as_ref(), view.armed.as_ref());
-                widgets::inspector::draw(f, inspector, state, view);
+                // TUI-NAV-035's count-prompt substitution belongs to the
+                // narrow-mode swap alone — "while the inspector holds the
+                // list's space" — so the persistent pane never loses its next
+                // cost or lock reason to an open prompt on the same row.
+                let pane_view = ViewState { prompt: None, ..view.clone() };
+                widgets::inspector::draw(f, inspector, state, &pane_view);
             }
         },
     }

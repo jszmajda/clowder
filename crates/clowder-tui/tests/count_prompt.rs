@@ -461,6 +461,135 @@ fn an_empty_or_zero_count_or_an_unlisted_row_previews_nothing() {
 }
 
 // ===========================================================================
+// TUI-NAV-035 — the preview while the inspector holds the list's space
+// ===========================================================================
+
+/// The narrow-mode swap's terminal: under the pane breakpoint, so the
+/// inspector takes the list's space, and tall enough that nothing the
+/// inspector says is cut for room.
+const SWAP_W: u16 = 99;
+const SWAP_H: u16 = 60;
+
+/// The text of the list's space — where the swapped inspector draws — for
+/// this view, in a cold frame at the swap's size.
+fn swapped_text(state: &GameState, view: &ViewState) -> String {
+    let area = Rect::new(0, 0, SWAP_W, SWAP_H);
+    let Body::Narrow { main, .. } = compute(area, None, false).body else {
+        panic!("fixture: {SWAP_W} columns should lay out narrow");
+    };
+    let mut term = Terminal::new(TestBackend::new(SWAP_W, SWAP_H)).expect("TestBackend is infallible");
+    term.draw(|f| {
+        clowder_tui::render::frame(f, state, view, None);
+    })
+    .expect("TestBackend is infallible");
+    buffer_text(term.backend().buffer(), main)
+}
+
+/// Open the prompt on `row` from inside the swap, as a player does, with the
+/// keys a player might press on the way — Space and i among them, which the
+/// open prompt takes as it takes any key but a digit — and type `digits`.
+fn swapped_prompt_on(section: Section, row: &Row, digits: &str, state: &GameState) -> ViewState {
+    let mut view = focused(section, row.key.clone());
+    view.inspector_wanted = true;
+    update(Action::CountPrompt, &mut view, state);
+    assert!(view.prompt.is_some(), "fixture: x on {:?} in the swap opened no count prompt", row.key);
+    for c in [' ', 'i'].into_iter().chain(digits.chars()) {
+        update(Action::Type(c), &mut view, state);
+    }
+    assert_eq!(
+        view.prompt.as_ref().map(|p| p.digits.as_str()),
+        Some(digits),
+        "fixture: the prompt on {:?} holds what was typed",
+        row.key
+    );
+    view
+}
+
+/// While the inspector holds the list's space and describes the row an open
+/// count prompt is held to, it shows the prompt's count and its preview — the
+/// core's total on a repeat-N row, N times the one-unit price on a Pounce or
+/// Trade row, the count alone on the nap row and a count row — and the swap
+/// stays in: opening the prompt, and Space or i pressed into it, leave it.
+/// Quantified over every row the prompt opens on.
+///
+/// @spec TUI-NAV-035
+#[test]
+fn the_swapped_inspector_shows_an_open_prompts_count_and_preview() {
+    const N: &str = "37";
+    const COUNT: u32 = 37;
+    let state = rich();
+    let rows_seen = prompt_rows(&state);
+    assert!(!rows_seen.is_empty(), "fixture: no row takes a count");
+
+    for (section, row) in rows_seen {
+        let empty = swapped_prompt_on(section, &row, "", &state);
+        let typed = swapped_prompt_on(section, &row, N, &state);
+        assert!(
+            typed.inspector_wanted,
+            "opening the prompt on {:?} in the swap, and pressing Space and i into it, took the \
+             swap away; the open prompt takes those keys, and the swap stays until it closes",
+            row.key
+        );
+
+        let before = numbers(&swapped_text(&state, &empty));
+        let frame = swapped_text(&state, &typed);
+        let after = numbers(&frame);
+        assert!(
+            !before.contains(N),
+            "fixture: {N} is already in the swapped inspector for {:?}, so the count cannot be \
+             told apart",
+            row.key
+        );
+        let added: BTreeSet<String> = after.difference(&before).cloned().collect();
+        assert!(
+            after.contains(N),
+            "with {N} typed into the prompt on {:?}, the inspector holding the list's space does \
+             not show the count.\n{frame}",
+            row.key
+        );
+
+        let priced: Option<Vec<(ResourceId, f64)>> = match &row.kind {
+            RowKind::Act { semantics: CountSemantics::RepeatN, .. } => match row.key {
+                RowKey::Content(id, _) => Some(state.cost_of_next(id, COUNT)),
+                _ => None,
+            },
+            RowKind::Act { command, semantics: CountSemantics::CountTaking } if !row.heavy => state
+                .unit_price(command)
+                .map(|unit| unit.into_iter().map(|(r, each)| (r, each * COUNT as f64)).collect()),
+            _ => None,
+        };
+        match priced.filter(|p| !p.is_empty()) {
+            Some(total) => {
+                for (r, amount) in &total {
+                    assert!(
+                        shows_amount(&after, *amount),
+                        "with {N} typed into the prompt on {:?}, the preview's {} {r:?} is not in \
+                         the inspector holding the list's space.\n{frame}",
+                        row.key,
+                        fmt::exact(*amount)
+                    );
+                }
+                assert!(
+                    total.iter().any(|(_, a)| renderings(*a).iter().any(|t| added.contains(t))),
+                    "with {N} typed into the prompt on {:?}, nothing of the preview appeared in the \
+                     swapped inspector that was not already there.\n{frame}",
+                    row.key
+                );
+            }
+            None => {
+                let extra: Vec<&String> = added.iter().filter(|t| t.as_str() != N).collect();
+                assert!(
+                    extra.is_empty(),
+                    "with {N} typed into the prompt on {:?}, the count brought {extra:?} to the \
+                     swapped inspector as well; the preview there is the count alone.\n{frame}",
+                    row.key
+                );
+            }
+        }
+    }
+}
+
+// ===========================================================================
 // TUI-NAV-068 — the bound
 // ===========================================================================
 

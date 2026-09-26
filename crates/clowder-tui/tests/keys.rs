@@ -1270,3 +1270,84 @@ fn an_esc_leaves_no_prefix_behind_for_the_next_key_to_join() {
         }
     }
 }
+
+/// A late Esc under tmux escape-time can arrive fused to the key after it, and
+/// the terminal then delivers the pair as one Alt/Meta chord. Every such key —
+/// the whole admissible set, Esc itself and Ctrl-C included, under Alt or Meta
+/// with or without Shift — is ignored whole, in every context, so the late Esc
+/// can neither act nor quit through the key it swallowed.
+///
+/// @spec TUI-NAV-030
+#[test]
+fn a_key_fused_with_a_preceding_esc_is_ignored_whole_in_every_context() {
+    let mut codes: Vec<KeyCode> = printables().map(KeyCode::Char).collect();
+    codes.extend([
+        KeyCode::Tab,
+        KeyCode::BackTab,
+        KeyCode::Enter,
+        KeyCode::Esc,
+        KeyCode::Backspace,
+        KeyCode::Up,
+        KeyCode::Down,
+        KeyCode::Left,
+        KeyCode::Right,
+    ]);
+    let chords = [
+        KeyModifiers::ALT,
+        KeyModifiers::META,
+        KeyModifiers::ALT | KeyModifiers::SHIFT,
+        KeyModifiers::META | KeyModifiers::SHIFT,
+    ];
+    for (label, view) in every_context() {
+        for code in &codes {
+            for mods in chords {
+                let key = with(*code, mods);
+                assert_eq!(
+                    resolve(key, &view),
+                    Action::Ignored,
+                    "with {label}, {key:?} — a key fused with a late Esc — resolved to something; \
+                     it must be ignored whole"
+                );
+            }
+        }
+        let fused_ctrl_c = with(KeyCode::Char('c'), KeyModifiers::CONTROL | KeyModifiers::ALT);
+        assert_eq!(
+            resolve(fused_ctrl_c, &view),
+            Action::Ignored,
+            "with {label}, Ctrl-C fused with a late Esc resolved to something; a fused key is \
+             ignored whole"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-035 — the narrow-mode swap changes no key's meaning
+// ---------------------------------------------------------------------------
+
+/// Whether the inspector is swapped in over the list changes what no key
+/// resolves to: every key in the corpus, in every context with no field or
+/// full-screen overlay open, resolves the same with the swap in as without
+/// it. What Space, i, and Esc then *do* to the swap is the reducer's and the
+/// loop's; resolution gives the swap no keys of its own.
+///
+/// @spec TUI-NAV-035
+#[test]
+fn the_swap_changes_what_no_key_resolves_to() {
+    let contexts: Vec<(&str, ViewState)> = Section::ALL
+        .into_iter()
+        .map(|s| ("a focused screen", screen(s)))
+        .chain([("a heavy row armed", armed()), ("an unread report banner", banner())])
+        .collect();
+    for (label, listing) in contexts {
+        let swapped = ViewState { inspector_wanted: true, ..listing.clone() };
+        for key in key_corpus() {
+            assert_eq!(
+                resolve(key, &swapped),
+                resolve(key, &listing),
+                "with {label} on {:?}, {key:?} resolves differently with the inspector swapped in; \
+                 the swap keeps every key's list-view meaning",
+                listing.section
+            );
+        }
+    }
+}

@@ -21,8 +21,8 @@ use ratatui::{
     Frame,
 };
 
-use crate::nav::rows::{rows, RowKey, RowKind};
-use crate::nav::{Section, ViewState};
+use crate::nav::rows::{rows, Row, RowKey, RowKind};
+use crate::nav::{CountPrompt, Section, ViewState};
 use crate::render::fmt;
 
 /// The section a frame draws when the view state has not chosen one yet —
@@ -360,8 +360,12 @@ fn unit_cost_lines(state: &GameState, unit: &[(ResourceId, f64)]) -> Vec<String>
 // ---------------------------------------------------------------------------
 
 /// The lines the inspector states about a piece of content, beyond its name.
-/// @spec TUI-NAV-018, TUI-NAV-078, TUI-NAV-079
-fn content_lines(state: &GameState, id: ContentId, tag: &str) -> Vec<String> {
+/// While a count prompt is held to this row, its count and preview
+/// (TUI-NAV-067) take the place of the next cost alone — the same
+/// substitution the list makes in its own cost slot, leaving the lock reason
+/// stated beside it exactly where the core reports one, prompt or none.
+/// @spec TUI-NAV-018, TUI-NAV-078, TUI-NAV-079, TUI-NAV-035
+fn content_lines(state: &GameState, row: &Row, id: ContentId, tag: &str, prompt: Option<&CountPrompt>) -> Vec<String> {
     let mut out = Vec::new();
 
     let stmt = statement(id);
@@ -383,13 +387,23 @@ fn content_lines(state: &GameState, id: ContentId, tag: &str) -> Vec<String> {
         if let ContentId::Craft(c) = id {
             out.push(format!("Tinkerers in the meadow: {}.", bound_tinkerers(state, c)));
         }
+        if let Some(p) = prompt {
+            out.push(crate::render::count_prompt_preview(state, row, &p.digits));
+        }
         // A tinkerer count row binds rather than makes: no next cost, no
         // reason — the core reports neither for it.
         return out;
     }
 
     let reason = state.lock_reason(id);
-    if reason != Some(LockReason::AlreadyYours) {
+
+    // TUI-NAV-035: the prompt's count and preview substitute for the next
+    // cost alone, exactly where the core reports one to substitute — the
+    // lock reason beside it (TUI-NAV-079) is read whether or not a prompt is
+    // held to this row.
+    if let Some(p) = prompt {
+        out.push(crate::render::count_prompt_preview(state, row, &p.digits));
+    } else if reason != Some(LockReason::AlreadyYours) {
         out.extend(cost_lines(state, id, &reason));
     }
     if let Some(r) = &reason {
@@ -424,8 +438,11 @@ fn store_lines(state: &GameState, r: ResourceId) -> Vec<String> {
     )]
 }
 
-/// The whole of the inspector's content for one row.
-/// @spec TUI-NAV-018, TUI-NAV-077
+/// The whole of the inspector's content for one row. While an open count
+/// prompt is held to this row, its count and preview (TUI-NAV-067) are shown
+/// alongside — the same row the prompt was opened on, by identity, so a
+/// cursor that has since moved off it never previews on the wrong row.
+/// @spec TUI-NAV-018, TUI-NAV-077, TUI-NAV-035
 fn draw_body(
     f: &mut Frame,
     area: Rect,
@@ -433,10 +450,12 @@ fn draw_body(
     section: Section,
     key: &RowKey,
     armed: Option<&crate::nav::ArmedRow>,
+    prompt: Option<&CountPrompt>,
 ) {
     let Some(row) = rows(state, section).into_iter().find(|r| &r.key == key) else {
         return;
     };
+    let on_this_row = prompt.filter(|p| p.row.as_ref() == Some(key));
 
     let mut lines: Vec<String> = vec![full_name(state, key)];
 
@@ -450,14 +469,17 @@ fn draw_body(
     match key {
         RowKey::Content(id, tag) => {
             lines.push(String::new());
-            lines.extend(content_lines(state, *id, tag));
+            lines.extend(content_lines(state, &row, *id, tag, on_this_row));
         }
         RowKey::Resource(r) => {
             lines.push(String::new());
             lines.extend(store_lines(state, *r));
         }
         _ => {
-            if let RowKind::Act { command, .. } = &row.kind {
+            if let Some(p) = on_this_row {
+                lines.push(String::new());
+                lines.push(crate::render::count_prompt_preview(state, &row, &p.digits));
+            } else if let RowKind::Act { command, .. } = &row.kind {
                 if let Some(unit) = state.unit_price(command) {
                     lines.push(String::new());
                     lines.extend(unit_cost_lines(state, &unit));
@@ -496,7 +518,7 @@ pub fn draw(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
         return;
     };
     let key = row.key.clone();
-    draw_body(f, area, state, section, &key, view.armed.as_ref());
+    draw_body(f, area, state, section, &key, view.armed.as_ref(), view.prompt.as_ref());
 }
 
 /// Where the inspector stops being a swap over the list and becomes a pane of
