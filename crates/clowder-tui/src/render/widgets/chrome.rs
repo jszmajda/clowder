@@ -36,23 +36,6 @@ fn draw_line(f: &mut Frame, area: Rect, text: String) {
     f.render_widget(Paragraph::new(Line::from(text)), area);
 }
 
-/// Left-flush text on one side and right-flush text on the other, within a
-/// character budget. When there is not room for both, they simply run
-/// together — the terminal-facing Paragraph clips whatever does not fit
-/// rather than this function inventing its own truncation.
-fn split_line(left: &str, right: &str, width: usize) -> String {
-    if right.is_empty() {
-        return left.to_string();
-    }
-    let left_w = left.chars().count();
-    let right_w = right.chars().count();
-    if left_w + 1 + right_w >= width {
-        return format!("{left} {right}");
-    }
-    let pad = width - left_w - right_w;
-    format!("{left}{}{right}", " ".repeat(pad))
-}
-
 fn mood_word(tier: MoodTier) -> &'static str {
     match tier {
         MoodTier::Blissful => "blissful",
@@ -67,16 +50,19 @@ fn mood_word(tier: MoodTier) -> &'static str {
 // Header + attention chips
 // ---------------------------------------------------------------------------
 
-/// How many rows have appeared, across every section, since the player last
-/// looked — what `★N new` counts. @spec TUI-NAV-020
+/// The tabs currently on the bar that wear TUI-NAV-006's ★ — a tab appeared
+/// and has not been visited since. Computed straight from the bar's own
+/// membership, never from stored bookkeeping alone, so a tab that leaves the
+/// bar stops counting the instant it does, with no key pressed and no frame
+/// of per-frame cleanup required first. @spec TUI-NAV-006, TUI-NAV-020
+fn badged_tabs(state: &GameState, view: &ViewState) -> Vec<Section> {
+    tab_sections(state, view.section).into_iter().filter(|s| !view.seen[s.index()].visited).collect()
+}
+
+/// How many tabs in the bar wear ★ right now — what `★N new` counts.
+/// @spec TUI-NAV-020
 fn new_content_count(state: &GameState, view: &ViewState) -> usize {
-    Section::ALL
-        .iter()
-        .map(|s| {
-            let total = rows(state, *s).len();
-            total.saturating_sub(view.seen[s.index()].revealed_at_last_visit)
-        })
-        .sum()
+    badged_tabs(state, view).len()
 }
 
 /// Kittens with no job who are in the meadow to be assigned — the only ones
@@ -93,46 +79,101 @@ fn sky_live(state: &GameState) -> bool {
     state.pending_sky_event.is_some_and(|expiry| state.ticks < expiry)
 }
 
-/// The right-aligned attention cluster: glyph + count + word, each shown only
-/// while its opportunity is live, empty otherwise. @spec TUI-NAV-020,
-/// TUI-NAV-022, TUI-NAV-044, TUI-NAV-054
-fn chips(state: &GameState, view: &ViewState) -> String {
-    let mut out: Vec<String> = Vec::new();
+/// The four attention opportunities, in the fixed order idle, sky, new, away,
+/// each live or not. Shared by the counted and uncounted chip clusters so the
+/// two never drift on which chips are live.
+fn live_opportunities(state: &GameState, view: &ViewState) -> [bool; 4] {
+    [
+        idle_here_count(state) > 0,
+        sky_live(state),
+        new_content_count(state, view) > 0,
+        view.reports.iter().any(|r| !r.dismissed),
+    ]
+}
 
+/// The chip cluster at either detail level TUI-NAV-086 steps through: with a
+/// count between glyph and word on the two chips that count, or — once the
+/// header has shed the count first — glyph directly before word on every
+/// chip. Which chips are live never changes between the two; only whether
+/// the count is drawn does.
+fn chip_cluster(state: &GameState, view: &ViewState, with_counts: bool) -> String {
+    let live = live_opportunities(state, view);
     let idle = idle_here_count(state);
-    if idle > 0 {
-        out.push(format!("◦{idle} idle"));
-    }
-    if sky_live(state) {
-        out.push("!sky".to_string());
-    }
     let new = new_content_count(state, view);
-    if new > 0 {
-        out.push(format!("★{new} new"));
-    }
-    if view.reports.iter().any(|r| !r.dismissed) {
-        out.push("~away".to_string());
-    }
+    let labels = if with_counts {
+        [format!("◦{idle} idle"), "!sky".to_string(), format!("★{new} new"), "~away".to_string()]
+    } else {
+        ["◦idle".to_string(), "!sky".to_string(), "★new".to_string(), "~away".to_string()]
+    };
+    labels.into_iter().zip(live).filter(|(_, on)| *on).map(|(label, _)| label).collect::<Vec<_>>().join("  ")
+}
 
-    out.join("  ")
+/// The five glance facts in full wording, joined `·`. @spec TUI-NAV-086
+fn full_facts(state: &GameState) -> Vec<String> {
+    vec![
+        format!("Gen {}", state.generation),
+        format!("{:?} Day {} Year {}", state.season(), state.day(), state.year()),
+        format!("{} kittens", state.kittens.len()),
+        mood_word(state.mood_tier()).to_string(),
+        format!("×{}", state.speed),
+    ]
+}
+
+/// The same five facts in compact wording — generation, day, and year
+/// shortened to their letter, season to its first three letters, kitten count
+/// and mood and speed unchanged. @spec TUI-NAV-086
+fn compact_facts(state: &GameState) -> Vec<String> {
+    let season: String = format!("{:?}", state.season()).chars().take(3).collect();
+    vec![
+        format!("G{}", state.generation),
+        format!("{season} D{} Y{}", state.day(), state.year()),
+        format!("{} kittens", state.kittens.len()),
+        mood_word(state.mood_tier()).to_string(),
+        format!("×{}", state.speed),
+    ]
+}
+
+/// Facts and chips together, right-flush chips with at least one blank
+/// column before them, or facts alone once the chips are empty. `None` when
+/// even this pairing overruns `width`.
+fn fit(facts: &str, chips: &str, width: usize) -> Option<String> {
+    let fw = facts.chars().count();
+    let cw = chips.chars().count();
+    if chips.is_empty() {
+        (fw <= width).then(|| format!("{facts}{}", " ".repeat(width - fw)))
+    } else {
+        (fw + 1 + cw <= width).then(|| format!("{facts}{}{chips}", " ".repeat(width - fw - cw)))
+    }
 }
 
 /// Clowder generation, date, kitten count, mood as a word, speed, and the
-/// right-aligned attention chips. @spec TUI-NAV-019, TUI-NAV-020, TUI-NAV-021,
-/// TUI-NAV-022, TUI-NAV-044, TUI-NAV-054
+/// right-aligned attention chips — drawn as the first of TUI-NAV-086's steps
+/// that fits the pane: the full facts with counted chips; the compact facts
+/// with counted chips; the compact facts with the counting chips reduced to
+/// glyph and word; the compact facts shed whole — generation, then date, then
+/// kitten count — never the mood word or the speed, chips as in the previous
+/// step. @spec TUI-NAV-019, TUI-NAV-020, TUI-NAV-021, TUI-NAV-022,
+/// TUI-NAV-044, TUI-NAV-054, TUI-NAV-086
 pub fn header(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
-    let left = format!(
-        "Gen {} · {:?} Day {} Year {} · {} kittens · {} · ×{}",
-        state.generation,
-        state.season(),
-        state.day(),
-        state.year(),
-        state.kittens.len(),
-        mood_word(state.mood_tier()),
-        fmt::compact(state.speed),
-    );
-    let right = chips(state, view);
-    draw_line(f, area, split_line(&left, &right, area.width as usize));
+    let width = area.width as usize;
+    let with_counts = chip_cluster(state, view, true);
+    let without_counts = chip_cluster(state, view, false);
+    let compact = compact_facts(state);
+
+    let steps: [Option<String>; 6] = [
+        fit(&full_facts(state).join(" · "), &with_counts, width),
+        fit(&compact.join(" "), &with_counts, width),
+        fit(&compact.join(" "), &without_counts, width),
+        fit(&compact[1..].join(" "), &without_counts, width),
+        fit(&compact[2..].join(" "), &without_counts, width),
+        fit(&compact[3..].join(" "), &without_counts, width),
+    ];
+    let line = steps
+        .into_iter()
+        .flatten()
+        .next()
+        .unwrap_or_else(|| format!("{}{}", compact[3..].join(" "), without_counts));
+    draw_line(f, area, line);
 }
 
 // ---------------------------------------------------------------------------

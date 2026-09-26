@@ -2,7 +2,8 @@
 //! attention chips, the tab bar, the resource sidebar, and the hint bar.
 //!
 //! @spec TUI-NAV-019, TUI-NAV-020, TUI-NAV-021, TUI-NAV-022, TUI-NAV-023,
-//! TUI-NAV-024, TUI-NAV-025, TUI-NAV-034, TUI-NAV-044, TUI-NAV-045, TUI-NAV-054
+//! TUI-NAV-024, TUI-NAV-025, TUI-NAV-034, TUI-NAV-044, TUI-NAV-045, TUI-NAV-054,
+//! TUI-NAV-086
 //!
 //! **The contract these tests are made of.** The chrome's job is to be quiet.
 //! An empty attention cluster means nothing needs you, and that only works if
@@ -25,8 +26,9 @@
 //! the roster and requiring the drawn line to change. That tests the claim the
 //! spec actually makes (the fact reaches the screen) without inventing a layout
 //! the design never chose. Where the design *does* pin a form — mood as a word,
-//! a chip as glyph + count + word, a capped store's text `full` tag, the help
-//! key last on the hint bar — the form is asserted directly.
+//! a chip as glyph and word with a count between them on the two that count,
+//! the header's width steps (TUI-NAV-086), a capped store's text `full` tag,
+//! the help key last on the hint bar — the form is asserted directly.
 //!
 //! **Fixtures assert themselves.** Several states here are built to sit in a
 //! particular mood tier or to reveal a particular set of sections. Each such
@@ -46,9 +48,10 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
 
-use clowder_tui::nav::rows::{rows, Row, RowKey, RowKind};
+use clowder_tui::nav::rows::{rows, tab_sections, Row, RowKey, RowKind};
 use clowder_tui::nav::{
-    ArmedRow, CountPrompt, CountSemantics, Overlay, PendingReport, Section, SeenMark, ViewState,
+    reset_hidden_tabs, update, Action, ArmedRow, CountPrompt, CountSemantics, Overlay,
+    PendingReport, Section, SeenMark, ViewState,
 };
 use clowder_tui::render::layout::{compute, Body};
 use clowder_tui::render::widgets::{chrome, overlays};
@@ -359,7 +362,7 @@ fn says(line: &str, word: &str) -> bool {
 // ---------------------------------------------------------------------------
 
 /// The four chips, each as the design states it: a glyph, then a count where it
-/// has one, then a word. Triple-channel, so no chip depends on colour.
+/// has one, then a word — so no chip depends on colour.
 const IDLE: (char, &str) = ('◦', "idle");
 const SKY: (char, &str) = ('!', "sky");
 const NEW: (char, &str) = ('★', "new");
@@ -394,6 +397,57 @@ fn live_chips(line: &str) -> Vec<&'static str> {
     CHIPS.iter().filter(|c| chip_shown(line, **c)).map(|c| c.1).collect()
 }
 
+/// How many tabs the bar draws wearing `★`, read from what `chrome::tabs`
+/// draws at a width where every tab is named — never from the view's own
+/// bookkeeping, since the chip is defined by the bar.
+fn badged_tab_count(state: &GameState, view: &ViewState) -> usize {
+    tab_line(state, view, WIDE_W).chars().filter(|c| *c == '★').count()
+}
+
+/// The sections with a tab on the bar other than the focused one, in digit
+/// order — the tabs a test may badge without contradicting the rule that the
+/// section in focus never wears `★`.
+fn unfocused_tabs(state: &GameState, view: &ViewState) -> Vec<Section> {
+    tab_sections(state, view.section).into_iter().filter(|s| Some(*s) != view.section).collect()
+}
+
+/// A settled meadow and a calm view with a chosen set of chips live, in the
+/// order idle, sky, new, away: `idle` kittens waiting in the meadow when the
+/// first is live, and `new` unfocused tabs wearing `★` when the third is.
+fn live_chips_fixture(live: [bool; 4], idle: usize, new: usize) -> (GameState, ViewState) {
+    let mut state = every_section_revealed();
+    let mut roster = idle_here(if live[0] { idle } else { 0 });
+    roster.extend(idle_away(2));
+    roster.extend(employed(3));
+    state.kittens = roster;
+    state.pending_sky_event = if live[1] { Some(state.ticks + 5) } else { None };
+
+    let mut view = calm_view(&state);
+    if live[2] {
+        let others = unfocused_tabs(&state, &view);
+        assert!(others.len() >= new, "fixture: {new} tabs to badge, only {} on the bar", others.len());
+        for section in &others[..new] {
+            view.seen[section.index()].visited = false;
+        }
+    }
+    if live[3] {
+        view.reports = vec![PendingReport { entry: 0, dismissed: false }];
+    }
+    (state, view)
+}
+
+/// The chip cluster the design pins for a set of live chips: idle, sky, new,
+/// away in that order, two blank columns apart, the counting chips carrying
+/// `counts` (idle, new) between glyph and word where given and none where not.
+fn chip_cluster(live: [bool; 4], counts: Option<(usize, usize)>) -> String {
+    let (idle, new) = match counts {
+        Some((i, n)) => (format!("◦{i} idle"), format!("★{n} new")),
+        None => ("◦idle".to_string(), "★new".to_string()),
+    };
+    let forms = [idle, "!sky".to_string(), new, "~away".to_string()];
+    forms.iter().zip(live).filter(|(_, on)| *on).map(|(f, _)| f.clone()).collect::<Vec<_>>().join("  ")
+}
+
 /// A meadow and a view in which all four opportunities are live at once — the
 /// state every "clears on its own signal" claim is measured against.
 fn all_four_live() -> (GameState, ViewState) {
@@ -405,14 +459,14 @@ fn all_four_live() -> (GameState, ViewState) {
     state.pending_sky_event = Some(state.ticks + 5);
 
     let mut view = calm_view(&state);
-    // Three rows have appeared in the Clowder section since it was last looked
-    // at, which is what `★N new` counts.
-    let clowder = Section::Clowder.index();
-    assert!(
-        view.seen[clowder].revealed_at_last_visit >= 3,
-        "fixture: the Clowder section needs rows for the watermark to sit behind"
+    // The Clowder section's tab wears `★` — it has appeared on the bar since
+    // the player last looked — which is what `★N new` counts.
+    view.seen[Section::Clowder.index()].visited = false;
+    assert_eq!(
+        badged_tab_count(&state, &view),
+        1,
+        "fixture: exactly the Clowder tab should wear ★ on the bar"
     );
-    view.seen[clowder].revealed_at_last_visit -= 3;
     view.reports = vec![PendingReport { entry: 0, dismissed: false }];
 
     (state, view)
@@ -682,36 +736,218 @@ fn the_sky_chip_shows_only_while_the_window_is_open() {
     }
 }
 
-/// `★N new` counts what has appeared since the player last looked, and says
-/// nothing when they are caught up.
+/// `★N new` counts the tabs on the bar wearing `★`, N being how many do, and
+/// says nothing while none does. Asserted for every number of badged tabs the
+/// bar can hold beside the focused one, with the chip's count read from the
+/// header and the badges read from the tab bar drawn from the same inputs, so
+/// the chip can never disagree with the bar it points at.
 ///
 /// @spec TUI-NAV-020
 #[test]
-fn the_new_content_chip_counts_what_arrived_since_you_looked() {
+fn the_new_content_chip_counts_the_tabs_wearing_a_badge() {
     let state = every_section_revealed();
+    let base = calm_view(&state);
+    let others = unfocused_tabs(&state, &base);
+    assert!(
+        others.len() >= 9,
+        "fixture: every section should have a tab in a meadow this far along, got {others:?}"
+    );
 
-    let caught_up = calm_view(&state);
-    let line = header_line(&state, &caught_up, WIDE_W);
+    for k in 0..=others.len() {
+        let mut view = base.clone();
+        for section in &others[..k] {
+            view.seen[section.index()].visited = false;
+        }
+        assert_eq!(badged_tab_count(&state, &view), k, "fixture: {k} tabs should wear ★");
+
+        let line = header_line(&state, &view, WIDE_W);
+        if k == 0 {
+            assert!(
+                !chip_shown(&line, NEW),
+                "no tab on the bar wears ★ and the header still shows the new-content chip. The \
+                 chip counts badged tabs and nothing else, so with none there is nothing new.\n\
+                 header: {line:?}"
+            );
+        } else {
+            assert_eq!(
+                chip_count(&line, NEW),
+                Some(k as u64),
+                "{k} tabs on the bar wear ★, so the chip must read ★{k} new — the number the \
+                 player can find by looking at the tab bar.\nheader: {line:?}\ntabs:   {:?}",
+                tab_line(&state, &view, WIDE_W)
+            );
+        }
+    }
+
+    // A section with no tab on the bar is counted nowhere, however its own
+    // bookkeeping reads: a badge that is not drawn marks nothing, and a chip
+    // counting it would point at no place on screen.
+    let fresh = GameState::new(3);
+    let mut view = ViewState { section: Some(Section::Meadow), ..Default::default() };
+    view.seen[Section::Meadow.index()].visited = true;
+    assert_eq!(
+        badged_tab_count(&fresh, &view),
+        0,
+        "fixture: on a new game only the Meadow has a tab, and it has been visited"
+    );
+    let line = header_line(&fresh, &view, WIDE_W);
     assert!(
         !chip_shown(&line, NEW),
-        "the player has looked at every section and the header still claims there is new \
-         content: {line:?}"
+        "on a new game no tab but the Meadow's is on the bar and it wears no ★, yet the header \
+         shows the new-content chip: {line:?}"
     );
+}
 
-    let mut behind = calm_view(&state);
-    behind.seen[Section::Ideas.index()].revealed_at_last_visit -= 2;
-    let line = header_line(&state, &behind, WIDE_W);
-    assert!(
-        chip_shown(&line, NEW),
-        "two rows have appeared since the Ideas section was last visited and the header said \
-         nothing. Newly revealed content is the one opportunity a player has no other way to \
-         notice.\nheader: {line:?}"
-    );
-    assert_eq!(
-        chip_count(&line, NEW),
-        Some(2),
-        "the new-content chip must count what arrived; header read as {line:?}"
-    );
+/// The counting chips carry their count between glyph and word; `!sky` and
+/// `~away` carry none, their glyph directly before their word. Checked with
+/// every chip live at a width where the full line fits, and for several
+/// counts, so a count of more than one digit is still one figure between the
+/// glyph and the word.
+///
+/// @spec TUI-NAV-020
+#[test]
+fn each_chip_is_its_glyph_and_word_with_a_count_on_the_two_that_count() {
+    for (idle, new) in [(1usize, 1usize), (4, 3), (12, 9)] {
+        let (state, view) = live_chips_fixture([true, true, true, true], idle, new);
+        let line = header_line(&state, &view, WIDE_W);
+        for form in [format!("◦{idle} idle"), "!sky".to_string(), format!("★{new} new"), "~away".to_string()] {
+            assert!(
+                line.contains(&form),
+                "with {idle} idle kittens and {new} badged tabs the header should carry the chip \
+                 {form:?} exactly — glyph, then the count where the chip counts, then its word.\n\
+                 header: {line:?}"
+            );
+        }
+    }
+}
+
+/// `◦N idle` shows exactly while a kitten TUI-NAV-054 counts waits for work,
+/// and counts every one of them — for rosters of every size from none up,
+/// with kittens at work and kittens away alongside.
+///
+/// @spec TUI-NAV-020
+#[test]
+fn the_idle_chip_shows_exactly_while_a_counted_kitten_waits() {
+    for waiting in 0..=7usize {
+        for (away, working) in [(0usize, 0usize), (3, 0), (0, 4), (2, 5)] {
+            let mut state = every_section_revealed();
+            let mut roster = idle_here(waiting);
+            roster.extend(idle_away(away));
+            roster.extend(employed(working));
+            state.kittens = roster;
+            let line = header_line(&state, &calm_view(&state), WIDE_W);
+            if waiting == 0 {
+                assert!(
+                    !chip_shown(&line, IDLE),
+                    "no kitten in the meadow waits for work ({away} away, {working} working), \
+                     and the idle chip shows: {line:?}"
+                );
+            } else {
+                assert_eq!(
+                    chip_count(&line, IDLE),
+                    Some(waiting as u64),
+                    "{waiting} kittens in the meadow wait for work ({away} jobless away, \
+                     {working} working); the chip must count exactly them.\nheader: {line:?}"
+                );
+            }
+        }
+    }
+}
+
+/// `!sky` shows exactly while the core holds a window pending and the tick has
+/// not reached the expiry the core recorded for it — on both sides of that
+/// boundary, and with no window at all.
+///
+/// @spec TUI-NAV-020
+#[test]
+fn the_sky_chip_shows_exactly_until_the_tick_reaches_the_recorded_expiry() {
+    let base = every_section_revealed();
+    let now = base.ticks;
+    let cases: [(&str, Option<u64>, bool); 6] = [
+        ("no window pending", None, false),
+        ("a window that expired long ago", Some(now - 10), false),
+        ("a window that expired a tick ago", Some(now - 1), false),
+        ("a window whose expiry is this very tick", Some(now), false),
+        ("a window with one tick left", Some(now + 1), true),
+        ("a window with a long while left", Some(now + 1_000), true),
+    ];
+    for (what, pending, live) in cases {
+        let mut state = base.clone();
+        state.pending_sky_event = pending;
+        let line = header_line(&state, &calm_view(&state), WIDE_W);
+        assert_eq!(
+            chip_shown(&line, SKY),
+            live,
+            "with {what} the sky chip should {}show.\nheader: {line:?}",
+            if live { "" } else { "not " }
+        );
+    }
+}
+
+/// `~away` shows exactly while any report in the queue is unread, whether an
+/// absence or a nap brought it — however many are queued and wherever in the
+/// queue the unread one sits.
+///
+/// @spec TUI-NAV-020
+#[test]
+fn the_away_chip_shows_exactly_while_any_queued_report_is_unread() {
+    let state = every_section_revealed();
+    let report = |entry: usize, read: bool| PendingReport { entry, dismissed: read };
+    type Case = (&'static str, Vec<PendingReport>, Vec<(usize, u32)>, bool);
+    let cases: Vec<Case> = vec![
+        ("an empty queue", vec![], vec![], false),
+        ("one unread absence report", vec![report(0, false)], vec![], true),
+        ("one unread nap report", vec![report(0, false)], vec![(0, 3)], true),
+        ("one read nap report", vec![report(0, true)], vec![(0, 3)], false),
+        ("every report read", vec![report(2, true), report(1, true), report(0, true)], vec![], false),
+        ("only the newest unread", vec![report(2, false), report(1, true), report(0, true)], vec![], true),
+        ("only the oldest unread", vec![report(2, true), report(1, true), report(0, false)], vec![], true),
+        (
+            "an unread nap behind a read absence",
+            vec![report(1, true), report(0, false)],
+            vec![(0, 2)],
+            true,
+        ),
+    ];
+    for (what, reports, naps, live) in cases {
+        let mut view = calm_view(&state);
+        view.reports = reports;
+        view.nap_years = naps;
+        let line = header_line(&state, &view, WIDE_W);
+        assert_eq!(
+            chip_shown(&line, AWAY),
+            live,
+            "with {what} the away chip should {}show.\nheader: {line:?}",
+            if live { "" } else { "not " }
+        );
+    }
+}
+
+/// The live chips stand right-aligned, in the fixed order idle, sky, new,
+/// away, two blank columns apart — for every combination of live chips, so a
+/// chip coming or going never moves another out of its place in the order.
+///
+/// @spec TUI-NAV-020
+#[test]
+fn the_live_chips_stand_right_aligned_in_their_fixed_order_two_columns_apart() {
+    for mask in 1u8..16 {
+        let live = [mask & 1 != 0, mask & 2 != 0, mask & 4 != 0, mask & 8 != 0];
+        let (state, view) = live_chips_fixture(live, 3, 2);
+        let expected = chip_cluster(live, Some((3, 2)));
+        let line = header_line(&state, &view, WIDE_W);
+        assert!(
+            line.ends_with(&expected),
+            "with chips {live:?} live the header should end, flush with its last column, in \
+             {expected:?} — idle, sky, new, away in that order, two blank columns apart.\n\
+             header: {line:?}"
+        );
+        let before = line[..line.len() - expected.len()].chars().last();
+        assert_eq!(
+            before,
+            Some(' '),
+            "the chip cluster must stand apart from the facts by a blank column: {line:?}"
+        );
+    }
 }
 
 /// `~away` shows while a report is unread and clears when it has been read. The
@@ -830,8 +1066,7 @@ fn each_chip_clears_on_its_own_signal_and_leaves_the_others_alone() {
     };
     let visited = {
         let mut v = view.clone();
-        v.seen[Section::Clowder.index()].revealed_at_last_visit =
-            rows(&state, Section::Clowder).len();
+        v.seen[Section::Clowder.index()].visited = true;
         (state.clone(), v)
     };
     let dismissed = {
@@ -846,7 +1081,7 @@ fn each_chip_clears_on_its_own_signal_and_leaves_the_others_alone() {
     let cases: [Case; 4] = [
         ("every idle kitten was given work", IDLE, assigned),
         ("the sky was observed", SKY, observed),
-        ("the section with new content was visited", NEW, visited),
+        ("the badged section was visited", NEW, visited),
         ("the away report was read", AWAY, dismissed),
     ];
 
@@ -866,6 +1101,331 @@ fn each_chip_clears_on_its_own_signal_and_leaves_the_others_alone() {
                 chip_name(*other),
                 chip_name(cleared)
             );
+        }
+    }
+}
+
+/// A settled meadow with four tabs badged, idle kittens waiting, a sky window
+/// open, and `unread` reports queued — the state the new-content chip's
+/// countdown is measured against.
+fn countdown_fixture(unread: usize) -> (GameState, ViewState, Vec<Section>) {
+    let (state, mut view) = live_chips_fixture([true, true, true, false], 4, 4);
+    view.reports = (0..unread).rev().map(|entry| PendingReport { entry, dismissed: false }).collect();
+    let badged: Vec<Section> = unfocused_tabs(&state, &view)
+        .into_iter()
+        .filter(|s| !view.seen[s.index()].visited)
+        .collect();
+    assert_eq!(badged.len(), 4, "fixture: four tabs should be badged");
+    (state, view, badged)
+}
+
+/// Visiting each badged tab lowers `★N new` by exactly one, the chip clearing
+/// once no tab wears `★` — and visiting touches no other chip: the idle count
+/// and the sky window stand throughout. A visit to a tab that wears no badge
+/// lowers nothing. Visits are driven through the reducer, the way a digit
+/// press reaches them; each press also retires one report banner (TUI-NAV-083),
+/// so the queue holds one report more than the presses made, keeping `~away`
+/// live to show that no visit clears it.
+///
+/// @spec TUI-NAV-044
+#[test]
+fn each_visit_to_a_badged_tab_lowers_the_new_chip_by_one_and_no_other_chip() {
+    let (state, mut view, badged) = countdown_fixture(6);
+
+    // A visit to a tab that wears no badge: nothing to count down.
+    let plain = unfocused_tabs(&state, &view)
+        .into_iter()
+        .find(|s| view.seen[s.index()].visited)
+        .expect("fixture: an unbadged tab besides the focused one");
+    let before = header_line(&state, &view, WIDE_W);
+    update(Action::SectionJump(plain), &mut view, &state);
+    let after = header_line(&state, &view, WIDE_W);
+    assert_eq!(
+        chip_count(&after, NEW),
+        chip_count(&before, NEW),
+        "visiting {} — a tab wearing no ★ — changed the new-content chip.\n before: {before:?}\n  \
+         after: {after:?}",
+        plain.title()
+    );
+
+    let mut expected = badged.len();
+    for section in badged {
+        update(Action::SectionJump(section), &mut view, &state);
+        expected -= 1;
+        let line = header_line(&state, &view, WIDE_W);
+        assert_eq!(badged_tab_count(&state, &view), expected, "fixture: the visit should clear {}'s badge", section.title());
+        if expected == 0 {
+            assert!(
+                !chip_shown(&line, NEW),
+                "the last badged tab was visited and the new-content chip is still on the \
+                 header: {line:?}"
+            );
+        } else {
+            assert_eq!(
+                chip_count(&line, NEW),
+                Some(expected as u64),
+                "visiting {} should lower the chip by exactly one, to {expected}: {line:?}",
+                section.title()
+            );
+        }
+        assert_eq!(chip_count(&line, IDLE), Some(4), "a visit changed the idle chip: {line:?}");
+        assert!(chip_shown(&line, SKY), "a visit cleared the sky chip: {line:?}");
+        assert!(
+            chip_shown(&line, AWAY),
+            "a report is still unread, yet the away chip is gone after a visit: {line:?}"
+        );
+    }
+}
+
+/// A badged tab that leaves the bar unvisited lowers `★N new` by one too: a
+/// badge no longer drawn marks nothing. Its leaving touches no other chip.
+///
+/// @spec TUI-NAV-044
+#[test]
+fn a_badged_tab_leaving_the_bar_lowers_the_new_chip_by_one() {
+    let with_sky = every_section_revealed();
+    let mut quiet_sky = with_sky.clone();
+    quiet_sky.ideas.remove(&IdeaId::SkywardLonging);
+    quiet_sky.ideas.remove(&IdeaId::SkywardSong);
+
+    let focus = Some(Section::Meadow);
+    let leaving: Vec<Section> = tab_sections(&with_sky, focus)
+        .into_iter()
+        .filter(|s| !tab_sections(&quiet_sky, focus).contains(s))
+        .collect();
+    let staying: Vec<Section> = tab_sections(&quiet_sky, focus)
+        .into_iter()
+        .filter(|s| Some(*s) != focus)
+        .collect();
+    assert!(!leaving.is_empty(), "fixture: quieting the sky should take a tab off the bar");
+    assert!(!staying.is_empty(), "fixture: some unfocused tab should stay on the bar");
+
+    let prepare = |state: &GameState| {
+        let mut st = state.clone();
+        st.kittens = idle_here(2);
+        st.kittens.extend(employed(2));
+        st.pending_sky_event = Some(st.ticks + 5);
+        st
+    };
+    let before_state = prepare(&with_sky);
+    let after_state = prepare(&quiet_sky);
+
+    let mut view = calm_view(&before_state);
+    view.seen[leaving[0].index()].visited = false;
+    view.seen[staying[0].index()].visited = false;
+    view.reports = vec![PendingReport { entry: 0, dismissed: false }];
+
+    assert_eq!(badged_tab_count(&before_state, &view), 2, "fixture: two tabs should wear ★");
+    let before = header_line(&before_state, &view, WIDE_W);
+    assert_eq!(
+        chip_count(&before, NEW),
+        Some(2),
+        "two tabs on the bar wear ★, so the chip should read ★2 new: {before:?}"
+    );
+
+    // The tab leaves with no key pressed; the chip follows the bar at once.
+    let after = header_line(&after_state, &view, WIDE_W);
+    assert_eq!(
+        chip_count(&after, NEW),
+        Some(1),
+        "the badged {} tab left the bar unvisited and the chip did not fall by one. A badge no \
+         longer drawn marks nothing, and the chip counts the tabs on the bar.\n before: \
+         {before:?}\n  after: {after:?}",
+        leaving[0].title()
+    );
+    for other in [IDLE, SKY, AWAY] {
+        assert!(chip_shown(&after, other), "a tab leaving cleared the {} chip: {after:?}", chip_name(other));
+    }
+
+    // And the per-frame bookkeeping that follows a tab leaving keeps it so.
+    let mut kept = view.clone();
+    reset_hidden_tabs(&mut kept, &after_state);
+    let line = header_line(&after_state, &kept, WIDE_W);
+    assert_eq!(chip_count(&line, NEW), Some(1), "after the frame's bookkeeping: {line:?}");
+}
+
+/// `~away` clears once no report in the queue stays unread, and not before:
+/// retiring banners one by one leaves it standing while any report is unread;
+/// opening the Journal reads them all at once. Neither touches the other
+/// chips — `★N new` keeps its count throughout.
+///
+/// @spec TUI-NAV-044
+#[test]
+fn the_away_chip_clears_only_once_no_report_stays_unread() {
+    // Banners retired one at a time by Esc.
+    let (state, mut view, badged) = countdown_fixture(3);
+    for remaining in (0..3usize).rev() {
+        update(Action::Dismiss, &mut view, &state);
+        let line = header_line(&state, &view, WIDE_W);
+        assert_eq!(
+            chip_shown(&line, AWAY),
+            remaining > 0,
+            "{remaining} reports remain unread, so the away chip should {}show: {line:?}",
+            if remaining > 0 { "" } else { "not " }
+        );
+        assert_eq!(
+            chip_count(&line, NEW),
+            Some(badged.len() as u64),
+            "reading a report changed the new-content chip: {line:?}"
+        );
+        assert_eq!(chip_count(&line, IDLE), Some(4), "reading a report changed the idle chip: {line:?}");
+        assert!(chip_shown(&line, SKY), "reading a report cleared the sky chip: {line:?}");
+    }
+
+    // The Journal reads every unread report at once.
+    let (state, mut view, badged) = countdown_fixture(3);
+    update(Action::OpenJournal, &mut view, &state);
+    let line = header_line(&state, &view, WIDE_W);
+    assert!(!chip_shown(&line, AWAY), "the Journal opened and the away chip stays: {line:?}");
+    assert_eq!(chip_count(&line, NEW), Some(badged.len() as u64), "the Journal changed ★N new: {line:?}");
+    assert_eq!(chip_count(&line, IDLE), Some(4), "the Journal changed the idle chip: {line:?}");
+    assert!(chip_shown(&line, SKY), "the Journal cleared the sky chip: {line:?}");
+}
+
+/// One press can carry two chips' signals: a digit landing in a badged section
+/// while a banner shows both visits the section and retires the banner. Each
+/// chip answers its own signal from that press — `★N new` falls by one, and
+/// `~away` clears exactly when that banner was the last unread report.
+///
+/// @spec TUI-NAV-044
+#[test]
+fn one_press_carrying_two_signals_moves_each_chip_by_its_own() {
+    for unread in [1usize, 2] {
+        let (state, mut view, badged) = countdown_fixture(unread);
+        update(Action::SectionJump(badged[0]), &mut view, &state);
+        let line = header_line(&state, &view, WIDE_W);
+        assert_eq!(
+            chip_count(&line, NEW),
+            Some(badged.len() as u64 - 1),
+            "the press visited a badged tab, so ★N new falls by one: {line:?}"
+        );
+        assert_eq!(
+            chip_shown(&line, AWAY),
+            unread > 1,
+            "with {unread} reports unread before the press retired one, the away chip should {}show: \
+             {line:?}",
+            if unread > 1 { "" } else { "not " }
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-086 — the header's width
+// ---------------------------------------------------------------------------
+
+/// The five facts in the full wording: the generation, the date, the kitten
+/// count, the mood word, the speed.
+fn full_facts(s: &GameState) -> Vec<String> {
+    vec![
+        format!("Gen {}", s.generation),
+        format!("{:?} Day {} Year {}", s.season(), s.day(), s.year()),
+        format!("{} kittens", s.kittens.len()),
+        mood_name(s.mood_tier()).to_string(),
+        format!("×{}", s.speed),
+    ]
+}
+
+/// The same five facts in the compact wording.
+fn compact_facts(s: &GameState) -> Vec<String> {
+    let season: String = format!("{:?}", s.season()).chars().take(3).collect();
+    vec![
+        format!("G{}", s.generation),
+        format!("{season} D{} Y{}", s.day(), s.year()),
+        format!("{} kittens", s.kittens.len()),
+        mood_name(s.mood_tier()).to_string(),
+        format!("×{}", s.speed),
+    ]
+}
+
+/// The header TUI-NAV-086 pins at width `w` — the first step whose line fits,
+/// the facts on the left, the chips flush right, at least one blank column
+/// between — with the step's number; `None` below the narrowest line any step
+/// can draw.
+fn pinned_header(
+    s: &GameState,
+    live: [bool; 4],
+    counts: (usize, usize),
+    w: usize,
+) -> Option<(usize, String)> {
+    let full = full_facts(s).join(" · ");
+    let compact = compact_facts(s);
+    let with_counts = chip_cluster(live, Some(counts));
+    let without = chip_cluster(live, None);
+    let mut steps: Vec<(usize, String, String)> = vec![
+        (1, full, with_counts.clone()),
+        (2, compact.join(" "), with_counts),
+        (3, compact.join(" "), without.clone()),
+    ];
+    for shed in 1..=3 {
+        steps.push((4, compact[shed..].join(" "), without.clone()));
+    }
+    steps.into_iter().find_map(|(step, facts, chips)| {
+        let fw = facts.chars().count();
+        let cw = chips.chars().count();
+        if chips.is_empty() {
+            (fw <= w).then(|| (step, format!("{facts}{}", " ".repeat(w - fw))))
+        } else {
+            (fw + 1 + cw <= w).then(|| (step, format!("{facts}{}{chips}", " ".repeat(w - fw - cw))))
+        }
+    })
+}
+
+/// At every width from the narrowest any step can draw up past the full line,
+/// the header is exactly the first step that fits: the full line; the compact
+/// facts; the chips without their counts; the compact facts shed whole —
+/// generation, then date, then kitten count — never the mood word or the
+/// speed. No live chip is cut or dropped and no figure is cut at any width,
+/// which the exact line carries. Swept for all four chips live, for none, for
+/// two, and for figures long enough that the facts must shed at the floor
+/// width itself.
+///
+/// @spec TUI-NAV-086
+#[test]
+fn the_header_draws_the_first_step_that_fits_at_every_width() {
+    let big = {
+        let (mut s, v) = live_chips_fixture([true, true, true, true], 20, 9);
+        s.generation = 12_345;
+        s.ticks = 1_234_567_890 * content::TICKS_PER_DAY;
+        s.pending_sky_event = Some(s.ticks + 5);
+        s.kittens.extend(employed(12_209));
+        s.speed = 0.25;
+        (s, v)
+    };
+    type Case = (&'static str, [bool; 4], (usize, usize), (GameState, ViewState));
+    let cases: Vec<Case> = vec![
+        ("all four chips live", [true; 4], (12, 3), live_chips_fixture([true; 4], 12, 3)),
+        ("no chip live", [false; 4], (0, 0), live_chips_fixture([false; 4], 0, 0)),
+        ("idle and away live", [true, false, false, true], (7, 0), live_chips_fixture([true, false, false, true], 7, 0)),
+        ("long figures, all four live", [true; 4], (20, 9), big),
+    ];
+
+    for (what, live, counts, (state, view)) in cases {
+        let widest = pinned_header(&state, live, counts, 400).expect("the full line fits 400").1;
+        let full_w = widest.trim_end().chars().count();
+        let mut steps_seen = BTreeSet::new();
+        for w in 10..=(full_w + 3) {
+            let Some((step, expected)) = pinned_header(&state, live, counts, w) else { continue };
+            steps_seen.insert(step);
+            let drawn = header_line(&state, &view, w as u16);
+            assert_eq!(
+                drawn, expected,
+                "{what}, at width {w}: the header should draw step {step}, the first that fits.\n\
+                 expected: {expected:?}\n   drawn: {drawn:?}"
+            );
+        }
+        let wanted: BTreeSet<usize> =
+            if live == [false; 4] { [1, 2, 4].into() } else { [1, 2, 3, 4].into() };
+        assert!(
+            wanted.is_subset(&steps_seen),
+            "fixture: {what} should sweep through steps {wanted:?}, swept {steps_seen:?}"
+        );
+
+        // The floor width is swept too; say so for the long figures, where the
+        // shedding step is reached there.
+        if what.starts_with("long") {
+            let (step, _) = pinned_header(&state, live, counts, FLOOR_W as usize)
+                .expect("the floor width holds mood, speed and every chip");
+            assert_eq!(step, 4, "fixture: long figures should shed facts at the floor width");
         }
     }
 }
@@ -1058,6 +1618,182 @@ fn a_capped_store_says_so_in_words_and_not_only_in_colour() {
         "a full store and a half-full one drew the same sidebar text, so the fill is being told \
          by colour alone"
     );
+}
+
+/// Whether a sidebar line draws a fill bar.
+fn draws_fill_bar(line: &str) -> bool {
+    line.contains('▓') || line.contains('░')
+}
+
+/// A store wears `full` exactly where the core reports a cap above zero and
+/// its stock has reached that cap — for every resource the core defines, in
+/// each of the cases the rule separates: a finite cap reached, a finite cap
+/// not reached, no cap at all, and a cap of zero with something in it. The
+/// word stands on the sidebar line that draws that store's fill bar, and on
+/// no other line; checked at the floor and wide.
+///
+/// @spec TUI-NAV-022
+#[test]
+fn a_store_wears_full_exactly_where_a_cap_above_zero_is_reached() {
+    let mut classes = [0usize; 3]; // finite above zero, uncapped, zero
+    for r in ResourceId::ALL {
+        let mut base = GameState::new(11);
+        for other in ResourceId::ALL {
+            base.resources[other.ix()] = 0.0;
+        }
+        let cap = base.cap(r);
+
+        let mut cases: Vec<(&str, f64, bool)> = Vec::new();
+        if cap.is_finite() && cap > 0.0 {
+            classes[0] += 1;
+            cases.push(("at its cap", cap, true));
+            cases.push(("just under its cap", cap * 0.99, false));
+            cases.push(("at half its cap", cap * 0.5, false));
+        } else if cap.is_infinite() {
+            classes[1] += 1;
+            cases.push(("uncapped, with a great deal in it", 1.0e12, false));
+            cases.push(("uncapped, with a little in it", 3.0, false));
+        } else {
+            classes[2] += 1;
+            cases.push(("with a zero cap and something in it", 5.0, false));
+        }
+
+        for (what, stock, capped) in cases {
+            let mut state = base.clone();
+            state.resources[r.ix()] = stock;
+            for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE_W, WIDE_H)] {
+                let lines = sidebar_lines(&state, w, h);
+                let bars: Vec<&String> = lines.iter().filter(|l| draws_fill_bar(l)).collect();
+                let tagged: Vec<&String> = lines.iter().filter(|l| has_key(l, "full")).collect();
+                if capped {
+                    assert_eq!(
+                        bars.len(),
+                        1,
+                        "{r:?} {what} ({w}x{h}): the sidebar should draw its one fill bar.\n{}",
+                        lines.join("\n")
+                    );
+                    assert!(
+                        has_key(bars[0], "full"),
+                        "{r:?} {what} ({w}x{h}): a capped store wears `full` on the line that \
+                         draws its fill bar.\n{}",
+                        lines.join("\n")
+                    );
+                    assert_eq!(tagged.len(), 1, "{r:?} {what}: `full` on one line only.\n{}", lines.join("\n"));
+                } else {
+                    assert!(
+                        tagged.is_empty(),
+                        "{r:?} {what} ({w}x{h}): the store is not capped — {} — and the sidebar \
+                         wears `full`.\n{}",
+                        if cap.is_infinite() {
+                            "the core reports no cap for it"
+                        } else if cap <= 0.0 {
+                            "its cap is zero"
+                        } else {
+                            "its stock is below its cap"
+                        },
+                        lines.join("\n")
+                    );
+                }
+            }
+        }
+    }
+    assert!(
+        classes.iter().all(|n| *n > 0),
+        "fixture: a new game should hold stores of every cap class (finite, uncapped, zero); \
+         found {classes:?}"
+    );
+}
+
+/// Affordability's colour never stands on a line without its glyph: every
+/// line of a drawn frame holding a cell in the ready colour carries `●`, and
+/// every line holding one in the partial colour carries `◐`. Swept over every
+/// section's list in a meadow where rows of both kinds are listed.
+///
+/// @spec TUI-NAV-022
+#[test]
+fn affordability_colour_stands_only_on_a_line_carrying_its_marker() {
+    use clowder_tui::theme::Role;
+
+    let mut state = every_section_revealed();
+    for r in ResourceId::ALL {
+        state.resources[r.ix()] = state.cap(r).min(40.0);
+    }
+    for b in StructureId::ALL {
+        state.structures[b.ix()] = 0;
+    }
+    let ready = Role::Ready.color().expect("Ready carries a colour");
+    let partial = Role::Partial.color().expect("Partial carries a colour");
+
+    let (mut saw_ready, mut saw_partial) = (false, false);
+    for section in Section::ALL {
+        let mut view = calm_view(&state);
+        view.section = Some(section);
+        let mut term = terminal(WIDE_W, WIDE_H);
+        term.draw(|f| {
+            clowder_tui::render::frame(f, &state, &view, None);
+        })
+        .expect("TestBackend is infallible");
+        let buf = term.backend().buffer().clone();
+        for y in 0..WIDE_H {
+            let cells: Vec<_> = (0..WIDE_W).map(|x| buf.cell((x, y)).expect("cell").clone()).collect();
+            let text: String = cells.iter().map(|c| c.symbol().to_string()).collect();
+            if cells.iter().any(|c| c.fg == ready) {
+                saw_ready = true;
+                assert!(
+                    text.contains('●'),
+                    "{} section, line {y}: the ready colour is drawn on a line with no `●`, so \
+                     the line's affordability is told by colour alone.\nline: {text:?}",
+                    section.title()
+                );
+            }
+            if cells.iter().any(|c| c.fg == partial) {
+                saw_partial = true;
+                assert!(
+                    text.contains('◐'),
+                    "{} section, line {y}: the partial colour is drawn on a line with no `◐`.\n\
+                     line: {text:?}",
+                    section.title()
+                );
+            }
+        }
+    }
+    assert!(saw_ready && saw_partial, "fixture: the sweep should draw both colours (ready {saw_ready}, partial {saw_partial})");
+}
+
+/// Attention reaches the player by each chip's glyph and word at every width
+/// the header can be drawn at, whatever the header gives up for room: for
+/// every combination of live chips, each live chip keeps both its glyph and
+/// its word on the header line, and no chip that is not live shows either.
+///
+/// @spec TUI-NAV-022
+#[test]
+fn every_live_chip_keeps_its_glyph_and_word_at_every_header_width() {
+    for mask in 0u8..16 {
+        let live = [mask & 1 != 0, mask & 2 != 0, mask & 4 != 0, mask & 8 != 0];
+        let (state, view) = live_chips_fixture(live, 3, 2);
+        let floor_line = chip_cluster(live, None).chars().count()
+            + compact_facts(&state)[3..].join(" ").chars().count()
+            + 1;
+        for w in floor_line..=(WIDE_W as usize) {
+            let line = header_line(&state, &view, w as u16);
+            for (chip, on) in CHIPS.iter().zip(live) {
+                if on {
+                    assert!(
+                        line.contains(chip.0) && says(&line, chip.1),
+                        "{} is live and at width {w} the header does not carry both its glyph \
+                         and its word: {line:?}",
+                        chip_name(*chip)
+                    );
+                } else {
+                    assert!(
+                        !line.contains(chip.0),
+                        "{} is not live and at width {w} the header draws its glyph: {line:?}",
+                        chip_name(*chip)
+                    );
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
