@@ -198,7 +198,7 @@ fn ideas_rows(state: &GameState) -> Vec<Row> {
     for r in RefinementId::ALL {
         let id = ContentId::Refinement(r);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyRefinement(r), CountSemantics::Single), heavy: false });
+            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyRefinement(r), CountSemantics::RepeatN), heavy: false });
         }
     }
     for r in RuleId::ALL {
@@ -234,7 +234,7 @@ fn sunbeams_rows(state: &GameState) -> Vec<Row> {
     for r in RiteId::ALL {
         let id = ContentId::Rite(r);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyRite(r), CountSemantics::Single), heavy: false });
+            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyRite(r), CountSemantics::RepeatN), heavy: false });
         }
     }
     out.push(Row { key: RowKey::Fixed("Enlighten"), kind: act(Command::Enlighten, CountSemantics::Single), heavy: false });
@@ -246,7 +246,7 @@ fn wonders_rows(state: &GameState) -> Vec<Row> {
     for a in ArchId::ALL {
         let id = ContentId::Arch(a);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyArch(a), CountSemantics::Single), heavy: false });
+            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyArch(a), CountSemantics::RepeatN), heavy: false });
         }
     }
     out.push(Row { key: RowKey::Fixed("RefineStarshard"), kind: act(Command::RefineStarshard, CountSemantics::Single), heavy: false });
@@ -299,7 +299,7 @@ fn dreams_rows(state: &GameState) -> Vec<Row> {
     for id in DreamLoomId::ALL {
         let cid = ContentId::DreamLoom(id);
         if revealed(state, cid) {
-            out.push(Row { key: RowKey::Content(cid, ""), kind: act(Command::BuyDreamLoom(id), CountSemantics::Single), heavy: false });
+            out.push(Row { key: RowKey::Content(cid, ""), kind: act(Command::BuyDreamLoom(id), CountSemantics::RepeatN), heavy: false });
         }
     }
     out
@@ -313,7 +313,7 @@ fn legacy_rows(state: &GameState) -> Vec<Row> {
     for t in TraditionId::ALL {
         let id = ContentId::Tradition(t);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyTradition(t), CountSemantics::Single), heavy: false });
+            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyTradition(t), CountSemantics::RepeatN), heavy: false });
         }
     }
 

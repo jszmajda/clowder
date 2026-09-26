@@ -987,6 +987,191 @@ fn a_run_that_reaches_its_count_or_the_cap_unrefused_leaves_no_footer() {
     }
 }
 
+/// The press of `X`, as the terminal delivers it.
+fn big_x() -> Event {
+    press('X')
+}
+
+/// One frame with these keys, `secs` of time having passed since the last.
+fn step_after(app: &mut App, secs: f64, input: &[Event]) {
+    let mut term = Terminal::new(TestBackend::new(120, 40)).expect("TestBackend is infallible");
+    let d = Duration::from_secs_f64(secs);
+    app.step(&mut term, Reading { monotonic: d, wall: d }, input)
+        .expect("an in-memory step does not fail");
+}
+
+/// `state` after a run of `command` made the way the spec has it: every call
+/// against the state the call before it left, stopping at the first the core
+/// refuses or after `n`. Returns the state and how many calls the core took.
+fn run_at_the_press(state: &GameState, command: Command, n: u32) -> (GameState, u32) {
+    let mut s = state.clone();
+    let mut done = 0;
+    for _ in 0..n {
+        if s.apply(command).is_err() {
+            break;
+        }
+        done += 1;
+    }
+    (s, done)
+}
+
+/// Advance `state` by what one frame of `secs` owes on `clock`, as the loop
+/// does after the frame's input.
+fn tick_frame(state: &mut GameState, clock: &mut TickAccumulator, secs: f64) {
+    let d = Duration::from_secs_f64(secs);
+    clock.observe(Reading { monotonic: d, wall: d }, state.speed);
+    for _ in 0..clock.take(2_000) {
+        state.tick();
+    }
+}
+
+/// A run is made whole at the press: every call against the state the call
+/// before it left, the simulation not advancing between them, and nothing of
+/// the run left to spend what arrives in the frames that follow. Checked on
+/// every kind of run — ×N on a repeat-N row and on a count row, and `X` on a
+/// repeat-N, a count-taking, and a count row — in frames that owe ticks, by
+/// holding the meadow the loop leaves to one in which the whole run was made
+/// first and only then the frame's time passed, frame after frame.
+///
+/// @spec TUI-NAV-012, TUI-NAV-031
+#[test]
+fn every_run_is_made_whole_at_the_press_with_no_tick_between_its_calls() {
+    let (builds, build_key, s) = stocked_for_builds(3);
+    let (builds_x, build_key_x, _) = stocked_for_builds(4);
+    let idle = with_idle(2);
+    let (job_key, assign) = job_row(&idle);
+    let idle_x = with_idle(3);
+    let squads = stocked_for_squads(3);
+    let squad_key = pounce_row(&squads);
+
+    type Case = (&'static str, GameState, Section, RowKey, Vec<Event>, Command, u32);
+    let cases: Vec<Case> = vec![
+        ("×5 on a repeat-N row", builds, Section::Meadow, build_key, times(5), Command::Build(s), 5),
+        ("×4 on a count row", idle, Section::Clowder, job_key.clone(), times(4), assign, 4),
+        ("X on a repeat-N row", builds_x, Section::Meadow, build_key_x, vec![big_x()], Command::Build(s), MAX_AFFORDABLE_CAP),
+        ("X on a count-taking row", squads, Section::Clowder, squad_key, vec![big_x()], Command::Pounce(1), MAX_AFFORDABLE_CAP),
+        ("X on a count row", idle_x, Section::Clowder, job_key, vec![big_x()], assign, MAX_AFFORDABLE_CAP),
+    ];
+
+    for (what, state, section, key, keys, command, n) in cases {
+        let (mut expected, done) = run_at_the_press(&state, command, n);
+        assert!(done > 0, "fixture: {what} should take at least one call");
+        let mut clock = TickAccumulator::default();
+        let opened_at = state.ticks;
+
+        let mut app = app_on(state, section, key, "at-the-press");
+        step_after(&mut app, 3.0, &keys);
+        tick_frame(&mut expected, &mut clock, 3.0);
+        assert!(app.state.ticks > opened_at, "fixture: the frame for {what} ran no ticks");
+        assert!(
+            app.state == expected,
+            "{what}: the meadow after the frame is not the whole run made at the press and then \
+             the frame's ticks — a call was made against a state the sim had moved, or not made"
+        );
+
+        for frame in 1..=3 {
+            step_after(&mut app, 3.0, &[]);
+            tick_frame(&mut expected, &mut clock, 3.0);
+            assert!(
+                app.state == expected,
+                "{what}: frame {frame} after the press differs from the ticks alone; the run went \
+                 on spending after the press"
+            );
+        }
+    }
+}
+
+/// A held `X` delivering several presses into one frame makes one run: the
+/// repeats that arrive within a tenth of a second of it are dropped with no
+/// footer note, so the footer the frame leaves is the run's own stop — never a
+/// later repeat's refusal written over it. On every kind of row `X` runs on.
+///
+/// @spec TUI-NAV-012
+#[test]
+fn a_held_x_within_one_frame_makes_one_run_and_leaves_its_footer_standing() {
+    let (builds, build_key, s) = stocked_for_builds(4);
+    let squads = stocked_for_squads(3);
+    let squad_key = pounce_row(&squads);
+    let idle = with_idle(3);
+    let (job_key, assign) = job_row(&idle);
+
+    let cases: Vec<(&str, GameState, Section, RowKey, Command)> = vec![
+        ("a repeat-N row", builds, Section::Meadow, build_key, Command::Build(s)),
+        ("a count-taking row", squads, Section::Clowder, squad_key, Command::Pounce(1)),
+        ("a count row", idle, Section::Clowder, job_key, assign),
+    ];
+
+    for (what, state, section, key, command) in cases {
+        let (expected, _) = run_at_the_press(&state, command, MAX_AFFORDABLE_CAP);
+
+        let mut once = app_on(state.clone(), section, key.clone(), "held-once");
+        step(&mut once, &[big_x()]);
+        let single = footer(&once).expect("fixture: X stopped by the core leaves a footer");
+
+        let mut held = app_on(state, section, key, "held-many");
+        step(&mut held, &[big_x(), big_x(), big_x(), big_x()]);
+        assert!(held.state == expected, "a held X on {what} did not make exactly one whole run");
+        assert_eq!(
+            footer(&held).as_deref(),
+            Some(single.as_str()),
+            "a held X on {what} left a footer other than its one run's stop; a repeat within a \
+             tenth of a second is dropped with no footer note"
+        );
+    }
+}
+
+/// How many copies of an item a buy takes is the core's per-item refusal to
+/// decide, never the tag's: ×3 on every buy row the player does not already
+/// own makes three calls at the press, and the meadow the loop leaves is the
+/// one the core makes of three calls in a row, stopping where it first refuses.
+///
+/// @spec TUI-NAV-031
+#[test]
+fn how_many_copies_a_buy_takes_is_the_cores_per_item_refusal() {
+    let base = rich();
+    let mut kinds: BTreeSet<&str> = BTreeSet::new();
+    let mut took_any = 0;
+
+    for (section, row) in every_row(&base) {
+        let RowKind::Act { command, .. } = row.kind else { continue };
+        let kind = match command {
+            Command::BuyRefinement(_) => "refinement",
+            Command::BuyRite(_) => "rite",
+            Command::BuyArch(_) => "arch",
+            Command::BuyDreamLoom(_) => "dream loom",
+            Command::BuyTradition(_) => "tradition",
+            _ => continue,
+        };
+        if let RowKey::Content(id, _) = &row.key {
+            if base.lock_reason(*id) == Some(LockReason::AlreadyYours) {
+                continue;
+            }
+        }
+        kinds.insert(kind);
+
+        let (expected, done) = run_at_the_press(&base, command, 3);
+        if done > 0 {
+            took_any += 1;
+        }
+        let mut app = app_on(base.clone(), section, row.key.clone(), "buy");
+        step(&mut app, &times(3));
+        assert!(
+            app.state == expected,
+            "×3 on the buy row {:?} did not leave the meadow three calls in a row make of it \
+             (the core took {done}); a buy is repeat-called and the core's refusal decides how \
+             many it takes",
+            row.key
+        );
+    }
+
+    assert_eq!(
+        kinds,
+        BTreeSet::from(["arch", "dream loom", "refinement", "rite", "tradition"]),
+        "fixture: an unowned row of every buy command must be listed"
+    );
+    assert!(took_any > 0, "fixture: some buy the core accepts at least once");
+}
+
 // ===========================================================================
 // TUI-NAV-073 — the inspector's one-unit price
 // ===========================================================================

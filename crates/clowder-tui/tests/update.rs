@@ -1723,6 +1723,134 @@ fn an_empty_or_zero_count_cancels() {
     }
 }
 
+/// Enter is ×1 on every row, so on an unarmed count-taking row it takes one
+/// unit: every Pounce and Trade row's Enter passes a count of one — one squad,
+/// one caravan — and the unarmed nap row's Enter arms a nap of one year rather
+/// than firing. Quantified over every count-taking row the game lists.
+///
+/// @spec TUI-NAV-031
+#[test]
+fn enter_on_every_unarmed_count_taking_row_takes_one_unit() {
+    let state = rich();
+    let (mut ordinary, mut heavy, mut trade) = (0, 0, 0);
+
+    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| is_count_taking(r)) {
+        let command = row_command(&row).expect("a count-taking row has a command");
+        let mut view = focused(section, row.key.clone());
+        let out = update(Action::Activate, &mut view, &state);
+        assert!(view.prompt.is_none(), "Enter on {:?} opened a count prompt", row.key);
+
+        if row.heavy {
+            heavy += 1;
+            assert_eq!(out, Outcome::Handled, "Enter on the unarmed heavy {:?} fired", row.key);
+            let armed = view
+                .armed
+                .as_ref()
+                .unwrap_or_else(|| panic!("Enter on the unarmed heavy {:?} armed nothing", row.key));
+            assert_eq!(armed.key, row.key, "Enter on {:?} armed a different row", row.key);
+            assert_eq!(
+                armed.command,
+                with_count(command, 1),
+                "Enter on the unarmed {:?} armed {:?}; one unit is a count of one",
+                row.key,
+                armed.command
+            );
+        } else {
+            ordinary += 1;
+            if matches!(command, Command::Trade(..)) {
+                trade += 1;
+            }
+            assert_eq!(
+                out,
+                Outcome::Apply(with_count(command, 1)),
+                "Enter on {:?} did not pass a count of one; Enter is the row's action ×1",
+                row.key
+            );
+            assert!(view.armed.is_none(), "Enter on the ordinary {:?} armed it", row.key);
+        }
+    }
+
+    assert!(ordinary > trade, "fixture: the Pounce row must be listed");
+    assert!(trade > 0, "fixture: a trade row must be listed");
+    assert!(heavy > 0, "fixture: the nap row must be listed");
+}
+
+/// An empty or zero count closes the prompt with no command and no footer
+/// note — the prompt closing is its answer, as it is for Esc — on every row
+/// the prompt opens on. On the nap row an arming already standing is left
+/// exactly as it stood. Where the prompt's row has gone, that same Enter
+/// reports the row's going as any Enter on a vanished row does.
+///
+/// @spec TUI-NAV-031
+#[test]
+fn an_empty_or_zero_count_closes_the_prompt_with_no_command_and_no_footer_on_every_row() {
+    let state = rich();
+    let gone = fresh();
+    let (mut seen, mut armed_rows, mut vanished) = (0, 0, 0);
+
+    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| opens_prompt(&state, r)) {
+        seen += 1;
+        for typed in ["", "0", "00"] {
+            let mut view = focused(section, row.key.clone());
+            if row.heavy {
+                // Arm the row first, so the cancel has an arming to leave be.
+                update(Action::Activate, &mut view, &state);
+                assert!(view.armed.is_some(), "fixture: Enter on the heavy {:?} did not arm", row.key);
+                armed_rows += 1;
+            }
+            let before = view.armed.clone();
+            update(Action::CountPrompt, &mut view, &state);
+            assert!(view.prompt.is_some(), "fixture: x on {:?} opened no prompt", row.key);
+            for c in typed.chars() {
+                update(Action::Type(c), &mut view, &state);
+            }
+            let out = update(Action::Activate, &mut view, &state);
+
+            assert_eq!(
+                commands_of(&out),
+                None,
+                "a count of {typed:?} on {:?} asked the core for {out:?}",
+                row.key
+            );
+            assert!(view.prompt.is_none(), "a count of {typed:?} left the prompt over {:?} open", row.key);
+            assert_eq!(
+                footer_text(&view),
+                None,
+                "a count of {typed:?} on {:?} left a footer note; the prompt closing is its answer",
+                row.key
+            );
+            assert_eq!(
+                view.armed, before,
+                "a count of {typed:?} on {:?} changed the arming; a cancel leaves it as it stood",
+                row.key
+            );
+        }
+
+        if !rows(&gone, section).iter().any(|r| r.key == row.key) {
+            vanished += 1;
+            for typed in ["", "0"] {
+                let mut view = open_and_type(section, &row, typed, &state);
+                let out = update(Action::Activate, &mut view, &gone);
+                assert_eq!(
+                    commands_of(&out),
+                    None,
+                    "a count of {typed:?} on the vanished {:?} asked the core for something",
+                    row.key
+                );
+                assert!(view.prompt.is_none(), "the prompt over the vanished {:?} stayed open", row.key);
+                assert_footer_says_something_plain(
+                    &view,
+                    &format!("a count of {typed:?} on a prompt whose row {:?} has gone", row.key),
+                );
+            }
+        }
+    }
+
+    assert!(seen > 0, "fixture: no row opens the count prompt");
+    assert!(armed_rows > 0, "fixture: the heavy nap row opens the count prompt");
+    assert!(vanished > 0, "fixture: no prompt row leaves its list in a fresh meadow");
+}
+
 /// Esc cancels the count prompt and nothing happened. Esc only ever closes the
 /// topmost transient.
 ///
@@ -2275,6 +2403,196 @@ fn x_max_runs_every_row_that_takes_a_count_one_unit_per_call() {
     }
     assert!(seen > 0, "fixture: no row X runs on is listed");
     assert!(count_taking > 0, "fixture: no count-taking row X runs on is listed");
+}
+
+/// Whether `X` runs on this row: a row `x` opens the prompt on that is not
+/// heavy. @spec TUI-NAV-012
+fn x_runs_on(state: &GameState, row: &Row) -> bool {
+    opens_prompt(state, row) && !row.heavy
+}
+
+/// The shell-side cap is ten thousand calls: every row `X` runs on asks for
+/// its one unit exactly that many times, and the constant the prompt's count
+/// is bounded by is that same number.
+///
+/// @spec TUI-NAV-012
+#[test]
+fn x_max_asks_for_exactly_ten_thousand_calls_on_every_row_it_runs_on() {
+    assert_eq!(MAX_AFFORDABLE_CAP, 10_000, "the shell-side cap is ten thousand calls");
+    let state = rich();
+    let mut seen = 0;
+
+    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| x_runs_on(&state, r)) {
+        seen += 1;
+        let mut view = focused(section, row.key.clone());
+        let out = update(Action::MaxAffordable, &mut view, &state);
+        assert_eq!(
+            out,
+            Outcome::Repeat(one_unit(&row), 10_000),
+            "X on {:?} did not ask for its one unit ten thousand times",
+            row.key
+        );
+    }
+    assert!(seen > 0, "fixture: no row X runs on is listed");
+}
+
+/// `X` makes no affordability pre-check, as Enter and `x` make none: with the
+/// stores empty, every row it runs on — Teased and unaffordable ones included
+/// — asks for the same run a rich meadow's does, with no footer of the shell's
+/// own; the core arbitrates each call.
+///
+/// @spec TUI-NAV-012
+#[test]
+fn x_max_runs_on_rows_the_stock_cannot_cover() {
+    let mut state = rich();
+    for r in ResourceId::ALL {
+        state.resources[r.ix()] = 0.0;
+    }
+    let teased = every_row(&state).into_iter().any(|(_, r)| match &r.key {
+        RowKey::Content(id, _) => x_runs_on(&state, &r) && state.availability(*id) == Availability::Teased,
+        _ => false,
+    });
+    assert!(teased, "fixture: with the stores empty, some row X runs on should be Teased");
+
+    let mut seen = 0;
+    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| x_runs_on(&state, r)) {
+        seen += 1;
+        let mut view = focused(section, row.key.clone());
+        let out = update(Action::MaxAffordable, &mut view, &state);
+        assert_eq!(
+            out,
+            Outcome::Repeat(one_unit(&row), MAX_AFFORDABLE_CAP),
+            "X on the unaffordable {:?} was not attempted; X makes no affordability pre-check",
+            row.key
+        );
+        assert_eq!(
+            footer_text(&view),
+            None,
+            "X on the unaffordable {:?} left a footer note of the shell's own; the core says \
+             what is short once the run is attempted",
+            row.key
+        );
+    }
+    assert!(seen > 0, "fixture: no row X runs on is listed");
+}
+
+/// One row of each kind `X` runs on: a repeat-N row, a count-taking row, and a
+/// count row.
+fn one_x_row_of_each_kind(state: &GameState) -> Vec<(Section, Row)> {
+    let rows: Vec<(Section, Row)> =
+        every_row(state).into_iter().filter(|(_, r)| x_runs_on(state, r)).collect();
+    let repeat_n = rows
+        .iter()
+        .find(|(_, r)| matches!(r.kind, RowKind::Act { semantics: CountSemantics::RepeatN, .. }))
+        .cloned()
+        .expect("fixture: a repeat-N row X runs on");
+    let count_taking =
+        rows.iter().find(|(_, r)| is_count_taking(r)).cloned().expect("fixture: a count-taking row X runs on");
+    let count_row = rows
+        .iter()
+        .find(|(_, r)| matches!(r.kind, RowKind::Count { .. }))
+        .cloned()
+        .expect("fixture: a count row X runs on");
+    vec![repeat_n, count_taking, count_row]
+}
+
+/// Hold `X` on `row` for a second, one press every `pace` (or as fast as the
+/// loop runs), and return how many presses there were and the instants a run
+/// was asked for. Every press is checked on the way: a run is a whole run, and
+/// a dropped press leaves no footer note.
+fn hold_x(section: Section, row: &Row, pace: Option<Duration>, state: &GameState) -> (u32, Vec<Instant>) {
+    let mut view = focused(section, row.key.clone());
+    let whole = Outcome::Repeat(one_unit(row), MAX_AFFORDABLE_CAP);
+    let start = Instant::now();
+    let mut presses = 0u32;
+    let mut ran = Vec::new();
+    while start.elapsed() < Duration::from_secs(1) {
+        presses += 1;
+        let out = update(Action::MaxAffordable, &mut view, state);
+        if commands_of(&out).is_some() {
+            assert_eq!(out, whole, "a held X on {:?} made a run that was not a whole run", row.key);
+            ran.push(Instant::now());
+        } else {
+            assert_eq!(out, Outcome::Handled, "a held X on {:?} yielded {out:?}", row.key);
+            assert_eq!(
+                footer_text(&view),
+                None,
+                "a held X dropped on {:?} left a footer note; a dropped repeat is silent",
+                row.key
+            );
+        }
+        assert!(view.prompt.is_none() && view.armed.is_none(), "a held X on {:?} opened or armed", row.key);
+        if let Some(p) = pace {
+            std::thread::sleep(p);
+        }
+    }
+    (presses, ran)
+}
+
+fn assert_x_no_faster_than_ten_a_second(ran: &[Instant], what: &str) {
+    assert!(
+        ran.len() >= 2,
+        "{what}: a held X ran {} times in a second; held, it must still repeat, as a held Enter \
+         does",
+        ran.len()
+    );
+    assert!(
+        ran.len() <= 11,
+        "{what}: a held X ran {} times in a second; it runs no more than ten times a second",
+        ran.len()
+    );
+    for pair in ran.windows(2) {
+        let gap = pair[1].duration_since(pair[0]);
+        assert!(
+            gap >= Duration::from_millis(95),
+            "{what}: a held X ran twice {gap:?} apart; an X within a tenth of a second of the last \
+             run is dropped"
+        );
+    }
+}
+
+/// Held, `X` makes no more than ten runs a second — the pace a held Enter
+/// keeps — on every kind of row it runs on, under a stream of presses far
+/// denser than any terminal's key repeat. Each run it makes is a whole run;
+/// every press it drops leaves no footer note.
+///
+/// @spec TUI-NAV-012
+#[test]
+fn a_held_x_makes_no_more_than_ten_runs_a_second() {
+    let state = rich();
+    for (section, row) in one_x_row_of_each_kind(&state) {
+        let (presses, ran) = hold_x(section, &row, None, &state);
+        assert!(
+            presses > 100,
+            "fixture: only {presses} presses in a second — the stream must outrun any terminal's \
+             key repeat for the pace to be under test"
+        );
+        assert_x_no_faster_than_ten_a_second(&ran, &format!("X on {:?}", row.key));
+    }
+}
+
+/// The same pace whatever the terminal's key-repeat rate: a fast repeat and a
+/// slower one both land at no more than ten runs a second, and a repeat slower
+/// than that runs on every press.
+///
+/// @spec TUI-NAV-012
+#[test]
+fn a_held_xs_pace_does_not_depend_on_the_key_repeat_rate() {
+    let state = rich();
+    let (section, row) = one_x_row_of_each_kind(&state).into_iter().next().expect("fixture");
+    for rate_ms in [15u64, 40] {
+        let (presses, ran) = hold_x(section, &row, Some(Duration::from_millis(rate_ms)), &state);
+        assert!(presses > 11, "fixture: only {presses} presses at one per {rate_ms}ms");
+        assert_x_no_faster_than_ten_a_second(&ran, &format!("X repeating every {rate_ms}ms"));
+    }
+    let (presses, ran) = hold_x(section, &row, Some(Duration::from_millis(150)), &state);
+    assert_eq!(
+        ran.len() as u32,
+        presses,
+        "X repeating every 150ms ran {} times from {presses} presses; a repeat slower than ten a \
+         second is slower than the pace, so every press runs",
+        ran.len()
+    );
 }
 
 // ---------------------------------------------------------------------------

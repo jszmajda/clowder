@@ -653,6 +653,86 @@ fn a_command_carries_the_same_count_tag_wherever_it_appears() {
     assert!(!tags.is_empty(), "fixture: some actionable rows must exist");
 }
 
+/// The tag the spec names for a command: count-taking for the three whose
+/// count is an argument, repeat-N for building, crafting, and every buy
+/// command, and single for every other command.
+fn tag_the_spec_names(command: &Command) -> CountSemantics {
+    match command {
+        Command::Pounce(_) | Command::Trade(_, _) | Command::DeepNap(_) => CountSemantics::CountTaking,
+        Command::Build(_)
+        | Command::Craft(_)
+        | Command::BuyRefinement(_)
+        | Command::BuyRite(_)
+        | Command::BuyArch(_)
+        | Command::BuyDreamLoom(_)
+        | Command::BuyTradition(_) => CountSemantics::RepeatN,
+        _ => CountSemantics::Single,
+    }
+}
+
+/// Every action row carries exactly the tag the spec names for its command —
+/// count-taking, repeat-N, or single — in every meadow the row can be listed
+/// in, so the tag is the command's and never the state's. The repeat-N set is
+/// building, crafting, and every buy command: how many copies of an item a buy
+/// takes is the core's per-item refusal to decide, so a buy row is repeat-called
+/// rather than tagged single. Every command the spec names under count-taking
+/// and repeat-N must actually be offered by some row, or the quantifier is
+/// vacuous for it.
+///
+/// @spec TUI-NAV-031
+#[test]
+fn every_action_row_carries_exactly_the_tag_the_spec_names_for_its_command() {
+    let named: HashSet<&str> = HashSet::from([
+        "Pounce",
+        "Trade",
+        "DeepNap",
+        "Build",
+        "Craft",
+        "BuyRefinement",
+        "BuyRite",
+        "BuyArch",
+        "BuyDreamLoom",
+        "BuyTradition",
+    ]);
+    let mut seen: HashSet<&str> = HashSet::new();
+    let mut singles = 0;
+
+    for (label, state) in [
+        ("a maximal meadow", maximal()),
+        ("everything unlocked, nothing affordable", poor_but_unlocked()),
+        ("wealth without progress", rich_but_locked()),
+        ("a brand-new meadow", GameState::new(5)),
+    ] {
+        for (section, row) in all_rows(&state) {
+            let RowKind::Act { command, semantics } = &row.kind else {
+                continue;
+            };
+            let expected = tag_the_spec_names(command);
+            if named.contains(variant(command)) {
+                seen.insert(variant(command));
+            } else {
+                singles += 1;
+            }
+            assert_eq!(
+                *semantics,
+                expected,
+                "in {label}, the {} section tags {} as {:?}; the spec names it {:?}",
+                section.title(),
+                variant(command),
+                semantics,
+                expected
+            );
+        }
+    }
+
+    assert_eq!(
+        seen, named,
+        "fixture: every command the spec tags count-taking or repeat-N must be offered by some \
+         row, or the tagging assertion says nothing about it"
+    );
+    assert!(singles > 0, "fixture: some single-tagged row must be listed");
+}
+
 // ---------------------------------------------------------------------------
 // TUI-NAV-053 — the core answers; the shell renders
 // ---------------------------------------------------------------------------

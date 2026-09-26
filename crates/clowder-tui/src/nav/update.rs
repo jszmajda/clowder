@@ -719,8 +719,21 @@ fn handle_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
 /// Act to the maximum affordable. The entry point for the behaviour, which is
 /// why the annotation is here rather than only on the action variant and the
 /// shell-side cap that this reads.
+///
+/// Held, `X` is paced the same as any other held key — no more than ten runs
+/// a second, whatever the terminal's key-repeat rate — by the same gate and
+/// the same `last_repeat` clock ordinary rows use; a press that lands inside
+/// the gate is dropped in full, before the row or its ownership is even
+/// looked at, with no footer note of its own.
 /// @spec TUI-NAV-012
 fn handle_max_affordable(view: &mut ViewState, state: &GameState) -> Outcome {
+    let now = Instant::now();
+    if let Some(last) = view.last_repeat {
+        if now.duration_since(last) < REPEAT_GATE {
+            return Outcome::Handled;
+        }
+    }
+
     let Some(row) = current_row(view, state) else {
         return no_row_to_act_on(view);
     };
@@ -740,6 +753,7 @@ fn handle_max_affordable(view: &mut ViewState, state: &GameState) -> Outcome {
     match &row.kind {
         RowKind::Act { command, semantics } => match semantics {
             CountSemantics::CountTaking | CountSemantics::RepeatN => {
+                view.last_repeat = Some(now);
                 Outcome::Repeat(*command, MAX_AFFORDABLE_CAP)
             }
             CountSemantics::Single => {
@@ -747,7 +761,10 @@ fn handle_max_affordable(view: &mut ViewState, state: &GameState) -> Outcome {
                 Outcome::Handled
             }
         },
-        RowKind::Count { increment, .. } => Outcome::Repeat(*increment, MAX_AFFORDABLE_CAP),
+        RowKind::Count { increment, .. } => {
+            view.last_repeat = Some(now);
+            Outcome::Repeat(*increment, MAX_AFFORDABLE_CAP)
+        }
         RowKind::Display | RowKind::Group => {
             set_footer(view, "There's no count to set here.");
             Outcome::Handled
