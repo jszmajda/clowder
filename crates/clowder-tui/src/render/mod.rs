@@ -269,10 +269,14 @@ pub(crate) fn count_prompt_preview(state: &GameState, row: &Row, digits: &str) -
     prompt_text(&prompt_preview_parts(&comps), digits)
 }
 
-/// A row's stable display name — the content name where the row is content,
-/// or a readable label invented from the row's own fixed key otherwise.
-/// @spec TUI-RENDER-001
+/// A row's stable display name — a later row's own label (TUI-NAV-089) where
+/// it has one, the content name where the row is content, or a readable label
+/// invented from the row's own fixed key otherwise.
+/// @spec TUI-RENDER-001, TUI-NAV-089
 fn row_label(state: &GameState, row: &Row) -> String {
+    if let Some(label) = crate::nav::rows::later_row_label(&row.key) {
+        return label.to_string();
+    }
     match &row.key {
         RowKey::Content(id, _) => content_name(*id),
         RowKey::Resource(r) => humanize(&format!("{r:?}")),

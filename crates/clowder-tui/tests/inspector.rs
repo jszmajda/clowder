@@ -751,6 +751,111 @@ fn the_inspector_names_the_item_in_full() {
     );
 }
 
+/// The label TUI-NAV-089 draws in the name's place on a later row of an item,
+/// keyed by the row's own tag.
+fn later_row_label(key: &RowKey) -> Option<&'static str> {
+    match key {
+        RowKey::Content(ContentId::Craft(_), "tinker") => Some("tinkerers"),
+        RowKey::Kitten(_, "elder") => Some("appoint Elder"),
+        RowKey::Colony(_, "penpal") => Some("send a pen-pal"),
+        _ => None,
+    }
+}
+
+/// Whether `key` is a later row of its item in `section` — a row of an item
+/// that carries several, other than the first of them listed — which is the
+/// row the list draws with a label in its name's place (TUI-NAV-089).
+fn is_later_row(state: &GameState, section: Section, key: &RowKey) -> bool {
+    let same_item = |k: &RowKey| match (k, key) {
+        (RowKey::Content(a, _), RowKey::Content(b, _)) => a == b,
+        (RowKey::Kitten(a, _), RowKey::Kitten(b, _)) => a == b,
+        (RowKey::Colony(a, _), RowKey::Colony(b, _)) => a == b,
+        _ => k == key,
+    };
+    rows(state, section).iter().find(|r| same_item(&r.key)).is_some_and(|first| &first.key != key)
+}
+
+/// The inspector's non-blank lines, trimmed, as the frame draws it at `w`
+/// columns with the player having called for it — the persistent pane at and
+/// past the breakpoint, the swap in the list's place below it.
+fn inspector_lines_in_frame(state: &GameState, view: &ViewState, w: u16, h: u16) -> Vec<String> {
+    let view = ViewState { inspector_wanted: true, ..view.clone() };
+    let mut term = terminal(w, h);
+    let mut layout = None;
+    term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, &view, None)))
+        .expect("TestBackend is infallible");
+    let rect = match layout.expect("frame returns its layout").body {
+        Body::Wide { inspector, .. } => inspector,
+        Body::Narrow { main, .. } => Rect::new(main.x + 1, main.y, main.width.saturating_sub(1), main.height),
+        other => panic!("fixture: {w}x{h} lays out an inspector, not {other:?}"),
+    };
+    region_lines(term.backend().buffer(), rect)
+        .into_iter()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect()
+}
+
+/// While the cursor is on a row the list draws with a label in its name's
+/// place, the inspector states that label whole, beneath the item's name —
+/// the label beginning on a line of its own once the name's lines end — at
+/// every width, persistent pane and narrow swap alike; on a row drawn with its
+/// item's name it states no label. Quantified over every selectable row of
+/// every section of a meadow where every recipe, kitten, and colony is listed,
+/// at widths from the floor through the pane breakpoint to the widest.
+/// @spec TUI-NAV-091
+#[test]
+fn the_inspector_states_a_later_rows_label_beneath_the_name_at_every_width() {
+    let mut state = world(true);
+    state.discovered = clowder_core::ColonyId::ALL.into_iter().collect();
+    let labels = ["tinkerers", "appoint Elder", "send a pen-pal"];
+
+    let mut labelled = std::collections::BTreeMap::<&str, usize>::new();
+    for w in [FLOOR_W, 90, PANE_BREAKPOINT - 1, PANE_BREAKPOINT, CAP_BREAKPOINT, WIDE, WIDEST] {
+        for (section, row) in every_row(&state) {
+            let view = looking_at(section, row.key.clone());
+            let shown = inspector_lines_in_frame(&state, &view, w, TALL);
+            let whr = format!("at {w} columns, on {:?} in {}", row.key, section.title());
+
+            if is_later_row(&state, section, &row.key) {
+                let label = later_row_label(&row.key).unwrap_or_else(|| {
+                    panic!("fixture: {whr}, a later row with no label TUI-NAV-089 names")
+                });
+                // The item's name, as the widest pane states it on one line.
+                let name = inspector_lines_in_frame(&state, &view, WIDEST, TALL)
+                    .into_iter()
+                    .next()
+                    .expect("the inspector states the item's name");
+                let beneath = (1..=shown.len()).any(|i| {
+                    let (above, below) = shown.split_at(i);
+                    let rest = below.join(" ");
+                    above.join(" ") == name
+                        && (rest == label || rest.starts_with(&format!("{label} ")))
+                });
+                assert!(
+                    beneath,
+                    "{whr}: the list draws {label:?} in this row's name place, so the inspector \
+                     states that label whole, beginning beneath the item's name {name:?}. It read:\n{}",
+                    shown.join("\n")
+                );
+                *labelled.entry(label).or_default() += 1;
+            } else {
+                for label in labels {
+                    assert!(
+                        !shown.iter().any(|l| l == label),
+                        "{whr}: a row drawn with its item's name states no label, but the \
+                         inspector states {label:?}. It read:\n{}",
+                        shown.join("\n")
+                    );
+                }
+            }
+        }
+    }
+    for label in labels {
+        assert!(labelled.get(label).copied().unwrap_or(0) > 0, "fixture: no row labelled {label:?} was inspected");
+    }
+}
+
 /// The exact next cost, component by component, with what the player has beside
 /// what the item needs. Exact, because this is the number a decision turns on
 /// and the compact form on the row has already rounded it (TUI-RENDER-012); per
@@ -1950,10 +2055,11 @@ fn rows_whose_definition_states_nothing_carry_no_statement_and_no_stand_in() {
 
 /// A row whose action has no content definition — a fixed action, a kitten's
 /// rows, a site, an adventure, a pen pal — has nothing to state beyond its name:
-/// no statement, no stand-in, no price, no reason. (Pounce and Trade rows state
-/// the core's one-unit price instead, TUI-NAV-073.) Quantified over every such
-/// row a full meadow lists.
-/// @spec TUI-NAV-018
+/// no statement, no stand-in, no price, no reason — save, on a row the list
+/// draws with a label in its name's place, that label (TUI-NAV-091). (Pounce
+/// and Trade rows state the core's one-unit price instead, TUI-NAV-073.)
+/// Quantified over every such row a full meadow lists.
+/// @spec TUI-NAV-018, TUI-NAV-091
 #[test]
 fn a_row_with_no_definition_states_only_its_name() {
     let mut checked = 0;
@@ -1969,11 +2075,13 @@ fn a_row_with_no_definition_states_only_its_name() {
             }
             let shown = pane_text(&state, &looking_at(section, row.key.clone()), WIDE, TALL);
             let lines = lines_of(&shown);
+            let label = is_later_row(&state, section, &row.key)
+                .then(|| later_row_label(&row.key).expect("fixture: a later row has a label"));
             assert_eq!(
                 lines.len(),
-                1,
-                "{:?} has no definition to state; the inspector names it and says nothing else. It \
-                 read:\n{shown}",
+                1 + usize::from(label.is_some()),
+                "{:?} has no definition to state; the inspector names it, states the row's label \
+                 {label:?} where the list draws one, and says nothing else. It read:\n{shown}",
                 row.key
             );
             checked += 1;

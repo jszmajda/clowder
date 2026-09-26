@@ -72,6 +72,21 @@ impl Row {
     }
 }
 
+/// The plain-word label a later row of a multi-row item draws in its name
+/// column, and states in the inspector beneath the item's name, in place of
+/// the item's own name — keyed by the row's own tag, so a row this table does
+/// not name draws its item's name instead. `None` marks the first-listed row
+/// of an item (or any row that carries no sibling rows), which draws the
+/// item's own name. @spec TUI-NAV-089
+pub fn later_row_label(key: &RowKey) -> Option<&'static str> {
+    match key {
+        RowKey::Content(ContentId::Craft(_), "tinker") => Some("tinkerers"),
+        RowKey::Kitten(_, "elder") => Some("appoint Elder"),
+        RowKey::Colony(_, "penpal") => Some("send a pen-pal"),
+        _ => None,
+    }
+}
+
 fn revealed(state: &GameState, id: ContentId) -> bool {
     state.availability(id) != clowder_core::Availability::Hidden
 }

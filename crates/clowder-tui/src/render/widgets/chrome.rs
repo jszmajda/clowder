@@ -477,15 +477,17 @@ fn strs(items: &[&str]) -> Vec<String> {
 }
 
 /// The word a mnemonic's item names it by, matching the design's own hint-bar
-/// phrasing for each row it can stand for.
+/// phrasing for each row it can stand for — a later row's own label
+/// (TUI-NAV-089, TUI-NAV-090) where it stands for one.
 fn mnemonic_label(key: &RowKey) -> &'static str {
+    if let Some(label) = crate::nav::rows::later_row_label(key) {
+        return label;
+    }
     match key {
         RowKey::Fixed("GatherCatnip") => "gather",
         RowKey::Fixed("Forage") => "forage",
         RowKey::Fixed("Rummage") => "rummage",
         RowKey::Kitten(_, "promote") => "promote",
-        RowKey::Kitten(_, "elder") => "Elder",
-        RowKey::Colony(_, "penpal") => "pen-pal",
         _ => "",
     }
 }
@@ -494,7 +496,7 @@ fn mnemonic_label(key: &RowKey) -> &'static str {
 /// focused row — Enter already names that act. A focused-item letter is
 /// inserted directly after the item naming Enter, among that item's own
 /// keys; the fixed letters are appended last, in their rows' list order,
-/// after every other context key. @spec TUI-NAV-082
+/// after every other context key. @spec TUI-NAV-082, TUI-NAV-090
 fn add_mnemonics(items: &mut Vec<String>, state: &GameState, view: &ViewState) {
     // A full-screen overlay suspends every mnemonic the same way it suspends
     // the rest of the global table (`keys::resolve` leaves every letter

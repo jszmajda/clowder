@@ -3325,15 +3325,193 @@ fn live_mnemonics(
 }
 
 /// The keys a line names, in order and with repeats kept: the probe keys, and
-/// every single lowercase letter standing as a token of its own.
+/// every single lowercase letter standing as a token of its own — read only
+/// where a key stands, at the head of a hint, so a one-letter word inside a
+/// hint's own wording (a later row's label, TUI-NAV-090) is never read as a
+/// key.
 fn named_keys(line: &str) -> Vec<String> {
-    tokens(line)
-        .into_iter()
+    line.split(|c: char| SEPARATORS.contains(&c))
+        .filter_map(|entry| entry.split_whitespace().next())
+        .map(str::to_string)
         .filter(|t| {
             PROBE_KEYS.contains(&t.as_str())
                 || (t.chars().count() == 1 && t.chars().all(|c| c.is_ascii_lowercase()))
         })
         .collect()
+}
+
+/// The hints a line names, each trimmed, split where a hint ends.
+fn hint_entries(line: &str) -> Vec<String> {
+    line.split(|c: char| SEPARATORS.contains(&c))
+        .map(|e| e.trim().to_string())
+        .filter(|e| !e.is_empty())
+        .collect()
+}
+
+/// The label TUI-NAV-089 draws in the name's place on a later row of an item,
+/// keyed by the row's own tag.
+fn later_row_label(key: &RowKey) -> Option<&'static str> {
+    match key {
+        RowKey::Content(ContentId::Craft(_), "tinker") => Some("tinkerers"),
+        RowKey::Kitten(_, "elder") => Some("appoint Elder"),
+        RowKey::Colony(_, "penpal") => Some("send a pen-pal"),
+        _ => None,
+    }
+}
+
+/// Whether `target` is a later row of its item in `section` — a row of an
+/// item that carries several, other than the first of them listed.
+fn is_later_row(state: &GameState, section: Section, target: &RowKey) -> bool {
+    let same_item = |k: &RowKey| match (k, target) {
+        (RowKey::Content(a, _), RowKey::Content(b, _)) => a == b,
+        (RowKey::Kitten(a, _), RowKey::Kitten(b, _)) => a == b,
+        (RowKey::Colony(a, _), RowKey::Colony(b, _)) => a == b,
+        _ => k == target,
+    };
+    rows(state, section).iter().find(|r| same_item(&r.key)).is_some_and(|first| &first.key != target)
+}
+
+/// The word naming the item a focused-item mnemonic acts on.
+fn item_word(key: &RowKey) -> &'static str {
+    match key {
+        RowKey::Kitten(..) => "kitten",
+        RowKey::Colony(..) => "colony",
+        RowKey::Content(ContentId::Craft(_), _) => "recipe",
+        _ => "item",
+    }
+}
+
+/// Wherever the hint bar names a focused-item mnemonic whose row is a later
+/// row of its item, it words the letter's act by that row's label, so the act
+/// reads the same beside its letter as on its row. Quantified over every
+/// selectable row of every screen as the focus, at the floor, at the pane
+/// breakpoint, and wide — every context in which such a letter is named.
+///
+/// @spec TUI-NAV-090
+#[test]
+fn the_hint_bar_words_a_later_rows_letter_by_that_rows_label() {
+    let state = every_section_revealed();
+    let mut named: BTreeSet<(char, &'static str)> = BTreeSet::new();
+    for w in [FLOOR_W, 100, WIDE_W] {
+        for section in Section::ALL {
+            for row in rows(&state, section).into_iter().filter(|r| r.selectable()) {
+                let view = focus_on(&state, section, row.key.clone());
+                let line = hint_line(&state, &view, w);
+                let entries = hint_entries(&line);
+                for (c, target, kind) in live_mnemonics(&state, section, Some(&row.key)) {
+                    if kind != MnemonicKind::FocusedItem
+                        || target == row.key
+                        || !is_later_row(&state, section, &target)
+                    {
+                        continue;
+                    }
+                    let label = later_row_label(&target).unwrap_or_else(|| {
+                        panic!("fixture: {target:?} is a later row with no label TUI-NAV-089 names")
+                    });
+                    let lead = format!("{c} ");
+                    let mine: Vec<&String> = entries.iter().filter(|e| e.starts_with(&lead)).collect();
+                    let whr = format!(
+                        "at {w} columns on the {} screen with {:?} focused",
+                        section.title(),
+                        row.key
+                    );
+                    for entry in &mine {
+                        assert_eq!(
+                            entry.as_str(),
+                            format!("{c} {label}"),
+                            "{whr}, the hint bar names `{c}`, which acts on the later row \
+                             {target:?}, as {entry:?}; the letter's act is worded by that row's \
+                             label {label:?}.\nhint bar: {line:?}"
+                        );
+                    }
+                    if w == WIDE_W {
+                        assert_eq!(
+                            mine.len(),
+                            1,
+                            "fixture: {whr}, the hint bar names the live letter `{c}` once at a \
+                             width where nothing is dropped.\nhint bar: {line:?}"
+                        );
+                    }
+                    if !mine.is_empty() {
+                        named.insert((c, label));
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        named.contains(&('n', "appoint Elder")) && named.contains(&('p', "send a pen-pal")),
+        "fixture: both later-row letters were named on the bar somewhere; named {named:?}"
+    );
+}
+
+/// Wherever the help overlay names a focused-item mnemonic whose row is a
+/// later row of its item, it words the letter's act by that row's label and
+/// follows it with the item it acts on, in parentheses — so the act reads the
+/// same beside its letter as on its row. Quantified over every such letter the
+/// design's table spends: each (screen, letter) whose live mnemonic, with any
+/// row of the screen focused, stands for a later row.
+///
+/// @spec TUI-NAV-090
+#[test]
+fn the_help_overlay_words_a_later_rows_letter_by_its_label_and_names_its_item() {
+    let state = every_section_revealed();
+    let mut later: Vec<(Section, char, &'static str, &'static str)> = Vec::new();
+    for section in Section::ALL {
+        for row in rows(&state, section).into_iter().filter(|r| r.selectable()) {
+            for (c, target, kind) in live_mnemonics(&state, section, Some(&row.key)) {
+                if kind != MnemonicKind::FocusedItem || !is_later_row(&state, section, &target) {
+                    continue;
+                }
+                let label = later_row_label(&target).unwrap_or_else(|| {
+                    panic!("fixture: {target:?} is a later row with no label TUI-NAV-089 names")
+                });
+                let entry = (section, c, label, item_word(&target));
+                if !later.contains(&entry) {
+                    later.push(entry);
+                }
+            }
+        }
+    }
+    assert!(
+        later.iter().any(|(_, c, _, _)| *c == 'n') && later.iter().any(|(s, c, _, _)| *s == Section::Friends && *c == 'p'),
+        "fixture: the later-row letters of both screens were found; found {later:?}"
+    );
+
+    let (w, h) = (120u16, 60u16);
+    let mut term = terminal(w, h);
+    term.draw(|f| {
+        let area = f.area();
+        overlays::help(f, area);
+    })
+    .expect("TestBackend is infallible");
+    let lines = region_lines(term.backend().buffer(), Rect::new(0, 0, w, h));
+
+    for (section, c, label, item) in later {
+        let line = lines
+            .iter()
+            .find(|l| l.trim_start().starts_with(section.title()))
+            .unwrap_or_else(|| {
+                panic!("the help overlay has no line for the {} screen's letters", section.title())
+            });
+        let worded = format!("{c} {label} (");
+        let at = line.find(&worded).unwrap_or_else(|| {
+            panic!(
+                "the help overlay's {} line does not word `{c}` by its row's label followed by \
+                 its item in parentheses — `{c} {label} (…)`.\nline: {line:?}",
+                section.title()
+            )
+        });
+        let rest = &line[at + worded.len()..];
+        let inside = rest.split(')').next().filter(|_| rest.contains(')')).unwrap_or_else(|| {
+            panic!("the help overlay's `{c} {label} (` is never closed.\nline: {line:?}")
+        });
+        assert!(
+            inside.split_whitespace().any(|word| word == item),
+            "the help overlay follows `{c} {label}` with ({inside}), which does not name the \
+             {item} the letter acts on.\nline: {line:?}"
+        );
+    }
 }
 
 /// Wherever the hint bar shows the focused row's keys, it names every live

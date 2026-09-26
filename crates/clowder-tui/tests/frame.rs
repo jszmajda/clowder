@@ -1063,9 +1063,33 @@ fn cells_text(cells: &[String], from: usize, to: usize) -> String {
     cells[from..to].concat()
 }
 
-/// A row's name in full: the first line of the inspector's description of it
-/// (TUI-NAV-018), drawn wide enough that nothing is cut.
+/// The label a row draws in its name's place, where it is a later row of an
+/// item that carries several (TUI-NAV-089): keyed by the row's own tag, and
+/// only where an earlier row of the same item is listed before it.
+fn later_row_label(state: &GameState, section: Section, key: &RowKey) -> Option<&'static str> {
+    let label = match key {
+        RowKey::Content(ContentId::Craft(_), "tinker") => "tinkerers",
+        RowKey::Kitten(_, "elder") => "appoint Elder",
+        RowKey::Colony(_, "penpal") => "send a pen-pal",
+        _ => return None,
+    };
+    let same_item = |k: &RowKey| match (k, key) {
+        (RowKey::Content(a, _), RowKey::Content(b, _)) => a == b,
+        (RowKey::Kitten(a, _), RowKey::Kitten(b, _)) => a == b,
+        (RowKey::Colony(a, _), RowKey::Colony(b, _)) => a == b,
+        _ => false,
+    };
+    rows(state, section).iter().find(|r| same_item(&r.key)).filter(|first| &first.key != key).map(|_| label)
+}
+
+/// What a row draws in its name's place, in full: on a later row of an item
+/// that carries several, that row's label (TUI-NAV-089); on any other row, the
+/// first line of the inspector's description of it (TUI-NAV-018), drawn wide
+/// enough that nothing is cut.
 fn inspector_name(state: &GameState, section: Section, key: &RowKey) -> String {
+    if let Some(label) = later_row_label(state, section, key) {
+        return label.to_string();
+    }
     let (w, h) = (180u16, 6u16);
     let mut view = ViewState { section: Some(section), ..Default::default() };
     view.focus[section.index()] = Some(key.clone());

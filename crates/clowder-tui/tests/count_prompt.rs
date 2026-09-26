@@ -1368,8 +1368,32 @@ fn list_cells(state: &GameState, view: &ViewState, (w, h): (u16, u16)) -> Vec<Ve
         .collect()
 }
 
-/// A row's name in full, as the inspector's first line states it.
+/// The label a row draws in its name's place, where it is a later row of an
+/// item that carries several (TUI-NAV-089): keyed by the row's own tag, and
+/// only where an earlier row of the same item is listed before it.
+fn later_row_label(state: &GameState, section: Section, key: &RowKey) -> Option<&'static str> {
+    let label = match key {
+        RowKey::Content(ContentId::Craft(_), "tinker") => "tinkerers",
+        RowKey::Kitten(_, "elder") => "appoint Elder",
+        RowKey::Colony(_, "penpal") => "send a pen-pal",
+        _ => return None,
+    };
+    let same_item = |k: &RowKey| match (k, key) {
+        (RowKey::Content(a, _), RowKey::Content(b, _)) => a == b,
+        (RowKey::Kitten(a, _), RowKey::Kitten(b, _)) => a == b,
+        (RowKey::Colony(a, _), RowKey::Colony(b, _)) => a == b,
+        _ => false,
+    };
+    rows(state, section).iter().find(|r| same_item(&r.key)).filter(|first| &first.key != key).map(|_| label)
+}
+
+/// What a row draws in its name's place, in full: on a later row of an item
+/// that carries several, that row's label (TUI-NAV-089); on any other row, the
+/// name the inspector's first line states.
 fn full_row_name(state: &GameState, section: Section, key: &RowKey) -> String {
+    if let Some(label) = later_row_label(state, section, key) {
+        return label.to_string();
+    }
     let rect = Rect::new(0, 0, 180, 6);
     let mut term = Terminal::new(TestBackend::new(180, 6)).expect("TestBackend is infallible");
     term.draw(|f| inspector::draw(f, rect, state, &focused(section, key.clone())))

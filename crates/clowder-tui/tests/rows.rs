@@ -1506,6 +1506,251 @@ fn every_content_row_is_actionable() {
 }
 
 // ---------------------------------------------------------------------------
+// TUI-NAV-089 — an item's rows: the name heads them once
+// ---------------------------------------------------------------------------
+
+/// The plain-word label TUI-NAV-089 names for a row that does one of an item's
+/// several acts, keyed by the row's own tag — never by its position, so a
+/// later row the table does not name fails loudly rather than passing as
+/// whatever the implementation drew.
+fn act_label(key: &RowKey) -> Option<&'static str> {
+    match key {
+        RowKey::Content(ContentId::Craft(_), "tinker") => Some("tinkerers"),
+        RowKey::Kitten(_, "elder") => Some("appoint Elder"),
+        RowKey::Colony(_, "penpal") => Some("send a pen-pal"),
+        _ => None,
+    }
+}
+
+/// The item a row is about — the thing the palette counts once (TUI-NAV-063):
+/// a content id, a kitten, or a colony, whichever of its rows the key names.
+/// Every other row is an item of its own.
+fn item_of(key: &RowKey) -> String {
+    match key {
+        RowKey::Content(id, _) => format!("content {id:?}"),
+        RowKey::Kitten(ix, _) => format!("kitten {ix}"),
+        RowKey::Colony(c, _) => format!("colony {c:?}"),
+        other => format!("{other:?}"),
+    }
+}
+
+/// The item's name as the inspector states it on the first line of its
+/// description (TUI-NAV-018: the flavor name of the item the row is about),
+/// read at a width where nothing needs shortening.
+fn item_name(state: &GameState, section: Section, key: &RowKey) -> String {
+    use clowder_tui::render::widgets::inspector;
+    use ratatui::backend::TestBackend;
+    use ratatui::layout::Rect;
+    use ratatui::Terminal;
+
+    let (w, h) = (160u16, 12u16);
+    let mut view = nav::ViewState { section: Some(section), ..Default::default() };
+    view.focus[section.index()] = Some(key.clone());
+    let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
+    term.draw(|f| inspector::draw(f, Rect::new(0, 0, w, h), state, &view))
+        .expect("TestBackend is infallible");
+    let buf = term.backend().buffer();
+    (0..w)
+        .map(|x| buf.cell((x, 0)).map(|c| c.symbol().to_string()).unwrap_or_default())
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+/// Every row of `section` drawn at `w`×`h` with nothing focused, each with what
+/// its name column reads: the text from where a row's name begins — after the
+/// cursor slot, the marker, and one space — up to the first run of two blanks,
+/// leading blanks set aside.
+fn drawn_name_fields(state: &GameState, section: Section, w: u16, h: u16) -> Vec<(Row, String)> {
+    use clowder_tui::render::layout::Body;
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+
+    let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
+    let view = nav::ViewState { section: Some(section), ..Default::default() };
+    let mut layout = None;
+    term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, &view, None)))
+        .expect("TestBackend is infallible");
+    // The list's own space, dividers set aside, as the frame draws it.
+    let (x0, x1, y0, height) = match layout.expect("frame returns its layout").body {
+        Body::Wide { list, .. } => (list.x + 1, list.right() - 1, list.y, list.height),
+        Body::Narrow { main, .. } => (main.x + 1, main.right(), main.y, main.height),
+        other => panic!("fixture: {w}x{h} lays out a list, not {other:?}"),
+    };
+    let listed = rows(state, section);
+    assert!(
+        listed.len() <= height as usize,
+        "fixture: the {} list ({} rows) must fit its {height}-line pane at {w}x{h} unscrolled",
+        section.title(),
+        listed.len()
+    );
+
+    let buf = term.backend().buffer();
+    listed
+        .into_iter()
+        .enumerate()
+        .map(|(i, row)| {
+            let y = y0 + i as u16;
+            let line: String = (x0..x1)
+                .map(|x| buf.cell((x, y)).map(|c| c.symbol().to_string()).unwrap_or_default())
+                .collect();
+            let after_marker: String = line.chars().skip(4).collect();
+            let field = after_marker.trim_start().split("  ").next().unwrap_or("").trim_end().to_string();
+            (row, field)
+        })
+        .collect()
+}
+
+/// Whether a drawn name column reads as `whole`: the whole of it, or the list's
+/// ellipsis-shortened form of it (TUI-RENDER-014) — a label being fitted as a
+/// name is.
+fn reads_as(field: &str, whole: &str) -> bool {
+    if field == whole {
+        return true;
+    }
+    match field.strip_suffix('\u{2026}') {
+        Some(kept) => !kept.is_empty() && whole.starts_with(kept),
+        None => false,
+    }
+}
+
+/// A meadow where every item that carries several rows is listed — every
+/// recipe revealed, every colony found, a small roster of distinctly named
+/// kittens — so the lists fit a pane unscrolled.
+fn every_multi_row_item_listed() -> GameState {
+    let mut s = maximal();
+    let names = ["Biscuit", "Clover", "Dumpling", "Juniper", "Waffle"];
+    s.kittens.truncate(names.len());
+    for (k, name) in s.kittens.iter_mut().zip(names) {
+        k.name = name.to_string();
+    }
+    s
+}
+
+/// Where an item carries several rows in its section, each stays a row of its
+/// own; the first of them that is listed draws the item's name, and every
+/// later one draws in the name's place its own plain-word, glyph-free label —
+/// never the item's name — so no two of the item's rows read alike and no list
+/// shows the item's name twice. Quantified over every item with several rows in
+/// every section — every recipe's make and tinkerer rows, every kitten's two
+/// rows, every colony's two rows — in both the wide and the narrow layout.
+///
+/// @spec TUI-NAV-089
+#[test]
+fn an_items_first_listed_row_draws_its_name_and_each_later_row_its_own_label() {
+    let state = every_multi_row_item_listed();
+    let crafts_revealed =
+        CraftId::ALL.iter().filter(|c| state.availability(ContentId::Craft(**c)) != Availability::Hidden).count();
+    assert!(crafts_revealed > 1, "fixture: several recipes are listed");
+    assert!(state.kittens.len() > 1 && state.discovered.len() > 1, "fixture: several kittens and colonies");
+
+    for (w, h) in [(200u16, 150u16), (80, 150)] {
+        let mut multi_items: HashMap<&'static str, usize> = HashMap::new();
+        for section in Section::ALL {
+            let drawn = drawn_name_fields(&state, section, w, h);
+
+            // Group the selectable rows by the item they are about, in list order.
+            let mut items: Vec<(String, Vec<(Row, String)>)> = Vec::new();
+            for (row, field) in drawn.iter().filter(|(r, _)| r.selectable()) {
+                let item = item_of(&row.key);
+                match items.iter_mut().find(|(i, _)| *i == item) {
+                    Some((_, rs)) => rs.push((row.clone(), field.clone())),
+                    None => items.push((item, vec![(row.clone(), field.clone())])),
+                }
+            }
+
+            for (item, item_rows) in items.iter().filter(|(_, rs)| rs.len() > 1) {
+                let kind = match &item_rows[0].0.key {
+                    RowKey::Content(ContentId::Craft(_), _) => "recipe",
+                    RowKey::Kitten(..) => "kitten",
+                    RowKey::Colony(..) => "colony",
+                    _ => "other",
+                };
+                *multi_items.entry(kind).or_default() += 1;
+                let whr = format!("at {w}x{h}, in the {} list, {item}", section.title());
+                let name = item_name(&state, section, &item_rows[0].0.key);
+                assert!(!name.is_empty(), "fixture: {whr} has a name the inspector states");
+
+                // Each is a row of its own, with an identity of its own.
+                let keys: HashSet<String> = item_rows.iter().map(|(r, _)| format!("{:?}", r.key)).collect();
+                assert_eq!(keys.len(), item_rows.len(), "{whr}: two of the item's rows share one identity");
+
+                // The first listed row draws the item's name.
+                let (first, first_field) = &item_rows[0];
+                assert!(
+                    reads_as(first_field, &name),
+                    "{whr}: the first listed row {:?} draws {first_field:?} in its name column, \
+                     but the first of an item's listed rows carries the item's name {name:?}",
+                    first.key
+                );
+
+                // Each later listed row draws its own label, in the name's place.
+                for (later, field) in &item_rows[1..] {
+                    let label = act_label(&later.key).unwrap_or_else(|| {
+                        panic!("{whr}: the later row {:?} has no label TUI-NAV-089 names", later.key)
+                    });
+                    assert!(
+                        reads_as(field, label),
+                        "{whr}: the later row {:?} draws {field:?} in its name column, but a later \
+                         row of an item draws, in the name's place, its own label {label:?}",
+                        later.key
+                    );
+                    assert!(
+                        !reads_as(field, &name) && !field.contains(name.as_str()),
+                        "{whr}: the later row {:?} draws the item's name {name:?}; a label is its \
+                         row's own and never the item's name",
+                        later.key
+                    );
+                    assert!(
+                        field.chars().all(|c| c.is_alphabetic() || c == ' ' || c == '-' || c == '\u{2026}'),
+                        "{whr}: the later row {:?} draws {field:?}; its label is plain words with no glyph",
+                        later.key
+                    );
+                }
+
+                // No two of the item's rows read alike.
+                let fields: HashSet<&str> = item_rows.iter().map(|(_, f)| f.as_str()).collect();
+                assert_eq!(
+                    fields.len(),
+                    item_rows.len(),
+                    "{whr}: two of the item's rows read alike: {:?}",
+                    item_rows.iter().map(|(_, f)| f).collect::<Vec<_>>()
+                );
+
+                // And the list shows the item's name once.
+                let named = drawn.iter().filter(|(r, f)| r.selectable() && reads_as(f, &name)).count();
+                assert_eq!(
+                    named, 1,
+                    "{whr}: the list shows the item's name {name:?} on {named} rows; it heads the \
+                     item's rows once"
+                );
+            }
+        }
+
+        let craft_rows = multi_items.get("recipe").copied().unwrap_or(0);
+        let kitten_rows = multi_items.get("kitten").copied().unwrap_or(0);
+        let colony_rows = multi_items.get("colony").copied().unwrap_or(0);
+        assert_eq!(craft_rows, crafts_revealed, "at {w}x{h}: every listed recipe carries several rows");
+        assert_eq!(kitten_rows, state.kittens.len(), "at {w}x{h}: every kitten carries several rows");
+        let colonies = rows(&state, Section::Friends)
+            .iter()
+            .filter_map(|r| match r.key {
+                RowKey::Colony(c, _) => Some(c),
+                _ => None,
+            })
+            .collect::<HashSet<ColonyId>>()
+            .len();
+        assert!(colonies > 1, "fixture: several colonies are listed");
+        assert_eq!(colony_rows, colonies, "at {w}x{h}: every listed colony carries several rows");
+        assert_eq!(
+            multi_items.get("other").copied().unwrap_or(0),
+            0,
+            "at {w}x{h}: an item carries several rows beyond the three kinds TUI-NAV-089 names"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
 // TUI-NAV-049 — the stores group
 // ---------------------------------------------------------------------------
 

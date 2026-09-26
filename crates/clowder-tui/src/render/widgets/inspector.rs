@@ -453,7 +453,8 @@ fn store_lines(state: &GameState, r: ResourceId) -> Vec<String> {
 /// prompt is held to this row, its count and preview (TUI-NAV-067) are shown
 /// alongside — the same row the prompt was opened on, by identity, so a
 /// cursor that has since moved off it never previews on the wrong row.
-/// @spec TUI-NAV-018, TUI-NAV-077, TUI-NAV-035, TUI-THEME-011
+/// @spec TUI-NAV-018, TUI-NAV-077, TUI-NAV-035, TUI-THEME-011, TUI-NAV-089,
+///       TUI-NAV-091
 fn draw_body(
     f: &mut Frame,
     area: Rect,
@@ -469,6 +470,12 @@ fn draw_body(
     let on_this_row = prompt.filter(|p| p.row.as_ref() == Some(key));
 
     let mut lines: Vec<String> = vec![full_name(state, key)];
+
+    // A later row of a multi-row item states its own label whole, beneath the
+    // item's name — never the item's name a second time. @spec TUI-NAV-091
+    if let Some(label) = crate::nav::rows::later_row_label(key) {
+        lines.push(label.to_string());
+    }
 
     // The swapped-in inspector carries the same consequence summary the list
     // would show beneath the armed row, in the same attention colour it wears

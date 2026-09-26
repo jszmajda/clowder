@@ -334,7 +334,7 @@ fn away_report_lines(report: &OfflineReport) -> Vec<Line<'static>> {
 }
 
 /// The complete key map and glyph legend. There is no manual; this and the
-/// hint bar are the manual. @spec TUI-NAV-025
+/// hint bar are the manual. @spec TUI-NAV-025, TUI-NAV-090
 pub fn help(f: &mut Frame, area: Rect) {
     const KEYS: &[(&str, &str)] = &[
         ("1-9, 0", "Jump to that section"),
@@ -360,10 +360,13 @@ pub fn help(f: &mut Frame, area: Rect) {
     // permanent line in the hint bar, and the help overlay is the only place
     // every one of them is named at once, whatever screen the player is on.
     // @spec TUI-NAV-025, TUI-NAV-046
+    // A focused-item mnemonic's act is worded by its row's label (TUI-NAV-089)
+    // followed by the item it acts on, in parentheses (TUI-NAV-090) — the same
+    // wording the hint bar gives it.
     const MNEMONICS: &[(&str, &str)] = &[
         ("Meadow", "g gather / f forage / r rummage"),
-        ("Clowder", "p promote focused kitten / n appoint focused kitten Elder"),
-        ("Friends", "p deepen pen-pal with focused colony"),
+        ("Clowder", "p promote (kitten) / n appoint Elder (kitten)"),
+        ("Friends", "p send a pen-pal (colony)"),
     ];
     const LEGEND: &[(&str, &str)] = &[
         ("\u{25cf}", "affordable now"),
