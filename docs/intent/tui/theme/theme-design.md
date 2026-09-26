@@ -110,7 +110,7 @@ Both rules hold whatever values the palette settles on (Deferred 1). Retuning th
 
 ## Three Things the Palette Does Not Cover
 
-**Focus takes no colour.** The cursor is the `▸` glyph, and where more emphasis is wanted the row reverses. Giving focus a palette colour would break the rule that colour means state — the focused row's state is whatever its marker says, and tinting it would put two colours on the row's line saying different things.
+**Focus takes no colour.** The cursor is the `▸` glyph, and where more emphasis is wanted the row reverses. Giving focus a palette colour would break the rule that colour means state — the focused row's state is whatever its marker says, and tinting it would put two colours on the row's line saying different things. The focused tab on the tab bar reverses the same way, its label a block of the terminal's own pair inverted (TUI-NAV-092); a section in focus has no cursor to carry the glyph, so the reversal alone marks it.
 
 **Reverse video inverts the terminal's own pair.** The offline banner and any emphasised row swap the terminal's foreground and background rather than reversing a palette colour. This works on a ground we do not own and in either polarity, and it is the one emphasis that needs no colour at all.
 

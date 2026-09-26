@@ -3,7 +3,7 @@
 //!
 //! @spec TUI-NAV-019, TUI-NAV-020, TUI-NAV-021, TUI-NAV-022, TUI-NAV-023,
 //! TUI-NAV-024, TUI-NAV-025, TUI-NAV-034, TUI-NAV-044, TUI-NAV-045, TUI-NAV-054,
-//! TUI-NAV-086, TUI-THEME-011, TUI-THEME-015, TUI-RENDER-016
+//! TUI-NAV-086, TUI-NAV-092, TUI-THEME-011, TUI-THEME-015, TUI-RENDER-016
 //!
 //! **The contract these tests are made of.** The chrome's job is to be quiet.
 //! An empty attention cluster means nothing needs you, and that only works if
@@ -48,9 +48,10 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
 
+use clowder_tui::nav::palette::results;
 use clowder_tui::nav::rows::{rows, tab_sections, Row, RowKey, RowKind};
 use clowder_tui::nav::{
-    reset_hidden_tabs, update, Action, ArmedRow, CountPrompt, CountSemantics, Overlay,
+    opening, reset_hidden_tabs, update, Action, ArmedRow, CountPrompt, CountSemantics, Overlay,
     PendingReport, Section, SeenMark, ViewState,
 };
 use clowder_tui::render::fmt;
@@ -3039,6 +3040,437 @@ fn every_revealed_tab_is_reachable_at_every_width() {
             );
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-092 — the focused tab, reversed
+//
+// These are the tab bar's one set of assertions that read a style as well as
+// symbols. That is no exception to TUI-NAV-022: reverse video is a fill — the
+// terminal's own pair swapped — not a colour, so it survives every colour
+// being stripped. The claim is read cell by cell: the reversed cells of the
+// bar form exactly one run; that run is exactly the focused tab's label, its
+// digit, a space, and its name; each of its cells leaves the pair unresolved
+// for the terminal to invert (TUI-THEME-007); and the columns either side of
+// it are the bar's own plain gaps, so the reversal brought no column with it.
+// ---------------------------------------------------------------------------
+
+/// A tab's label as the design fixes it: its digit, then its name.
+fn tab_label(section: Section) -> String {
+    format!("{} {}", section.digit(), section.title())
+}
+
+/// The tab bar drawn alone at `w` columns, as cells.
+fn tab_cells(state: &GameState, view: &ViewState, w: u16) -> Vec<ratatui::buffer::Cell> {
+    let mut term = terminal(w, 1);
+    term.draw(|f| {
+        let area = f.area();
+        chrome::tabs(f, area, state, view);
+    })
+    .expect("TestBackend is infallible");
+    row_cells(term.backend().buffer(), Rect::new(0, 0, w, 1), 0)
+}
+
+/// Every run of consecutive reversed cells on a line: its first column and
+/// the text its cells hold.
+fn reversed_runs(cells: &[ratatui::buffer::Cell]) -> Vec<(usize, String)> {
+    use ratatui::style::Modifier;
+    let mut runs: Vec<(usize, String)> = Vec::new();
+    let mut open = false;
+    for (x, cell) in cells.iter().enumerate() {
+        if cell.modifier.contains(Modifier::REVERSED) {
+            if !open {
+                runs.push((x, String::new()));
+                open = true;
+            }
+            runs.last_mut().expect("a run is open").1.push_str(cell.symbol());
+        } else {
+            open = false;
+        }
+    }
+    runs
+}
+
+/// The whole of TUI-NAV-092's claim about one drawn tab bar: the focused
+/// tab's label, and nothing else on the bar, is reversed; the reversal
+/// inverts the terminal's own pair; and it is flanked by the bar's plain
+/// gaps or its edge, so it added no column to the label.
+fn assert_only_focus_reversed(cells: &[ratatui::buffer::Cell], focus: Section, what: &str) {
+    use ratatui::style::Color;
+
+    let line: String = cells.iter().map(|c| c.symbol()).collect();
+    let label = tab_label(focus);
+    let runs = reversed_runs(cells);
+    assert_eq!(
+        runs.len(),
+        1,
+        "{what}, with the {} section in focus, the tab bar reverses {} runs of cells {runs:?}. \
+         Exactly one tab is reversed on every frame that draws the bar — the focused one — and \
+         it is the one mark on the bar that says where the player is.\ntab bar: {line:?}",
+        focus.title(),
+        runs.len()
+    );
+    let (at, text) = &runs[0];
+    assert_eq!(
+        text,
+        &label,
+        "{what}, the tab bar reverses {text:?} at column {at}, where the focused tab's label is \
+         {label:?} — its digit and its name, no more and no less: no other tab's label and no \
+         column between tabs is reversed.\ntab bar: {line:?}"
+    );
+    let end = at + label.chars().count();
+    for (x, cell) in cells.iter().enumerate().take(end).skip(*at) {
+        assert_eq!(
+            (cell.fg, cell.bg),
+            (Color::Reset, Color::Reset),
+            "{what}, focused-tab column {x} (`{}`) is reversed over {:?} on {:?}. The reversal \
+             inverts the terminal's own foreground and background (TUI-THEME-007), never a \
+             palette colour.\ntab bar: {line:?}",
+            cell.symbol(),
+            cell.fg,
+            cell.bg
+        );
+    }
+    if *at > 0 {
+        assert_eq!(
+            cells[at - 1].symbol(),
+            " ",
+            "{what}, the column before the focused tab's reversed label holds `{}`: the reversal \
+             adds no column to the bar, so the label sits in the bar's own gap.\ntab bar: {line:?}",
+            cells[at - 1].symbol()
+        );
+    }
+    if end < cells.len() {
+        assert_eq!(
+            cells[end].symbol(),
+            " ",
+            "{what}, the column after the focused tab's reversed label holds `{}`: the reversal \
+             adds no column to the bar, so the label sits in the bar's own gap.\ntab bar: {line:?}",
+            cells[end].symbol()
+        );
+    }
+}
+
+/// The tab after `focus` in the ring the bar draws, if the bar holds another.
+fn next_tab(state: &GameState, focus: Section) -> Option<Section> {
+    let ring = tab_sections(state, Some(focus));
+    let at = ring.iter().position(|s| *s == focus)?;
+    let next = ring[(at + 1) % ring.len()];
+    (next != focus).then_some(next)
+}
+
+/// Whether a drawn bar is in its full form: every tab on it named.
+fn in_full_form(state: &GameState, focus: Section, line: &str) -> bool {
+    tab_sections(state, Some(focus)).into_iter().all(|s| line.contains(s.title()))
+}
+
+/// The focused tab's label — digit and name — is the one run of reversed
+/// cells on the tab bar, in the full form and in the compact strip alike, its
+/// cells inverting the terminal's own pair, and no other tab's label and no
+/// column between tabs reversed. Swept over meadows where most sections list
+/// nothing and where every one does, with every section in focus in turn —
+/// one that lists nothing included — with no other tab badged and with the
+/// next tab badged (so the compact strip names a tab beside the focused one),
+/// at every width from the floor to wide.
+///
+/// @spec TUI-NAV-092
+#[test]
+fn only_the_focused_tabs_label_is_reversed_in_the_full_form_and_the_compact_strip() {
+    let mut full_seen = false;
+    let mut compact_seen = false;
+    let mut compact_named_another = false;
+    let mut empty_focus_seen = false;
+
+    for (what, state) in reveal_corpus() {
+        for focus in Section::ALL {
+            if !rows(&state, focus).iter().any(|r| r.selectable()) {
+                empty_focus_seen = true;
+            }
+            for badge_neighbour in [false, true] {
+                let mut view = calm_view(&state);
+                view.section = Some(focus);
+                if badge_neighbour {
+                    if let Some(s) = next_tab(&state, focus) {
+                        view.seen[s.index()].visited = false;
+                    }
+                }
+                for w in FLOOR_W..=WIDE_W {
+                    let cells = tab_cells(&state, &view, w);
+                    let line: String = cells.iter().map(|c| c.symbol()).collect();
+                    if in_full_form(&state, focus, &line) {
+                        full_seen = true;
+                    } else {
+                        compact_seen = true;
+                        if Section::ALL.into_iter().any(|s| s != focus && line.contains(s.title())) {
+                            compact_named_another = true;
+                        }
+                    }
+                    let badges =
+                        if badge_neighbour { "the next tab badged" } else { "no tab badged" };
+                    assert_only_focus_reversed(
+                        &cells,
+                        focus,
+                        &format!("in {what} with {badges}, at {w} columns"),
+                    );
+                }
+            }
+        }
+    }
+
+    assert!(full_seen, "fixture: some case draws the bar in its full form");
+    assert!(compact_seen, "fixture: some case draws the bar as its compact strip");
+    assert!(compact_named_another, "fixture: some compact strip names a tab besides the focused one");
+    assert!(empty_focus_seen, "fixture: some case focuses a section that lists nothing");
+}
+
+/// The reversal adds no column: over one set of tabs, the widths at which the
+/// bar takes its full form are the same whichever tab is in focus, and in the
+/// full form the bar's characters are the same whichever tab is in focus —
+/// only which label is reversed differs.
+///
+/// @spec TUI-NAV-092
+#[test]
+fn the_focused_tabs_reversal_adds_no_column_to_the_bar() {
+    let state = every_section_revealed();
+
+    // The first focus's full-form widths and full-form lines, which every
+    // other focus is held to.
+    type FullForm = (Section, BTreeSet<u16>, Vec<(u16, String)>);
+    let mut baseline: Option<FullForm> = None;
+    for focus in Section::ALL {
+        let mut view = calm_view(&state);
+        view.section = Some(focus);
+        assert_eq!(
+            tab_sections(&state, Some(focus)),
+            Section::ALL.to_vec(),
+            "fixture: every section has its tab whatever is in focus"
+        );
+
+        let mut full_widths: BTreeSet<u16> = BTreeSet::new();
+        let mut full_lines: Vec<(u16, String)> = Vec::new();
+        for w in FLOOR_W..=WIDE_W {
+            let line = tab_line(&state, &view, w);
+            if in_full_form(&state, focus, &line) {
+                full_widths.insert(w);
+                full_lines.push((w, line));
+            }
+        }
+        assert!(
+            !full_widths.is_empty() && !full_widths.contains(&FLOOR_W),
+            "fixture: the sweep reaches both the full form and the compact strip"
+        );
+
+        match &baseline {
+            None => baseline = Some((focus, full_widths, full_lines)),
+            Some((first, widths, lines)) => {
+                assert_eq!(
+                    &full_widths,
+                    widths,
+                    "with the {} tab in focus the bar takes its full form at widths {:?}..; with \
+                     the {} tab in focus, at {:?}... The reversal adds no column, so the width at \
+                     which the full form fits is the same whichever tab is in focus.",
+                    focus.title(),
+                    full_widths.first(),
+                    first.title(),
+                    widths.first()
+                );
+                for ((w, got), (_, want)) in full_lines.iter().zip(lines) {
+                    assert_eq!(
+                        got,
+                        want,
+                        "at {w} columns the full-form bar reads differently with the {} tab in \
+                         focus than with the {} tab in focus. The reversal is a fill on the \
+                         focused label, never a character or a column.",
+                        focus.title(),
+                        first.title()
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// The views a frame can hold over one focus: nothing open; a count prompt
+/// on the focused row; the palette empty and with a query typed; the Journal;
+/// help; the inspector called for (a swap at the floor, a pane wide); a
+/// report banner showing; the next tab badged; and — where the focus is
+/// the section with a heavy row — that row armed. Each keeps `focus` as the
+/// section beneath.
+fn focus_contexts(state: &GameState, focus: Section) -> Vec<(&'static str, ViewState)> {
+    let mut base = calm_view(state);
+    base.section = Some(focus);
+    let first_row = rows(state, focus).into_iter().find(|r| r.selectable()).map(|r| r.key);
+    base.focus[focus.index()] = first_row.clone();
+
+    let mut out: Vec<(&'static str, ViewState)> = vec![("nothing open", base.clone())];
+
+    if let Some(key) = first_row {
+        let mut prompt = base.clone();
+        prompt.prompt = Some(CountPrompt { digits: "3".to_string(), row: Some(key) });
+        out.push(("a count prompt open", prompt));
+    }
+
+    let mut palette = base.clone();
+    palette.overlay = Some(Overlay::Palette { query: String::new(), selected: 0 });
+    out.push(("the palette open and empty", palette));
+
+    let mut typed = base.clone();
+    typed.overlay = Some(Overlay::Palette { query: "e".to_string(), selected: 0 });
+    out.push(("the palette open with a query typed", typed));
+
+    let mut journal = base.clone();
+    journal.overlay = Some(Overlay::Journal { anchor: 0 });
+    out.push(("the Journal open", journal));
+
+    let mut help = base.clone();
+    help.overlay = Some(Overlay::Help);
+    out.push(("help open", help));
+
+    let mut inspector = base.clone();
+    inspector.inspector_wanted = true;
+    out.push(("the inspector called for", inspector));
+
+    let mut banner = base.clone();
+    banner.reports = vec![PendingReport { entry: 0, dismissed: false }];
+    out.push(("a report banner showing", banner));
+
+    if let Some(s) = next_tab(state, focus) {
+        let mut badged = base.clone();
+        badged.seen[s.index()].visited = false;
+        out.push(("the next tab badged", badged));
+    }
+
+    if focus == Section::Legacy && rows(state, focus).iter().any(|r| r.heavy) {
+        let key = heavy_row(state);
+        let mut armed = base.clone();
+        armed.focus[focus.index()] = Some(key.clone());
+        armed.armed = Some(ArmedRow {
+            key,
+            command: Command::GreatMeadowMove,
+            expires_at: Instant::now() + Duration::from_secs(8),
+        });
+        out.push(("a heavy row armed", armed));
+    }
+
+    out
+}
+
+/// On every whole frame that draws the tab bar, exactly one tab is reversed
+/// and it is the section in focus — whatever else the view holds. While a
+/// field (the count prompt, the palette) or a full-screen overlay (the
+/// Journal, help) is open, the reversal stays on the section beneath; the
+/// inspector, a banner, badges, and an armed row move it nowhere. Swept over
+/// every section in focus, one that lists nothing included, in meadows young
+/// and far along, at the floor and wide.
+///
+/// @spec TUI-NAV-092
+#[test]
+fn every_frame_reverses_the_section_in_focus_even_beneath_a_field_or_full_screen_overlay() {
+    let mut contexts_seen: BTreeSet<&'static str> = BTreeSet::new();
+    for (what, state) in reveal_corpus() {
+        for focus in Section::ALL {
+            for (context, view) in focus_contexts(&state, focus) {
+                contexts_seen.insert(context);
+                for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE_W, WIDE_H)] {
+                    let (buf, layout) = composed_frame(&state, &view, w, h);
+                    let cells = row_cells(&buf, layout.tabs, layout.tabs.y);
+                    assert_only_focus_reversed(
+                        &cells,
+                        focus,
+                        &format!("in {what} with {context}, in a {w}x{h} frame"),
+                    );
+                }
+            }
+        }
+    }
+    for context in [
+        "a count prompt open",
+        "the palette open and empty",
+        "the palette open with a query typed",
+        "the Journal open",
+        "help open",
+        "a heavy row armed",
+    ] {
+        assert!(contexts_seen.contains(context), "fixture: the sweep draws a frame with {context}");
+    }
+}
+
+/// The reversal follows focus alone, and moves on the very frame focus moves:
+/// from the opening focus, through a digit to every section, a section cycle
+/// forward and back around the whole ring, and the palette's jump to every
+/// section it can reach — the palette open over the old section keeping the
+/// reversal there until the jump. Each step's expected tab is worked out from
+/// the key pressed, never read back from the view, and every frame is drawn
+/// at the floor (the compact strip) and wide (the full form).
+///
+/// @spec TUI-NAV-092
+#[test]
+fn the_reversal_moves_on_the_frame_a_digit_a_cycle_or_the_palettes_jump_moves_focus() {
+    let state = every_section_revealed();
+    let sizes = [(FLOOR_W, FLOOR_H), (WIDE_W, WIDE_H)];
+    let check = |view: &ViewState, expected: Section, step: &str| {
+        for (w, h) in sizes {
+            let (buf, layout) = composed_frame(&state, view, w, h);
+            let cells = row_cells(&buf, layout.tabs, layout.tabs.y);
+            assert_only_focus_reversed(&cells, expected, &format!("after {step}, in a {w}x{h} frame"));
+        }
+    };
+
+    let mut view = ViewState::default();
+    opening(&mut view, &state);
+    check(&view, Section::Meadow, "the opening focus");
+
+    let mut current = Section::Meadow;
+    for target in Section::ALL {
+        update(Action::SectionJump(target), &mut view, &state);
+        check(&view, target, &format!("pressing {}", target.digit()));
+        current = target;
+    }
+
+    let ring = tab_sections(&state, Some(current));
+    for _ in 0..=ring.len() {
+        let at = ring.iter().position(|s| *s == current).expect("the focused section has a tab");
+        let next = ring[(at + 1) % ring.len()];
+        update(Action::SectionNext, &mut view, &state);
+        check(&view, next, &format!("cycling forward from {}", current.digit()));
+        current = next;
+    }
+    for _ in 0..=ring.len() {
+        let at = ring.iter().position(|s| *s == current).expect("the focused section has a tab");
+        let prev = ring[(at + ring.len() - 1) % ring.len()];
+        update(Action::SectionPrev, &mut view, &state);
+        check(&view, prev, &format!("cycling back from {}", current.digit()));
+        current = prev;
+    }
+
+    let mut landed: BTreeSet<Section> = BTreeSet::new();
+    for target in Section::ALL {
+        if target == current {
+            continue;
+        }
+        let Some(query) = results(&state, "")
+            .into_iter()
+            .filter(|r| r.section == target)
+            .map(|r| r.name)
+            .find(|name| results(&state, name).first().map(|r| r.section) == Some(target))
+        else {
+            continue;
+        };
+
+        // Each jump is its own deliberate Enter, well apart from the last:
+        // no field-accept guard (TUI-NAV-061) still stands from the jump before.
+        view.field_guard = false;
+        update(Action::OpenPalette, &mut view, &state);
+        for c in query.chars() {
+            update(Action::Type(c), &mut view, &state);
+        }
+        check(&view, current, &format!("typing a query for {} into the palette", target.digit()));
+        update(Action::Activate, &mut view, &state);
+        check(&view, target, &format!("the palette's jump to {}", target.digit()));
+        landed.insert(target);
+        current = target;
+    }
+    assert!(landed.len() >= 5, "fixture: the palette's jump reaches most sections ({} reached)", landed.len());
 }
 
 // ---------------------------------------------------------------------------

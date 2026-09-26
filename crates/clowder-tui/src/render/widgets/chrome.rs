@@ -8,6 +8,7 @@
 use clowder_core::{GameState, Location, MoodTier, ResourceId};
 use ratatui::{
     layout::Rect,
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::Paragraph,
     Frame,
@@ -206,11 +207,34 @@ pub fn header(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
 // Tab bar
 // ---------------------------------------------------------------------------
 
+/// Every tab's label beside the separator that joins the run: the reversal is
+/// a fill, never a column, so the separators stay in the bar's own plain
+/// gaps and only a label's own span carries `Modifier::REVERSED`, never a
+/// palette colour, so the terminal's own pair still shows through
+/// (TUI-THEME-007). @spec TUI-NAV-092
+fn tab_spans(sections: &[Section], labels: &[String], focused: Option<Section>, sep: &str) -> Vec<Span<'static>> {
+    let mut spans = Vec::with_capacity(sections.len() * 2);
+    for (i, (section, label)) in sections.iter().zip(labels).enumerate() {
+        if i > 0 {
+            spans.push(Span::raw(sep.to_string()));
+        }
+        if focused == Some(*section) {
+            spans.push(Span::styled(label.clone(), Style::default().add_modifier(Modifier::REVERSED)));
+        } else {
+            spans.push(Span::raw(label.clone()));
+        }
+    }
+    spans
+}
+
 /// Sections that list a selectable row, or hold focus, with their digits; a
 /// badge on one not yet visited since it last appeared. Width-responsive:
 /// full labels where they fit, else a compact digit strip — never a name
-/// truncated mid-word, never a tab scrolled out of reach.
-/// @spec TUI-NAV-006, TUI-NAV-034, TUI-NAV-085
+/// truncated mid-word, never a tab scrolled out of reach. The section in
+/// focus is always the one tab reversed, in either form: the mark of where
+/// the player is, following focus alone and never the field or full-screen
+/// overlay drawn over it. @spec TUI-NAV-006, TUI-NAV-034, TUI-NAV-085,
+/// TUI-NAV-092
 pub fn tabs(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     let revealed: Vec<Section> = tab_sections(state, view.section);
     let focused = view.section;
@@ -223,7 +247,8 @@ pub fn tabs(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     let full_line = full.join("  ");
 
     if full_line.chars().count() <= area.width as usize {
-        draw_line(f, area, full_line);
+        let spans = tab_spans(&revealed, &full, focused, "  ");
+        f.render_widget(Paragraph::new(Line::from(spans)), area);
         return;
     }
 
@@ -242,7 +267,8 @@ pub fn tabs(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
             }
         })
         .collect();
-    draw_line(f, area, compact.join(" "));
+    let spans = tab_spans(&revealed, &compact, focused, " ");
+    f.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
 // ---------------------------------------------------------------------------
