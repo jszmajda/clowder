@@ -35,28 +35,49 @@ fn style_for(role: Role) -> Style {
 }
 
 /// The glyph-and-role a row wears, taken from the core's answers rather than
-/// worked out here. Glyph first: the marker is legible with every colour
-/// stripped. @spec TUI-NAV-009, TUI-NAV-053, TUI-THEME-014
-fn marker_for(state: &GameState, row: &Row) -> (&'static str, Role) {
-    let RowKey::Content(id, _) = &row.key else {
-        return ("●", Role::Ready);
-    };
-    if state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours) {
-        return ("✓", Role::Dim);
+/// worked out here — never from a price or a threshold of the shell's own.
+/// `None` is a display-only row: an empty marker slot. Glyph first: the
+/// marker is legible with every colour stripped.
+/// @spec TUI-NAV-009, TUI-NAV-053, TUI-THEME-014
+fn marker_for(state: &GameState, row: &Row) -> Option<(&'static str, Role)> {
+    use clowder_core::{Availability, LockReason};
+
+    if matches!(row.kind, RowKind::Display) {
+        return None;
     }
-    match state.availability(*id) {
-        clowder_core::Availability::Teased => ("○", Role::Dim),
-        _ => {
-            let covered = state.affordability(*id);
-            if covered >= 1.0 {
-                ("●", Role::Ready)
-            } else if covered > 0.0 {
+    let RowKey::Content(id, tag) = &row.key else {
+        return Some(("●", Role::Ready));
+    };
+    // A craft's tinkerer count row carries no price of its own to fall short
+    // on — it wears the same marker as any actionable row with no content
+    // item, whatever the craft's own lock reason.
+    if *tag == "tinker" {
+        return Some(("●", Role::Ready));
+    }
+    let (glyph, role) = match state.lock_reason(*id) {
+        Some(LockReason::AlreadyYours) => ("✓", Role::Dim),
+        None => ("●", Role::Ready),
+        Some(LockReason::ShortBy { .. }) => {
+            if state.affordability(*id) > 0.0 {
                 ("◐", Role::Partial)
             } else {
                 ("○", Role::Dim)
             }
         }
-    }
+        Some(_) => ("○", Role::Dim),
+    };
+    // A Teased row is dimmed whatever glyph it wears, `◐` included, and the
+    // dim is the availability report's answer, not the lock reason's: a kind
+    // without a reveal ladder is never Teased, so its rows keep their glyph's
+    // own colour. The core reports a revealed item Available exactly where
+    // its lock reason names none (SIM-ENG-023), so the dim never lands on `●`.
+    // @spec TUI-NAV-009, TUI-NAV-053
+    let role = if state.availability(*id) == Availability::Teased {
+        Role::Dim
+    } else {
+        role
+    };
+    Some((glyph, role))
 }
 
 /// How many of this the meadow already has, blank where the notion does not
@@ -358,7 +379,7 @@ fn row_line(
         ));
     }
 
-    let (marker, role) = marker_for(state, row);
+    let (marker, role) = marker_for(state, row).unwrap_or((" ", Role::Inherited));
     let cursor = if focused { "▸ " } else { "  " };
     let count = owned_count(state, row);
     let cost = match prompt {

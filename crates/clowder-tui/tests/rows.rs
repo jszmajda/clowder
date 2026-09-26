@@ -798,6 +798,563 @@ fn a_kind_with_no_reveal_ladder_is_present_or_absent_and_never_in_between() {
     }
 }
 
+/// The rows each content item carries, where, and the command whose gate
+/// governs each: the item's own verb, and for a craft its tinkerer count row
+/// beside it. A job's count row is gated by its assign end.
+fn content_rows_of(id: ContentId) -> Vec<(Section, &'static str, Command)> {
+    match id {
+        ContentId::Structure(s) => vec![(Section::Meadow, "", Command::Build(s))],
+        ContentId::Idea(i) => vec![(Section::Ideas, "", Command::ResearchIdea(i))],
+        ContentId::Refinement(r) => vec![(Section::Ideas, "", Command::BuyRefinement(r))],
+        ContentId::Rule(r) => vec![(Section::Ideas, "", Command::AdoptRule(r))],
+        ContentId::Craft(c) => vec![
+            (Section::Crafts, "craft", Command::Craft(c)),
+            (Section::Crafts, "tinker", Command::AssignTinkerer(c)),
+        ],
+        ContentId::Job(j) => vec![(Section::Clowder, "", Command::AssignJob(j))],
+        ContentId::Rite(r) => vec![(Section::Sunbeams, "", Command::BuyRite(r))],
+        ContentId::Arch(a) => vec![(Section::Wonders, "", Command::BuyArch(a))],
+        ContentId::Tradition(t) => vec![(Section::Legacy, "", Command::BuyTradition(t))],
+        ContentId::DreamLoom(l) => vec![(Section::Dreams, "", Command::BuyDreamLoom(l))],
+    }
+}
+
+/// The same meadow with every stock emptied, or filled to the brim — including
+/// the spendable pool that is not a resource. Everything else (reveals, gates,
+/// ownership) is left exactly as it was.
+fn with_every_stock(state: &GameState, amount: f64) -> GameState {
+    let mut s = state.clone();
+    for r in ResourceId::ALL {
+        s.resources[r.ix()] = amount;
+    }
+    s.elder_wisdom = amount;
+    s
+}
+
+/// The whole open meadow with no kittens at all: every job the core reports is
+/// there to be had, but the gate on assigning one is shut.
+fn maximal_without_a_roster() -> GameState {
+    let mut s = maximal();
+    s.kittens = Vec::new();
+    s.elder = None;
+    s
+}
+
+/// A meadow that has never Moved: the prestige shop's kind answers absent.
+fn maximal_first_generation() -> GameState {
+    let mut s = maximal();
+    s.generation = 0;
+    s
+}
+
+/// A content row is listed exactly while the core reports its item Teased or
+/// Available *and* the gate of the row's own command open — never on the
+/// shell's own say-so, and never on stock. Quantified over every content item
+/// of every kind, every row each item carries, and a spread of meadows that
+/// between them open and shut every one of those conditions; each meadow is
+/// also re-asked with its stocks emptied and filled, which must move nothing.
+///
+/// @spec TUI-NAV-053
+#[test]
+fn a_content_row_is_listed_exactly_while_the_core_reports_it_revealed_and_its_gate_open() {
+    let meadows: Vec<(&str, GameState)> = vec![
+        ("a maximal meadow", maximal()),
+        ("everything unlocked, nothing affordable", poor_but_unlocked()),
+        ("wealth without progress", rich_but_locked()),
+        ("a brand-new meadow", GameState::new(5)),
+        ("an open meadow with no kittens", maximal_without_a_roster()),
+        ("an open meadow that has never Moved", maximal_first_generation()),
+    ];
+
+    let mut listed_seen = 0;
+    let mut hidden_seen = 0;
+    let mut shut_gate_seen = 0;
+
+    for (label, base) in &meadows {
+        for (stock_label, state) in [
+            ("as built", base.clone()),
+            ("with every stock emptied", with_every_stock(base, 0.0)),
+            ("with every stock filled", with_every_stock(base, 1.0e12)),
+        ] {
+            let listed: HashSet<(Section, ContentId, &'static str)> = all_rows(&state)
+                .into_iter()
+                .filter_map(|(s, r)| match r.key {
+                    RowKey::Content(id, tag) => Some((s, id, tag)),
+                    _ => None,
+                })
+                .collect();
+
+            let mut expected_rows: HashSet<(Section, ContentId, &'static str)> = HashSet::new();
+            for id in every_content_id() {
+                let reported = state.availability(id);
+                for (section, tag, command) in content_rows_of(id) {
+                    expected_rows.insert((section, id, tag));
+                    let revealed =
+                        matches!(reported, Availability::Teased | Availability::Available);
+                    let gate = state.command_gate_open(&command);
+                    let want = revealed && gate;
+                    let got = listed.contains(&(section, id, tag));
+                    assert_eq!(
+                        got,
+                        want,
+                        "in {label} {stock_label}, the {tag:?} row of {id:?} in {} is {} — but the \
+                         core reports the item {reported:?} and the gate of {} {}",
+                        section.title(),
+                        if got { "listed" } else { "not listed" },
+                        variant(&command),
+                        if gate { "open" } else { "shut" },
+                    );
+                    if want {
+                        listed_seen += 1;
+                    } else if !revealed {
+                        hidden_seen += 1;
+                    } else {
+                        shut_gate_seen += 1;
+                    }
+                }
+            }
+
+            // And nothing else: no content row turns up anywhere the item
+            // does not carry one.
+            let stray: Vec<String> = listed
+                .difference(&expected_rows)
+                .map(|(s, id, tag)| format!("{id:?} ({tag:?}) in {}", s.title()))
+                .collect();
+            assert!(
+                stray.is_empty(),
+                "in {label} {stock_label}, content rows are listed where the item carries none: {stray:?}"
+            );
+        }
+    }
+
+    assert!(listed_seen > 0, "fixture: some content rows must be listed");
+    assert!(hidden_seen > 0, "fixture: some items must be reported Hidden");
+    assert!(
+        shut_gate_seen > 0,
+        "fixture: some item must be revealed while its command's gate is shut, or the gate half \
+         of the claim is not under test"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-053 — the marker each row wears
+//
+// The marker is derived at draw time, so these tests read it off a drawn
+// frame: each row is focused in turn, and the cell after the cursor glyph is
+// the marker the player sees.
+// ---------------------------------------------------------------------------
+
+/// What one drawn row shows in its marker slot.
+struct DrawnMarker {
+    /// The marker glyph, or `' '` for an empty slot.
+    glyph: char,
+    /// The marker cell's style, for the dimming checks.
+    style: ratatui::style::Style,
+    /// Whether the name starts where every other row's does — one space after
+    /// the marker slot — so a blank slot still keeps the names aligned.
+    name_aligned: bool,
+}
+
+/// Draw `section` with `key` focused, and read the focused row's marker slot.
+fn drawn_marker(state: &GameState, section: Section, key: &RowKey) -> DrawnMarker {
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+
+    let (w, h) = (150u16, 60u16);
+    let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
+    let mut view = nav::ViewState { section: Some(section), ..Default::default() };
+    view.focus[section.index()] = Some(key.clone());
+    let mut layout = None;
+    term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, &view, None)))
+        .expect("TestBackend is infallible");
+    let list = match layout.expect("frame returns its layout").body {
+        clowder_tui::render::layout::Body::Wide { list, .. } => list,
+        other => panic!("fixture: {w}x{h} lays out a list pane, not {other:?}"),
+    };
+
+    let buf = term.backend().buffer();
+    let sym = |x: u16, y: u16| -> String {
+        buf.cell((x, y)).map(|c| c.symbol().to_string()).unwrap_or_default()
+    };
+    for y in list.y..list.bottom() {
+        for x in list.x..list.right() {
+            if sym(x, y) == "▸" {
+                let glyph = sym(x + 2, y).chars().next().unwrap_or(' ');
+                let style = buf.cell((x + 2, y)).map(|c| c.style()).unwrap_or_default();
+                let name_aligned = sym(x + 3, y) == " " && sym(x + 4, y).trim() != "";
+                return DrawnMarker { glyph, style, name_aligned };
+            }
+        }
+    }
+    panic!("fixture: no cursor line drawn for {key:?} in {}", section.title())
+}
+
+/// The marker TUI-NAV-053 gives a listed row, read from nothing but the core's
+/// answers: the lock reason decides, and the coverage fraction only splits a
+/// shortfall into some or none. `None` is an empty slot.
+fn marker_the_core_gives(state: &GameState, row: &Row) -> Option<char> {
+    use clowder_core::LockReason;
+    match (&row.kind, &row.key) {
+        (RowKind::Display, _) => None,
+        (_, RowKey::Content(_, "tinker")) => Some('●'),
+        (_, RowKey::Content(id, _)) => Some(match state.lock_reason(*id) {
+            Some(LockReason::AlreadyYours) => '✓',
+            None => '●',
+            Some(LockReason::ShortBy { .. }) => {
+                if state.affordability(*id) > 0.0 {
+                    '◐'
+                } else {
+                    '○'
+                }
+            }
+            Some(_) => '○',
+        }),
+        _ => Some('●'),
+    }
+}
+
+/// A revealed structure whose price is half in hand: Teased, short, and partly
+/// covered — the one state where a dimmed row wears `◐`.
+fn teased_and_half_covered() -> GameState {
+    for s in StructureId::ALL {
+        let id = ContentId::Structure(s);
+        let mut state = GameState::new(17);
+        state.revealed.insert(id);
+        let cost = state.cost_of_next(id, 1);
+        if cost.is_empty() {
+            continue;
+        }
+        for (r, amount) in cost {
+            state.resources[r.ix()] = amount * 0.5;
+        }
+        let covered = state.affordability(id);
+        if state.availability(id) == Availability::Teased
+            && matches!(state.lock_reason(id), Some(clowder_core::LockReason::ShortBy { .. }))
+            && covered > 0.0
+            && covered < 1.0
+        {
+            return state;
+        }
+    }
+    panic!("fixture: no structure can be revealed, short, and partly covered on a new meadow")
+}
+
+/// The open meadow with every kitten already at work: the jobs are there, cost
+/// nothing, and no one is free to take one.
+fn maximal_all_hands_busy() -> GameState {
+    let mut s = maximal();
+    for k in s.kittens.iter_mut() {
+        if k.job.is_none() {
+            k.job = Some(JobId::ALL[0]);
+            k.job_seq = Some(1);
+        }
+    }
+    s
+}
+
+/// Every listed row in every section wears exactly the marker the core's
+/// answers give it: `✓` where the lock reason is ownership, `●` where there is
+/// none, `◐`/`○` by coverage where it is a shortfall, `○` for any other reason
+/// whatever the coverage; a craft's tinkerer count row and every actionable
+/// row with no content item wear `●`; a display-only row wears none, its slot
+/// left blank with the name still aligned. Quantified over every row of every
+/// section in a spread of meadows that between them reach every branch — and
+/// the test checks that they did.
+///
+/// @spec TUI-NAV-053
+#[test]
+fn every_row_wears_the_marker_the_cores_lock_reason_and_coverage_give_it() {
+    use clowder_core::LockReason;
+
+    let meadows: Vec<(&str, GameState)> = vec![
+        ("a maximal meadow", maximal()),
+        ("everything unlocked, nothing affordable", poor_but_unlocked()),
+        ("a revealed structure half paid for", teased_and_half_covered()),
+        ("an open meadow with every kitten at work", maximal_all_hands_busy()),
+        ("a brand-new meadow", GameState::new(5)),
+    ];
+
+    let mut reached: BTreeSet<&'static str> = BTreeSet::new();
+    let mut wrong: Vec<String> = Vec::new();
+
+    for (label, state) in &meadows {
+        for (section, row) in all_rows(state) {
+            if !row.selectable() {
+                continue;
+            }
+            let want = marker_the_core_gives(state, &row);
+            let drawn = drawn_marker(state, section, &row.key);
+
+            match (&row.key, want) {
+                (_, None) => {
+                    reached.insert("a display-only row");
+                    if !drawn.name_aligned {
+                        wrong.push(format!(
+                            "in {label}, the display row {:?} in {} leaves its name out of line \
+                             with the rows around it",
+                            row.key,
+                            section.title()
+                        ));
+                    }
+                }
+                (RowKey::Content(id, "tinker"), _) => {
+                    if state.lock_reason(*id).is_some() {
+                        reached.insert("a tinkerer row whose craft the core reports locked");
+                    }
+                }
+                (RowKey::Content(id, _), Some(_)) => {
+                    let reason = state.lock_reason(*id);
+                    let covered = state.affordability(*id);
+                    match &reason {
+                        Some(LockReason::AlreadyYours) => {
+                            reached.insert("ownership");
+                        }
+                        None => {
+                            reached.insert("no lock reason");
+                        }
+                        Some(LockReason::ShortBy { .. }) if covered > 0.0 => {
+                            reached.insert("a shortfall with some coverage");
+                            if covered >= 1.0 {
+                                reached.insert("a shortfall the coverage reports whole");
+                            }
+                            if state.availability(*id) == Availability::Teased {
+                                reached.insert("a Teased row with some coverage");
+                                // A Teased row is dimmed whatever its marker
+                                // (TUI-NAV-009): a partly-covered Teased row
+                                // still wears the row colour that says
+                                // "revealed but not actionable", never the
+                                // Partial colour a two-state kind's own
+                                // partial coverage wears.
+                                let dim = clowder_tui::theme::Role::Dim.color();
+                                if drawn.style.fg != dim {
+                                    wrong.push(format!(
+                                        "in {label}, {:?} in {} is Teased with some coverage but \
+                                         is not drawn dim",
+                                        row.key,
+                                        section.title()
+                                    ));
+                                }
+                            }
+                        }
+                        Some(LockReason::ShortBy { .. }) => {
+                            reached.insert("a shortfall with no coverage");
+                        }
+                        Some(_) if covered > 0.0 => {
+                            reached.insert("another reason, with some coverage");
+                        }
+                        Some(_) => {}
+                    }
+                }
+                _ => {
+                    reached.insert("an actionable row with no content item");
+                }
+            }
+
+            let want_glyph = want.unwrap_or(' ');
+            if drawn.glyph != want_glyph {
+                let answers = match &row.key {
+                    RowKey::Content(id, _) => format!(
+                        " (core: {:?}, lock reason {:?}, coverage {:.3})",
+                        state.availability(*id),
+                        state.lock_reason(*id),
+                        state.affordability(*id)
+                    ),
+                    _ => String::new(),
+                };
+                wrong.push(format!(
+                    "in {label}, {:?} in {} wears {:?} but the core's answers give {:?}{answers}",
+                    row.key,
+                    section.title(),
+                    drawn.glyph,
+                    want_glyph
+                ));
+            }
+        }
+    }
+
+    for branch in [
+        "ownership",
+        "no lock reason",
+        "a shortfall with some coverage",
+        "a shortfall the coverage reports whole",
+        "a shortfall with no coverage",
+        "another reason, with some coverage",
+        "a Teased row with some coverage",
+        "a tinkerer row whose craft the core reports locked",
+        "an actionable row with no content item",
+        "a display-only row",
+    ] {
+        assert!(
+            reached.contains(branch),
+            "fixture: no meadow here reaches {branch}, so that branch of the marker rule is not \
+             under test"
+        );
+    }
+
+    assert!(
+        wrong.is_empty(),
+        "{} rows wear a marker other than the one the core's answers give:\n  {}",
+        wrong.len(),
+        wrong.join("\n  ")
+    );
+}
+
+/// Every row the core reports no lock reason for — a craft's tinkerer count
+/// row, and every actionable row with no content item (a fixed action, a
+/// kitten's promote and Elder rows, a colony's trade and pen-pal rows, a
+/// site's row, the declare-list rows) — wears `●` while it is listed, whatever
+/// the stock and whatever the lock reason of the craft beside it. The shell
+/// works out no coverage of its own for these: not from the one-unit price the
+/// core reports for a count-taking row, not from the content tables. So the
+/// meadows here include ones with every stock emptied, where any such
+/// derivation would put `○` on the row. Quantified over every such row of
+/// every section in each meadow, and over every one of those row shapes — the
+/// test checks each shape was reached.
+///
+/// @spec TUI-NAV-053
+#[test]
+fn every_row_the_core_reports_no_lock_reason_for_wears_ready_whatever_the_stock() {
+    let meadows: Vec<(&str, GameState)> = vec![
+        ("a maximal meadow", maximal()),
+        ("everything unlocked, nothing affordable", poor_but_unlocked()),
+        ("an open meadow with every stock emptied", with_every_stock(&maximal(), 0.0)),
+        ("an open meadow with every kitten at work", maximal_all_hands_busy()),
+        ("wealth without progress", rich_but_locked()),
+        ("a brand-new meadow", GameState::new(5)),
+        ("a brand-new meadow with every stock emptied", with_every_stock(&GameState::new(5), 0.0)),
+    ];
+
+    let mut reached: BTreeSet<&'static str> = BTreeSet::new();
+    let mut wrong: Vec<String> = Vec::new();
+
+    for (label, state) in &meadows {
+        let emptied = ResourceId::ALL.iter().all(|r| state.resources[r.ix()] == 0.0);
+        for (section, row) in all_rows(state) {
+            if !matches!(row.kind, RowKind::Act { .. } | RowKind::Count { .. }) {
+                continue;
+            }
+            let shape: &'static str = match &row.key {
+                RowKey::Content(id, "tinker") => {
+                    if state.lock_reason(*id).is_some() {
+                        reached.insert("a tinkerer row whose craft the core reports locked");
+                    }
+                    if emptied {
+                        reached.insert("a tinkerer row with every stock emptied");
+                    }
+                    "a craft's tinkerer count row"
+                }
+                RowKey::Content(..) => continue,
+                RowKey::Fixed("Pounce") => "the fixed count-taking row priced per unit",
+                RowKey::Fixed(_) => "a fixed action row",
+                RowKey::Kitten(_, "promote") => "a kitten's promote row",
+                RowKey::Kitten(_, "elder") => "a kitten's Elder row",
+                RowKey::Kitten(..) => "a kitten row of another shape",
+                RowKey::Colony(_, "trade") => "a colony's trade row",
+                RowKey::Colony(_, "penpal") => "a colony's pen-pal row",
+                RowKey::Colony(..) => "a colony row of another shape",
+                RowKey::Site(_) => "a site's row",
+                RowKey::Adventure(_) => "a declare-list row",
+                RowKey::Resource(_) => "an actionable resource row",
+            };
+            reached.insert(shape);
+            if emptied
+                && matches!(
+                    row.key,
+                    RowKey::Fixed("Pounce") | RowKey::Colony(_, "trade")
+                )
+            {
+                reached.insert("a per-unit-priced row with every stock emptied");
+            }
+
+            let drawn = drawn_marker(state, section, &row.key);
+            if drawn.glyph != '●' {
+                wrong.push(format!(
+                    "in {label}, {:?} ({shape}) in {} wears {:?}, but the core reports no lock \
+                     reason for it, so it wears ● while listed",
+                    row.key,
+                    section.title(),
+                    drawn.glyph
+                ));
+            }
+        }
+    }
+
+    for shape in [
+        "a craft's tinkerer count row",
+        "a tinkerer row whose craft the core reports locked",
+        "a tinkerer row with every stock emptied",
+        "a fixed action row",
+        "the fixed count-taking row priced per unit",
+        "a kitten's promote row",
+        "a kitten's Elder row",
+        "a colony's trade row",
+        "a colony's pen-pal row",
+        "a site's row",
+        "a declare-list row",
+        "a per-unit-priced row with every stock emptied",
+    ] {
+        assert!(
+            reached.contains(shape),
+            "fixture: no meadow here lists {shape}, so that part of the claim is not under test"
+        );
+    }
+
+    assert!(
+        wrong.is_empty(),
+        "{} rows the core reports no lock reason for wear a marker other than ●:\n  {}",
+        wrong.len(),
+        wrong.join("\n  ")
+    );
+}
+
+/// A kind with no reveal ladder is present or absent, never a Teased row in
+/// between: where it is listed and its marker says it can be acted on (`●`) or
+/// is partly covered (`◐`), the marker is not drawn in the dim a Teased row
+/// wears. Quantified over every listed row of every two-state kind.
+///
+/// @spec TUI-NAV-053
+#[test]
+fn a_listed_row_of_a_kind_with_no_reveal_ladder_is_never_dimmed_as_teased() {
+    use ratatui::style::Modifier;
+
+    let dim = clowder_tui::theme::Role::Dim.color();
+    let mut checked = 0;
+
+    for (label, state) in [
+        ("a maximal meadow", maximal()),
+        ("everything unlocked, nothing affordable", poor_but_unlocked()),
+    ] {
+        for (section, row) in all_rows(&state) {
+            let RowKey::Content(id, _) = row.key else { continue };
+            if id.is_reveal_tracked() {
+                continue;
+            }
+            assert_ne!(
+                state.availability(id),
+                Availability::Teased,
+                "fixture: in {label} the core reports a middle tier for {id:?}, which carries no \
+                 reveal ladder"
+            );
+            let drawn = drawn_marker(&state, section, &row.key);
+            if drawn.glyph != '●' && drawn.glyph != '◐' {
+                continue;
+            }
+            checked += 1;
+            assert!(
+                drawn.style.fg != dim && !drawn.style.add_modifier.contains(Modifier::DIM),
+                "in {label}, {:?} in {} is reported {:?} and wears {:?}, but is drawn dimmed \
+                 like a Teased row",
+                row.key,
+                section.title(),
+                state.availability(id),
+                drawn.glyph
+            );
+        }
+    }
+
+    assert!(checked > 0, "fixture: some two-state row must wear ● or ◐");
+}
+
 // ---------------------------------------------------------------------------
 // TUI-NAV-009 — what a row is
 // ---------------------------------------------------------------------------
