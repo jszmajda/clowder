@@ -21,7 +21,7 @@
 ## Colour as the Second Channel
 
 - [x] **TUI-THEME-010**: The system shall pair every meaning colour carries with a glyph, a word, or a fill that carries the same meaning, so that rendering with all colour removed loses no information the player needs.
-- [ ] **TUI-THEME-011**: The system shall keep the glyphs of the states whose colours are nearest in hue — affordable, partially affordable, and attention — mutually distinct, so a red-green deficiency that compresses those hues never collapses two states into one appearance.
+- [x] **TUI-THEME-011**: The system shall give each of the three states whose colours are nearest in hue — affordable, partially affordable, and attention — a non-colour channel neither of the other two uses: affordable the marker `●`, partially affordable the marker `◐`, and attention each chip's own glyph (TUI-NAV-020), a word — the `full` tag — or an armed row's expansion beneath itself (TUI-NAV-077), never `●` or `◐`; and, among `ready`, `partial`, and `attention`, shall draw each of those glyphs only in its own state's colour — `●` never in `partial` or `attention`, `◐` never in `ready` or `attention`, a chip's glyph never in `ready` or `partial` — an armed row wearing `attention` on its expansion and nowhere on its own line, whose marker keeps its availability colour; both whatever values the palette holds, so a red-green deficiency that compresses those hues never collapses two states into one appearance.
 
 ## Terminal Capability
 

@@ -3,7 +3,7 @@
 //!
 //! @spec TUI-NAV-019, TUI-NAV-020, TUI-NAV-021, TUI-NAV-022, TUI-NAV-023,
 //! TUI-NAV-024, TUI-NAV-025, TUI-NAV-034, TUI-NAV-044, TUI-NAV-045, TUI-NAV-054,
-//! TUI-NAV-086
+//! TUI-NAV-086, TUI-THEME-011
 //!
 //! **The contract these tests are made of.** The chrome's job is to be quiet.
 //! An empty attention cluster means nothing needs you, and that only works if
@@ -1794,6 +1794,279 @@ fn every_live_chip_keeps_its_glyph_and_word_at_every_header_width() {
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-011 — the compressed run: each state its own glyph, each glyph
+// its own colour
+//
+// Ready, partial and attention are the three colours a red-green deficiency
+// compresses toward one. For the player this is written for, the glyph is the
+// whole distinction between those three states, so the chrome is held to two
+// rules: attention never borrows `●` or `◐`, and none of the three glyphs is
+// ever drawn in a neighbour's colour. Colours are identified by the roles the
+// palette hands out, never by their values, so the rules are checked whatever
+// values the palette holds.
+// ---------------------------------------------------------------------------
+
+/// Attention's non-colour channels — each chip's glyph, and the word `full`
+/// on a capped store — are never `●` or `◐`: for every combination of live
+/// chips at every width the header can be drawn at, no header line carries
+/// either marker and every live chip's own glyph is neither; and every
+/// sidebar line that wears `full`, for every store the core reports a cap
+/// for, carries neither marker.
+///
+/// @spec TUI-THEME-011
+#[test]
+fn no_attention_channel_is_ever_the_affordable_or_partial_marker() {
+    const MARKERS: [char; 2] = ['●', '◐'];
+
+    for chip in CHIPS {
+        assert!(
+            !MARKERS.contains(&chip.0),
+            "{} uses an affordability marker as its glyph; once the hues compress it is the \
+             same appearance as that marker",
+            chip_name(chip)
+        );
+    }
+
+    for mask in 0u8..16 {
+        let live = [mask & 1 != 0, mask & 2 != 0, mask & 4 != 0, mask & 8 != 0];
+        let (state, view) = live_chips_fixture(live, 3, 2);
+        let floor_line = chip_cluster(live, None).chars().count()
+            + compact_facts(&state)[3..].join(" ").chars().count()
+            + 1;
+        for w in floor_line..=(WIDE_W as usize) {
+            let line = header_line(&state, &view, w as u16);
+            for m in MARKERS {
+                assert!(
+                    !line.contains(m),
+                    "with chips {live:?} live, at width {w} the header draws `{m}` — an \
+                     affordability marker on the line that carries attention: {line:?}"
+                );
+            }
+            for (chip, on) in CHIPS.iter().zip(live) {
+                if !on {
+                    continue;
+                }
+                let at = line
+                    .rfind(chip.1)
+                    .unwrap_or_else(|| panic!("fixture: {} is live and drawn", chip_name(*chip)));
+                let glyph = line[..at]
+                    .chars()
+                    .rev()
+                    .find(|c| !c.is_ascii_digit() && !c.is_whitespace())
+                    .unwrap_or(' ');
+                assert!(
+                    !MARKERS.contains(&glyph),
+                    "at width {w}, the live {} chip is drawn with `{glyph}` as its glyph: {line:?}",
+                    chip.1
+                );
+            }
+        }
+    }
+
+    let mut capped = GameState::new(11);
+    let mut finite = 0;
+    for r in ResourceId::ALL {
+        let cap = capped.cap(r);
+        if cap.is_finite() && cap > 0.0 {
+            capped.resources[r.ix()] = cap;
+            finite += 1;
+        }
+    }
+    assert!(finite > 0, "fixture: a new game holds stores with a cap");
+    for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE_W, WIDE_H)] {
+        let lines = sidebar_lines(&capped, w, h);
+        let tagged: Vec<&String> = lines.iter().filter(|l| has_key(l, "full")).collect();
+        assert!(!tagged.is_empty(), "fixture: at {w}x{h} some capped store wears `full`");
+        for line in tagged {
+            for m in MARKERS {
+                assert!(
+                    !line.contains(m),
+                    "at {w}x{h}, a capped store's line carries `{m}` beside its `full` tag: {line:?}"
+                );
+            }
+        }
+    }
+}
+
+/// A meadow where the list draws `●` and `◐` rows, a Teased row wears `◐` in
+/// dim, a store is capped, and all four attention chips are live — so every
+/// glyph of the compressed run is on screen at once.
+fn compressed_run_meadows() -> Vec<(&'static str, GameState, ViewState)> {
+    let mut out = Vec::new();
+
+    // Rows of both affordability kinds, every chip live, some store capped.
+    let mut mixed = every_section_revealed();
+    for r in ResourceId::ALL {
+        mixed.resources[r.ix()] = mixed.cap(r).min(40.0);
+    }
+    for b in StructureId::ALL {
+        mixed.structures[b.ix()] = 0;
+    }
+    let capped = ResourceId::ALL
+        .into_iter()
+        .find(|r| mixed.cap(*r).is_finite() && mixed.cap(*r) > 0.0)
+        .expect("fixture: some store carries a cap");
+    mixed.resources[capped.ix()] = mixed.cap(capped);
+    let mut roster = idle_here(4);
+    roster.extend(employed(3));
+    mixed.kittens = roster;
+    mixed.pending_sky_event = Some(mixed.ticks + 5);
+    let mut view = calm_view(&mixed);
+    view.seen[Section::Clowder.index()].visited = false;
+    view.reports = vec![PendingReport { entry: 0, dismissed: false }];
+    out.push(("a mixed meadow with every chip live", mixed, view));
+
+    // The rich meadow, every chip live: mostly `●` and `✓`.
+    let (rich, view) = all_four_live();
+    out.push(("a rich meadow with every chip live", rich, view));
+
+    // A revealed structure half paid for: Teased, and wearing `◐` in dim.
+    let teased = StructureId::ALL
+        .into_iter()
+        .find_map(|s| {
+            let id = ContentId::Structure(s);
+            let mut state = GameState::new(17);
+            state.revealed.insert(id);
+            let cost = state.cost_of_next(id, 1);
+            if cost.is_empty() {
+                return None;
+            }
+            for (r, amount) in cost {
+                state.resources[r.ix()] = amount * 0.5;
+            }
+            let covered = state.affordability(id);
+            (state.availability(id) == clowder_core::Availability::Teased
+                && matches!(state.lock_reason(id), Some(LockReason::ShortBy { .. }))
+                && covered > 0.0
+                && covered < 1.0)
+                .then_some(state)
+        })
+        .expect("fixture: some structure can be revealed, short, and partly covered");
+    let view = calm_view(&teased);
+    out.push(("a meadow with a Teased row half paid for", teased, view));
+
+    out
+}
+
+/// Among `ready`, `partial` and `attention`, each glyph of the compressed run
+/// is drawn only in its own state's colour: `●` never in partial or
+/// attention, `◐` never in ready or attention, and an attention chip's glyph
+/// never in ready or partial. Swept over every cell of whole frames — every
+/// section with the inspector asked for and not, a footer note showing and
+/// not, and each full-screen overlay, at the floor, in the narrow range, and
+/// past both breakpoints; and the cursor on every row with the list and the
+/// inspector pane both on screen — in meadows where every one of those glyphs
+/// is drawn.
+///
+/// @spec TUI-THEME-011
+#[test]
+fn among_the_compressed_run_each_glyph_wears_only_its_own_colour() {
+    use clowder_tui::theme::Role;
+
+    let ready = Role::Ready.color().expect("Ready carries a colour");
+    let partial = Role::Partial.color().expect("Partial carries a colour");
+    let attention = Role::Attention.color().expect("Attention carries a colour");
+    let colour_name = |c: ratatui::style::Color| {
+        if c == ready {
+            "ready"
+        } else if c == partial {
+            "partial"
+        } else if c == attention {
+            "attention"
+        } else {
+            "another colour"
+        }
+    };
+
+    let sizes: [(u16, u16); 4] = [(FLOOR_W, FLOOR_H), (99, 30), (120, 40), (WIDE_W, WIDE_H)];
+    let (mut saw_filled, mut saw_half, mut saw_chip) = (0usize, 0usize, 0usize);
+
+    for (label, state, base) in compressed_run_meadows() {
+        // Each view with the sizes it is drawn at. The cursor is walked over
+        // every row at one size where the list and the inspector pane are both
+        // on screen; every other view is drawn at every size.
+        let pane: (u16, u16) = (120, 40);
+        type ChromeView = (String, ViewState, Vec<(u16, u16)>);
+        let mut views: Vec<ChromeView> = Vec::new();
+        for section in Section::ALL {
+            for key in rows(&state, section).into_iter().filter(|r| r.selectable()).map(|r| r.key) {
+                let mut v = base.clone();
+                v.section = Some(section);
+                v.focus[section.index()] = Some(key.clone());
+                v.inspector_wanted = true;
+                views.push((format!("{} section, cursor on {key:?}", section.title()), v, vec![pane]));
+            }
+            for inspector in [false, true] {
+                let mut v = base.clone();
+                v.section = Some(section);
+                v.inspector_wanted = inspector;
+                views.push((format!("{} section, inspector {inspector}", section.title()), v, sizes.to_vec()));
+            }
+            let mut v = base.clone();
+            v.section = Some(section);
+            v.footer = Some(("a footer note".to_string(), Instant::now() + Duration::from_secs(600)));
+            views.push((format!("{} section with a footer note", section.title()), v, sizes.to_vec()));
+        }
+        for overlay in [
+            Overlay::Help,
+            Overlay::Journal { anchor: 0 },
+            Overlay::Palette { query: String::new(), selected: 0 },
+        ] {
+            let v = ViewState { overlay: Some(overlay.clone()), ..base.clone() };
+            views.push((format!("overlay {overlay:?}"), v, sizes.to_vec()));
+        }
+
+        for (what, view, at) in &views {
+            for &(w, h) in at {
+                let mut term = terminal(w, h);
+                let mut layout = None;
+                term.draw(|f| layout = Some(clowder_tui::render::frame(f, &state, view, None)))
+                    .expect("TestBackend is infallible");
+                let header = layout.expect("frame returns its layout").header;
+                let buf = term.backend().buffer();
+                for y in 0..h {
+                    for x in 0..w {
+                        let cell = buf.cell((x, y)).expect("cell");
+                        let (forbidden, glyph): (&[ratatui::style::Color], &str) = match cell.symbol() {
+                            "●" => {
+                                saw_filled += 1;
+                                (&[partial, attention], "●")
+                            }
+                            "◐" => {
+                                saw_half += 1;
+                                (&[ready, attention], "◐")
+                            }
+                            s if header.contains(ratatui::layout::Position { x, y })
+                                && CHIPS.iter().any(|c| s.starts_with(c.0)) =>
+                            {
+                                saw_chip += 1;
+                                (&[ready, partial], "an attention chip's glyph")
+                            }
+                            _ => continue,
+                        };
+                        assert!(
+                            !forbidden.contains(&cell.fg),
+                            "in {label}, {what}, at {w}x{h}: {glyph} at ({x}, {y}) is drawn in \
+                             the {} colour. Among ready, partial and attention each glyph wears \
+                             only its own state's colour, or two states become one appearance \
+                             once the hues compress.\nline: {:?}",
+                            colour_name(cell.fg),
+                            (0..w).map(|x| buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" ")).collect::<String>()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    assert!(
+        saw_filled > 0 && saw_half > 0 && saw_chip > 0,
+        "fixture: the sweep should draw every glyph of the run (● {saw_filled}, ◐ {saw_half}, \
+         chip glyphs {saw_chip})"
+    );
 }
 
 // ---------------------------------------------------------------------------

@@ -27,7 +27,7 @@
 //! AdoptRule rows — last in a long list — are checked on a terminal tall
 //! enough that nothing scrolls.
 //!
-//! @spec TUI-NAV-015, TUI-NAV-075, TUI-NAV-077
+//! @spec TUI-NAV-015, TUI-NAV-075, TUI-NAV-077, TUI-THEME-011
 
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
@@ -817,5 +817,216 @@ fn the_moment_an_arming_ends_nothing_on_screen_shows_it_armed() {
                 section.title()
             );
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-011 — an armed row wears attention on its expansion alone
+//
+// Ready, partial and attention are the colours a red-green deficiency
+// compresses toward one, so the armed row may not put attention on its own
+// line: its marker keeps its availability colour, and the arming's colour
+// sits on the expansion beneath it — the arming's own mark, which says
+// nothing else. Colours are identified by the role the palette hands out,
+// never by value, so this holds whatever values the palette holds.
+// ---------------------------------------------------------------------------
+
+/// The markers a listed row can wear.
+const MARKERS: [&str; 4] = ["●", "◐", "○", "✓"];
+
+fn attention() -> ratatui::style::Color {
+    clowder_tui::theme::Role::Attention.color().expect("Attention carries a colour")
+}
+
+/// The list's cursor line and the run of lines the arming expands beneath
+/// it, as row offsets into the list rectangle of the armed frame — read the
+/// same way `expansion` reads them.
+fn armed_rows(
+    armed: &Drawn,
+    plain: &Drawn,
+    size: (u16, u16),
+) -> (usize, std::ops::Range<usize>) {
+    let a = region_lines(&armed.buffer, list_rect(&armed.layout));
+    let u = region_lines(&plain.buffer, list_rect(&plain.layout));
+    let r = u.iter().position(|l| l.contains('▸')).expect("fixture: the unarmed list shows the cursor");
+    assert!(a[r].contains('▸'), "at {size:?}, the armed row is no longer where it was: {:?}", a[r]);
+    let end = match u.get(r + 1).filter(|l| !l.trim().is_empty()) {
+        Some(next) => a[r + 1..].iter().position(|l| l == next).map(|p| r + 1 + p).unwrap_or(a.len()),
+        None => a[r + 1..].iter().position(|l| l.trim().is_empty()).map(|p| r + 1 + p).unwrap_or(a.len()),
+    };
+    (r, r + 1..end)
+}
+
+/// The lines of `rect` in the armed frame that the unarmed frame does not
+/// have: from the first line the two differ on, to where the armed frame
+/// takes up the unarmed frame's lines again.
+fn inserted_rows(armed: &Buffer, plain: &Buffer, rect: Rect) -> std::ops::Range<usize> {
+    let a = region_lines(armed, rect);
+    let u = region_lines(plain, rect);
+    let i = a.iter().zip(&u).position(|(x, y)| x != y).unwrap_or(a.len());
+    let j = (i + 1..a.len())
+        .find(|&j| a[j..].iter().zip(&u[i..]).all(|(x, y)| x == y))
+        .unwrap_or(a.len());
+    i..j
+}
+
+/// Every drawn (non-blank) cell of the given rows of `rect`, with its column.
+fn drawn_cells(buf: &Buffer, rect: Rect, rows: std::ops::Range<usize>) -> Vec<(u16, u16, ratatui::buffer::Cell)> {
+    let mut out = Vec::new();
+    for dy in rows {
+        let y = rect.y + dy as u16;
+        for x in rect.x..rect.right() {
+            let cell = buf.cell((x, y)).expect("cell").clone();
+            if !cell.symbol().trim().is_empty() {
+                out.push((x, y, cell));
+            }
+        }
+    }
+    out
+}
+
+/// What the arming's expansion must be, wherever it is drawn: something, in
+/// attention on every drawn cell, and never an affordability marker.
+fn assert_expansion_wears_attention(
+    what: &str,
+    buf: &Buffer,
+    rect: Rect,
+    rows: std::ops::Range<usize>,
+) {
+    let text: Vec<String> = region_lines(buf, rect)[rows.clone()].to_vec();
+    let cells = drawn_cells(buf, rect, rows);
+    assert!(!cells.is_empty(), "{what}: the arming drew no expansion");
+    for (x, y, cell) in &cells {
+        assert!(
+            cell.symbol() != "●" && cell.symbol() != "◐",
+            "{what}: the expansion carries `{}` at ({x}, {y}); attention's channel is never an \
+             affordability marker.\nexpansion: {text:?}",
+            cell.symbol()
+        );
+        assert_eq!(
+            cell.fg,
+            attention(),
+            "{what}: the expansion's `{}` at ({x}, {y}) is drawn in {:?}, not attention — the \
+             armed row wears attention on its expansion.\nexpansion: {text:?}",
+            cell.symbol(),
+            cell.fg
+        );
+    }
+}
+
+/// A meadow in which `rule`'s price is half in hand, so its row is short and
+/// partly covered, or — with `share` zero — not covered at all.
+fn rule_short(rule: RuleId, share: f64) -> GameState {
+    let mut s = meadow();
+    let id = ContentId::Rule(rule);
+    for (r, amount) in s.cost_of_next(id, 1) {
+        s.resources[r.ix()] = amount * share;
+    }
+    s
+}
+
+/// An armed row wears `attention` on its expansion beneath it and nowhere on
+/// its own line, whose marker keeps its availability colour — for every heavy
+/// row, whatever marker it wears (armed while affordable, and still armed once
+/// its price is only partly or not at all in hand), at every supported size;
+/// and while the narrow-mode swap shows the inspector in the list's place, the
+/// summary the inspector carries wears attention there instead.
+///
+/// @spec TUI-THEME-011
+#[test]
+fn an_armed_row_wears_attention_on_its_expansion_and_nowhere_on_its_own_line() {
+    let rich = meadow();
+
+    // (name, the state drawn, the armed view, the sizes it is drawn at)
+    type ArmedCase = (String, GameState, ViewState, Vec<(u16, u16)>);
+    let mut cases: Vec<ArmedCase> = vec![
+        (
+            "GreatMeadowMove".into(),
+            rich.clone(),
+            armed_by_enter(&rich, Section::Legacy, &move_key(&rich)),
+            SIZES.to_vec(),
+        ),
+        (
+            "PassItDown".into(),
+            rich.clone(),
+            armed_by_enter(&rich, Section::Legacy, &pass_key(&rich)),
+            SIZES.to_vec(),
+        ),
+        ("DeepNap".into(), rich.clone(), nap_armed(&rich, 4), SIZES.to_vec()),
+    ];
+    for rule in RuleId::ALL {
+        let view = armed_by_enter(&rich, Section::Ideas, &rule_key(&rich, rule));
+        for (how, state) in [
+            ("affordable", rich.clone()),
+            ("half paid for", rule_short(rule, 0.5)),
+            ("not paid for", rule_short(rule, 0.0)),
+        ] {
+            let size = tall(&state);
+            cases.push((format!("AdoptRule({rule:?}), {how}"), state, view.clone(), vec![size]));
+        }
+    }
+
+    let mut markers_seen: BTreeSet<String> = BTreeSet::new();
+    for (name, state, view, sizes) in &cases {
+        for &size in sizes {
+            let armed = draw(state, view, size);
+            let plain = draw(state, &unarmed(view), size);
+            let rect = list_rect(&armed.layout);
+            let (r, expansion) = armed_rows(&armed, &plain, size);
+            let y = rect.y + r as u16;
+            let what = format!("the armed {name} row at {size:?}");
+
+            // Its own line: no attention anywhere, and the marker unchanged.
+            let line = region_lines(&armed.buffer, rect)[r].clone();
+            for x in rect.x..rect.right() {
+                let cell = armed.buffer.cell((x, y)).expect("cell");
+                assert_ne!(
+                    cell.fg,
+                    attention(),
+                    "{what}: `{}` at ({x}, {y}) on the row's own line is drawn in attention; \
+                     the arming wears its colour on its expansion and nowhere on its own line.\n\
+                     line: {line:?}",
+                    cell.symbol()
+                );
+            }
+            let marker_x = (rect.x..rect.right())
+                .find(|&x| MARKERS.contains(&plain.buffer.cell((x, y)).expect("cell").symbol()))
+                .unwrap_or_else(|| panic!("fixture: {what} wears a marker when unarmed"));
+            let before = plain.buffer.cell((marker_x, y)).expect("cell");
+            let after = armed.buffer.cell((marker_x, y)).expect("cell");
+            markers_seen.insert(before.symbol().to_string());
+            assert_eq!(
+                (after.symbol(), after.fg),
+                (before.symbol(), before.fg),
+                "{what}: arming changed the row's marker; it keeps its availability colour.\n\
+                 line: {line:?}"
+            );
+
+            // Its expansion: attention on every drawn cell.
+            assert_expansion_wears_attention(&what, &armed.buffer, rect, expansion);
+        }
+
+        // The narrow-mode swap carries the summary in the inspector instead.
+        for size in NARROW {
+            let swapped = ViewState { inspector_wanted: true, ..view.clone() };
+            let armed = draw(state, &swapped, size);
+            let plain = draw(state, &unarmed(&swapped), size);
+            assert!(matches!(armed.layout.body, Body::Narrow { .. }), "fixture: {size:?} is a swap size");
+            let rect = list_rect(&armed.layout);
+            let rows = inserted_rows(&armed.buffer, &plain.buffer, rect);
+            assert_expansion_wears_attention(
+                &format!("the swapped inspector over the armed {name} row at {size:?}"),
+                &armed.buffer,
+                rect,
+                rows,
+            );
+        }
+    }
+
+    for m in ["●", "◐"] {
+        assert!(
+            markers_seen.contains(m),
+            "fixture: some armed row should wear `{m}` (saw {markers_seen:?})"
+        );
     }
 }

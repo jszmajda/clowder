@@ -24,6 +24,7 @@ use ratatui::{
 use crate::nav::rows::{rows, Row, RowKey, RowKind};
 use crate::nav::{CountPrompt, Section, ViewState};
 use crate::render::fmt;
+use crate::theme::Role;
 
 /// The section a frame draws when the view state has not chosen one yet —
 /// matching `render::DEFAULT_SECTION`, since the inspector must describe the
@@ -442,7 +443,7 @@ fn store_lines(state: &GameState, r: ResourceId) -> Vec<String> {
 /// prompt is held to this row, its count and preview (TUI-NAV-067) are shown
 /// alongside — the same row the prompt was opened on, by identity, so a
 /// cursor that has since moved off it never previews on the wrong row.
-/// @spec TUI-NAV-018, TUI-NAV-077, TUI-NAV-035
+/// @spec TUI-NAV-018, TUI-NAV-077, TUI-NAV-035, TUI-THEME-011
 fn draw_body(
     f: &mut Frame,
     area: Rect,
@@ -460,10 +461,15 @@ fn draw_body(
     let mut lines: Vec<String> = vec![full_name(state, key)];
 
     // The swapped-in inspector carries the same consequence summary the list
-    // would show beneath the armed row. @spec TUI-NAV-077
+    // would show beneath the armed row, in the same attention colour it wears
+    // there — never on its own line, only on what it expands to.
+    // @spec TUI-NAV-077, TUI-THEME-011
+    let mut attention_rows: Option<std::ops::Range<usize>> = None;
     if let Some(armed) = armed.filter(|a| a.key == *key && crate::render::armed_is_live(a)) {
+        let start = lines.len();
         lines.push(String::new());
         lines.extend(crate::render::consequence_summary(state, armed));
+        attention_rows = Some(start..lines.len());
     }
 
     match key {
@@ -488,8 +494,14 @@ fn draw_body(
         }
     }
 
-    let text = lines.join("\n");
-    let out: Vec<Line<'static>> = text.lines().map(|l| Line::from(l.to_string())).collect();
+    let out: Vec<Line<'static>> = lines
+        .into_iter()
+        .enumerate()
+        .map(|(i, l)| match &attention_rows {
+            Some(r) if r.contains(&i) => Line::styled(l, crate::render::style_for(Role::Attention)),
+            _ => Line::from(l),
+        })
+        .collect();
     let para = Paragraph::new(out).wrap(Wrap { trim: true });
     f.render_widget(para, area);
 }

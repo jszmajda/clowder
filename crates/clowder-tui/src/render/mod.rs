@@ -27,7 +27,7 @@ const DEFAULT_SECTION: Section = Section::Meadow;
 
 /// A palette role as a style. `None` means the terminal's own foreground —
 /// clowder paints no colour where none is meant. @spec TUI-THEME-001
-fn style_for(role: Role) -> Style {
+pub(crate) fn style_for(role: Role) -> Style {
     match role.color() {
         Some(c) => Style::default().fg(c),
         None => Style::default(),
@@ -302,7 +302,7 @@ fn window_for(total: usize, cursor: usize, capacity: usize) -> Window {
 /// summary, likewise, expands only on the row an arming names, and only
 /// while it is still live — never a stale one past its expiry.
 /// @spec TUI-RENDER-009, TUI-RENDER-010, TUI-RENDER-011, TUI-RENDER-015,
-/// TUI-NAV-067, TUI-NAV-077
+/// TUI-NAV-067, TUI-NAV-077, TUI-THEME-011
 fn draw_list(
     f: &mut Frame,
     area: Rect,
@@ -337,12 +337,14 @@ fn draw_list(
         lines.push(row_line(state, row, focused, area.width as usize, on_this_row));
         // The row an arming holds expands in place, on the lines directly
         // beneath it — never anywhere else, and only while the arming still
-        // holds. @spec TUI-NAV-015, TUI-NAV-077
+        // holds. The expansion carries attention's colour so the row's own
+        // line can keep its availability marker's colour undisturbed.
+        // @spec TUI-NAV-015, TUI-NAV-077, TUI-THEME-011
         if armed.is_some_and(|a| a.key == row.key) {
             for line in consequence_summary(state, armed.expect("checked Some above")) {
                 lines.push(Line::from(Span::styled(
                     fmt::fit(&format!("  {line}"), area.width as usize),
-                    style_for(Role::Dim),
+                    style_for(Role::Attention),
                 )));
             }
         }
