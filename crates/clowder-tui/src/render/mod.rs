@@ -423,7 +423,7 @@ pub fn frame(
 
     // @spec TUI-RENDER-004
     if let Body::TooSmall(rect) = layout.body {
-        f.render_widget(Paragraph::new("too small"), rect);
+        widgets::overlays::too_small(f, rect);
         return layout;
     }
 

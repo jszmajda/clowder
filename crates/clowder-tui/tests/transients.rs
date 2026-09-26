@@ -1,8 +1,8 @@
 //! Esc's order of transients (TUI-NAV-030) and the narrow-mode inspector
-//! swap's keys (TUI-NAV-035), as a session lives them — every key pressed
+//! swap's keys (TUI-NAV-035, TUI-NAV-088), as a session lives them — every key pressed
 //! through `App::step`, at the width the terminal has.
 //!
-//! @spec TUI-NAV-030, TUI-NAV-035
+//! @spec TUI-NAV-030, TUI-NAV-035, TUI-NAV-088
 //!
 //! **Why through the loop.** Resolution (`nav::keys::resolve`) and the
 //! reducer (`nav::update`) each see only part of what these two specs decide.
@@ -50,9 +50,14 @@ use ratatui::Terminal;
 // Fixtures
 // ---------------------------------------------------------------------------
 
+/// A fresh directory per call, not per name: tests run in parallel within one
+/// process, and two callers sharing a name would race one another's
+/// remove-and-recreate.
 fn scratch(name: &str) -> PathBuf {
-    let dir =
-        std::env::temp_dir().join(format!("clowder-transients-{}-{name}", std::process::id()));
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir = std::env::temp_dir()
+        .join(format!("clowder-transients-{}-{name}-{n}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir.join("save.json")
@@ -789,5 +794,216 @@ fn space_i_and_esc_return_the_list_view_at_the_row_the_cursor_is_on() {
             region(tn.backend().buffer(), main_rect(&never)),
             "{what} returned a list that is not the list at the row the cursor is on"
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-088 — Space and i act on the call only where the swap can show it
+// ---------------------------------------------------------------------------
+
+/// The inspector keys, as the terminal delivers them.
+fn inspector_keys() -> [(&'static str, Event); 2] {
+    [("Space", press_char(' ')), ("i", press_char('i'))]
+}
+
+/// Space and i set the inspector call and clear it again wherever the narrow
+/// layout is on screen at the press, judged as Esc's swap step is judged: by
+/// the layout drawn, the breakpoint's dead-band applied. That is every width
+/// from the floor to just under the pane breakpoint reached from below, at
+/// more than one height, and every such width narrowed to from the pane that
+/// lies past the dead-band.
+///
+/// @spec TUI-NAV-088
+#[test]
+fn space_and_i_set_and_clear_the_call_wherever_the_narrow_layout_is_on_screen() {
+    let first = meadow_rows(&meadow())[0].clone();
+    for h in [24u16, 30] {
+        let band = dead_band_widths(h);
+        for w in 80u16..100 {
+            let mut approaches: Vec<(&str, u16)> = vec![("reached from below", 80)];
+            if !band.contains(&w) {
+                approaches.push(("narrowed from the pane past the dead-band", 100));
+            }
+            for (how, from) in approaches {
+                for (what, key) in inspector_keys() {
+                    let mut a = session(Some((Section::Meadow, first.clone())), false, "narrow-key");
+                    keys(&mut a, &mut term(from, h), &[]);
+                    let mut t = term(w, h);
+                    keys(&mut a, &mut t, &[]);
+                    assert!(
+                        matches!(a.prev_layout.map(|l| l.body), Some(Body::Narrow { .. })),
+                        "fixture: {w}×{h} {how} draws the narrow layout"
+                    );
+                    assert!(!a.view.inspector_wanted, "fixture: no inspector called for yet");
+
+                    keys(&mut a, &mut t, std::slice::from_ref(&key));
+                    assert!(
+                        a.view.inspector_wanted,
+                        "{what} at {w}×{h} ({how}), the narrow layout on screen, did not call \
+                         for the inspector"
+                    );
+                    keys(&mut a, &mut t, std::slice::from_ref(&key));
+                    assert!(
+                        !a.view.inspector_wanted,
+                        "{what} at {w}×{h} ({how}) with the swap in did not clear the call"
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// The widths at which the persistent pane is drawn, each with the width the
+/// terminal was at the frame before: every width from the breakpoint up
+/// through the cap breakpoint and on to the widest walked here, reached
+/// cold, and every width inside the dead-band narrowed to from the pane.
+fn pane_widths(h: u16) -> Vec<(u16, Option<u16>)> {
+    let mut out: Vec<(u16, Option<u16>)> =
+        (100u16..=160).chain([200, 240]).map(|w| (w, None)).collect();
+    out.extend(dead_band_widths(h).into_iter().map(|w| (w, Some(100))));
+    out
+}
+
+/// While the persistent pane is drawn at the press — at any width, the
+/// dead-band's included — Space and i leave the inspector call exactly as it
+/// stood, called for or not, and answer with one footer note (that the
+/// inspector already stands beside the list), drawn where the hint bar
+/// was; nothing else in the view changes, and nothing reaches the game. A
+/// footer note already showing gives way to that one note.
+///
+/// @spec TUI-NAV-088
+#[test]
+fn while_the_pane_is_drawn_space_and_i_leave_the_call_and_leave_one_note() {
+    const H: u16 = 30;
+    let first = meadow_rows(&meadow())[0].clone();
+    for (w, from) in pane_widths(H) {
+        for wanted in [false, true] {
+            for earlier_note in [false, true] {
+                for (what, key) in inspector_keys() {
+                    let mut a = session(Some((Section::Meadow, first.clone())), false, "pane-key");
+                    a.view.inspector_wanted = wanted;
+                    if let Some(from) = from {
+                        keys(&mut a, &mut term(from, H), &[]);
+                    }
+                    let mut t = term(w, H);
+                    keys(&mut a, &mut t, &[]);
+                    assert!(
+                        matches!(a.prev_layout.map(|l| l.body), Some(Body::Wide { .. })),
+                        "fixture: {w}×{H} draws the persistent pane"
+                    );
+                    if earlier_note {
+                        note(&mut a);
+                    }
+                    let before = a.view.clone();
+                    let game = a.state.clone();
+
+                    keys(&mut a, &mut t, std::slice::from_ref(&key));
+
+                    assert_eq!(
+                        a.view.inspector_wanted, wanted,
+                        "{what} at {w} columns, the persistent pane on screen, changed the \
+                         inspector call (was {wanted}); no swap is drawn for it to bring in or \
+                         take out"
+                    );
+                    let (text, _) = a.view.footer.clone().unwrap_or_else(|| {
+                        panic!(
+                            "{what} at {w} columns, the persistent pane on screen, left no footer \
+                             note; a bound key that cannot act says so"
+                        )
+                    });
+                    assert!(!text.trim().is_empty(), "{what} at {w} columns left an empty note");
+                    if earlier_note {
+                        assert_ne!(
+                            text, "a note already showing",
+                            "{what} at {w} columns left the earlier note standing instead of \
+                             answering with its own"
+                        );
+                    }
+                    let mut expected = before.clone();
+                    expected.footer = a.view.footer.clone();
+                    assert_eq!(
+                        view_of(&a),
+                        format!("{expected:?}"),
+                        "{what} at {w} columns, the persistent pane on screen, changed more than \
+                         the footer note"
+                    );
+                    assert!(a.state == game, "{what} at {w} columns changed the game");
+
+                    let hints = a.prev_layout.expect("a step drew a frame").hints;
+                    let bar = region(t.backend().buffer(), hints).concat();
+                    if text.chars().count() < w as usize {
+                        assert!(
+                            bar.contains(text.as_str()),
+                            "{what} at {w} columns: the note {text:?} is not drawn where the \
+                             hint bar was; the bar read {bar:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// While the too-small card is drawn at the press — below the floor by
+/// width, by height, or both, whether the terminal came to it from the
+/// narrow layout, from the pane, or opened on it — Space and i leave the
+/// inspector call exactly as it stood, called for or not, and leave no note:
+/// nothing in the view changes at all, a footer note already showing keeps
+/// its own clock, and nothing reaches the game.
+///
+/// @spec TUI-NAV-088
+#[test]
+fn under_the_too_small_card_space_and_i_leave_the_call_and_leave_no_note() {
+    let first = meadow_rows(&meadow())[0].clone();
+    let cards: [(u16, u16); 9] =
+        [(79, 24), (79, 40), (60, 20), (40, 30), (1, 1), (80, 23), (160, 23), (240, 10), (80, 1)];
+    let approaches: [(&str, Option<(u16, u16)>); 3] =
+        [("opened on it", None), ("from the narrow layout", Some((80, 24))), ("from the pane", Some((160, 40)))];
+    for (w, h) in cards {
+        for (how, from) in approaches {
+            for wanted in [false, true] {
+                for banner in [false, true] {
+                    for earlier_note in [false, true] {
+                        for (what, key) in inspector_keys() {
+                            let mut a =
+                                session(Some((Section::Meadow, first.clone())), banner, "card-key");
+                            a.view.inspector_wanted = wanted;
+                            if let Some((fw, fh)) = from {
+                                keys(&mut a, &mut term(fw, fh), &[]);
+                            }
+                            let mut t = term(w, h);
+                            keys(&mut a, &mut t, &[]);
+                            assert!(
+                                matches!(a.prev_layout.map(|l| l.body), Some(Body::TooSmall(_))),
+                                "fixture: {w}×{h} draws the too-small card"
+                            );
+                            if earlier_note {
+                                note(&mut a);
+                            }
+                            let before = view_of(&a);
+                            let game = a.state.clone();
+
+                            keys(&mut a, &mut t, std::slice::from_ref(&key));
+
+                            assert_eq!(
+                                a.view.inspector_wanted, wanted,
+                                "{what} under the too-small card at {w}×{h} ({how}) changed the \
+                                 inspector call (was {wanted})"
+                            );
+                            assert_eq!(
+                                view_of(&a),
+                                before,
+                                "{what} under the too-small card at {w}×{h} ({how}, {}, {}) \
+                                 changed the view; it leaves the call as it stood and leaves no \
+                                 note",
+                                if banner { "a banner queued" } else { "no banner" },
+                                if earlier_note { "a note already showing" } else { "no note" }
+                            );
+                            assert!(a.state == game, "{what} under the card changed the game");
+                        }
+                    }
+                }
+            }
+        }
     }
 }

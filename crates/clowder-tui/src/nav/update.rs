@@ -105,11 +105,16 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
         Action::Dismiss => handle_dismiss(view),
         Action::Quit => unreachable!("handled above"),
 
-        // @spec TUI-NAV-003
-        Action::ToggleInspector => {
-            view.inspector_wanted = !view.inspector_wanted;
-            Outcome::Handled
-        }
+        // Whether Space or i sets or clears the call, or only answers with a
+        // footer note, depends on the layout on screen at the press — the
+        // same thing Esc's swap step depends on — which only the loop holds.
+        // `toggle_inspector` below is the layout-aware version the loop
+        // actually runs Space and i through; called from within `update`,
+        // which holds no drawn layout to judge by, neither the narrow layout
+        // nor the pane is on screen, so the call is left exactly as it stood,
+        // as `dismiss` above defaults its own layout-judged step.
+        // @spec TUI-NAV-088
+        Action::ToggleInspector => toggle_inspector(view, false, false),
         // Opening the Journal reads every unread report at once — not just
         // the one showing — since every pinned entry is right there to read
         // the moment it opens. What was unread is frozen as this Journal's
@@ -880,5 +885,26 @@ pub fn dismiss(view: &mut ViewState, narrow_on_screen: bool) -> Outcome {
         return Outcome::Handled;
     }
     dismiss_active_report(view);
+    Outcome::Handled
+}
+
+/// Space and i, judged the same way Esc's swap step is judged (TUI-NAV-030):
+/// by the layout the previous frame actually drew, dead-band already folded
+/// in, rather than by the terminal's raw width — so a resize sitting inside
+/// the breakpoint's dead-band keeps whichever layout is already on screen.
+/// Only while the narrow layout is on screen does the press set or clear the
+/// inspector call; a swap is what answers it, and only the narrow layout
+/// draws one. While the persistent pane is drawn there is nothing for the
+/// press to bring in or take out, so the call is left exactly as it stood and
+/// the press answers with one footer note instead; while the too-small card
+/// is drawn there is nothing on screen to answer at all, so the call is left
+/// as it stood and nothing else in the view changes — no note, either.
+/// @spec TUI-NAV-088
+pub fn toggle_inspector(view: &mut ViewState, narrow_on_screen: bool, pane_on_screen: bool) -> Outcome {
+    if narrow_on_screen {
+        view.inspector_wanted = !view.inspector_wanted;
+    } else if pane_on_screen {
+        set_footer(view, "the inspector already stands beside the list");
+    }
     Outcome::Handled
 }

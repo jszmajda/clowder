@@ -259,8 +259,15 @@ fn a_frames_commands_are_applied_before_that_frames_ticks() {
 /// @spec TUI-RUN-016
 #[test]
 fn a_flood_of_input_is_bounded_within_one_frame() {
-    let mut term = Terminal::new(TestBackend::new(100, 30)).unwrap();
+    // A pane-width terminal draws the persistent pane, where Space is a no-op
+    // note rather than a toggle (TUI-NAV-088) — a poor tell for a drain bound.
+    // 80x24 draws the narrow layout instead, where Space always flips the
+    // call, but only once `prev_layout` says so: a first step sees `None` and
+    // toggles nothing regardless of width, so an empty step establishes the
+    // narrow layout on screen before the flood is the one that must bound it.
+    let mut term = Terminal::new(TestBackend::new(80, 24)).unwrap();
     let mut a = app(scratch("flood"));
+    a.step(&mut term, still(), &[]).expect("the priming step must not fail");
     let initial = a.view.inspector_wanted;
 
     // One past the bound, so an unbounded drain ends on the opposite state.

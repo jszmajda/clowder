@@ -177,6 +177,25 @@ fn changed_resources(report: &OfflineReport) -> Vec<(ResourceId, f64)> {
     changed
 }
 
+/// The too-small card's one line: calm, says nothing is wrong, and names the
+/// size the game needs. @spec TUI-NAV-087
+const TOO_SMALL_LINE: &str = "this pane is too cozy \u{2014} 80\u{d7}24 needed";
+
+/// The too-small card: below the floor, this line drawn whole in place of the
+/// whole frame — nothing else — wherever the pane is at least as wide as the
+/// line and at least one row tall. Too narrow for the line whole, or of no
+/// height at all, draws nothing rather than a clipped or wrapped fragment.
+/// @spec TUI-NAV-087
+pub fn too_small(f: &mut Frame, area: Rect) {
+    let line_w = TOO_SMALL_LINE.chars().count() as u16;
+    if area.width < line_w || area.height < 1 {
+        return;
+    }
+    let y = area.y + (area.height - 1) / 2;
+    let row = Rect::new(area.x, y, area.width, 1);
+    f.render_widget(Paragraph::new(Line::raw(TOO_SMALL_LINE)), row);
+}
+
 /// The dim one-line ticker. Flavour is quieter than mechanical; milestones are
 /// marked. Prominence comes from the core's classification, never from this
 /// module deciding which events matter. @spec TUI-NAV-026, TUI-NAV-057

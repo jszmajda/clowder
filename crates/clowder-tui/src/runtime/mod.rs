@@ -341,6 +341,10 @@ impl App {
         // that was in force when the key arrived. @spec TUI-NAV-017
         let narrow_on_screen =
             matches!(self.prev_layout.map(|l| l.body), Some(crate::render::Body::Narrow { .. }));
+        // Space and i's swap step is judged the same way, over the same
+        // frozen layout. @spec TUI-NAV-088
+        let pane_on_screen =
+            matches!(self.prev_layout.map(|l| l.body), Some(crate::render::Body::Wide { .. }));
         for event in input.iter().take(Self::MAX_INPUT_EVENTS_PER_FRAME) {
             match event {
                 crossterm::event::Event::Key(key) => {
@@ -352,6 +356,12 @@ impl App {
                     // before. @spec TUI-NAV-083
                     if action == crate::nav::Action::Dismiss {
                         crate::nav::dismiss(&mut self.view, narrow_on_screen);
+                        continue;
+                    }
+                    // TUI-NAV-088: Space and i act on the inspector call only
+                    // where the narrow-mode swap is what would answer them.
+                    if action == crate::nav::Action::ToggleInspector {
+                        crate::nav::toggle_inspector(&mut self.view, narrow_on_screen, pane_on_screen);
                         continue;
                     }
                     match crate::nav::update(action, &mut self.view, &self.state) {
