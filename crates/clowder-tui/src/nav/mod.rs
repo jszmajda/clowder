@@ -7,15 +7,17 @@ pub mod action;
 pub mod keys;
 pub mod mnemonics;
 pub mod palette;
+pub mod reports;
 pub mod rows;
 pub mod section;
 pub mod update;
 pub mod view;
 
 pub use action::{Action, CountSemantics};
+pub use reports::{queue_command_reports, queue_load_report};
 pub use rows::{row_still_listed, Row, RowKey, RowKind};
 pub use section::Section;
-pub use update::{expire_unlisted_arming, update, Outcome};
+pub use update::{dismiss, expire_unlisted_arming, update, Outcome};
 pub use view::{ArmedRow, CountPrompt, Overlay, PendingReport, SeenMark, ViewState};
 
 /// A command rejection in words a player can act on.

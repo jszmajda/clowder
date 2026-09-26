@@ -6,7 +6,7 @@
 //! the answer depends on the focused row, and rows come from game state.
 //! @spec TUI-NAV-002, TUI-NAV-011, TUI-NAV-015, TUI-NAV-037, TUI-NAV-038,
 //! TUI-NAV-041, TUI-NAV-051, TUI-NAV-058, TUI-NAV-060, TUI-NAV-061,
-//! TUI-NAV-064, TUI-NAV-065
+//! TUI-NAV-064, TUI-NAV-065, TUI-NAV-050, TUI-NAV-083, TUI-NAV-084
 
 use std::time::{Duration, Instant};
 
@@ -82,10 +82,15 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
                 return Outcome::Handled;
             }
             // Any navigation silently disarms whatever was armed, and ends any
-            // field-accept guard still standing over the row it left.
-            // @spec TUI-NAV-015, TUI-NAV-061
+            // field-accept guard still standing over the row it left — and
+            // retires whichever report banner is currently showing, whether
+            // or not the press actually moves anything: a digit for an empty
+            // section or a group jump with no groups is still a navigation
+            // key, and the player's return to the place they pressed it from
+            // is the same either way. @spec TUI-NAV-015, TUI-NAV-061, TUI-NAV-083
             view.armed = None;
             view.field_guard = false;
+            dismiss_active_report(view);
             handle_navigation(action, view, state);
             Outcome::Handled
         }
@@ -105,8 +110,20 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
             view.inspector_wanted = !view.inspector_wanted;
             Outcome::Handled
         }
-        // @spec TUI-NAV-026, TUI-NAV-025, TUI-NAV-038
-        Action::OpenJournal => open_overlay(view, Overlay::Journal { anchor: 0 }),
+        // Opening the Journal reads every unread report at once — not just
+        // the one showing — since every pinned entry is right there to read
+        // the moment it opens. What was unread is frozen as this Journal's
+        // own pinned set before any of it is marked read, so the entries
+        // stay exactly where the player opened onto them for as long as this
+        // Journal stays open. @spec TUI-NAV-026, TUI-NAV-025, TUI-NAV-038,
+        // TUI-NAV-050
+        Action::OpenJournal => {
+            view.journal_pinned = view.reports.iter().filter(|r| !r.dismissed).map(|r| r.entry).collect();
+            for r in &mut view.reports {
+                r.dismissed = true;
+            }
+            open_overlay(view, Overlay::Journal { anchor: 0 })
+        }
         Action::OpenHelp => open_overlay(view, Overlay::Help),
         Action::OpenPalette => {
             open_overlay(view, Overlay::Palette { query: String::new(), selected: 0 })
@@ -257,22 +274,20 @@ fn nudge_speed(view: &mut ViewState, state: &GameState, up: bool) -> Outcome {
 /// Enter `section`, restoring the remembered item by identity, or landing on
 /// the first actionable row, or the first row at all. This is navigation's one
 /// shared doorway — every path that changes `view.section` runs through it —
-/// so it is also where a visit marks the section seen and dismisses whatever
-/// report banner is currently showing, the same for a section cycle, a digit
-/// jump, or a palette landing. @spec TUI-NAV-008, TUI-NAV-032
+/// so it is also where a visit marks the section seen, the same for a section
+/// cycle, a digit jump, or a palette landing. Retiring the showing report
+/// banner is every caller's own concern rather than this one's: the top-level
+/// navigation dispatch already does it once for a section cycle or a digit
+/// jump, and doing it again here would retire a *second* report out from
+/// under a caller that already retired one this same press.
+/// @spec TUI-NAV-008, TUI-NAV-032
 fn enter_section(view: &mut ViewState, state: &GameState, section: Section) {
     view.section = Some(section);
     let list = rows(state, section);
     let idx = section.index();
 
-    // A visit marks the section seen and clears its new-content watermark,
-    // and dismisses the one report banner currently showing — the first
-    // still-undismissed entry in the newest-first queue; the rest stays
-    // pending for its own turn.
+    // A visit marks the section seen and clears its new-content watermark.
     view.seen[idx] = SeenMark { visited: true, revealed_at_last_visit: list.len() };
-    if let Some(r) = view.reports.iter_mut().find(|r| !r.dismissed) {
-        r.dismissed = true;
-    }
 
     let remembered_still_present = view.focus[idx]
         .as_ref()
@@ -289,6 +304,15 @@ fn enter_section(view: &mut ViewState, state: &GameState, section: Section) {
         .map(|r| r.key.clone());
 
     view.focus[idx] = landing;
+}
+
+/// Retires the one report banner currently showing — the first still-
+/// undismissed entry in the newest-first queue — leaving every other queued
+/// report exactly where it was, for its own turn. @spec TUI-NAV-050, TUI-NAV-083
+fn dismiss_active_report(view: &mut ViewState) {
+    if let Some(r) = view.reports.iter_mut().find(|r| !r.dismissed) {
+        r.dismissed = true;
+    }
 }
 
 fn is_available(state: &GameState, row: &Row) -> bool {
@@ -549,9 +573,10 @@ fn accept_palette(view: &mut ViewState, state: &GameState) -> Outcome {
 
     view.overlay = None;
     view.armed = None;
-    // The landing is navigation like any other, so it runs through the same
-    // shared doorway that marks the section seen and dismisses the showing
-    // report banner. @spec TUI-NAV-065
+    // The landing is navigation like any other: it disarms, retires the
+    // showing report banner, and runs through the same shared doorway that
+    // marks the section seen. @spec TUI-NAV-065, TUI-NAV-083
+    dismiss_active_report(view);
     enter_section(view, state, section);
     view.focus[section.index()] = Some(key);
 
@@ -741,16 +766,44 @@ pub fn expire_unlisted_arming(view: &mut ViewState, state: &GameState) {
 /// palette — a field under this rule, not a full-screen overlay) first, then
 /// any other overlay, then an armed row, then nothing further — so Esc over a
 /// field open above an armed row closes only the field, leaving the row
-/// beneath it exactly as armed. @spec TUI-NAV-030, TUI-NAV-037
+/// beneath it exactly as armed. Called from within `update`, which has no
+/// terminal width to judge the narrow-mode swap by, so it never reaches past
+/// an armed row; `dismiss` below is the width-aware version the loop actually
+/// runs Esc through, and reduces to exactly this over a field, overlay, or
+/// armed row. @spec TUI-NAV-030, TUI-NAV-037
 fn handle_dismiss(view: &mut ViewState) -> Outcome {
+    dismiss(view, u16::MAX)
+}
+
+/// Esc's full order of topmost transients, the report banner included: a
+/// field, then any other overlay, then an armed row, then — only once none of
+/// those are open — the narrow-mode inspector swap, and last the report
+/// banner showing. The swap is not a field or an overlay in `ViewState`'s own
+/// terms; whether it is even in effect depends on the terminal's width, which
+/// only the caller holding a real (or test) terminal has, which is why this
+/// takes `width` where the reducer's other actions do not. A pane at any
+/// width is not a swap and Esc never touches it — there is nothing above the
+/// banner there to close. @spec TUI-NAV-017, TUI-NAV-030, TUI-NAV-083
+pub fn dismiss(view: &mut ViewState, width: u16) -> Outcome {
     if view.prompt.take().is_some() {
         return Outcome::Handled;
     }
     if view.overlay.take().is_some() {
+        // Whatever the Journal pinned at its top was pinned for that
+        // Journal's own lifetime; closing it ends that hold, so the reports
+        // it read take their ordinary place in the scrollback from here.
+        // @spec TUI-NAV-027, TUI-NAV-050
+        view.journal_pinned.clear();
         return Outcome::Handled;
     }
     if view.armed.take().is_some() {
         return Outcome::Handled;
     }
+    use crate::render::widgets::inspector::{placement, Placement};
+    if placement(width, view.inspector_wanted) == Placement::Swapped {
+        view.inspector_wanted = false;
+        return Outcome::Handled;
+    }
+    dismiss_active_report(view);
     Outcome::Handled
 }

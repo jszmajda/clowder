@@ -174,12 +174,14 @@ fn settled() -> GameState {
     s
 }
 
-/// Where the pinned away-report sits among the retained entries — what a
-/// `PendingReport` indexes.
+/// Where the pinned away-report sits in `state.journal.kept` — what a
+/// `PendingReport` indexes: a position in the permanent, append-only list,
+/// never in the merged-with-`recent` view, whose order an ordinary event
+/// stamped earlier can still shift. @spec TUI-NAV-027
 fn away_entry(state: &GameState) -> usize {
     state
         .journal
-        .iter_chronological()
+        .kept
         .iter()
         .position(|e| matches!(e.item, JournalItem::Away(_)))
         .expect("fixture: the journal pins an away-report")

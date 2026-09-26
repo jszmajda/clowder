@@ -31,13 +31,17 @@
 //! *something specific* was rendered it uses a differential: two states that
 //! differ in exactly one entry must not draw the same overlay, and two that
 //! differ in nothing the surface is allowed to show must draw the same one.
-//! Lexical assertions are made in exactly three places, each one a thing a
-//! spec names outright: the resource behind a *gain* (TUI-NAV-055 says the
-//! banner carries the largest resource gains), the destination and the return
-//! of a wandering (TUI-NAV-056 says the entry names where they went and that
-//! they come back), and the vocabulary of loss (TUI-NAV-056 forbids it). A
-//! content name is matched by a uniqueness-checked prefix, as the sibling
-//! frame tests do, so an ellipsis cannot turn a hit into a miss.
+//! Lexical assertions are made only where a spec or the design names the
+//! thing outright: the resource behind a *gain*, by the name its stores row
+//! displays (TUI-NAV-055); the banner's two hints, by the words the design
+//! gives them (`e for the tale`, `Esc dismiss`); a count, as the number it
+//! must read; a truncated span, as *more than* it; the destination and the
+//! return of a wandering (TUI-NAV-056 says the entry names where they went and
+//! that they come back); and two forbidden vocabularies — loss, and words that
+//! say where a kitten is *now* (TUI-NAV-056 forbids both). A content name is
+//! matched by a uniqueness-checked prefix or as a whole word, so an ellipsis
+//! or a longer name containing it cannot turn a hit into a miss or a miss
+//! into a hit.
 //!
 //! **Geometry comes from the layout, not from this file.** The ticker rect is
 //! the row `render::layout` gives the ticker and the banner rect is the row it
@@ -47,9 +51,11 @@
 //!
 //! **Not tested here.** The help overlay is TUI-NAV-025, which belongs to the
 //! discoverability chunk; `overlays::help` is deliberately left alone. The
-//! palette's Enter (move to the hit's section and focus it) and the banner's
-//! dismissal on Esc or first navigation are input, not drawing: they live in
-//! `nav::update` and are that chunk's to test.
+//! palette's Enter (move to the hit's section and focus it) is input, not
+//! drawing, and lives with `nav::update`'s tests. Which reports queue a
+//! banner, what retires or keeps the one showing, and where a pinned entry
+//! sits before and after its report is read are a session's doing, tested
+//! through the loop in `report_queue.rs`.
 
 use clowder_tui::nav::{Overlay, PendingReport, ViewState};
 use clowder_tui::render::layout::{compute, Body, Layout};
@@ -1001,4 +1007,948 @@ fn assert_confined(what: &str, rect: Rect, render: impl FnOnce(&mut Frame)) {
             );
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-055 — what the report banner's one line holds, at every width
+//
+// The line is read at a width wide enough for everything (`WIDE`) unless a
+// test is about narrowing it. Clauses are located the way the spec names
+// them: a gain by its resource's name, the arrivals by their count, the hints
+// by the words the design gives them (`e for the tale`, `Esc dismiss`), and the
+// span by a differential — two reports alike but for their span first differ
+// where the span is drawn.
+// ---------------------------------------------------------------------------
+
+/// Wide enough for the whole line of any report these tests build.
+const WIDE: u16 = 240;
+
+/// The banner drawn into a one-row pane `width` columns wide, trailing blanks
+/// dropped. Every UI symbol is single-width (TUI-NAV-021), so the line's
+/// character count is the number of columns it takes.
+fn banner_at(state: &GameState, view: &ViewState, width: u16) -> String {
+    let rect = Rect::new(0, 0, width, 1);
+    let mut term = Terminal::new(TestBackend::new(width, 1)).expect("TestBackend is infallible");
+    term.draw(|f| overlays::banner(f, rect, state, view)).expect("TestBackend is infallible");
+    region_lines(term.backend().buffer(), rect).join("").trim_end().to_string()
+}
+
+fn columns(line: &str) -> usize {
+    line.chars().count()
+}
+
+/// The whole line for a single report, at `WIDE`.
+fn full_line(report: &OfflineReport) -> String {
+    let state = away(&[(9_000, report.clone())]);
+    banner_at(&state, &unread(&state), WIDE)
+}
+
+/// Where `word` first stands on its own in `text` — case ignored, and never
+/// inside a longer word, so `Dew` is not found in `Dewdrop`.
+fn find_word(text: &str, word: &str) -> Option<usize> {
+    let hay = text.to_lowercase();
+    let needle = word.to_lowercase();
+    if needle.is_empty() {
+        return None;
+    }
+    let bytes = hay.as_bytes();
+    let mut from = 0;
+    while let Some(off) = hay[from..].find(&needle) {
+        let at = from + off;
+        let end = at + needle.len();
+        let before_ok = at == 0 || !(bytes[at - 1] as char).is_ascii_alphanumeric();
+        let after_ok = end >= bytes.len() || !(bytes[end] as char).is_ascii_alphanumeric();
+        if before_ok && after_ok {
+            return Some(at);
+        }
+        from = at + 1;
+        while from < hay.len() && !hay.is_char_boundary(from) {
+            from += 1;
+        }
+    }
+    None
+}
+
+/// Where a run of digits reading exactly `digits` first stands in `text` — a
+/// whole number, never part of a longer one or of a decimal.
+fn find_number(text: &str, digits: &str) -> Option<usize> {
+    let chars: Vec<(usize, char)> = text.char_indices().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i].1.is_ascii_digit() {
+            let start = i;
+            while i < chars.len() && chars[i].1.is_ascii_digit() {
+                i += 1;
+            }
+            let run: String = chars[start..i].iter().map(|(_, c)| *c).collect();
+            let glued_before = start > 0 && chars[start - 1].1 == '.';
+            let glued_after = i < chars.len() && chars[i].1 == '.' && i + 1 < chars.len()
+                && chars[i + 1].1.is_ascii_digit();
+            if run == digits && !glued_before && !glued_after {
+                return Some(chars[start].0);
+            }
+        } else {
+            i += 1;
+        }
+    }
+    None
+}
+
+/// The runs of digits in `text`, in order.
+fn digit_runs(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_ascii_digit()).filter(|r| !r.is_empty()).map(String::from).collect()
+}
+
+/// The name a resource's stores row displays — the oracle for "each resource
+/// named as its stores row names it". Read from the palette, whose results
+/// carry the name each item's rows display (TUI-NAV-063), for a meadow that
+/// holds some of `r`, so its stores row is listed at all.
+fn stores_name(r: ResourceId) -> String {
+    use clowder_tui::nav::RowKey;
+    let mut s = GameState::new(11);
+    s.resources[r.ix()] = 1.0;
+    clowder_tui::nav::palette::results(&s, "")
+        .into_iter()
+        .find(|p| p.key == RowKey::Resource(r))
+        .map(|p| p.name)
+        .unwrap_or_else(|| panic!("fixture: a meadow holding {r:?} lists its stores row"))
+}
+
+/// Where a resource is first named in `text`, by its stores-row name or its
+/// identifier's spelling, whichever comes first — for surfaces the spec does
+/// not tie to the stores row's spelling.
+fn find_resource(text: &str, r: ResourceId) -> Option<usize> {
+    let debug = format!("{r:?}");
+    [stores_name(r), debug].iter().filter_map(|n| find_word(text, n)).min()
+}
+
+/// The first column at which two lines differ.
+fn first_difference(a: &str, b: &str) -> Option<usize> {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    (0..a.len().max(b.len())).find(|i| a.get(*i) != b.get(*i))
+}
+
+/// A report whose line has every clause: a span, three gains of distinct
+/// sizes listed out of the resources' own order, and arrivals counted more
+/// than once per name. No number on it collides with the arrivals' sum.
+fn full_report() -> OfflineReport {
+    let mut report = OfflineReport {
+        elapsed_seconds: 3 * 86_400 + 5 * 3_600,
+        ..OfflineReport::default()
+    };
+    report.resource_deltas[ResourceId::Twigs.ix()] = 9_600.0;
+    report.resource_deltas[ResourceId::Feathers.ix()] = 4_800.0;
+    report.resource_deltas[ResourceId::Catnip.ix()] = 1_500.0;
+    report.arrived = vec![("Zibbly".to_string(), 6), ("Quillow".to_string(), 8)];
+    report
+}
+
+/// The arrivals' sum in `full_report`.
+const ARRIVALS_SUM: &str = "14";
+
+/// The line runs, in order: how much time passed, the gains largest first,
+/// the arrivals, then the hint for the tale and the hint for dismissing.
+/// @spec TUI-NAV-055
+#[test]
+fn the_banner_line_runs_span_then_gains_then_arrivals_then_the_hints() {
+    let report = full_report();
+    let line = full_line(&report);
+
+    let mut longer = report.clone();
+    longer.elapsed_seconds = 40 * 86_400;
+    let span_at = first_difference(&line, &full_line(&longer)).unwrap_or_else(|| {
+        panic!("the line does not change with the span, so it does not say how much time passed: {line:?}")
+    });
+    let span_at = line.char_indices().nth(span_at).map(|(b, _)| b).unwrap_or(line.len());
+
+    let at = |what: &str, found: Option<usize>| {
+        found.unwrap_or_else(|| panic!("the banner has no {what} on it. It read as {line:?}"))
+    };
+    let order = [
+        ("span", span_at),
+        ("largest gain", at("largest gain", find_word(&line, "twigs"))),
+        ("second gain", at("second gain", find_word(&line, "feathers"))),
+        ("third gain", at("third gain", find_word(&line, "catnip"))),
+        ("arrivals count", at("arrivals count", find_number(&line, ARRIVALS_SUM))),
+        ("hint for the tale", at("hint for the tale", find_word(&line, "tale"))),
+        ("hint for dismissing", at("hint for dismissing", find_word(&line, "esc"))),
+    ];
+    for pair in order.windows(2) {
+        assert!(
+            pair[0].1 < pair[1].1,
+            "the {} comes after the {} on the banner; the line holds, in order, how much time \
+             passed, the largest gains, the arrivals, and the hints. It read as {line:?}",
+            pair[0].0,
+            pair[1].0
+        );
+    }
+}
+
+/// Each gain is named as the player already knows the resource — by the name
+/// its stores row displays — for every resource there is.
+/// @spec TUI-NAV-055
+#[test]
+fn every_gain_on_the_banner_is_named_as_its_stores_row_names_it() {
+    for r in ResourceId::ALL {
+        let mut report = OfflineReport { elapsed_seconds: 2 * 86_400, ..OfflineReport::default() };
+        report.resource_deltas[r.ix()] = 4_800.0;
+        let line = full_line(&report);
+        let name = stores_name(r);
+        assert!(
+            line.contains(&name),
+            "the banner named the only gain in the report some other way than its stores row \
+             does ({name:?}); the line names each resource as its stores row names it. It read \
+             as {line:?}"
+        );
+    }
+}
+
+/// At most three gains, the largest first by amount, and only stocks that grew
+/// — never one that fell, and never the fourth-largest gain.
+/// @spec TUI-NAV-055
+#[test]
+fn the_banner_shows_at_most_three_gains_largest_first_and_only_positive_ones() {
+    // Amounts deliberately out of the resources' own order, so "largest
+    // first" cannot be satisfied by listing in declaration order.
+    let mut report = OfflineReport { elapsed_seconds: 2 * 86_400, ..OfflineReport::default() };
+    let gains = [
+        (ResourceId::Pebbles, 900.0),
+        (ResourceId::Twigs, 700.0),
+        (ResourceId::Catnip, 500.0),
+        (ResourceId::Fluff, 300.0),
+        (ResourceId::Feathers, 100.0),
+    ];
+    for (r, d) in gains {
+        report.resource_deltas[r.ix()] = d;
+    }
+    // Falls far larger than any gain: largest by size is not what earns a place.
+    report.resource_deltas[ResourceId::Buttons.ix()] = -50_000.0;
+    report.resource_deltas[ResourceId::Embers.ix()] = -20_000.0;
+
+    let line = full_line(&report);
+    let shown: Vec<usize> = gains[..3]
+        .iter()
+        .map(|(r, _)| {
+            find_resource(&line, *r).unwrap_or_else(|| {
+                panic!("the banner left out {r:?}, one of the three largest gains. It read as {line:?}")
+            })
+        })
+        .collect();
+    assert!(
+        shown.windows(2).all(|p| p[0] < p[1]),
+        "the three largest gains are not listed largest first. It read as {line:?}"
+    );
+    for (r, _) in &gains[3..] {
+        assert!(
+            find_resource(&line, *r).is_none(),
+            "the banner lists {r:?}, the fourth or fifth largest gain; it shows at most three. It \
+             read as {line:?}"
+        );
+    }
+    for r in [ResourceId::Buttons, ResourceId::Embers] {
+        assert!(
+            find_resource(&line, r).is_none(),
+            "the banner names {r:?}, a stock that fell; only positive net changes are gains. It \
+             read as {line:?}"
+        );
+    }
+    assert!(!shows_a_decrease(&line), "the banner shows a number going down: {line:?}");
+}
+
+/// No gain on the line reads as nothing: whatever amount a gain is given, it
+/// shows as more than zero, or the gain is left off the line.
+/// @spec TUI-NAV-055
+#[test]
+fn no_gain_on_the_banner_reads_as_zero() {
+    let tiny = [
+        (ResourceId::Twigs, 1.0e-9),
+        (ResourceId::Pebbles, 1.0e-300),
+        (ResourceId::Fluff, f64::MIN_POSITIVE),
+        (ResourceId::Buttons, 4.0e-5),
+    ];
+    for (r, d) in tiny {
+        let mut report = OfflineReport { elapsed_seconds: 2 * 86_400, ..OfflineReport::default() };
+        report.resource_deltas[ResourceId::Catnip.ix()] = 4_800.0;
+        report.resource_deltas[r.ix()] = d;
+        let line = full_line(&report);
+        let Some(at) = find_resource(&line, r) else { continue };
+        // The clause the name stands in: between the separators around it.
+        let start = line[..at].rfind([',', '\u{b7}', ':', ';']).map(|i| i + 1).unwrap_or(0);
+        let end = line[at..].find([',', '\u{b7}', ';']).map(|i| at + i).unwrap_or(line.len());
+        let clause = &line[start..end];
+        assert!(
+            clause.chars().any(|c| ('1'..='9').contains(&c)),
+            "a gain of {d:e} {r:?} is on the banner as {clause:?}, which reads as nothing gained; \
+             a gain too small to show as more than zero stays off the line. It read as {line:?}"
+        );
+    }
+}
+
+/// The arrivals are counted as the sum of the report's per-name counts — a
+/// kitten who arrived twice is two arrivals — never as the number of names.
+/// @spec TUI-NAV-055
+#[test]
+fn the_banner_counts_arrivals_as_the_sum_of_the_per_name_counts() {
+    let mut report = OfflineReport {
+        elapsed_seconds: 3 * 86_400 + 5 * 3_600,
+        ..OfflineReport::default()
+    };
+    report.resource_deltas[ResourceId::Catnip.ix()] = 4_800.0;
+    report.arrived = vec![("Zibbly".to_string(), 6), ("Quillow".to_string(), 8)];
+    let line = full_line(&report);
+
+    assert!(
+        find_number(&line, ARRIVALS_SUM).is_some(),
+        "two names arrived six and eight times and the banner does not say fourteen kittens \
+         arrived; the arrivals are the sum of the per-name counts. It read as {line:?}"
+    );
+    assert!(
+        find_number(&line, "2").is_none(),
+        "the banner counts the arrivals' names (two) rather than the arrivals. It read as {line:?}"
+    );
+    for name in ["Zibbly", "Quillow"] {
+        assert!(
+            !mentions(&line, name),
+            "the banner names an arrival; the line carries the number who arrived and leaves the \
+             names to the pinned entry. It read as {line:?}"
+        );
+    }
+}
+
+/// A truncated absence is a floor, not the absence: the line says it was more
+/// than the span the core reports, and otherwise reads the same.
+/// @spec TUI-NAV-055
+#[test]
+fn a_truncated_absence_reads_as_more_than_its_span() {
+    let mut exact = OfflineReport { elapsed_seconds: 3 * 86_400, ..OfflineReport::default() };
+    exact.resource_deltas[ResourceId::Catnip.ix()] = 4_800.0;
+    let mut floor = exact.clone();
+    floor.truncated = true;
+
+    let (exact_line, floor_line) = (full_line(&exact), full_line(&floor));
+    assert_ne!(
+        exact_line, floor_line,
+        "a truncated report's banner reads exactly as an exact one's; where the core stopped \
+         counting, the span is stated as more than that span"
+    );
+    assert!(
+        ["more than", "over", ">"].iter().any(|m| floor_line.to_lowercase().contains(m)),
+        "the truncated report's banner does not say the absence was more than its span. It read \
+         as {floor_line:?}"
+    );
+    let kept: BTreeSet<String> = words(&exact_line);
+    let missing: Vec<&String> = kept.iter().filter(|w| !words(&floor_line).contains(*w)).collect();
+    assert!(
+        missing.is_empty(),
+        "stating the span as more than it lost {missing:?} from the line; the span itself, the \
+         gains and the hints all stay. It read as {floor_line:?}"
+    );
+}
+
+/// With no stock grown and no kitten arrived, a quiet note stands where the
+/// gains would be, and the line still points at the tale. Nothing that fell or
+/// left changes it.
+/// @spec TUI-NAV-055
+#[test]
+fn with_nothing_grown_and_no_one_arrived_a_quiet_note_stands_in_for_the_gains() {
+    let span = 3 * 86_400 + 5 * 3_600;
+    let quiet = OfflineReport { elapsed_seconds: span, ..OfflineReport::default() };
+    let mut grew = quiet.clone();
+    grew.resource_deltas[ResourceId::Catnip.ix()] = 4_800.0;
+
+    let (quiet_line, grew_line) = (full_line(&quiet), full_line(&grew));
+    let note = note_words(&quiet_line, &grew_line);
+    assert!(
+        !note.is_empty(),
+        "with nothing grown and no one arrived, the banner puts nothing where the gains would \
+         be; a quiet note stands in their place. It read as {quiet_line:?}"
+    );
+    assert!(find_word(&quiet_line, "tale").is_some(), "the quiet line no longer points at the tale: {quiet_line:?}");
+
+    // Arrivals are something to tell: no quiet note beside them.
+    let mut arrived = quiet.clone();
+    arrived.arrived = vec![("Zibbly".to_string(), 2)];
+    let arrived_line = full_line(&arrived);
+    assert!(
+        !note.iter().all(|w| find_word(&arrived_line, w).is_some()),
+        "the quiet note shows beside arrivals; it stands in only where no stock grew and no \
+         kitten arrived. It read as {arrived_line:?}"
+    );
+
+    // Falls, departures, homecomings and seasons are not growth, and do not
+    // move the line at all.
+    let mut fell = quiet.clone();
+    for r in ResourceId::ALL {
+        fell.resource_deltas[r.ix()] = -25.0;
+    }
+    fell.wandered = vec![("Mopsy".to_string(), 2)];
+    fell.returned = vec![("Mopsy".to_string(), 1)];
+    fell.seasons_passed = 9;
+    let (a, b) = (away(&[(9_000, quiet)]), away(&[(9_000, fell)]));
+    assert_eq!(
+        banner(&a, &unread(&a)),
+        banner(&b, &unread(&b)),
+        "a report where every stock fell and kittens came and went drew a different banner from \
+         one where nothing happened; with nothing grown and no one arrived, both are the quiet \
+         note"
+    );
+}
+
+/// The words a quiet line has that a line with one gain does not: the note
+/// that stands in for the gains.
+fn note_words(quiet_line: &str, grew_line: &str) -> Vec<String> {
+    let grew = words(grew_line);
+    words(quiet_line).into_iter().filter(|w| !grew.contains(w)).collect()
+}
+
+/// The line reads nothing of wanderings, homecomings, seasons passed or falling
+/// stocks — each on its own, and all together, leaves it cell for cell as it
+/// was.
+/// @spec TUI-NAV-055
+#[test]
+fn the_banner_reads_nothing_of_wanderings_returns_seasons_or_falls() {
+    type Variant = (&'static str, Box<dyn Fn(&mut OfflineReport)>);
+    let base = full_report();
+    let variants: Vec<Variant> = vec![
+        ("wanderings", Box::new(|r| r.wandered = vec![("Mopsy".to_string(), 3)])),
+        ("homecomings", Box::new(|r| r.returned = vec![("Mopsy".to_string(), 2)])),
+        ("seasons passed", Box::new(|r| r.seasons_passed = 11)),
+        (
+            "falling stocks",
+            Box::new(|r| {
+                r.resource_deltas[ResourceId::Buttons.ix()] = -90_000.0;
+                r.resource_deltas[ResourceId::Embers.ix()] = -7.0;
+            }),
+        ),
+    ];
+
+    let plain = away(&[(9_000, base.clone())]);
+    let plain_banner = banner_at(&plain, &unread(&plain), WIDE);
+    let mut everything = base.clone();
+    for (what, change) in &variants {
+        let mut changed = base.clone();
+        change(&mut changed);
+        change(&mut everything);
+        let s = away(&[(9_000, changed)]);
+        assert_eq!(
+            banner_at(&s, &unread(&s), WIDE),
+            plain_banner,
+            "{what} changed the banner; the line reads nothing of wanderings, returns, seasons \
+             passed, or falling stocks, leaving them to the pinned entry"
+        );
+    }
+    let s = away(&[(9_000, everything)]);
+    assert_eq!(
+        banner_at(&s, &unread(&s), WIDE),
+        plain_banner,
+        "wanderings, returns, seasons and falls together changed the banner"
+    );
+}
+
+/// A finder function for a `Clause`.
+type ClauseFinder = Box<dyn Fn(&str) -> Option<usize>>;
+
+/// A clause the narrowing checker can find on a line.
+struct Clause {
+    what: &'static str,
+    find: ClauseFinder,
+}
+
+fn word_clause(what: &'static str, word: &'static str) -> Clause {
+    Clause { what, find: Box::new(move |l| find_word(l, word)) }
+}
+
+/// Narrow the pane a column at a time, from wide enough for everything down to
+/// the width of the span alone, and demand at every width: the clauses gone
+/// are exactly the first few of `drop_order`, and no more than the width
+/// forced; a clause is either wholly there or wholly gone, so a line with a
+/// given set of clauses reads the same at every width that shows it; the span
+/// is always there; and the clauses left keep the order they had.
+fn assert_narrows_by_whole_clauses(what: &str, report: &OfflineReport, drop_order: Vec<Clause>) {
+    let state = away(&[(9_000, report.clone())]);
+    let view = unread(&state);
+    assert_narrows_by_whole_clauses_in(what, &|w| banner_at(&state, &view, w), drop_order);
+}
+
+fn assert_narrows_by_whole_clauses_in(what: &str, render: &dyn Fn(u16) -> String, drop_order: Vec<Clause>) {
+    let full = render(WIDE);
+    for c in &drop_order {
+        assert!((c.find)(&full).is_some(), "{what}: the whole line has no {}: {full:?}", c.what);
+    }
+    let order_in = |line: &str, present: &[&Clause]| -> Vec<&'static str> {
+        let mut at: Vec<(usize, &'static str)> =
+            present.iter().map(|c| ((c.find)(line).expect("present"), c.what)).collect();
+        at.sort();
+        at.into_iter().map(|(_, w)| w).collect()
+    };
+
+    let n = drop_order.len();
+    let mut seen: Vec<Option<(String, u16)>> = vec![None; n + 1];
+    let mut floor: Option<usize> = None;
+    for w in (1..=WIDE).rev() {
+        if floor.is_some_and(|f| (w as usize) < f) {
+            break;
+        }
+        let line = render(w);
+        let present: Vec<bool> = drop_order.iter().map(|c| (c.find)(&line).is_some()).collect();
+        let k = present.iter().take_while(|p| !**p).count();
+        let dropped: Vec<&str> = drop_order[..k].iter().map(|c| c.what).collect();
+        let stray: Vec<&str> =
+            drop_order[k..].iter().zip(&present[k..]).filter(|(_, p)| !**p).map(|(c, _)| c.what).collect();
+        assert!(
+            stray.is_empty(),
+            "{what}: at {w} columns the banner dropped {stray:?} while keeping clauses that are \
+             dropped before it; the order is {:?}. It read as {line:?}",
+            drop_order.iter().map(|c| c.what).collect::<Vec<_>>()
+        );
+
+        let kept: Vec<&Clause> = drop_order[k..].iter().collect();
+        assert_eq!(
+            order_in(&line, &kept),
+            order_in(&full, &kept),
+            "{what}: at {w} columns the clauses left changed their order. It read as {line:?}"
+        );
+
+        match &seen[k] {
+            Some((earlier, at)) => assert_eq!(
+                &line, earlier,
+                "{what}: with {dropped:?} dropped, the banner reads differently at {w} columns \
+                 than at {at}; a clause is dropped whole, never cut to fit"
+            ),
+            None => {
+                if k > 0 {
+                    let (with_one_more, _) = seen[k - 1].as_ref().unwrap_or_else(|| {
+                        panic!(
+                            "{what}: at {w} columns the banner dropped {dropped:?} at once, \
+                             never showing the line with only the first {} of them dropped; \
+                             it drops whole clauses one at a time, as the width requires. It \
+                             read as {line:?}",
+                            k - 1
+                        )
+                    });
+                    assert!(
+                        columns(with_one_more) > w as usize,
+                        "{what}: at {w} columns the banner dropped the {} though the line with \
+                         it ({} columns) fits; clauses are dropped only where the pane is too \
+                         narrow for them. It read as {line:?}",
+                        drop_order[k - 1].what,
+                        columns(with_one_more)
+                    );
+                }
+                seen[k] = Some((line.clone(), w));
+            }
+        }
+        if k == n && floor.is_none() {
+            floor = Some(columns(&line));
+        }
+    }
+
+    let (span_only, _) = seen[n].clone().unwrap_or_else(|| {
+        panic!("{what}: narrowing never reached the line with every droppable clause gone")
+    });
+    assert!(!span_only.trim().is_empty(), "{what}: with every clause dropped, the span went too");
+    for (line, w) in seen.iter().flatten() {
+        assert!(
+            line.starts_with(span_only.trim_end_matches(':')),
+            "{what}: at {w} columns the line does not open with the span ({span_only:?}); the \
+             span is never dropped. It read as {line:?}"
+        );
+    }
+}
+
+/// Too narrow for the whole line, the banner drops whole clauses in the order
+/// the spec gives — the dismiss hint, the third gain, the second, the tale
+/// hint, the arrivals, the largest gain — and never the span.
+/// @spec TUI-NAV-055
+#[test]
+fn a_narrow_banner_drops_whole_clauses_in_order_and_never_the_span() {
+    assert_narrows_by_whole_clauses(
+        "the full line",
+        &full_report(),
+        vec![
+            word_clause("dismiss hint", "esc"),
+            word_clause("third gain", "catnip"),
+            word_clause("second gain", "feathers"),
+            word_clause("tale hint", "tale"),
+            Clause { what: "arrivals", find: Box::new(|l| find_number(l, ARRIVALS_SUM)) },
+            word_clause("largest gain", "twigs"),
+        ],
+    );
+}
+
+/// Where the quiet note stands in the gains' place, it goes last, after the
+/// two hints — and the span still never does.
+/// @spec TUI-NAV-055
+#[test]
+fn a_narrow_quiet_banner_drops_the_hints_then_the_note_and_never_the_span() {
+    let span = 3 * 86_400 + 5 * 3_600;
+    let quiet = OfflineReport { elapsed_seconds: span, ..OfflineReport::default() };
+    let mut grew = quiet.clone();
+    grew.resource_deltas[ResourceId::Catnip.ix()] = 4_800.0;
+    let note = note_words(&full_line(&quiet), &full_line(&grew));
+    assert!(!note.is_empty(), "the quiet line carries no note in the gains' place: {:?}", full_line(&quiet));
+
+    assert_narrows_by_whole_clauses(
+        "the quiet line",
+        &quiet,
+        vec![
+            word_clause("dismiss hint", "esc"),
+            word_clause("tale hint", "tale"),
+            Clause {
+                what: "quiet note",
+                find: Box::new(move |l| {
+                    let at: Vec<Option<usize>> = note.iter().map(|w| find_word(l, w)).collect();
+                    if at.iter().all(Option::is_some) {
+                        at.into_iter().flatten().min()
+                    } else {
+                        None
+                    }
+                }),
+            },
+        ],
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-027 / TUI-NAV-056 — what the pinned entry tells
+//
+// The entry is read off the whole Journal, drawn tall and wide enough that no
+// line of it is scrolled or clipped away, with no report queued: what the
+// entry says is the same wherever it sits.
+// ---------------------------------------------------------------------------
+
+fn whole_journal(state: &GameState) -> String {
+    let rect = Rect::new(0, 0, 400, 160);
+    let mut term = Terminal::new(TestBackend::new(400, 160)).expect("TestBackend is infallible");
+    let view = journal_view(0);
+    term.draw(|f| overlays::journal(f, rect, state, &view)).expect("TestBackend is infallible");
+    region_lines(term.backend().buffer(), rect)
+        .into_iter()
+        .map(|l| l.trim_end().to_string())
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim_end()
+        .to_string()
+}
+
+fn entry_of(report: OfflineReport) -> String {
+    whole_journal(&away(&[(9_000, report)]))
+}
+
+/// The clause around byte `at`: between the separators on either side of it.
+fn clause_at(text: &str, at: usize) -> &str {
+    let seps = [',', ';', '\u{b7}', '\n', '|'];
+    let start = text[..at].rfind(seps).map(|i| i + 1).unwrap_or(0);
+    let end = text[at..].find(seps).map(|i| at + i).unwrap_or(text.len());
+    &text[start..end]
+}
+
+/// The line `at` stands on.
+fn line_at(text: &str, at: usize) -> &str {
+    let start = text[..at].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let end = text[at..].find('\n').map(|i| at + i).unwrap_or(text.len());
+    &text[start..end]
+}
+
+fn count_words(text: &str, word: &str) -> usize {
+    let mut n = 0;
+    let mut rest = text;
+    while let Some(at) = find_word(rest, word) {
+        n += 1;
+        rest = &rest[at + word.len()..];
+    }
+    n
+}
+
+/// Every resource whose stock changed is in the entry, signed — gains before
+/// decreases, and each group largest first (a decrease's size is how far the
+/// stock fell) — and no resource whose stock did not change is.
+/// @spec TUI-NAV-027
+#[test]
+fn the_pinned_entry_lists_every_changed_stock_signed_gains_first_each_largest_first() {
+    let mut report = OfflineReport { elapsed_seconds: 2 * 86_400, ..OfflineReport::default() };
+    // Every resource moves, alternately up and down, each by a distinct amount
+    // that runs against the resources' own order.
+    for (i, r) in ResourceId::ALL.into_iter().enumerate() {
+        let size = ((i * 37) % ResourceId::ALL.len() + 1) as f64 * 100.0;
+        report.resource_deltas[r.ix()] = if i % 2 == 0 { size } else { -size };
+    }
+    let entry = entry_of(report.clone());
+
+    let mut expected: Vec<(ResourceId, f64)> =
+        ResourceId::ALL.into_iter().map(|r| (r, report.resource_deltas[r.ix()])).collect();
+    expected.sort_by(|a, b| {
+        let group = |d: f64| if d > 0.0 { 0 } else { 1 };
+        group(a.1).cmp(&group(b.1)).then(b.1.abs().partial_cmp(&a.1.abs()).unwrap())
+    });
+
+    let mut last = None;
+    for (r, d) in &expected {
+        let at = find_resource(&entry, *r).unwrap_or_else(|| {
+            panic!("the pinned entry leaves out {r:?}, whose stock changed by {d}; it tells every resource whose stock changed. It read as:\n{entry}")
+        });
+        let clause = clause_at(&entry, at);
+        if *d > 0.0 {
+            assert!(
+                clause.contains('+'),
+                "the pinned entry gives {r:?}'s gain unsigned: {clause:?}; every change is signed"
+            );
+        } else {
+            assert!(
+                clause.contains('-') || clause.contains('\u{2212}'),
+                "the pinned entry gives {r:?}'s fall without its sign: {clause:?}; every change \
+                 is signed"
+            );
+        }
+        if let Some((prev, prev_at)) = last {
+            assert!(
+                prev_at < at,
+                "the pinned entry tells {r:?} ({d}) before {prev:?}; gains come before decreases, \
+                 and each group runs largest first. It read as:\n{entry}"
+            );
+        }
+        last = Some((*r, at));
+    }
+
+    // Only what changed.
+    let mut two = OfflineReport { elapsed_seconds: 2 * 86_400, ..OfflineReport::default() };
+    two.resource_deltas[ResourceId::Catnip.ix()] = 480.0;
+    two.resource_deltas[ResourceId::Twigs.ix()] = -30.0;
+    let entry = entry_of(two);
+    for r in ResourceId::ALL.into_iter().filter(|r| ![ResourceId::Catnip, ResourceId::Twigs].contains(r)) {
+        assert!(
+            find_resource(&entry, r).is_none(),
+            "the pinned entry names {r:?}, whose stock did not change. It read as:\n{entry}"
+        );
+    }
+}
+
+/// Each kitten who arrived is named, once, with its count where the report
+/// counts it more than once.
+/// @spec TUI-NAV-027
+#[test]
+fn the_pinned_entry_names_each_arrival_once_with_its_count_where_more_than_one() {
+    let mut report = OfflineReport { elapsed_seconds: 3 * 86_400 + 5 * 3_600, ..OfflineReport::default() };
+    report.arrived = vec![("Pebblekin".to_string(), 1), ("Quoriel".to_string(), 4)];
+    let entry = entry_of(report);
+
+    for (name, count) in [("Pebblekin", 1), ("Quoriel", 4)] {
+        assert_eq!(
+            count_words(&entry, name),
+            1,
+            "the pinned entry names {name} {} times; each kitten who arrived is named once. It \
+             read as:\n{entry}",
+            count_words(&entry, name)
+        );
+        let at = find_word(&entry, name).expect("named once");
+        let clause = clause_at(&entry, at);
+        let runs = digit_runs(clause);
+        if count > 1 {
+            assert!(
+                runs.contains(&count.to_string()),
+                "{name} arrived {count} times and the entry does not say so: {clause:?}"
+            );
+        } else {
+            assert!(
+                !runs.contains(&"1".to_string()),
+                "{name} arrived once and the entry counts it anyway: {clause:?}; the count is \
+                 given only where the report counts more than one"
+            );
+        }
+    }
+}
+
+/// The seasons that passed are part of the tale.
+/// @spec TUI-NAV-027
+#[test]
+fn the_pinned_entry_tells_the_seasons_passed() {
+    let quiet = OfflineReport { elapsed_seconds: 3 * 86_400 + 5 * 3_600, ..OfflineReport::default() };
+    let mut seasons = quiet.clone();
+    seasons.seasons_passed = 7;
+    let (without, with) = (entry_of(quiet), entry_of(seasons));
+    assert_ne!(without, with, "seven seasons passing left the pinned entry unchanged");
+    assert!(
+        digit_runs(&with).contains(&"7".to_string()),
+        "the pinned entry does not say how many seasons passed. It read as:\n{with}"
+    );
+}
+
+/// Where the core stopped counting, the entry says the absence was more than
+/// its span and adds a gentle note that the meadow stopped counting there.
+/// @spec TUI-NAV-027
+#[test]
+fn a_truncated_reports_entry_says_more_than_its_span_and_that_counting_stopped() {
+    let exact = OfflineReport { elapsed_seconds: 3 * 86_400, ..OfflineReport::default() };
+    let mut floor = exact.clone();
+    floor.truncated = true;
+    let (exact_entry, floor_entry) = (entry_of(exact), entry_of(floor));
+
+    assert!(
+        ["more than", "over", ">"].iter().any(|m| floor_entry.to_lowercase().contains(m)),
+        "a truncated report's entry does not say the absence was more than its span. It read \
+         as:\n{floor_entry}"
+    );
+    let marker: BTreeSet<String> = ["more", "than", "over"].iter().map(|w| w.to_string()).collect();
+    let extra: Vec<String> = words(&floor_entry)
+        .into_iter()
+        .filter(|w| !words(&exact_entry).contains(w) && !marker.contains(w))
+        .collect();
+    assert!(
+        !extra.is_empty(),
+        "a truncated report's entry carries no note that the meadow stopped counting; it read \
+         as:\n{floor_entry}"
+    );
+    assert!(loss_vocabulary(&floor_entry).is_empty(), "the stopped-counting note speaks of loss: {floor_entry}");
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-056 — wanderings and homecomings in the pinned entry
+// ---------------------------------------------------------------------------
+
+/// Words that say where a kitten is *now* — which the report cannot know, since
+/// its lists count what happened, not where anyone ended up.
+const WHEREABOUTS: [&str; 10] =
+    ["is", "are", "still", "now", "currently", "remains", "remain", "soon", "until", "yet"];
+
+fn wandering_report(wandered: &[(&str, u32)], returned: &[(&str, u32)]) -> OfflineReport {
+    OfflineReport {
+        elapsed_seconds: 3 * 86_400 + 5 * 3_600,
+        wandered: wandered.iter().map(|(n, c)| (n.to_string(), *c)).collect(),
+        returned: returned.iter().map(|(n, c)| (n.to_string(), *c)).collect(),
+        ..OfflineReport::default()
+    }
+}
+
+/// Each kitten who wandered is named once, with its count where more than one,
+/// as a visit to the neighbour's yard that ends back home.
+/// @spec TUI-NAV-056
+#[test]
+fn each_wandering_is_named_once_as_a_visit_that_ends_back_home() {
+    let entry = entry_of(wandering_report(&[("Moss", 1), ("Wren", 2)], &[]));
+    for (name, count) in [("Moss", 1), ("Wren", 2)] {
+        assert_eq!(count_words(&entry, name), 1, "{name} is named other than once:\n{entry}");
+        let at = find_word(&entry, name).expect("named");
+        let line = line_at(&entry, at);
+        assert!(mentions(line, "neighb"), "{name}'s visit does not say where they went: {line:?}");
+        assert!(
+            ["home", "back"].iter().any(|w| find_word(line, w).is_some()),
+            "{name}'s visit does not say it ends back home: {line:?}"
+        );
+        let runs = digit_runs(clause_at(&entry, at));
+        if count > 1 {
+            assert!(runs.contains(&count.to_string()), "{name} wandered {count} times and the entry does not say so: {line:?}");
+        } else {
+            assert!(!runs.contains(&"1".to_string()), "{name} wandered once and is counted anyway: {line:?}");
+        }
+    }
+}
+
+/// Each kitten who came home is named once, with its count where more than
+/// one, as a homecoming — and a kitten on both lists is named once on each.
+/// @spec TUI-NAV-056
+#[test]
+fn each_homecoming_is_named_once_per_list_with_its_count() {
+    let entry = entry_of(wandering_report(&[], &[("Moss", 1), ("Wren", 2)]));
+    for (name, count) in [("Moss", 1), ("Wren", 2)] {
+        assert_eq!(count_words(&entry, name), 1, "{name} is named other than once:\n{entry}");
+        let at = find_word(&entry, name).expect("named");
+        let line = line_at(&entry, at);
+        assert!(find_word(line, "home").is_some(), "{name}'s homecoming does not read as one: {line:?}");
+        let runs = digit_runs(clause_at(&entry, at));
+        if count > 1 {
+            assert!(runs.contains(&count.to_string()), "{name} came home {count} times and the entry does not say so: {line:?}");
+        } else {
+            assert!(!runs.contains(&"1".to_string()), "{name} came home once and is counted anyway: {line:?}");
+        }
+    }
+
+    let both = entry_of(wandering_report(&[("Moss", 2)], &[("Moss", 2)]));
+    assert_eq!(
+        count_words(&both, "Moss"),
+        2,
+        "a kitten who both wandered and came home is named {} times; once per list. It read \
+         as:\n{both}",
+        count_words(&both, "Moss")
+    );
+}
+
+fn kitten_named(name: &str, location: clowder_core::Location) -> clowder_core::Kitten {
+    clowder_core::Kitten {
+        name: name.to_string(),
+        job: None,
+        location,
+        arrived_day: 0,
+        job_seq: None,
+        away_seq: None,
+        skills: [0.0; 8],
+        exp: 0.0,
+        rank: 0,
+        trait_id: clowder_core::KittenTrait::None,
+        tinkering: None,
+    }
+}
+
+/// The entry states occurrences, never whereabouts: where the roster says a
+/// kitten is now changes nothing in it, and nothing in its kitten lines says
+/// where anyone is.
+/// @spec TUI-NAV-056
+#[test]
+fn the_entry_states_occurrences_and_never_whereabouts() {
+    use clowder_core::Location;
+    let report = wandering_report(&[("Moss", 2), ("Wren", 1)], &[("Moss", 1), ("Hazel", 1)]);
+    let entry_with = |moss: Location, extra: usize| {
+        let mut s = away(&[(9_000, report.clone())]);
+        s.kittens = vec![
+            kitten_named("Moss", moss),
+            kitten_named("Wren", Location::Home),
+            kitten_named("Hazel", Location::Home),
+        ];
+        s.kittens.extend((0..extra).map(|i| kitten_named(&format!("Extra{i}"), Location::Home)));
+        whole_journal(&s)
+    };
+    let home = entry_with(Location::Home, 0);
+    assert_eq!(
+        home,
+        entry_with(Location::NeighborsYard, 0),
+        "where the roster says a kitten is now changed the pinned entry; the entry states what \
+         happened during its span, never who is away now"
+    );
+    assert_eq!(
+        home,
+        entry_with(Location::Home, 9),
+        "the size of the clowder changed the pinned entry; it never states a kitten total"
+    );
+
+    for name in ["Moss", "Wren", "Hazel"] {
+        let mut rest = home.as_str();
+        while let Some(at) = find_word(rest, name) {
+            let line = line_at(rest, at);
+            let said: Vec<&str> = WHEREABOUTS.iter().copied().filter(|w| find_word(line, w).is_some()).collect();
+            assert!(
+                said.is_empty(),
+                "the entry's line for {name} says where they are ({said:?}): {line:?}; it states \
+                 occurrences, never whereabouts"
+            );
+            rest = &rest[at + name.len()..];
+        }
+    }
+}
+
+/// No departure reads as a loss, as a count going down, or as a kitten total
+/// net of departures.
+/// @spec TUI-NAV-056
+#[test]
+fn no_departure_reads_as_a_loss_a_decrease_or_a_net_total() {
+    let mut report = wandering_report(&[("Moss", 1), ("Wren", 3)], &[("Wren", 2)]);
+    // Five arrived, four wandered: a total net of departures would read one.
+    report.arrived = vec![("Pip".to_string(), 2), ("Clover".to_string(), 3)];
+    let entry = entry_of(report);
+
+    assert!(loss_vocabulary(&entry).is_empty(), "the entry speaks of {:?}:\n{entry}", loss_vocabulary(&entry));
+    assert!(!shows_a_decrease(&entry), "the entry shows a count going down:\n{entry}");
+    assert!(
+        !digit_runs(&entry).contains(&"1".to_string()),
+        "the entry shows a one where five arrived and four wandered — a total net of \
+         departures:\n{entry}"
+    );
 }

@@ -95,6 +95,22 @@ pub struct ViewState {
     pub seen: [SeenMark; 10],
     /// Unread reports, newest first. @spec TUI-NAV-050
     pub reports: Vec<PendingReport>,
+    /// The nap length in years for a queued report that came from an
+    /// accepted nap, keyed by the same journal-entry index `PendingReport`
+    /// holds. The core's retained report does not itself say whether a nap
+    /// or an absence folded it, so this is the one fact the banner needs
+    /// that nothing else on `GameState` carries — read once, off the
+    /// `Event::Napped` the commit returned, and kept here rather than
+    /// re-derived, since it cannot be re-derived at all. @spec TUI-NAV-055
+    pub nap_years: Vec<(usize, u32)>,
+    /// Which journal entries the currently open Journal pins at its top —
+    /// the reports unread at the moment it opened, newest first. Frozen for
+    /// that Journal's whole lifetime: opening it reads every unread report
+    /// at once (TUI-NAV-050), but the entry must not leave the place the
+    /// player opened onto while they are still looking at it, so rendering
+    /// reads this rather than which reports are unread *now*. Cleared when
+    /// the Journal closes. @spec TUI-NAV-027, TUI-NAV-050
+    pub journal_pinned: Vec<usize>,
     /// When the last Enter-driven action fired, for the ~10/s repeat limit.
     /// @spec TUI-NAV-010
     pub last_repeat: Option<Instant>,

@@ -99,11 +99,19 @@ pub fn run() -> ExitCode {
         .unwrap_or_default()
         .as_secs();
 
+    // Carried past the match so start-up can queue whatever report the load
+    // retained (TUI-NAV-027) once `view` exists — a load never runs through a
+    // command, so this is the one seam that reaches for it directly.
+    let mut loaded_game: Option<clowder_core::LoadedGame> = None;
     let state = match contents {
         // TUI-RUN-010: an ordinary first run, not an error.
         None => GameState::new(now_unix),
         Some(c) => match clowder_core::load_string(&c, now_unix) {
-            Ok(loaded) => loaded.state,
+            Ok(loaded) => {
+                let state = loaded.state.clone();
+                loaded_game = Some(loaded);
+                state
+            }
             // TUI-RUN-011: never guess forward over a save that is currently fine.
             Err(clowder_core::LoadError::TooNew { found }) => {
                 eprintln!(
@@ -180,6 +188,11 @@ pub fn run() -> ExitCode {
         &mut view,
         &state,
     );
+    // TUI-NAV-027: exactly where the core kept a catch-up report, never from
+    // a span the shell judges on its own.
+    if let Some(loaded) = &loaded_game {
+        crate::nav::queue_load_report(&mut view, loaded);
+    }
 
     let mut app = App {
         state,
@@ -321,21 +334,42 @@ impl App {
         // rather than after the elapsed interval — and never has to sit out a
         // catch-up burst. @spec TUI-RUN-014, TUI-RUN-015, TUI-RUN-016
         let mut last_resize = None;
+        // The width Esc judges the narrow-mode inspector swap by (TUI-NAV-083)
+        // — read once per frame, before any resize this frame's own events
+        // apply, exactly as every other per-frame decision reads the width
+        // that was in force when the key arrived. @spec TUI-NAV-017
+        let width = terminal.size().map(|s| s.width).unwrap_or(u16::MAX);
         for event in input.iter().take(Self::MAX_INPUT_EVENTS_PER_FRAME) {
             match event {
                 crossterm::event::Event::Key(key) => {
                     let action = crate::nav::keys::resolve(*key, &self.view);
+                    // Esc's full order of transients — a field, an overlay, an
+                    // armed row, the narrow-mode swap, and last the report
+                    // banner — needs the terminal's width, which only this
+                    // loop holds; every other action reaches `update` as
+                    // before. @spec TUI-NAV-083
+                    if action == crate::nav::Action::Dismiss {
+                        crate::nav::dismiss(&mut self.view, width);
+                        continue;
+                    }
                     match crate::nav::update(action, &mut self.view, &self.state) {
                         crate::nav::Outcome::Handled => {}
                         crate::nav::Outcome::Quit => self.quitting = true,
-                        crate::nav::Outcome::Apply(cmd) => {
-                            if let Err(e) = self.state.apply(cmd) {
+                        crate::nav::Outcome::Apply(cmd) => match self.state.apply(cmd) {
+                            // An accepted nap returns its own report among its
+                            // events — the one route to a retained report
+                            // that runs through a command rather than a load.
+                            // @spec TUI-NAV-027, TUI-NAV-050
+                            Ok(events) => {
+                                crate::nav::queue_command_reports(&mut self.view, &self.state, &events)
+                            }
+                            Err(e) => {
                                 self.view.footer = Some((
                                     crate::nav::plain_error(&e),
                                     Instant::now() + std::time::Duration::from_secs(4),
                                 ));
                             }
-                        }
+                        },
                         crate::nav::Outcome::Repeat(cmd, n) => {
                             // Partial success is intended: take as many as you
                             // can afford, stop at the first refusal. A run

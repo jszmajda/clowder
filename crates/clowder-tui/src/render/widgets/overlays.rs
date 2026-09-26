@@ -87,6 +87,20 @@ fn spaced_words(camel: &str) -> String {
     out
 }
 
+/// A resource named the way its stores row names it — the same humanized
+/// spelling every other surface uses, never the bare identifier's own case.
+fn resource_label(r: ResourceId) -> String {
+    let tag = format!("{r:?}");
+    let mut out = String::with_capacity(tag.len() + 4);
+    for (i, c) in tag.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            out.push(' ');
+        }
+        out.push(c);
+    }
+    out
+}
+
 /// A wall-clock span, humanized coarsely enough that two spans differing by
 /// weeks never read the same.
 fn format_span(elapsed_seconds: u64) -> String {
@@ -101,6 +115,26 @@ fn format_span(elapsed_seconds: u64) -> String {
     } else {
         format!("{}m", (elapsed_seconds % 3_600) / 60)
     }
+}
+
+/// How much time passed, humanized — stated as *more than* that span, with a
+/// gentle note that the meadow stopped counting there, where the core's own
+/// replay hit its cap (`truncated`). A floor is not the absence, so the
+/// wording says so rather than reading as an exact figure it is not.
+/// @spec TUI-NAV-027, TUI-NAV-055
+fn span_clause(report: &OfflineReport) -> String {
+    let span = format_span(report.elapsed_seconds);
+    if report.truncated {
+        format!("more than {span}")
+    } else {
+        span
+    }
+}
+
+/// The gentle note appended where the core stopped counting — never on its
+/// own line, since it belongs to the span it qualifies. @spec TUI-NAV-027
+fn truncated_note(report: &OfflineReport) -> Option<&'static str> {
+    report.truncated.then_some(" \u{2014} the meadow stopped counting there")
 }
 
 /// The largest positive resource gains in a report, curated to a handful so a
@@ -121,9 +155,26 @@ fn largest_gains(report: &OfflineReport) -> Vec<(ResourceId, f64)> {
 fn gains_text(report: &OfflineReport) -> String {
     largest_gains(report)
         .into_iter()
-        .map(|(r, d)| format!("+{} {}", fmt::compact(d), format!("{r:?}").to_lowercase()))
+        .map(|(r, d)| format!("+{} {}", fmt::compact(d), resource_label(r)))
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+/// Every resource whose stock changed at all during the report's span,
+/// signed — gains before decreases, and each group largest amount first (a
+/// decrease's size is how far the stock fell). The pinned entry tells the
+/// whole report, unlike the banner's curated three. @spec TUI-NAV-027
+fn changed_resources(report: &OfflineReport) -> Vec<(ResourceId, f64)> {
+    let mut changed: Vec<(ResourceId, f64)> = ResourceId::ALL
+        .into_iter()
+        .map(|r| (r, report.resource_deltas[r.ix()]))
+        .filter(|(_, delta)| *delta != 0.0)
+        .collect();
+    changed.sort_by(|a, b| {
+        let group = |d: f64| if d > 0.0 { 0 } else { 1 };
+        group(a.1).cmp(&group(b.1)).then(b.1.abs().partial_cmp(&a.1.abs()).unwrap_or(std::cmp::Ordering::Equal))
+    });
+    changed
 }
 
 /// The dim one-line ticker. Flavour is quieter than mechanical; milestones are
@@ -142,18 +193,52 @@ pub fn ticker(f: &mut Frame, area: Rect, state: &GameState) {
     f.render_widget(Paragraph::new(Line::styled(text, style)), area);
 }
 
-/// Full scrollback over the retained journal, grouped by day.
-/// @spec TUI-NAV-026
+/// Full scrollback over the retained journal, grouped by day — with every
+/// unread report pinned above it, newest first, so the Journal opens onto the
+/// tale rather than making the player scroll to find it.
+/// @spec TUI-NAV-026, TUI-NAV-027, TUI-NAV-050
 pub fn journal(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     let anchor = match &view.overlay {
         Some(Overlay::Journal { anchor }) => *anchor,
         _ => 0,
     };
 
+    let entries = state.journal.iter_chronological();
+
+    // While this Journal is open, what is pinned is frozen to what was
+    // unread the moment it opened (`ViewState::journal_pinned`) — reading it
+    // must not walk an entry back out of the place the player opened onto.
+    // With no Journal open at all, pinning simply reads what is unread now.
+    // Indices are positions in `state.journal.kept` — append-only, so they
+    // stay put however many ordinary occurrences land in `recent` afterward
+    // — never a position in the two merged and re-sorted, which an event
+    // stamped earlier than a pinned report would shift out from under it.
+    // @spec TUI-NAV-027, TUI-NAV-050
+    let pinned: Vec<usize> = if matches!(view.overlay, Some(Overlay::Journal { .. })) {
+        view.journal_pinned.clone()
+    } else {
+        view.reports.iter().filter(|r| !r.dismissed).map(|r| r.entry).collect()
+    };
+    // Identified by their place in memory, since that is what a `kept` index
+    // and a reference out of the merged, re-sorted list can be compared by in
+    // common. @spec TUI-NAV-027, TUI-NAV-050
+    let pinned_ptrs: Vec<*const clowder_core::JournalEntry> =
+        pinned.iter().filter_map(|&idx| state.journal.kept.get(idx).map(|e| e as *const _)).collect();
+
     let mut lines: Vec<Line<'static>> = Vec::new();
+    for &idx in &pinned {
+        if let Some(JournalItem::Away(report)) = state.journal.kept.get(idx).map(|e| &e.item) {
+            lines.extend(away_report_lines(report));
+        }
+    }
+
     // Newest first, so scrolling forward from the top reads like the ticker
-    // it complements. @spec TUI-NAV-026
-    for entry in state.journal.iter_chronological().into_iter().rev() {
+    // it complements — every pinned entry left out, since it is already
+    // told above. @spec TUI-NAV-026
+    for entry in entries.into_iter().rev() {
+        if pinned_ptrs.contains(&(entry as *const _)) {
+            continue;
+        }
         match &entry.item {
             JournalItem::Happened(event) => lines.push(Line::raw(event_line(event))),
             JournalItem::Away(report) => lines.extend(away_report_lines(report)),
@@ -167,25 +252,62 @@ pub fn journal(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     f.render_widget(Paragraph::new(visible), area);
 }
 
-/// The pinned entry's full folded detail: the elapsed span and gains a banner
-/// would also show, and — unlike the banner — every kitten who wandered,
-/// named as a visit that reverses on its own, and every arrival.
+/// The pinned entry's full folded detail: the span (stated as more than
+/// itself, with a gentle note, where the core stopped counting); every
+/// resource whose stock changed, signed, gains before decreases, each group
+/// largest first; each kitten who arrived, wandered, or came home, by name;
+/// and the seasons passed. Unlike the banner, this tells everything the
+/// report holds — dismissing the banner must lose nothing.
 /// @spec TUI-NAV-027, TUI-NAV-056
 fn away_report_lines(report: &OfflineReport) -> Vec<Line<'static>> {
-    let mut lines = vec![Line::raw(format!(
-        "\u{2605} away for {}: {}",
-        format_span(report.elapsed_seconds),
-        gains_text(report)
-    ))];
-    for (name, _) in &report.wandered {
-        // A present absence that reverses on its own — never a loss or a
-        // count decrease. @spec TUI-NAV-056
+    let mut header = format!("\u{2605} away for {}", span_clause(report));
+    if let Some(note) = truncated_note(report) {
+        header.push_str(note);
+    }
+    header.push('.');
+    let mut lines = vec![Line::raw(header)];
+
+    // Every changed stock, one to a line — never joined onto the header's
+    // own line, which a report touching every resource would run well past
+    // any pane's width; the Journal scrolls, so a line each costs nothing.
+    // @spec TUI-NAV-027
+    for (r, d) in changed_resources(report) {
         lines.push(Line::raw(format!(
-            "  {name} is off visiting the neighbours' yard \u{2014} home again soon."
+            "  {}{} {}",
+            if d > 0.0 { "+" } else { "-" },
+            fmt::compact(d.abs()),
+            resource_label(r)
         )));
     }
-    for (name, _) in &report.arrived {
-        lines.push(Line::raw(format!("  {name} arrived!")));
+
+    // Occurrences, never whereabouts (TUI-NAV-056): each list counts what
+    // happened during the span, by name, with its count where the report
+    // counts more than one — never where anyone ended up.
+    for (name, count) in &report.arrived {
+        lines.push(Line::raw(if *count > 1 {
+            format!("  {name} arrived {count} times!")
+        } else {
+            format!("  {name} arrived!")
+        }));
+    }
+    for (name, count) in &report.wandered {
+        // A visit to the neighbour's yard that ends back home — never a loss
+        // or a departure. @spec TUI-NAV-056
+        lines.push(Line::raw(if *count > 1 {
+            format!("  {name} visited the neighbours' yard {count} times and came back home.")
+        } else {
+            format!("  {name} visited the neighbours' yard and came back home.")
+        }));
+    }
+    for (name, count) in &report.returned {
+        lines.push(Line::raw(if *count > 1 {
+            format!("  {name} came home {count} times.")
+        } else {
+            format!("  {name} came home.")
+        }));
+    }
+    if report.seasons_passed > 0 {
+        lines.push(Line::raw(format!("  {} seasons passed.", report.seasons_passed)));
     }
     lines
 }
@@ -272,40 +394,133 @@ pub fn palette(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     f.render_widget(Paragraph::new(lines), area);
 }
 
-/// The unread report the banner is currently showing: the first entry in
+/// The unread report the banner is currently showing — the first entry in
 /// `view.reports` that has not been dismissed, so a queue of several drains
-/// oldest-visible-first while newer ones keep their place ahead of it.
+/// oldest-visible-first while newer ones keep their place ahead of it — and
+/// the journal-entry index it sits at, which is the one thing the nap route
+/// hangs its own length in years off (`ViewState::nap_years`), since the
+/// core's retained report does not say whether a nap or an absence folded it.
 /// @spec TUI-NAV-050
-fn active_report<'a>(state: &'a GameState, view: &ViewState) -> Option<&'a OfflineReport> {
+fn active_report<'a>(state: &'a GameState, view: &ViewState) -> Option<(usize, &'a OfflineReport)> {
     let pending = view.reports.iter().find(|r| !r.dismissed)?;
-    let entries = state.journal.iter_chronological();
-    match &entries.get(pending.entry)?.item {
-        JournalItem::Away(report) => Some(report),
+    match &state.journal.kept.get(pending.entry)?.item {
+        JournalItem::Away(report) => Some((pending.entry, report)),
         JournalItem::Happened(_) => None,
     }
 }
 
-/// The returning player's one-line banner: elapsed span, the largest gains, and
-/// arrivals. Departures belong to the pinned entry — the first thing seen on
-/// return leads with what grew.
+/// How much time passed, as the banner's opening clause: the core's own span
+/// for an absence, or — for a nap, which the core folds through the very same
+/// report — the nap's length in years, the one fact the retained report
+/// itself cannot carry (Decisions & Alternatives: how much time a nap's
+/// banner says passed). @spec TUI-NAV-055
+fn banner_time_clause(report: &OfflineReport, nap_years: Option<u32>) -> String {
+    match nap_years {
+        Some(years) => format!("~ after a nap of {years} year{}", if years == 1 { "" } else { "s" }),
+        None => format!("~ while you were away ({})", span_clause(report)),
+    }
+}
+
+/// The returning player's one-line banner, assembled clause by clause so a
+/// pane too narrow for all of it drops whole clauses — never cuts one — in
+/// the fixed order TUI-NAV-055 gives, and never drops the span.
 /// @spec TUI-NAV-027, TUI-NAV-050, TUI-NAV-055, TUI-NAV-056
 pub fn banner(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
-    let Some(report) = active_report(state, view) else {
+    let Some((entry, report)) = active_report(state, view) else {
         return;
     };
+    let nap_years = view.nap_years.iter().find(|(e, _)| *e == entry).map(|(_, y)| *y);
+    let line = banner_line(report, nap_years, area.width as usize);
+    f.render_widget(Paragraph::new(Line::styled(line, Style::default().add_modifier(Modifier::REVERSED))), area);
+}
 
-    let mut parts = vec![gains_text(report)];
-    if !report.arrived.is_empty() {
-        let n = report.arrived.len();
-        parts.push(format!("{n} kitten{} arrived", if n == 1 { "" } else { "s" }));
+/// Assemble the banner's line for a pane `width` columns wide. Nothing here
+/// reads `report.wandered` or `report.returned` — departures and absences are
+/// the pinned entry's to tell. @spec TUI-NAV-055, TUI-NAV-056
+fn banner_line(report: &OfflineReport, nap_years: Option<u32>, width: usize) -> String {
+    let time = banner_time_clause(report, nap_years);
+    let gains: Vec<String> =
+        largest_gains(report).into_iter().map(|(r, d)| format!("+{} {}", fmt::compact(d), resource_label(r))).collect();
+    let arrivals_sum: u32 = report.arrived.iter().map(|(_, c)| *c).sum();
+    let arrivals = (arrivals_sum > 0)
+        .then(|| format!("{arrivals_sum} kitten{} arrived", if arrivals_sum == 1 { "" } else { "s" }));
+    let quiet_note = (gains.is_empty() && arrivals.is_none()).then(|| "the meadow kept quiet".to_string());
+
+    // Priority order — lowest dropped first — exactly TUI-NAV-055's list:
+    // the dismiss hint, the third gain, the second gain, the tale hint, the
+    // arrivals, then the largest gain (or the quiet note standing in for
+    // it). Absent clauses are simply never candidates to drop, and the
+    // numbering below is `assemble_banner_line`'s own vocabulary of which
+    // clause each priority names.
+    let mut droppable: Vec<u8> = vec![0]; // the dismiss hint is always a candidate
+    if gains.len() > 2 {
+        droppable.push(1); // the third gain
+    }
+    if gains.len() > 1 {
+        droppable.push(2); // the second gain
+    }
+    droppable.push(3); // the tale hint
+    if arrivals.is_some() {
+        droppable.push(4);
+    }
+    if quiet_note.is_some() || !gains.is_empty() {
+        droppable.push(5); // the largest gain, or the quiet note in its place
     }
 
-    // Nothing here reads `report.wandered` or `report.returned` — departures
-    // and absences are the pinned entry's to tell. @spec TUI-NAV-055, TUI-NAV-056
-    let line = format!(
-        "~ while you were away ({}): {} \u{b7} e for the tale \u{b7} Esc dismiss",
-        format_span(report.elapsed_seconds),
-        parts.join(", "),
-    );
-    f.render_widget(Paragraph::new(Line::styled(line, Style::default().add_modifier(Modifier::REVERSED))), area);
+    for dropped in 0..=droppable.len() {
+        let kept: std::collections::BTreeSet<u8> = droppable[dropped..].iter().copied().collect();
+        let line = assemble_banner_line(&time, &gains, arrivals.as_deref(), quiet_note.as_deref(), &kept);
+        if line.chars().count() <= width || dropped == droppable.len() {
+            return line;
+        }
+    }
+    time
+}
+
+/// Reconstruct the line in the banner's own display order — span, then the
+/// gains (or the quiet note in their place), the arrivals, and the two hints
+/// — including a clause only where its priority is still in `kept`.
+fn assemble_banner_line(
+    time: &str,
+    gains: &[String],
+    arrivals: Option<&str>,
+    quiet_note: Option<&str>,
+    kept: &std::collections::BTreeSet<u8>,
+) -> String {
+    let mut middle: Vec<&str> = Vec::new();
+    if kept.contains(&5) {
+        if let Some(note) = quiet_note {
+            middle.push(note);
+        } else if let Some(t) = gains.first() {
+            middle.push(t);
+        }
+    }
+    if kept.contains(&2) {
+        if let Some(t) = gains.get(1) {
+            middle.push(t);
+        }
+    }
+    if kept.contains(&1) {
+        if let Some(t) = gains.get(2) {
+            middle.push(t);
+        }
+    }
+    if kept.contains(&4) {
+        if let Some(t) = arrivals {
+            middle.push(t);
+        }
+    }
+
+    let mut line = time.to_string();
+    if !middle.is_empty() {
+        line.push_str(": ");
+        line.push_str(&middle.join(", "));
+    }
+    if kept.contains(&3) {
+        line.push_str(" \u{b7} e for the tale");
+    }
+    if kept.contains(&0) {
+        line.push_str(" \u{b7} Esc dismiss");
+    }
+    line
 }
