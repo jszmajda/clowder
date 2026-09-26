@@ -27,7 +27,7 @@
 //! AdoptRule rows — last in a long list — are checked on a terminal tall
 //! enough that nothing scrolls.
 //!
-//! @spec TUI-NAV-015, TUI-NAV-075, TUI-NAV-077, TUI-THEME-011
+//! @spec TUI-NAV-015, TUI-NAV-075, TUI-NAV-077, TUI-THEME-011, TUI-THEME-015
 
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
@@ -1029,4 +1029,175 @@ fn an_armed_row_wears_attention_on_its_expansion_and_nowhere_on_its_own_line() {
             "fixture: some armed row should wear `{m}` (saw {markers_seen:?})"
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-015 — the expansion wears attention on what is drawn of it, and
+// nothing else in the frame takes it
+//
+// The arming is one of the three things that want the player, and its mark is
+// its expansion. Where the layout leaves part of the expansion out of view,
+// the colour stays on what is drawn of it: it does not move onto the row's
+// own line, nor onto the hint bar, whose armed keys are the arming's word
+// channel and are drawn as any hint is. The header's chips and the sidebar's
+// `full` tags are the other two wearers, and are held to their own rule in
+// `chrome.rs`; everywhere else in an armed frame, only the expansion may be
+// in attention.
+// ---------------------------------------------------------------------------
+
+/// Every heavy row, armed as the player arms it, over the rich meadow.
+fn every_arming(state: &GameState) -> Vec<(String, ViewState)> {
+    let mut out = vec![
+        ("GreatMeadowMove".to_string(), armed_by_enter(state, Section::Legacy, &move_key(state))),
+        ("PassItDown".to_string(), armed_by_enter(state, Section::Legacy, &pass_key(state))),
+        ("DeepNap".to_string(), nap_armed(state, 4)),
+    ];
+    for rule in RuleId::ALL {
+        out.push((
+            format!("AdoptRule({rule:?})"),
+            armed_by_enter(state, Section::Ideas, &rule_key(state, rule)),
+        ));
+    }
+    out
+}
+
+/// Whether a cell lies outside the header row and the sidebar — the two
+/// places the other wearers of attention are drawn.
+fn outside_chip_and_tag_regions(l: &Layout, x: u16, y: u16) -> bool {
+    let sidebar = match l.body {
+        Body::Narrow { sidebar, .. } | Body::Wide { sidebar, .. } => Some(sidebar),
+        Body::TooSmall(_) => None,
+    };
+    let p = ratatui::layout::Position { x, y };
+    y != l.header.y && !sidebar.is_some_and(|s| s.contains(p))
+}
+
+/// An armed row's expansion wears the one `attention` value on every cell
+/// drawn of it, however much of it is in view, and nothing else in the frame outside the header and the sidebar
+/// is drawn in attention: not the row's own line, not the hint bar's armed
+/// keys, not the rest of the list or the inspector. Swept for every heavy
+/// row, with the list alone and with the inspector pane beside it, at heights
+/// where the lists scroll and at one where nothing does, so a row at the
+/// list's end is drawn with its expansion out of view; and for the
+/// narrow-mode swap, where the inspector carries the summary instead.
+///
+/// @spec TUI-THEME-015
+#[test]
+fn an_armed_rows_expansion_keeps_attention_on_what_is_drawn_and_nothing_else_takes_it() {
+    let state = meadow();
+    let attention = attention();
+    // The floor and one past both breakpoints, each at the floor's height
+    // and the one after it (the last row of a scrolled list sits at the
+    // bottom at every height), two taller, and the height at which nothing
+    // scrolls at all.
+    let widths: [u16; 2] = [80, 150];
+    let heights: [u16; 5] = [24, 25, 31, 40, tall(&state).1];
+
+    let (mut whole, mut part, mut none) = (0usize, 0usize, 0usize);
+    for (name, mut view) in every_arming(&state) {
+        view.armed.as_mut().expect("armed").expires_at = Instant::now() + Duration::from_secs(3600);
+        let full_len = expansion(&state, &view, tall(&state)).len();
+
+        // The list, and in a wide frame the inspector pane beside it.
+        let mut frames: Vec<((u16, u16), bool)> = Vec::new();
+        for &w in &widths {
+            for &h in &heights {
+                frames.push(((w, h), false));
+            }
+        }
+        for size in NARROW {
+            frames.push((size, true));
+        }
+
+        for (size, swap) in frames {
+            // The sweep outlasts an arming's own expiry, so each frame is
+            // drawn over an arming made fresh for it.
+            let mut view = ViewState { inspector_wanted: swap, ..view.clone() };
+            view.armed.as_mut().expect("armed").expires_at = Instant::now() + Duration::from_secs(3600);
+            let armed = draw(&state, &view, size);
+            let plain = draw(&state, &unarmed(&view), size);
+            let what = format!("the armed {name} row at {size:?} (swap {swap})");
+
+            // Where the expansion is drawn: beneath the row in the list, or
+            // inserted into whatever inspector is on screen.
+            let mut allowed: Vec<(Rect, std::ops::Range<usize>)> = Vec::new();
+            let mut own_line: Option<u16> = None;
+            let main = list_rect(&armed.layout);
+            if swap {
+                allowed.push((main, inserted_rows(&armed.buffer, &plain.buffer, main)));
+            } else {
+                let (r, rows) = armed_rows(&armed, &plain, size);
+                own_line = Some(main.y + r as u16);
+                match rows.len() {
+                    n if n == full_len => whole += 1,
+                    0 => none += 1,
+                    n if n < full_len => part += 1,
+                    n => panic!("{what}: {n} expansion lines drawn, more than the {full_len} it has"),
+                }
+                if !rows.is_empty() {
+                    assert_expansion_wears_attention(&what, &armed.buffer, main, rows.clone());
+                }
+                allowed.push((main, rows));
+                if let Body::Wide { inspector, .. } = armed.layout.body {
+                    allowed.push((inspector, inserted_rows(&armed.buffer, &plain.buffer, inspector)));
+                }
+            }
+
+            let (w, h) = size;
+            for y in 0..h {
+                for x in 0..w {
+                    if !outside_chip_and_tag_regions(&armed.layout, x, y) {
+                        continue;
+                    }
+                    let p = ratatui::layout::Position { x, y };
+                    let in_expansion = allowed.iter().any(|(rect, rows)| {
+                        rect.contains(p) && rows.contains(&((y - rect.y) as usize))
+                    });
+                    let cell = armed.buffer.cell((x, y)).expect("cell");
+                    if in_expansion {
+                        if !cell.symbol().trim().is_empty() {
+                            assert_eq!(
+                                cell.fg,
+                                attention,
+                                "{what}: the expansion's `{}` at ({x}, {y}) is drawn in {:?}, \
+                                 not attention",
+                                cell.symbol(),
+                                cell.fg
+                            );
+                        }
+                        continue;
+                    }
+                    let place = if Some(y) == own_line {
+                        "on the row's own line"
+                    } else if y == armed.layout.hints.y {
+                        "on the hint bar"
+                    } else {
+                        "outside the expansion"
+                    };
+                    let line: String = (0..w)
+                        .map(|x| armed.buffer.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+                        .collect();
+                    assert_ne!(
+                        cell.fg,
+                        attention,
+                        "{what}: `{}` at ({x}, {y}) {place} is drawn in attention. The arming \
+                         wears attention on what is drawn of its expansion and nowhere else — \
+                         the colour never moves onto the row's line or the hint bar when the \
+                         expansion is out of view.\nline: {line:?}",
+                        cell.symbol()
+                    );
+                }
+            }
+        }
+    }
+
+    // An expansion of several lines partly cut off is held to the same rule
+    // wherever the sweep reaches one; the nearest the lists come today is a
+    // one-line expansion wholly out of view beneath a row at the list's end.
+    let _ = part;
+    assert!(
+        whole > 0 && none > 0,
+        "fixture: the sweep should draw expansions wholly in view ({whole}) and wholly out of \
+         view beneath a row at the list's end ({none})"
+    );
 }

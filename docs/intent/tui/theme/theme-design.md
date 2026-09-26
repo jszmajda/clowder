@@ -39,10 +39,24 @@ Six roles. Every value sits in a mid-luminance band so it clears the contrast fl
 | `dim` | `#7C7873` | Revealed but not actionable, owned and done, flavour events, chrome rules, spent hints |
 | `ready` | `#3E8E5A` | ● affordable now |
 | `partial` | `#A8802F` | ◐ partially affordable |
-| `attention` | `#C0663A` | Attention chips, the `full` tag on a capped store, an armed row's expansion beneath it |
+| `attention` | `#C0663A` | Each attention chip whole, the `full` tag on a capped store, an armed row's expansion beneath it — and nothing else |
 | `milestone` | `#7E6BA8` | ★ milestones and newly revealed content |
 
 Mood takes no colour at all. The navigation leaf already renders it as a word (TUI-NAV-019), and a word is unambiguous, translatable to a screen reader, and immune to every failure mode a five-step colour ramp has. Where a channel is already carrying meaning well, adding colour is noise.
+
+### What wears `attention`
+
+`attention` means one thing — *this wants you* — and the glance contract depends on it meaning nothing else. An empty chip cluster and no `full` tag is how the player reads, in two seconds, that nothing needs them, and the eye can only learn that if orange appearing is always that signal. So the role is not subdivided by surface, and it is not lent to anything that is merely information.
+
+Three elements wear it, each on exactly the mark that says it wants notice:
+
+- **An attention chip, whole.** Its glyph, its count where it has one, and its word all wear `attention`; the blank columns between chips, and the header's facts beside them, do not. This holds at every width step the header takes (TUI-NAV-086) — a chip that has shed its count is still a chip — and for every chip alike, the `★N new` chip included. That chip counts tabs wearing the `milestone` ★, but the chip itself is asking for the player, and a cluster in two colours would leave the eye to work out which colour means "come look".
+- **The `full` tag on a capped store, and only the tag.** The store's name, figures, fill bar, and rate are drawn as any store's are. The tag is present exactly while the store is capped (TUI-NAV-022), whereas the bar's cells can read full a little before the cap is reached, so the word is the state's exact mark and the colour sits on it.
+- **An armed row's expansion.** The summary lines beneath the row, and their copy in the inspector while the narrow-mode swap holds the list's space — never the row's own line (The compressed run). Where the layout leaves part of the expansion out of view, the colour stays on what is drawn of it and does not move onto the row's line or the hint bar in its place. The hint bar's armed keys are drawn as any hint is: they are the arming's word channel, not a second coloured mark.
+
+All three wear the same `attention` value, whichever surface draws them, so there is one orange to learn.
+
+Nothing else wears `attention`. A footer note — the reply to a key just pressed (TUI-NAV-014) — is ordinary prose in the inherited foreground. It is drawn where the player is already looking and lasts seconds, so it needs no colour to be seen; in orange it would be one more thing the glance has to rule out before concluding nothing needs the player, and a refused keypress drawn in the colour of an opportunity would read as a scolding.
 
 ## The Signature: the Pane Keeps the Season
 
@@ -66,8 +80,8 @@ Every meaning colour carries is carried by something else first — a glyph, a w
 | Meaning | First channel | Colour |
 |---|---|---|
 | Affordability | `●` `◐` `○` `✓` | `ready` / `partial` / `dim` |
-| Attention | Glyph + count + word | `attention` |
-| Capped store | The word `full`, and a filled bar | `attention` |
+| Attention | Glyph + count + word | `attention`, on the whole chip |
+| Capped store | The word `full`, and a filled bar | `attention`, on the word |
 | Armed row | Its expansion beneath itself, and its keys in the hint bar | `attention`, on the expansion |
 | Milestone | `★` | `milestone` |
 | Flavour vs mechanical | `·` vs `▪` | `dim` vs inherited |
@@ -108,6 +122,10 @@ Both rules hold whatever values the palette settles on (Deferred 1). Retuning th
 | Luminance range | Mid-band throughout | Full range, tuned per background | The consequence of inheriting the ground; also pushes toward the calm the glance contract wants |
 | Focus emphasis | Cursor glyph, and reverse where more is needed | A focus colour | A focus tint would put a second, unrelated colour in a row whose marker is already saying something |
 | Where an armed row wears `attention` | On its expansion beneath it; none on its own line, whose marker keeps its availability colour | Tint the whole line, marker included; tint the line around a marker left in its availability colour | An orange `●` or `◐` is the same appearance as a green `●` or an amber `◐` to a red-green deficiency, so a tinted marker would put affordability in doubt; a line tinted around its marker carries two colours saying different things, the arrangement focus is kept off the palette to avoid; the expansion is the arming's own mark and says nothing else |
+| What wears `attention` | Each chip whole, the `full` tag alone, an armed row's expansion; one value everywhere, and nothing else | A distinct hue per surface; lending the role to other notices such as footer notes | One colour for one meaning is what lets an empty cluster and no `full` tag read as calm; a hue per surface is three colours to learn for one idea, and a notice that is not an opportunity dilutes the signal |
+| The `★N new` chip's colour | `attention`, as every chip | `milestone`, matching the ★ on the tabs it counts | The cluster is read as one signal; a chip in another colour would make the player ask which colour means "come look", and the chip's own glyph and word already say what it concerns |
+| Where a capped store wears `attention` | On the `full` tag alone | Tint the whole sidebar line; tint the fill bar with the tag | A tinted line colours the store's name and figures, which carry identity and quantity rather than the state; the bar's cells can read full before the cap is reached, so only the word marks the state exactly |
+| Footer notes | Inherited foreground | `attention` | A note answers the key just pressed, where the player is already looking, and lasts seconds; in `attention` it would be one more orange the glance must rule out, and a refusal in an opportunity's colour reads as a scolding |
 | Missing truecolor | Detect and say so once; render unchanged | Assume it; ship a 256-colour fallback | A silent approximation reads as a defect in the game; a fallback palette is an explicit HLD non-goal |
 
 ## Open Questions & Future Decisions

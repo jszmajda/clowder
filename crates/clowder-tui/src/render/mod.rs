@@ -482,13 +482,12 @@ pub fn frame(
     widgets::overlays::ticker(f, layout.ticker, state);
     // A footer note takes the hint bar's row while it lasts: it is the reply
     // to what the player just did, and it belongs where they are already
-    // looking. @spec TUI-NAV-014
+    // looking. It does not want the player — it is ordinary prose, not one of
+    // attention's three wearers — so it is drawn in the inherited foreground,
+    // never attention. @spec TUI-NAV-014, TUI-THEME-015
     match view.footer.as_ref().filter(|(_, until)| *until > std::time::Instant::now()) {
         Some((note, _)) => f.render_widget(
-            Paragraph::new(Line::from(Span::styled(
-                fmt::fit(note, layout.hints.width as usize),
-                style_for(Role::Attention),
-            ))),
+            Paragraph::new(Line::from(Span::raw(fmt::fit(note, layout.hints.width as usize)))),
             layout.hints,
         ),
         None => widgets::chrome::hints(f, layout.hints, state, view),

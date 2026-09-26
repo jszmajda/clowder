@@ -3,7 +3,7 @@
 //!
 //! @spec TUI-NAV-019, TUI-NAV-020, TUI-NAV-021, TUI-NAV-022, TUI-NAV-023,
 //! TUI-NAV-024, TUI-NAV-025, TUI-NAV-034, TUI-NAV-044, TUI-NAV-045, TUI-NAV-054,
-//! TUI-NAV-086, TUI-THEME-011
+//! TUI-NAV-086, TUI-THEME-011, TUI-THEME-015
 //!
 //! **The contract these tests are made of.** The chrome's job is to be quiet.
 //! An empty attention cluster means nothing needs you, and that only works if
@@ -53,6 +53,7 @@ use clowder_tui::nav::{
     reset_hidden_tabs, update, Action, ArmedRow, CountPrompt, CountSemantics, Overlay,
     PendingReport, Section, SeenMark, ViewState,
 };
+use clowder_tui::render::fmt;
 use clowder_tui::render::layout::{compute, Body};
 use clowder_tui::render::widgets::{chrome, overlays};
 
@@ -2066,6 +2067,585 @@ fn among_the_compressed_run_each_glyph_wears_only_its_own_colour() {
         saw_filled > 0 && saw_half > 0 && saw_chip > 0,
         "fixture: the sweep should draw every glyph of the run (● {saw_filled}, ◐ {saw_half}, \
          chip glyphs {saw_chip})"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-015 — what wears `attention`, and nothing else
+//
+// `attention` means one thing — this wants you — and the glance contract rests
+// on that: an empty chip cluster and no `full` tag reads as calm only if orange
+// appearing is always that signal. So each chip is drawn whole in it (glyph,
+// count where it has one, word) at every width step the header takes, the
+// capped store's `full` tag alone wears it, and nothing that is merely
+// information borrows it — a footer note included. The armed row's expansion,
+// the third element, is checked with the armed row in `armed_summary.rs`.
+// Every assertion compares against the one value `Role::Attention` hands out,
+// so three surfaces agreeing with it is one orange to learn.
+// ---------------------------------------------------------------------------
+
+fn attention_colour() -> ratatui::style::Color {
+    clowder_tui::theme::Role::Attention.color().expect("Attention carries a colour")
+}
+
+/// The chips drawn on one line of cells, each as the columns it spans and the
+/// word it is: a chip's glyph, then any digits, then — after at most one
+/// blank — its word. A glyph not followed by its word is not a chip and is
+/// not returned.
+fn chip_spans(symbols: &[String]) -> Vec<(std::ops::Range<usize>, &'static str)> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < symbols.len() {
+        let Some(chip) = CHIPS.iter().find(|c| symbols[i].starts_with(c.0)) else {
+            i += 1;
+            continue;
+        };
+        let mut j = i + 1;
+        let mut counted = false;
+        while j < symbols.len() && symbols[j].chars().all(|c| c.is_ascii_digit()) && !symbols[j].is_empty() {
+            j += 1;
+            counted = true;
+        }
+        if counted && j < symbols.len() && symbols[j] == " " {
+            j += 1;
+        }
+        let word_len = chip.1.chars().count();
+        let word: String = symbols.get(j..j + word_len).map(|s| s.concat()).unwrap_or_default();
+        if word == chip.1 {
+            out.push((i..j + word_len, chip.1));
+            i = j + word_len;
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+/// The columns of every whole-token `word` on a line of cells.
+fn word_spans(symbols: &[String], word: &str) -> Vec<std::ops::Range<usize>> {
+    let len = word.chars().count();
+    (0..symbols.len().saturating_sub(len - 1))
+        .filter(|&i| {
+            symbols[i..i + len].concat() == word
+                && (i == 0 || symbols[i - 1].trim().is_empty())
+                && symbols.get(i + len).is_none_or(|s| s.trim().is_empty())
+        })
+        .map(|i| i..i + len)
+        .collect()
+}
+
+/// A leading fragment of `word` sitting at the very last column of `symbols`,
+/// preceded by whitespace: what a whole-word span becomes once the sidebar's
+/// fixed width (TUI-NAV-022's surface, not this spec's) clips the row's last
+/// character off. Recognized so this test's job — nothing wears `attention`
+/// but a chip or the `full` tag — stays about colour even on the row where
+/// width already cuts the tag's last letter; whether the tag fits whole is a
+/// layout question this spec does not decide.
+fn clipped_word_span(symbols: &[String], word: &str) -> Option<std::ops::Range<usize>> {
+    let word: Vec<char> = word.chars().collect();
+    (1..word.len()).rev().find_map(|k| {
+        let start = symbols.len().checked_sub(k)?;
+        let fragment: String = word[..k].iter().collect();
+        (symbols[start..].concat() == fragment && (start == 0 || symbols[start - 1].trim().is_empty()))
+            .then_some(start..symbols.len())
+    })
+}
+
+/// One row of a buffer as its cells, clipped to `rect`'s columns.
+fn row_cells(buf: &Buffer, rect: Rect, y: u16) -> Vec<ratatui::buffer::Cell> {
+    (rect.x..rect.right()).map(|x| buf.cell((x, y)).expect("cell").clone()).collect()
+}
+
+fn symbols_of(cells: &[ratatui::buffer::Cell]) -> Vec<String> {
+    cells.iter().map(|c| c.symbol().to_string()).collect()
+}
+
+/// Each attention chip is drawn whole in the one `attention` value — its
+/// glyph, its count where it has one, and its word — and nothing else on the
+/// header line is: not the blank columns between chips, not the facts. Swept
+/// for every combination of live chips, at every width from the narrowest any
+/// step can draw to wide, so every step TUI-NAV-086 takes is reached, the
+/// counted and the uncounted cluster alike; and for counts of one and of two
+/// digits. The `★N new` chip is held to this like any other.
+///
+/// @spec TUI-THEME-015
+#[test]
+fn every_attention_chip_is_drawn_whole_in_attention_and_nothing_else_on_the_header_is() {
+    let attention = attention_colour();
+    let mut forms_seen: BTreeSet<(&str, bool)> = BTreeSet::new();
+
+    for (idle, new) in [(3usize, 2usize), (12, 3)] {
+        for mask in 0u8..16 {
+            let live = [mask & 1 != 0, mask & 2 != 0, mask & 4 != 0, mask & 8 != 0];
+            let (state, view) = live_chips_fixture(live, idle, new);
+            let floor_line = chip_cluster(live, None).chars().count()
+                + compact_facts(&state)[3..].join(" ").chars().count()
+                + 1;
+            for w in floor_line..=(WIDE_W as usize) {
+                let mut term = terminal(w as u16, 1);
+                term.draw(|f| {
+                    let area = f.area();
+                    chrome::header(f, area, &state, &view);
+                })
+                .expect("TestBackend is infallible");
+                let buf = term.backend().buffer();
+                let cells = row_cells(buf, Rect::new(0, 0, w as u16, 1), 0);
+                let symbols = symbols_of(&cells);
+                let line = symbols.concat();
+
+                let spans = chip_spans(&symbols);
+                let drawn: Vec<&str> = spans.iter().map(|(_, word)| *word).collect();
+                let wanted: Vec<&str> =
+                    CHIPS.iter().zip(live).filter(|(_, on)| *on).map(|(c, _)| c.1).collect();
+                assert_eq!(
+                    drawn, wanted,
+                    "fixture: at width {w} with chips {live:?} live, the header's chips should \
+                     read as {wanted:?}: {line:?}"
+                );
+
+                let mut in_chip = vec![false; cells.len()];
+                for (span, word) in &spans {
+                    let counted = symbols[span.clone()].iter().any(|s| s.chars().all(|c| c.is_ascii_digit()));
+                    forms_seen.insert((word, counted));
+                    for x in span.clone() {
+                        in_chip[x] = true;
+                        assert_eq!(
+                            cells[x].fg,
+                            attention,
+                            "at width {w}, the `{word}` chip's `{}` at column {x} is drawn in \
+                             {:?}, not attention. A chip wears attention whole — glyph, count, \
+                             and word — at every width step.\nline: {line:?}",
+                            cells[x].symbol(),
+                            cells[x].fg
+                        );
+                    }
+                }
+                for (x, cell) in cells.iter().enumerate() {
+                    if in_chip[x] {
+                        continue;
+                    }
+                    assert_ne!(
+                        cell.fg,
+                        attention,
+                        "at width {w} with chips {live:?} live, `{}` at column {x} is outside \
+                         every chip and drawn in attention — the blank columns between chips and \
+                         the header's facts are not something that wants the player.\n\
+                         line: {line:?}",
+                        cell.symbol()
+                    );
+                }
+            }
+        }
+    }
+
+    for form in [("idle", true), ("idle", false), ("new", true), ("new", false), ("sky", false), ("away", false)] {
+        assert!(
+            forms_seen.contains(&form),
+            "fixture: the sweep should draw the `{}` chip {} its count (saw {forms_seen:?})",
+            form.0,
+            if form.1 { "with" } else { "without" }
+        );
+    }
+}
+
+/// A capped store wears `attention` on its `full` tag and nowhere else: the
+/// tag's cells are drawn in the one attention value, and the store's name,
+/// figures, fill bar and rate — and every other store's lines — are not. A
+/// store not capped wears it nowhere, the one just under its cap whose bar
+/// may already read full included. For every store the core defines, in each
+/// case the capping rule separates, at the sidebar's one fixed width.
+///
+/// A crew works every job in the fixture, so a capped store is checked while
+/// its rate is actually moving — the ordinary case in play, since a store
+/// that stays capped while nothing produces or consumes it is the unusual
+/// one — and the sweep is required to reach a rate compact enough to still
+/// read as a whole number of columns yet wide enough to spend all four of
+/// `fmt::compact`'s significant figures, and a stock of three integer digits,
+/// so the case that most crowds the line is on record. Whether the figures
+/// ever run long enough to cost the tag its own last column is the sidebar's
+/// fixed width (TUI-NAV-022's surface), not this spec's; whatever the row
+/// draws, the tag's cells and only the tag's cells wear `attention`.
+///
+/// @spec TUI-THEME-015
+#[test]
+fn a_capped_store_wears_attention_on_its_full_tag_and_nowhere_else() {
+    let attention = attention_colour();
+    let mut tagged_stores = 0usize;
+    let mut bar_full_below_cap = false;
+    let mut saw_nonzero_rate_capped = false;
+    let mut saw_three_digit_stock_capped = false;
+    let mut saw_four_sig_fig_rate_capped = false;
+
+    // Crew sizes tried per resource, so at least one store in the sweep is
+    // capped with a rate large enough to spend all four of `fmt::compact`'s
+    // significant figures rather than every crew leaving it at rest.
+    const CREW_SIZES: [usize; 8] = [6, 20, 50, 100, 167, 200, 300, 500];
+
+    for r in ResourceId::ALL {
+        // Pick whichever crew size makes this resource's own rate reach the
+        // most significant figures once capped, so the regression case —
+        // three-digit stocks and four-significant-figure rates together — is
+        // on record wherever the core's own numbers allow it.
+        let crew = CREW_SIZES
+            .iter()
+            .copied()
+            .max_by_key(|&n| {
+                let mut probe = GameState::new(11);
+                for job in JobId::ALL {
+                    for _ in 0..n {
+                        probe.kittens.push(kitten(Some(job), Location::Home));
+                    }
+                }
+                let rate = probe.net_rate(r);
+                let sig_figs =
+                    fmt::rate(rate).trim_start_matches(['+', '-']).chars().filter(char::is_ascii_digit).count();
+                (sig_figs, rate != 0.0)
+            })
+            .unwrap_or(CREW_SIZES[0]);
+
+        let mut base = GameState::new(11);
+        // A crew working every job, so a capped store is checked with real
+        // production and consumption running rather than only at rest.
+        for job in JobId::ALL {
+            for _ in 0..crew {
+                base.kittens.push(kitten(Some(job), Location::Home));
+            }
+        }
+        let cap = base.cap(r);
+        // Every other store stays at zero and so off the sidebar entirely —
+        // the store under test is the only line drawn, which keeps it inside
+        // the sidebar's fixed height (46 stores at two lines apiece would not
+        // otherwise all fit) while still letting "no other span wears
+        // attention" be checked against every cell the sidebar draws.
+
+        let mut cases: Vec<(&str, f64, bool)> = Vec::new();
+        if cap.is_finite() && cap > 0.0 {
+            cases.push(("at its cap", cap, true));
+            cases.push(("just under its cap", cap * 0.99, false));
+            cases.push(("at half its cap", cap * 0.5, false));
+        } else if cap.is_infinite() {
+            cases.push(("uncapped, with a great deal in it", 1.0e12, false));
+        } else {
+            cases.push(("with a zero cap and something in it", 5.0, false));
+        }
+
+        for (what, stock, capped) in cases {
+            let mut state = base.clone();
+            state.resources[r.ix()] = stock;
+            let rate = state.net_rate(r);
+            if capped {
+                if rate != 0.0 {
+                    saw_nonzero_rate_capped = true;
+                }
+                let compact_stock = fmt::compact(stock);
+                let integer_digits =
+                    compact_stock.trim_start_matches('-').split(['.', 'K', 'M', 'B', 'T', 'Q']).next().unwrap_or("").len();
+                if integer_digits >= 3 {
+                    saw_three_digit_stock_capped = true;
+                }
+                let compact_rate = fmt::rate(rate);
+                let sig_figs =
+                    compact_rate.trim_start_matches(['+', '-']).chars().filter(char::is_ascii_digit).count();
+                if sig_figs >= 4 {
+                    saw_four_sig_fig_rate_capped = true;
+                }
+            }
+            for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE_W, WIDE_H)] {
+                let (_, _, side, _) = regions(w, h);
+                let mut term = terminal(w, h);
+                term.draw(|f| chrome::sidebar(f, side, &state)).expect("TestBackend is infallible");
+                let buf = term.backend().buffer();
+                let lines = region_lines(buf, side);
+
+                let mut tags = 0usize;
+                for y in side.y..side.bottom() {
+                    let cells = row_cells(buf, side, y);
+                    let symbols = symbols_of(&cells);
+                    let line = symbols.concat();
+                    if !capped && line.contains("▓▓▓▓") {
+                        bar_full_below_cap = true;
+                    }
+                    let mut on_tag = vec![false; cells.len()];
+                    for span in word_spans(&symbols, "full") {
+                        tags += 1;
+                        for x in span {
+                            on_tag[x] = true;
+                            assert_eq!(
+                                cells[x].fg,
+                                attention,
+                                "{r:?} {what} ({w}x{h}): the `full` tag's `{}` is drawn in {:?}, \
+                                 not attention.\nsidebar:\n{}",
+                                cells[x].symbol(),
+                                cells[x].fg,
+                                lines.join("\n")
+                            );
+                        }
+                    }
+                    for (x, cell) in cells.iter().enumerate() {
+                        if on_tag[x] {
+                            continue;
+                        }
+                        assert_ne!(
+                            cell.fg,
+                            attention,
+                            "{r:?} {what} ({w}x{h}): `{}` at ({}, {y}) is drawn in attention. \
+                             Only the `full` tag wears it — never a store's name, figures, fill \
+                             bar or rate.\nline: {line:?}",
+                            cell.symbol(),
+                            side.x as usize + x
+                        );
+                    }
+                }
+                assert_eq!(
+                    tags,
+                    usize::from(capped),
+                    "fixture: {r:?} {what} ({w}x{h}) should draw {} `full` tag(s).\nsidebar:\n{}",
+                    usize::from(capped),
+                    lines.join("\n")
+                );
+                tagged_stores += usize::from(capped);
+            }
+        }
+    }
+    assert!(tagged_stores > 0, "fixture: some store should be drawn capped");
+    assert!(
+        bar_full_below_cap,
+        "fixture: some store just under its cap should draw a bar that already reads full"
+    );
+    assert!(
+        saw_nonzero_rate_capped,
+        "fixture: some capped store should draw with a nonzero net rate"
+    );
+    assert!(
+        saw_three_digit_stock_capped,
+        "fixture: some capped store's stock should compact to three integer digits"
+    );
+    assert!(
+        saw_four_sig_fig_rate_capped,
+        "fixture: some capped store's rate should compact to four significant figures"
+    );
+}
+
+/// A footer note — the reply to a key just pressed — is drawn in the
+/// inherited foreground on every cell of its row, never in attention nor in
+/// any other palette colour: the note is where the player is already looking
+/// and lasts seconds, and in orange it would be one more mark the glance has
+/// to rule out. Checked in every section, with the inspector asked for and
+/// not, at the floor, in the narrow range, and past both breakpoints, for a
+/// short note and one long enough to be clipped.
+///
+/// @spec TUI-THEME-015
+#[test]
+fn a_footer_note_is_drawn_in_the_inherited_foreground() {
+    let state = every_section_revealed();
+    let notes = [
+        "not yet".to_string(),
+        "a reply long enough that it runs past the edge of even the widest pane this sweep \
+         draws, so the clipped note is checked as well as the whole one, every column of it"
+            .to_string(),
+    ];
+    for section in Section::ALL {
+        for inspector in [false, true] {
+            for note in &notes {
+                for (w, h) in [(FLOOR_W, FLOOR_H), (99, 30), (120, 40), (WIDE_W, WIDE_H)] {
+                    let mut view = calm_view(&state);
+                    view.section = Some(section);
+                    view.inspector_wanted = inspector;
+                    view.footer = Some((note.clone(), Instant::now() + Duration::from_secs(600)));
+                    let mut term = terminal(w, h);
+                    let mut layout = None;
+                    term.draw(|f| layout = Some(clowder_tui::render::frame(f, &state, &view, None)))
+                        .expect("TestBackend is infallible");
+                    let hints = layout.expect("frame returns its layout").hints;
+                    let buf = term.backend().buffer();
+                    let cells = row_cells(buf, hints, hints.y);
+                    let line = symbols_of(&cells).concat();
+                    let head: String = note.chars().take(7).collect();
+                    assert!(
+                        line.starts_with(&head),
+                        "fixture: the footer note should hold the hint bar's row: {line:?}"
+                    );
+                    for (x, cell) in cells.iter().enumerate() {
+                        assert_eq!(
+                            cell.fg,
+                            ratatui::style::Color::Reset,
+                            "{} section, inspector {inspector}, {w}x{h}: the footer note's `{}` at \
+                             column {x} is drawn in {:?}. A footer note is ordinary prose in the \
+                             inherited foreground — it does not want the player, so it may not \
+                             borrow attention.\nline: {line:?}",
+                            section.title(),
+                            cell.symbol(),
+                            cell.fg
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A meadow with nothing wanting the player — no chip live, no store capped,
+/// nothing armed — so that nothing on screen may wear attention at all.
+fn calm_meadow() -> (GameState, ViewState) {
+    let mut state = every_section_revealed();
+    for r in ResourceId::ALL {
+        let cap = state.cap(r);
+        state.resources[r.ix()] = if cap.is_finite() && cap > 0.0 { cap * 0.5 } else { 40.0 };
+    }
+    state.kittens = employed(6);
+    state.pending_sky_event = None;
+    let view = calm_view(&state);
+    (state, view)
+}
+
+/// Nothing wears `attention` but a chip and a capped store's `full` tag: in
+/// every cell of whole frames with nothing armed, a cell is in the attention
+/// value exactly when it belongs to a chip on the header line or to a `full`
+/// tag on the sidebar. Swept over a calm meadow, where nothing on screen may
+/// wear it at all, and over meadows where every chip is live and stores are
+/// capped — every section, with the inspector asked for and not, a footer note
+/// showing and not, and each full-screen overlay, at the floor, in the narrow
+/// range and past both breakpoints; and the cursor on every row with the list
+/// and the inspector pane both on screen.
+///
+/// The sidebar's fixed width is TUI-NAV-022's surface, not this spec's: on
+/// the rare row where the figures already reach the last column, the `full`
+/// tag's own trailing letter is what the width clips, and a fragment of the
+/// tag there still counts as the tag for this test's purpose — this spec
+/// only decides which cells wear the colour, never whether the tag fits
+/// whole.
+///
+/// @spec TUI-THEME-015
+#[test]
+fn nothing_but_a_chip_or_a_full_tag_wears_attention_in_a_frame_with_nothing_armed() {
+    let attention = attention_colour();
+    let sizes: [(u16, u16); 4] = [(FLOOR_W, FLOOR_H), (99, 30), (120, 40), (WIDE_W, WIDE_H)];
+
+    let mut meadows: Vec<(&'static str, GameState, ViewState)> = Vec::new();
+    let (calm, calm_v) = calm_meadow();
+    meadows.push(("a calm meadow", calm, calm_v));
+    meadows.extend(compressed_run_meadows());
+
+    let (mut saw_chip_cells, mut saw_tag_cells, mut calm_frames) = (0usize, 0usize, 0usize);
+    for (label, state, base) in &meadows {
+        let pane: (u16, u16) = (120, 40);
+        type FrameView = (String, ViewState, Vec<(u16, u16)>);
+        let mut views: Vec<FrameView> = Vec::new();
+        for section in Section::ALL {
+            for key in rows(state, section).into_iter().filter(|r| r.selectable()).map(|r| r.key) {
+                let mut v = base.clone();
+                v.section = Some(section);
+                v.focus[section.index()] = Some(key.clone());
+                v.inspector_wanted = true;
+                views.push((format!("{} section, cursor on {key:?}", section.title()), v, vec![pane]));
+            }
+            for inspector in [false, true] {
+                for footer in [false, true] {
+                    let mut v = base.clone();
+                    v.section = Some(section);
+                    v.inspector_wanted = inspector;
+                    if footer {
+                        v.footer = Some(("a footer note".to_string(), Instant::now() + Duration::from_secs(600)));
+                    }
+                    views.push((
+                        format!("{} section, inspector {inspector}, footer {footer}", section.title()),
+                        v,
+                        sizes.to_vec(),
+                    ));
+                }
+            }
+        }
+        for overlay in [
+            Overlay::Help,
+            Overlay::Journal { anchor: 0 },
+            Overlay::Palette { query: String::new(), selected: 0 },
+        ] {
+            let v = ViewState { overlay: Some(overlay.clone()), ..base.clone() };
+            views.push((format!("overlay {overlay:?}"), v, sizes.to_vec()));
+        }
+
+        for (what, view, at) in &views {
+            for &(w, h) in at {
+                let mut term = terminal(w, h);
+                let mut layout = None;
+                term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, view, None)))
+                    .expect("TestBackend is infallible");
+                let layout = layout.expect("frame returns its layout");
+                let buf = term.backend().buffer();
+                let whole = Rect::new(0, 0, w, h);
+                let sidebar = match (&view.overlay, layout.body) {
+                    (None, Body::Narrow { sidebar, .. } | Body::Wide { sidebar, .. }) => Some(sidebar),
+                    _ => None,
+                };
+
+                let mut marks = 0usize;
+                for y in 0..h {
+                    let cells = row_cells(buf, whole, y);
+                    let symbols = symbols_of(&cells);
+                    let line = symbols.concat();
+                    let mut allowed = vec![false; cells.len()];
+                    if y == layout.header.y {
+                        for (span, _) in chip_spans(&symbols) {
+                            saw_chip_cells += span.len();
+                            marks += 1;
+                            span.for_each(|x| allowed[x] = true);
+                        }
+                    }
+                    if let Some(side) = sidebar.filter(|s| y >= s.y && y < s.bottom()) {
+                        let side_symbols = symbols_of(&row_cells(buf, side, y));
+                        let whole_spans = word_spans(&side_symbols, "full");
+                        let spans: Vec<std::ops::Range<usize>> = if whole_spans.is_empty() {
+                            clipped_word_span(&side_symbols, "full").into_iter().collect()
+                        } else {
+                            whole_spans
+                        };
+                        for span in spans {
+                            saw_tag_cells += span.len();
+                            marks += 1;
+                            for x in span {
+                                allowed[side.x as usize + x] = true;
+                            }
+                        }
+                    }
+                    for (x, cell) in cells.iter().enumerate() {
+                        if allowed[x] {
+                            assert_eq!(
+                                cell.fg,
+                                attention,
+                                "in {label}, {what}, at {w}x{h}: `{}` at ({x}, {y}) belongs to a \
+                                 chip or a `full` tag and is drawn in {:?}, not attention.\n\
+                                 line: {line:?}",
+                                cell.symbol(),
+                                cell.fg
+                            );
+                        } else {
+                            assert_ne!(
+                                cell.fg,
+                                attention,
+                                "in {label}, {what}, at {w}x{h}: `{}` at ({x}, {y}) is drawn in \
+                                 attention and is neither a chip nor a capped store's `full` \
+                                 tag. Nothing else wears attention, or an empty cluster stops \
+                                 meaning nothing needs you.\nline: {line:?}",
+                                cell.symbol()
+                            );
+                        }
+                    }
+                }
+                if *label == "a calm meadow" {
+                    assert_eq!(
+                        marks, 0,
+                        "fixture: {what} at {w}x{h} in the calm meadow should draw no chip and no \
+                         `full` tag"
+                    );
+                    calm_frames += 1;
+                }
+            }
+        }
+    }
+    assert!(
+        saw_chip_cells > 0 && saw_tag_cells > 0 && calm_frames > 0,
+        "fixture: the sweep should draw chips ({saw_chip_cells} cells), `full` tags \
+         ({saw_tag_cells} cells) and calm frames ({calm_frames})"
     );
 }
 

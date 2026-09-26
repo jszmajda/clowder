@@ -6,12 +6,18 @@
 //! @spec TUI-NAV-019..025, TUI-NAV-034, TUI-NAV-044, TUI-NAV-045, TUI-NAV-054
 
 use clowder_core::{GameState, Location, MoodTier, ResourceId};
-use ratatui::{layout::Rect, text::Line, widgets::Paragraph, Frame};
+use ratatui::{
+    layout::Rect,
+    text::{Line, Span},
+    widgets::Paragraph,
+    Frame,
+};
 
 use crate::nav::mnemonics::{self, MnemonicKind};
 use crate::nav::rows::{rows, tab_sections, Row, RowKey, RowKind};
 use crate::nav::{Overlay, Section, ViewState};
-use crate::render::fmt;
+use crate::render::{fmt, style_for};
+use crate::theme::Role;
 
 // ---------------------------------------------------------------------------
 // Small shared helpers
@@ -91,12 +97,14 @@ fn live_opportunities(state: &GameState, view: &ViewState) -> [bool; 4] {
     ]
 }
 
-/// The chip cluster at either detail level TUI-NAV-086 steps through: with a
-/// count between glyph and word on the two chips that count, or — once the
-/// header has shed the count first — glyph directly before word on every
-/// chip. Which chips are live never changes between the two; only whether
-/// the count is drawn does.
-fn chip_cluster(state: &GameState, view: &ViewState, with_counts: bool) -> String {
+/// The live chips at either detail level TUI-NAV-086 steps through, each a
+/// whole label — with a count between glyph and word on the two chips that
+/// count, or — once the header has shed the count first — glyph directly
+/// before word on every chip. Which chips are live never changes between the
+/// two; only whether the count is drawn does. Each label is later drawn as
+/// one span in `attention` (TUI-THEME-015): the glyph, any count, and the
+/// word together, never split.
+fn chip_labels(state: &GameState, view: &ViewState, with_counts: bool) -> Vec<String> {
     let live = live_opportunities(state, view);
     let idle = idle_here_count(state);
     let new = new_content_count(state, view);
@@ -105,7 +113,7 @@ fn chip_cluster(state: &GameState, view: &ViewState, with_counts: bool) -> Strin
     } else {
         ["◦idle".to_string(), "!sky".to_string(), "★new".to_string(), "~away".to_string()]
     };
-    labels.into_iter().zip(live).filter(|(_, on)| *on).map(|(label, _)| label).collect::<Vec<_>>().join("  ")
+    labels.into_iter().zip(live).filter(|(_, on)| *on).map(|(label, _)| label).collect()
 }
 
 /// The five glance facts in full wording, joined `·`. @spec TUI-NAV-086
@@ -135,15 +143,32 @@ fn compact_facts(state: &GameState) -> Vec<String> {
 
 /// Facts and chips together, right-flush chips with at least one blank
 /// column before them, or facts alone once the chips are empty. `None` when
-/// even this pairing overruns `width`.
+/// even this pairing overruns `width`. Returns the facts-and-padding prefix
+/// apart from the chips text, so the chips alone can be drawn in attention.
 fn fit(facts: &str, chips: &str, width: usize) -> Option<String> {
     let fw = facts.chars().count();
     let cw = chips.chars().count();
     if chips.is_empty() {
         (fw <= width).then(|| format!("{facts}{}", " ".repeat(width - fw)))
     } else {
-        (fw + 1 + cw <= width).then(|| format!("{facts}{}{chips}", " ".repeat(width - fw - cw)))
+        (fw + 1 + cw <= width).then(|| format!("{facts}{}", " ".repeat(width - fw - cw)))
     }
+}
+
+/// The header line as spans: the facts and padding in the inherited
+/// foreground, then each live chip's label whole in `attention` — its glyph,
+/// any count, and its word together — with the blank columns between chips
+/// left unstyled, so only what wants the player carries the colour.
+/// @spec TUI-THEME-015
+fn chip_line(prefix: String, labels: &[String]) -> Line<'static> {
+    let mut spans = vec![Span::raw(prefix)];
+    for (i, label) in labels.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::raw("  "));
+        }
+        spans.push(Span::styled(label.clone(), style_for(Role::Attention)));
+    }
+    Line::from(spans)
 }
 
 /// Clowder generation, date, kitten count, mood as a word, speed, and the
@@ -156,24 +181,25 @@ fn fit(facts: &str, chips: &str, width: usize) -> Option<String> {
 /// TUI-NAV-044, TUI-NAV-054, TUI-NAV-086
 pub fn header(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     let width = area.width as usize;
-    let with_counts = chip_cluster(state, view, true);
-    let without_counts = chip_cluster(state, view, false);
+    let with_labels = chip_labels(state, view, true);
+    let without_labels = chip_labels(state, view, false);
+    let with_counts = with_labels.join("  ");
+    let without_counts = without_labels.join("  ");
     let compact = compact_facts(state);
 
-    let steps: [Option<String>; 6] = [
-        fit(&full_facts(state).join(" · "), &with_counts, width),
-        fit(&compact.join(" "), &with_counts, width),
-        fit(&compact.join(" "), &without_counts, width),
-        fit(&compact[1..].join(" "), &without_counts, width),
-        fit(&compact[2..].join(" "), &without_counts, width),
-        fit(&compact[3..].join(" "), &without_counts, width),
+    let steps: [(Option<String>, &Vec<String>); 6] = [
+        (fit(&full_facts(state).join(" · "), &with_counts, width), &with_labels),
+        (fit(&compact.join(" "), &with_counts, width), &with_labels),
+        (fit(&compact.join(" "), &without_counts, width), &without_labels),
+        (fit(&compact[1..].join(" "), &without_counts, width), &without_labels),
+        (fit(&compact[2..].join(" "), &without_counts, width), &without_labels),
+        (fit(&compact[3..].join(" "), &without_counts, width), &without_labels),
     ];
-    let line = steps
+    let (prefix, labels) = steps
         .into_iter()
-        .flatten()
-        .next()
-        .unwrap_or_else(|| format!("{}{}", compact[3..].join(" "), without_counts));
-    draw_line(f, area, line);
+        .find_map(|(prefix, labels)| prefix.map(|p| (p, labels)))
+        .unwrap_or_else(|| (compact[3..].join(" "), &without_labels));
+    f.render_widget(Paragraph::new(chip_line(prefix, labels)), area);
 }
 
 // ---------------------------------------------------------------------------
@@ -241,7 +267,9 @@ fn fill_bar(stock: f64, cap: f64) -> String {
 
 /// A curated glance: revealed resources with stock, a fill bar, and a signed
 /// rate. Display-only — the complete table is a list in the home section.
-/// @spec TUI-NAV-019, TUI-NAV-022, TUI-NAV-049
+/// The `full` tag alone wears `attention` (TUI-THEME-015); the rest of the
+/// line stays in the inherited foreground.
+/// @spec TUI-NAV-019, TUI-NAV-022, TUI-NAV-049, TUI-THEME-015
 pub fn sidebar(f: &mut Frame, area: Rect, state: &GameState) {
     let mut lines: Vec<Line<'static>> = Vec::new();
     for r in ResourceId::ALL {
@@ -253,14 +281,19 @@ pub fn sidebar(f: &mut Frame, area: Rect, state: &GameState) {
         let name = humanize(&format!("{r:?}"));
         let bar = fill_bar(stock, cap);
         let rate = fmt::rate(state.net_rate(r));
-        let full_tag = if cap.is_finite() && cap > 0.0 && stock >= cap { " full" } else { "" };
+        let capped = cap.is_finite() && cap > 0.0 && stock >= cap;
         // Two lines per resource — a name and cap are wordy together, and the
         // sidebar's fixed width has no room to spare for both on one line
         // without risking the `full` tag (TUI-NAV-022's non-colour channel)
         // being the part that gets clipped.
         lines.push(Line::from(name));
-        let numbers = format!("{} {bar} {rate}{full_tag}", fmt::compact(stock));
-        lines.push(Line::from(numbers));
+        let numbers = format!("{} {bar} {rate}", fmt::compact(stock));
+        let mut spans = vec![Span::raw(numbers)];
+        if capped {
+            spans.push(Span::raw(" "));
+            spans.push(Span::styled("full", style_for(Role::Attention)));
+        }
+        lines.push(Line::from(spans));
     }
     f.render_widget(Paragraph::new(lines), area);
 }
