@@ -1559,6 +1559,154 @@ fn the_hint_bar_drops_the_least_relevant_key_first_and_never_the_help_key() {
 }
 
 // ---------------------------------------------------------------------------
+// TUI-NAV-077 — the armed row's keys, and only while the arming holds
+// ---------------------------------------------------------------------------
+
+/// Words only the armed row's line says. Either one on the bar is the bar
+/// showing a row armed.
+const ARMED_WORDS: [&str; 2] = ["yes, truly", "not today"];
+
+fn shows_armed(line: &str) -> bool {
+    ARMED_WORDS.iter().any(|w| line.contains(w))
+}
+
+/// Every heavy row listed anywhere, with its section and command.
+fn every_heavy_row(state: &GameState) -> Vec<(Section, RowKey, Command)> {
+    let mut out = Vec::new();
+    for section in Section::ALL {
+        for r in rows(state, section) {
+            if let RowKind::Act { command, .. } = r.kind {
+                if r.heavy {
+                    out.push((section, r.key, command));
+                }
+            }
+        }
+    }
+    out
+}
+
+fn armed_on(state: &GameState, section: Section, key: RowKey, command: Command) -> ViewState {
+    let mut v = focus_on(state, section, key.clone());
+    v.armed = Some(ArmedRow { key, command, expires_at: Instant::now() + Duration::from_secs(8) });
+    v
+}
+
+/// While a row is armed and no field or full-screen overlay holds the
+/// keyboard, the hint bar shows the armed row's keys — for every heavy row,
+/// with or without the inspector asked for, under a report banner, and at
+/// every width, since no layout ends an arming.
+///
+/// @spec TUI-NAV-077
+#[test]
+fn the_armed_rows_keys_show_wherever_nothing_holds_the_keyboard() {
+    let state = every_section_revealed();
+    let heavy = every_heavy_row(&state);
+    let kinds: BTreeSet<String> =
+        heavy.iter().map(|(_, _, c)| format!("{c:?}").split('(').next().unwrap().to_string()).collect();
+    assert_eq!(kinds.len(), 4, "fixture: all four heavy actions are listed ({kinds:?})");
+
+    for (section, key, command) in heavy {
+        let armed = armed_on(&state, section, key.clone(), command);
+        let contexts: Vec<(&str, ViewState)> = vec![
+            ("nothing else", armed.clone()),
+            ("the inspector asked for", ViewState { inspector_wanted: true, ..armed.clone() }),
+            (
+                "a report banner showing",
+                ViewState {
+                    reports: vec![PendingReport { entry: 0, dismissed: false }],
+                    ..armed.clone()
+                },
+            ),
+        ];
+        for (what, view) in contexts {
+            for w in [FLOOR_W, 99, 100, 120, WIDE_W] {
+                let line = hint_line(&state, &view, w);
+                assert!(
+                    line.contains(ARMED_WORDS[0]),
+                    "with {command:?} armed and {what}, a {w}-column hint bar read {line:?}; \
+                     the armed row's keys belong there wherever no field or overlay holds \
+                     the keyboard"
+                );
+            }
+        }
+    }
+}
+
+/// A full-screen overlay holds the keyboard: under the Journal or help, the
+/// next Enter does not reach the armed row, so the bar does not offer it.
+///
+/// @spec TUI-NAV-077
+#[test]
+fn a_full_screen_overlay_shows_no_armed_keys() {
+    let state = every_section_revealed();
+    for (section, key, command) in every_heavy_row(&state) {
+        for overlay in [Overlay::Journal { anchor: 0 }, Overlay::Help] {
+            let mut view = armed_on(&state, section, key.clone(), command);
+            view.overlay = Some(overlay.clone());
+            for w in [FLOOR_W, WIDE_W] {
+                let line = hint_line(&state, &view, w);
+                assert!(
+                    !shows_armed(&line),
+                    "with {overlay:?} open over armed {command:?}, a {w}-column hint bar read \
+                     {line:?}; the overlay holds the keyboard, not the armed row"
+                );
+            }
+        }
+    }
+}
+
+/// The moment an arming ends the bar stops showing it: an arming past its
+/// expiry, or one whose row is no longer listed, leaves nothing on the bar
+/// that reads as armed — a stale "Enter yes, truly" would promise a commit
+/// the next Enter does not make.
+///
+/// @spec TUI-NAV-077, TUI-NAV-076
+#[test]
+fn an_ended_arming_leaves_no_armed_keys_on_the_hint_bar() {
+    let state = every_section_revealed();
+    let past = Instant::now().checked_sub(Duration::from_secs(1)).expect("clock has a past");
+
+    for (section, key, command) in every_heavy_row(&state) {
+        let mut view = armed_on(&state, section, key, command);
+        view.armed.as_mut().expect("armed").expires_at = past;
+        for w in [FLOOR_W, WIDE_W] {
+            let line = hint_line(&state, &view, w);
+            assert!(
+                !shows_armed(&line),
+                "an expired arming of {command:?} still reads as armed on a {w}-column bar: \
+                 {line:?}"
+            );
+        }
+    }
+
+    // The nap row leaves every list once its gate closes.
+    let (_, nap_key, nap_command) = every_heavy_row(&state)
+        .into_iter()
+        .find(|(_, _, c)| matches!(c, Command::DeepNap(_)))
+        .expect("fixture: the nap row is listed");
+    let mut gone = state.clone();
+    gone.ideas.remove(&IdeaId::DeepNapTheory);
+    assert!(
+        Section::ALL.iter().all(|s| rows(&gone, *s).iter().all(|r| r.key != nap_key)),
+        "fixture: the nap row must be listed nowhere"
+    );
+    let mut view = focus_on(&gone, Section::Legacy, heavy_row(&gone));
+    view.armed = Some(ArmedRow {
+        key: nap_key,
+        command: nap_command,
+        expires_at: Instant::now() + Duration::from_secs(8),
+    });
+    for w in [FLOOR_W, WIDE_W] {
+        let line = hint_line(&gone, &view, w);
+        assert!(
+            !shows_armed(&line),
+            "an arming whose row is no longer listed still reads as armed on a {w}-column bar: \
+             {line:?}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
 // TUI-NAV-024 — the first sixty seconds
 // ---------------------------------------------------------------------------
 

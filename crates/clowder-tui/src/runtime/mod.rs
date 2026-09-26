@@ -392,6 +392,12 @@ impl App {
             self.state.tick();
         }
 
+        // A tick (or a command this frame applied) can remove a row an
+        // arming stands on; that ending is checked every frame, independent
+        // of input, so it takes effect the moment the row leaves rather than
+        // waiting for a key that may never come. @spec TUI-NAV-076
+        crate::nav::expire_unlisted_arming(&mut self.view, &self.state);
+
         // ---- 4. autosave ----------------------------------------------------
         // @spec TUI-RUN-026, TUI-RUN-028
         if persist::autosave_due(self.last_save.elapsed()) {

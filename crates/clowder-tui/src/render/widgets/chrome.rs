@@ -238,17 +238,27 @@ fn focused_row(state: &GameState, view: &ViewState) -> Option<Row> {
 ///
 /// A field (the count prompt, or the palette) holds the keyboard, so it owns
 /// this line too — in place of *any* other context's, an armed row's beneath
-/// it included, since the field is what the next Enter actually reaches.
-/// @spec TUI-NAV-023, TUI-NAV-024, TUI-NAV-045, TUI-NAV-046, TUI-NAV-066,
-/// TUI-NAV-074
+/// it included, since the field is what the next Enter actually reaches. A
+/// full-screen overlay holds it the same way, and the armed keys stop
+/// showing the moment the arming itself ends, whether by expiry or by its
+/// row leaving every list. @spec TUI-NAV-023, TUI-NAV-024, TUI-NAV-045,
+/// TUI-NAV-046, TUI-NAV-066, TUI-NAV-074, TUI-NAV-076, TUI-NAV-077
 pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     const HELP: &str = "? help";
+
+    // A full-screen overlay (Journal or help) holds the keyboard too, the
+    // same as a field does — the armed row's keys beneath it are not what
+    // the next Enter reaches while it is open. @spec TUI-NAV-077
+    let armed_and_live = view.overlay.is_none()
+        && view.armed.as_ref().is_some_and(|a| {
+            std::time::Instant::now() < a.expires_at && crate::nav::row_still_listed(state, &a.key)
+        });
 
     let items: Vec<&str> = if view.prompt.is_some() {
         vec!["digits amount", "Enter go", "Esc never mind"]
     } else if matches!(view.overlay, Some(Overlay::Palette { .. })) {
         vec!["type to find", "Enter jump", "Esc close"]
-    } else if view.armed.is_some() {
+    } else if armed_and_live {
         vec!["Enter yes, truly", "Esc not today"]
     } else {
         // x opens the count prompt, and X runs to the maximum affordable,

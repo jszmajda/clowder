@@ -635,6 +635,428 @@ fn the_deep_nap_count_prompts_enter_arms_and_a_second_enter_commits() {
     );
 }
 
+/// The nap row, focused, in a meadow where a nap is open and affordable.
+fn nap_view(state: &GameState) -> (RowKey, ViewState) {
+    let (key, _) = find_row(state, Section::Dreams, |c| matches!(c, Command::DeepNap(_)));
+    let view = focused(Section::Dreams, key.clone());
+    (key, view)
+}
+
+/// `x`, the digits, then the prompt's Enter — one whole count-prompt acceptance.
+fn accept_count(digits: &str, view: &mut ViewState, state: &GameState) -> Outcome {
+    assert_eq!(update(Action::CountPrompt, view, state), Outcome::Handled);
+    assert!(view.prompt.is_some(), "fixture: x on the nap row opened no count prompt");
+    for c in digits.chars() {
+        update(Action::Type(c), view, state);
+    }
+    update(Action::Activate, view, state)
+}
+
+/// Enter is a row's action ×1, and one unit of a nap is one year: a plain
+/// Enter on the unarmed nap row arms a one-year nap — it neither opens the
+/// prompt nor fires.
+///
+/// @spec TUI-NAV-036
+#[test]
+fn a_plain_enter_on_the_unarmed_counted_heavy_row_arms_one_unit() {
+    let state = rich();
+    let (key, mut view) = nap_view(&state);
+
+    let out = update(Action::Activate, &mut view, &state);
+
+    assert_eq!(out, Outcome::Handled, "a plain Enter on the unarmed nap row reached the core");
+    assert!(view.prompt.is_none(), "a plain Enter on the nap row opened a count prompt");
+    let armed = view.armed.as_ref().expect("a plain Enter on the nap row armed nothing");
+    assert_eq!(armed.key, key, "the armed row is not the nap row");
+    assert_eq!(
+        armed.command,
+        Command::DeepNap(1),
+        "a plain Enter armed a nap of some length other than one year"
+    );
+}
+
+/// Accepting a new nonzero count over an already-armed nap re-arms it with
+/// that count and a fresh expiry, so the summary on screen is always the nap
+/// the next Enter commits — and that next Enter commits exactly it.
+///
+/// @spec TUI-NAV-036
+#[test]
+fn a_new_count_on_an_armed_counted_row_re_arms_it_with_that_count_and_a_fresh_expiry() {
+    let state = rich();
+    let (key, mut view) = nap_view(&state);
+
+    assert_eq!(accept_count("3", &mut view, &state), Outcome::Handled);
+    assert_eq!(view.armed.as_ref().map(|a| a.command), Some(Command::DeepNap(3)));
+    // Age the first arming so a renewed expiry is distinguishable from it.
+    view.armed.as_mut().expect("armed").expires_at = Instant::now() + Duration::from_secs(1);
+
+    std::thread::sleep(Duration::from_millis(300));
+    let out = accept_count("7", &mut view, &state);
+
+    assert_eq!(out, Outcome::Handled, "re-accepting a count over an armed nap fired it");
+    let armed = view.armed.as_ref().expect("re-accepting a count left the nap row unarmed");
+    assert_eq!(armed.key, key);
+    assert_eq!(
+        armed.command,
+        Command::DeepNap(7),
+        "the re-armed nap still carries the old count; the summary would describe a nap the \
+         next Enter does not commit"
+    );
+    let left = armed.expires_at.saturating_duration_since(Instant::now());
+    assert!(
+        left >= Duration::from_secs(7),
+        "the re-armed nap kept its old expiry ({left:?} left); a re-arming starts a fresh one"
+    );
+
+    let out = commit_deliberately(&mut view, &state);
+    assert_eq!(
+        out,
+        Outcome::Apply(Command::DeepNap(7)),
+        "the commit after a re-arming sent something other than the count it was re-armed with"
+    );
+}
+
+/// An empty or zero count arms nothing, and leaves an arming already on the
+/// row exactly as it stood — its count and its expiry both.
+///
+/// @spec TUI-NAV-036
+#[test]
+fn an_empty_or_zero_count_arms_nothing_and_leaves_any_arming_as_it_stood() {
+    let state = rich();
+
+    for digits in ["", "0", "00"] {
+        let (_, mut view) = nap_view(&state);
+        let out = accept_count(digits, &mut view, &state);
+        assert_eq!(out, Outcome::Handled, "a count of {digits:?} fired the nap");
+        assert!(view.armed.is_none(), "a count of {digits:?} armed the unarmed nap row");
+
+        let (_, mut view) = nap_view(&state);
+        assert_eq!(accept_count("5", &mut view, &state), Outcome::Handled);
+        let before = view.armed.clone().expect("fixture: a count of 5 arms the nap");
+        std::thread::sleep(Duration::from_millis(20));
+
+        let out = accept_count(digits, &mut view, &state);
+        assert_eq!(out, Outcome::Handled, "a count of {digits:?} over an armed nap fired it");
+        assert_eq!(
+            view.armed.as_ref(),
+            Some(&before),
+            "a count of {digits:?} changed the arming already on the nap row; it leaves any \
+             arming as it stood"
+        );
+    }
+}
+
+/// The nap commit re-runs the real command with the armed count, so the core
+/// re-validates it: a count the core will refuse by now still goes to it, and
+/// the refusal is the core's to make.
+///
+/// @spec TUI-NAV-036
+#[test]
+fn the_counted_commit_re_runs_the_real_command_with_the_armed_count() {
+    let state = rich();
+    let (_, mut view) = nap_view(&state);
+    assert_eq!(accept_count("4", &mut view, &state), Outcome::Handled);
+
+    let mut broke = state.clone();
+    broke.resources[ResourceId::Starshards.ix()] = 0.0;
+    assert!(
+        broke.clone().apply(Command::DeepNap(4)).is_err(),
+        "fixture: the armed nap must be one the core now refuses"
+    );
+
+    let out = commit_deliberately(&mut view, &broke);
+    assert_eq!(
+        out,
+        Outcome::Apply(Command::DeepNap(4)),
+        "the nap commit was judged in the shell rather than re-run through the core"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-076 — what ends an arming, and what leaves it running
+// ---------------------------------------------------------------------------
+
+/// The expiry is about eight seconds of wall-clock time whatever the game
+/// speed — the confirm is for the player's reading, not the sim's pace.
+///
+/// @spec TUI-NAV-076
+#[test]
+fn the_arming_expiry_is_wall_clock_time_at_every_game_speed() {
+    for speed in [0.25, 0.5, 1.0, 2.0, 4.0, 8.0] {
+        let mut state = rich();
+        state.speed = speed;
+        for (name, section, key, _) in heavy_rows(&state) {
+            let mut view = focused(section, key);
+            update(Action::Activate, &mut view, &state);
+            let armed = view.armed.as_ref().unwrap_or_else(|| panic!("{name} did not arm"));
+            let left = armed.expires_at.saturating_duration_since(Instant::now());
+            assert!(
+                left >= Duration::from_secs(7) && left <= Duration::from_secs(9),
+                "at speed ×{speed} the {name} arming expires in {left:?}; it is about eight \
+                 wall-clock seconds whatever the game speed"
+            );
+        }
+    }
+}
+
+/// Every navigation key on the screen ends an arming, silently — whether or
+/// not it moves the cursor or the section. The armed row here is the first
+/// row of its list, so ↑ moves nothing; a digit for the section already
+/// showing moves nothing either.
+///
+/// @spec TUI-NAV-076
+#[test]
+fn every_navigation_key_ends_an_arming_silently_whether_or_not_it_moves_anything() {
+    let state = rich();
+    let (row_key, command) = move_row(&state);
+    assert_eq!(
+        rows(&state, Section::Legacy).iter().position(|r| r.selectable()),
+        rows(&state, Section::Legacy).iter().position(|r| r.key == row_key),
+        "fixture: the armed row must be the first selectable row, so an ↑ moves nothing"
+    );
+    let revealed = clowder_tui::nav::rows::revealed_sections(&state);
+
+    let mut nav_keys: Vec<KeyEvent> = vec![
+        key(KeyCode::Up),
+        key(KeyCode::Down),
+        key(KeyCode::Char('k')),
+        key(KeyCode::Char('j')),
+        key(KeyCode::Tab),
+        key(KeyCode::BackTab),
+        KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT),
+        key(KeyCode::Char('l')),
+        key(KeyCode::Char('h')),
+        key(KeyCode::Left),
+        key(KeyCode::Right),
+        key(KeyCode::Char('[')),
+        key(KeyCode::Char(']')),
+    ];
+    nav_keys.extend(Section::ALL.iter().map(|s| key(KeyCode::Char(s.digit()))));
+
+    for k in nav_keys {
+        let mut view = focused(Section::Legacy, row_key.clone());
+        update(Action::Activate, &mut view, &state);
+        assert!(view.armed.is_some(), "fixture: the row must be armed before {k:?}");
+
+        let action = resolve(k, &view);
+        let out = update(action.clone(), &mut view, &state);
+
+        assert!(!would_fire(&out, command), "{k:?} ({action:?}) committed the armed row");
+        assert!(
+            view.armed.is_none(),
+            "{k:?} ({action:?}) left the row armed; any navigation key ends an arming, whether \
+             or not it moves anything"
+        );
+        let unrevealed_digit = matches!(action, Action::SectionJump(s) if !revealed.contains(&s));
+        if !unrevealed_digit {
+            assert!(
+                view.footer.is_none(),
+                "{k:?} ({action:?}) ended the arming with a footer note {:?}; an arming ends \
+                 silently",
+                view.footer
+            );
+        }
+    }
+}
+
+/// The palette's jump is navigation, so it ends an arming.
+///
+/// @spec TUI-NAV-076
+#[test]
+fn the_palettes_jump_ends_an_arming() {
+    let state = rich();
+    let (row_key, command) = move_row(&state);
+    let mut view = focused(Section::Legacy, row_key);
+    update(Action::Activate, &mut view, &state);
+    assert!(view.armed.is_some(), "fixture: armed");
+
+    press_char('/', &mut view, &state);
+    assert!(matches!(view.overlay, Some(Overlay::Palette { .. })), "fixture: palette open");
+    assert!(view.armed.is_some(), "opening the palette ended the arming");
+    let query = "a";
+    assert!(
+        !clowder_tui::nav::palette::results(&state, query).is_empty(),
+        "fixture: the query must aim the palette at something"
+    );
+    type_text(query, &mut view, &state);
+
+    let out = press(key(KeyCode::Enter), &mut view, &state);
+
+    assert!(!would_fire(&out, command), "the palette's jump committed the armed row");
+    assert!(view.overlay.is_none(), "fixture: the palette's Enter did not jump");
+    assert!(view.armed.is_none(), "the palette's jump left the row armed; the jump is navigation");
+}
+
+/// Esc with nothing above the armed row closes the arming, silently.
+///
+/// @spec TUI-NAV-076
+#[test]
+fn esc_closing_an_arming_ends_it_silently() {
+    let state = rich();
+    for (name, section, row_key, command) in heavy_rows(&state) {
+        let mut view = focused(section, row_key);
+        update(Action::Activate, &mut view, &state);
+        assert!(view.armed.is_some(), "fixture: {name} armed");
+
+        let out = press(key(KeyCode::Esc), &mut view, &state);
+
+        assert!(!would_fire(&out, command), "Esc committed the armed {name} row");
+        assert!(view.armed.is_none(), "Esc left the {name} row armed");
+        assert!(view.footer.is_none(), "Esc on the armed {name} row left a footer note");
+    }
+}
+
+/// A commit ends the arming whether the core accepts it or refuses it — so a
+/// refused commit needs a fresh arming, and the next Enter is a first press.
+///
+/// @spec TUI-NAV-076
+#[test]
+fn a_commit_ends_the_arming_whether_the_core_accepts_or_refuses_it() {
+    let state = rich();
+    let (key, command) = move_row(&state);
+
+    let mut lapsed = state.clone();
+    lapsed.kittens.truncate(1);
+    assert!(lapsed.clone().apply(command).is_err(), "fixture: the Move is refused now");
+    assert!(state.clone().apply(command).is_ok(), "fixture: the Move is accepted here");
+
+    for (which, world) in [("accepted", &state), ("refused", &lapsed)] {
+        let mut view = focused(Section::Legacy, key.clone());
+        update(Action::Activate, &mut view, world);
+        let out = commit_deliberately(&mut view, world);
+        assert_eq!(out, Outcome::Apply(command), "fixture: the {which} commit reached the core");
+        assert!(view.armed.is_none(), "an {which} commit left the row armed");
+
+        std::thread::sleep(Duration::from_millis(300));
+        let out = update(Action::Activate, &mut view, world);
+        assert!(
+            !would_fire(&out, command),
+            "the Enter after an {which} commit committed again; that press is a first press"
+        );
+        assert!(view.armed.is_some(), "the Enter after an {which} commit did not arm afresh");
+    }
+}
+
+/// The arming of another row ends the first — through the count prompt as
+/// well as through a plain Enter.
+///
+/// @spec TUI-NAV-076
+#[test]
+fn arming_another_row_ends_the_first_arming() {
+    let state = rich();
+    let (move_key, move_command) = move_row(&state);
+    let (nap_key, _) = find_row(&state, Section::Dreams, |c| matches!(c, Command::DeepNap(_)));
+
+    let mut view = focused(Section::Dreams, nap_key.clone());
+    view.armed = Some(ArmedRow {
+        key: move_key,
+        command: move_command,
+        expires_at: Instant::now() + Duration::from_secs(8),
+    });
+    assert_eq!(accept_count("2", &mut view, &state), Outcome::Handled);
+
+    let armed = view.armed.as_ref().expect("the nap prompt's Enter armed nothing");
+    assert_eq!(armed.key, nap_key, "arming the nap row left another row's arming standing");
+    assert_eq!(armed.command, Command::DeepNap(2));
+}
+
+/// Nothing but the endings ends an arming. Toggling the inspector, opening the
+/// Journal, help, the palette or a count prompt (and closing them again with
+/// Esc), and the speed keys all leave the row armed with the same expiry
+/// running.
+///
+/// @spec TUI-NAV-076
+#[test]
+fn opening_things_and_the_speed_keys_leave_an_arming_running() {
+    let state = rich();
+    let (nap_key, _) = find_row(&state, Section::Dreams, |c| matches!(c, Command::DeepNap(_)));
+
+    let armed_view = || {
+        let mut view = focused(Section::Dreams, nap_key.clone());
+        update(Action::Activate, &mut view, &state);
+        let armed = view.armed.clone().expect("fixture: the nap row arms");
+        (view, armed)
+    };
+
+    // Each opener, then (where it opened a transient) the Esc that closes it.
+    let openers: [(char, bool); 8] = [
+        (' ', false),
+        ('i', false),
+        ('e', true),
+        ('?', true),
+        ('/', true),
+        ('x', true),
+        ('<', false),
+        ('>', false),
+    ];
+    for (c, then_esc) in openers {
+        let (mut view, before) = armed_view();
+        std::thread::sleep(Duration::from_millis(5));
+
+        press_char(c, &mut view, &state);
+        assert_eq!(
+            view.armed.as_ref(),
+            Some(&before),
+            "{c:?} changed or ended the arming; only navigation, Esc on the arming, a commit, \
+             another arming, the expiry, or the row leaving its list may"
+        );
+        if c == 'x' {
+            assert!(view.prompt.is_some(), "fixture: x on the armed nap row opened no prompt");
+        }
+
+        if then_esc {
+            press(key(KeyCode::Esc), &mut view, &state);
+            assert!(
+                view.prompt.is_none() && view.overlay.is_none(),
+                "fixture: Esc did not close what {c:?} opened"
+            );
+            assert_eq!(
+                view.armed.as_ref(),
+                Some(&before),
+                "Esc closing what {c:?} opened also ended the arming beneath it"
+            );
+        }
+    }
+}
+
+/// The cursor and group keys an open Journal or help overlay takes for its
+/// own scrolling are the overlay's — their navigation meaning suspended — so
+/// scrolling there ends nothing: the row beneath stays armed, its expiry
+/// still running.
+///
+/// @spec TUI-NAV-076
+#[test]
+fn scrolling_an_open_journal_or_help_overlay_leaves_the_row_beneath_armed() {
+    let state = rich();
+    let (key_, _) = move_row(&state);
+
+    let scroll_keys = [
+        KeyCode::Up,
+        KeyCode::Down,
+        KeyCode::Char('k'),
+        KeyCode::Char('j'),
+        KeyCode::Char('['),
+        KeyCode::Char(']'),
+    ];
+    for overlay in [Overlay::Journal { anchor: 0 }, Overlay::Help] {
+        for code in scroll_keys {
+            let mut view = focused(Section::Legacy, key_.clone());
+            update(Action::Activate, &mut view, &state);
+            let before = view.armed.clone().expect("fixture: armed");
+            view.overlay = Some(overlay.clone());
+
+            press(key(code), &mut view, &state);
+
+            assert_eq!(
+                view.armed.as_ref(),
+                Some(&before),
+                "{code:?} inside {overlay:?} ended the arming beneath it; the overlay's scroll \
+                 keys are the overlay's, not navigation"
+            );
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // TUI-NAV-010 — repeat, rate-limited; the cursor stays put
 // ---------------------------------------------------------------------------

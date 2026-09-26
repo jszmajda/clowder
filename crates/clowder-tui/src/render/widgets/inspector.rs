@@ -241,13 +241,27 @@ fn unit_cost_lines(state: &GameState, unit: &[(ResourceId, f64)]) -> Vec<String>
 }
 
 /// The whole of the inspector's content for one row.
-/// @spec TUI-NAV-018
-fn draw_body(f: &mut Frame, area: Rect, state: &GameState, section: Section, key: &RowKey) {
+/// @spec TUI-NAV-018, TUI-NAV-077
+fn draw_body(
+    f: &mut Frame,
+    area: Rect,
+    state: &GameState,
+    section: Section,
+    key: &RowKey,
+    armed: Option<&crate::nav::ArmedRow>,
+) {
     let Some(row) = rows(state, section).into_iter().find(|r| &r.key == key) else {
         return;
     };
 
     let mut text = full_name(state, key);
+
+    // The swapped-in inspector carries the same consequence summary the list
+    // would show beneath the armed row. @spec TUI-NAV-077
+    if let Some(armed) = armed.filter(|a| a.key == *key && crate::render::armed_is_live(a)) {
+        text.push_str("\n\n");
+        text.push_str(&crate::render::consequence_summary(state, armed).join("\n"));
+    }
 
     if let RowKey::Content(id, _) = key {
         text.push_str("\n\n");
@@ -293,7 +307,7 @@ pub fn draw(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     let Some(key) = view.focus[section.index()].clone() else {
         return;
     };
-    draw_body(f, area, state, section, &key);
+    draw_body(f, area, state, section, &key, view.armed.as_ref());
 }
 
 /// Where the inspector stops being a swap over the list and becomes a pane of

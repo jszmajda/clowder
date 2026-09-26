@@ -12,9 +12,9 @@ pub mod update;
 pub mod view;
 
 pub use action::{Action, CountSemantics};
-pub use rows::{Row, RowKey, RowKind};
+pub use rows::{row_still_listed, Row, RowKey, RowKind};
 pub use section::Section;
-pub use update::{update, Outcome};
+pub use update::{expire_unlisted_arming, update, Outcome};
 pub use view::{ArmedRow, CountPrompt, Overlay, PendingReport, SeenMark, ViewState};
 
 /// A command rejection in words a player can act on.

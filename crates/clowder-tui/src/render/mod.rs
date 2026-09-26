@@ -9,7 +9,7 @@ pub mod fmt;
 pub mod widgets;
 pub mod layout;
 
-use clowder_core::{content, ContentId, GameState};
+use clowder_core::{content, Command, ContentId, GameState};
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -17,7 +17,7 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use crate::nav::rows::{rows, Row, RowKey, RowKind};
-use crate::nav::{CountPrompt, Overlay, Section, ViewState};
+use crate::nav::{ArmedRow, CountPrompt, Overlay, Section, ViewState};
 use crate::theme::Role;
 
 pub use layout::{Body, Layout};
@@ -183,6 +183,65 @@ fn humanize(tag: &str) -> String {
     out
 }
 
+/// Whether an armed row is still one the frame should draw as armed: not past
+/// its expiry. Whether its row is still listed is answered simply by whether
+/// it turns up in the section being iterated, so nothing beyond the clock is
+/// checked here. @spec TUI-NAV-076, TUI-NAV-077
+pub(crate) fn armed_is_live(armed: &ArmedRow) -> bool {
+    std::time::Instant::now() < armed.expires_at
+}
+
+/// A figure the core reports, or — when it is not a finite number — the
+/// plain words that say so instead of printing it. A cost or a stock this
+/// far past any real one overflows to infinity, and a bound the core has not
+/// yet reached (or a value fed by one, such as elder wisdom left non-finite
+/// by a test) can come back not a number at all; either prints as gibberish,
+/// so both are said in words instead. @spec TUI-NAV-075
+fn figure(value: f64) -> String {
+    if value.is_finite() {
+        fmt::compact(value)
+    } else {
+        "beyond reach".to_string()
+    }
+}
+
+/// The consequence summary an armed heavy row expands to: only what the core
+/// reports from current state, re-derived every time this is called, and
+/// with no consequence worked out by a rule of its own — never a judgement
+/// of whether the commit will be accepted, which is the core's to make at
+/// the commit. @spec TUI-NAV-075
+pub(crate) fn consequence_summary(state: &GameState, armed: &ArmedRow) -> Vec<String> {
+    // One fact per line, kept short: the list pane's width can be as narrow
+    // as the floor's 60 columns, and a single long sentence would either wrap
+    // (this pane never does) or clip a figure mid-digit.
+    match armed.command {
+        Command::GreatMeadowMove => {
+            let kittens = state.kittens.len();
+            let basket = figure(state.basket_capacity() as f64);
+            let share = figure(state.memory_chest_ratio() * 100.0);
+            vec![
+                "Move to a new meadow:".to_string(),
+                format!("{kittens} kittens come along"),
+                format!("room for {basket} in the basket"),
+                format!("the chest carries {share}% of stores"),
+            ]
+        }
+        Command::PassItDown => {
+            vec![format!("Pass down {} elder wisdom", figure(state.elder_wisdom))]
+        }
+        Command::AdoptRule(rule) => {
+            let sibling = content::rule_def(content::rule_def(rule).blocks).name;
+            vec![format!("Closes {sibling} for this meadow")]
+        }
+        Command::DeepNap(years) => {
+            let cost = figure(state.starshard_cost(years));
+            let wake = figure((state.year() + years as u64) as f64);
+            vec![format!("Nap {years} years"), format!("costs {cost} starshards"), format!("wakes in year {wake}")]
+        }
+        _ => Vec::new(),
+    }
+}
+
 /// The window of row indices to draw, and how many rows lie outside it.
 struct Window {
     start: usize,
@@ -216,8 +275,11 @@ fn window_for(total: usize, cursor: usize, capacity: usize) -> Window {
 /// cursor. An open count prompt's preview draws on the exact row it was
 /// opened on, by that row's identity, never by list position — so a cursor
 /// that has since drifted (or an open prompt whose own row has left the
-/// list) never previews on the wrong line.
-/// @spec TUI-RENDER-009, TUI-RENDER-010, TUI-RENDER-011, TUI-RENDER-015, TUI-NAV-067
+/// list) never previews on the wrong line. An armed row's consequence
+/// summary, likewise, expands only on the row an arming names, and only
+/// while it is still live — never a stale one past its expiry.
+/// @spec TUI-RENDER-009, TUI-RENDER-010, TUI-RENDER-011, TUI-RENDER-015,
+/// TUI-NAV-067, TUI-NAV-077
 fn draw_list(
     f: &mut Frame,
     area: Rect,
@@ -225,12 +287,14 @@ fn draw_list(
     section: Section,
     cursor_key: Option<&RowKey>,
     prompt: Option<&CountPrompt>,
+    armed: Option<&ArmedRow>,
 ) {
     let all = rows(state, section);
     let cursor = cursor_key
         .and_then(|k| all.iter().position(|r| &r.key == k))
         .unwrap_or(0);
     let prompt_key = prompt.and_then(|p| p.row.as_ref());
+    let armed = armed.filter(|a| armed_is_live(a));
 
     let capacity = area.height as usize;
     let win = window_for(all.len(), cursor, capacity);
@@ -248,6 +312,17 @@ fn draw_list(
         let focused = i == cursor && row.selectable();
         let on_this_row = prompt.filter(|_| prompt_key == Some(&row.key));
         lines.push(row_line(state, row, focused, area.width as usize, on_this_row));
+        // The row an arming holds expands in place, on the lines directly
+        // beneath it — never anywhere else, and only while the arming still
+        // holds. @spec TUI-NAV-015, TUI-NAV-077
+        if armed.is_some_and(|a| a.key == row.key) {
+            for line in consequence_summary(state, armed.expect("checked Some above")) {
+                lines.push(Line::from(Span::styled(
+                    fmt::fit(&format!("  {line}"), area.width as usize),
+                    style_for(Role::Dim),
+                )));
+            }
+        }
     }
     if win.hidden > 0 {
         lines.push(Line::from(Span::styled(
@@ -363,12 +438,12 @@ pub fn frame(
                 if view.inspector_wanted {
                     widgets::inspector::draw(f, main, state, view);
                 } else {
-                    draw_list(f, main, state, section, cursor_key, view.prompt.as_ref());
+                    draw_list(f, main, state, section, cursor_key, view.prompt.as_ref(), view.armed.as_ref());
                 }
             }
             Body::Wide { sidebar, list, inspector } => {
                 widgets::chrome::sidebar(f, sidebar, state);
-                draw_list(f, list, state, section, cursor_key, view.prompt.as_ref());
+                draw_list(f, list, state, section, cursor_key, view.prompt.as_ref(), view.armed.as_ref());
                 widgets::inspector::draw(f, inspector, state, view);
             }
         },

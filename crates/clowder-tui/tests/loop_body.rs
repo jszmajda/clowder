@@ -341,3 +341,123 @@ fn an_open_field_outlasts_every_timer_while_the_sim_runs_beneath_it() {
         apps[1].1.view.overlay
     );
 }
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-015 / TUI-NAV-076 — an arming across frames
+//
+// What ends an arming, and what leaves it running, includes things only the
+// loop sees happen: the simulation advancing, the terminal changing size, and
+// a row leaving its list because the state beneath it moved. These are
+// asserted through `step`, the one place all three happen.
+// ---------------------------------------------------------------------------
+
+/// A meadow where the nap row is listed and a nap is affordable — the one
+/// heavy row whose listing a test can switch off and on again.
+fn nappable() -> GameState {
+    let mut s = actionable();
+    s.ideas.insert(clowder_core::IdeaId::DeepNapTheory);
+    s.resources[clowder_core::ResourceId::Starshards.ix()] = 1.0e12;
+    s
+}
+
+fn nap_key(state: &GameState) -> clowder_tui::nav::RowKey {
+    use clowder_tui::nav::rows::{rows, RowKind};
+    use clowder_tui::nav::Section;
+    rows(state, Section::Dreams)
+        .into_iter()
+        .find(|r| {
+            matches!(r.kind, RowKind::Act { command: clowder_core::Command::DeepNap(_), .. })
+        })
+        .map(|r| r.key)
+        .expect("fixture: the nap row is listed")
+}
+
+fn still() -> Reading {
+    Reading { monotonic: Duration::ZERO, wall: Duration::ZERO }
+}
+
+/// An app focused on the nap row, armed by a real Enter through the loop.
+fn armed_on_the_nap(name: &str) -> (App, Terminal<TestBackend>) {
+    use clowder_tui::nav::Section;
+    let mut a = app(scratch(name));
+    a.state = nappable();
+    a.view.section = Some(Section::Dreams);
+    a.view.focus[Section::Dreams.index()] = Some(nap_key(&a.state));
+    let mut term = Terminal::new(TestBackend::new(120, 40)).unwrap();
+    a.step(&mut term, still(), &[key(crossterm::event::KeyCode::Enter)]).unwrap();
+    assert!(a.view.armed.is_some(), "fixture: Enter on the nap row armed it");
+    (a, term)
+}
+
+/// The simulation keeps advancing while a row is armed, and advancing it
+/// leaves the arming as it was — same row, same command, same expiry.
+///
+/// @spec TUI-NAV-015, TUI-NAV-076
+#[test]
+fn the_simulation_advancing_leaves_an_arming_running() {
+    let (mut a, mut term) = armed_on_the_nap("armed-sim");
+    let before = a.view.armed.clone();
+    a.state.speed = 8.0;
+    let ticks = a.state.ticks;
+
+    a.step(&mut term, elapsed(5.0), &[]).unwrap();
+
+    assert!(a.state.ticks > ticks, "the simulation stood still while a row was armed");
+    assert_eq!(
+        a.view.armed, before,
+        "the simulation advancing changed or ended the arming; only the endings may"
+    );
+}
+
+/// A change of layout leaves an arming running: however much of the summary
+/// a terminal has room for, the row stays armed.
+///
+/// @spec TUI-NAV-076
+#[test]
+fn a_change_of_layout_leaves_an_arming_running() {
+    use crossterm::event::Event;
+    let (mut a, mut term) = armed_on_the_nap("armed-resize");
+    let before = a.view.armed.clone();
+
+    for (w, h) in [(80u16, 24u16), (99, 24), (150, 50), (100, 30)] {
+        a.step(&mut term, still(), &[Event::Resize(w, h)]).unwrap();
+        assert_eq!(a.view.armed, before, "a resize to {w}×{h} changed or ended the arming");
+    }
+}
+
+/// An armed row that stops being listed ends its arming — navigation by other
+/// means — and the arming does not come back with the row: the next Enter on
+/// the row once it is listed again is a first press, which arms afresh, and
+/// never a commit.
+///
+/// @spec TUI-NAV-076
+#[test]
+fn an_armed_row_that_stops_being_listed_ends_its_arming_for_good() {
+    use crossterm::event::KeyCode;
+    let (mut a, mut term) = armed_on_the_nap("armed-unlisted");
+    let before = a.view.armed.clone().expect("fixture: armed");
+    let shards = a.state.stock(clowder_core::ResourceId::Starshards);
+
+    // The row leaves its list for a frame...
+    a.state.ideas.remove(&clowder_core::IdeaId::DeepNapTheory);
+    a.step(&mut term, still(), &[]).unwrap();
+    // ...and comes back, still well inside the old arming's eight seconds.
+    a.state.ideas.insert(clowder_core::IdeaId::DeepNapTheory);
+    a.view.focus[clowder_tui::nav::Section::Dreams.index()] = Some(before.key.clone());
+    std::thread::sleep(Duration::from_millis(300));
+    assert!(Instant::now() < before.expires_at, "fixture: the old arming has not expired");
+
+    a.step(&mut term, still(), &[key(KeyCode::Enter)]).unwrap();
+
+    assert_eq!(
+        a.state.stock(clowder_core::ResourceId::Starshards),
+        shards,
+        "the first Enter after the armed row left its list and came back committed the nap; \
+         the row leaving ended that arming"
+    );
+    let now = a.view.armed.as_ref().expect("that Enter did not arm the row afresh");
+    assert!(
+        now.expires_at > before.expires_at,
+        "the row came back still carrying the arming it had before it left its list"
+    );
+}

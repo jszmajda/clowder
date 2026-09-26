@@ -341,3 +341,11 @@ fn legacy_rows(state: &GameState) -> Vec<Row> {
 pub fn revealed_sections(state: &GameState) -> Vec<Section> {
     Section::ALL.into_iter().filter(|s| !rows(state, *s).is_empty()).collect()
 }
+
+/// Whether `key` names a row still listed anywhere — every section, not only
+/// the one it last lived in, since an arming carries no section of its own
+/// and a row's identity is unique across the whole app. Used to end an
+/// arming whose row has left its list. @spec TUI-NAV-076
+pub fn row_still_listed(state: &GameState, key: &RowKey) -> bool {
+    Section::ALL.iter().any(|s| rows(state, *s).iter().any(|r| &r.key == key))
+}

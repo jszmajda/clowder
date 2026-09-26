@@ -68,6 +68,18 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
         | Action::SectionJump(_)
         | Action::GroupNext
         | Action::GroupPrev => {
+            // A full-screen overlay (Journal or help) takes the cursor and
+            // group keys for its own scrolling — their navigation meaning is
+            // suspended, so they neither move the section cursor nor end an
+            // arming beneath the overlay. @spec TUI-NAV-076
+            if view.overlay.is_some()
+                && matches!(
+                    action,
+                    Action::CursorUp | Action::CursorDown | Action::GroupNext | Action::GroupPrev
+                )
+            {
+                return Outcome::Handled;
+            }
             // Any navigation silently disarms whatever was armed, and ends any
             // field-accept guard still standing over the row it left.
             // @spec TUI-NAV-015, TUI-NAV-061
@@ -670,6 +682,25 @@ fn handle_erase(view: &mut ViewState) -> Outcome {
         query.pop();
     }
     Outcome::Handled
+}
+
+// ---------------------------------------------------------------------------
+// Row departure — TUI-NAV-076
+// ---------------------------------------------------------------------------
+
+/// Ends an arming whose row is no longer listed in its section — the row
+/// leaving is navigation by other means (the cursor has already lost it,
+/// TUI-NAV-032), so the arming ends the same as any other navigation would,
+/// and the next Enter is an ordinary press on whatever is focused now. Called
+/// every frame, independent of input, since a tick or a loaded command can
+/// remove a row out from under an arming with no key pressed at all.
+/// @spec TUI-NAV-076
+pub fn expire_unlisted_arming(view: &mut ViewState, state: &GameState) {
+    if let Some(armed) = &view.armed {
+        if !super::rows::row_still_listed(state, &armed.key) {
+            view.armed = None;
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
