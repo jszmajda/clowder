@@ -1936,26 +1936,11 @@ impl GameState {
         if !self.revealed.contains(&id) {
             return Availability::Hidden;
         }
-        let actionable = match id {
-            ContentId::Structure(s) => {
-                self.structure_unlocked(s)
-                    && self
-                        .next_cost(s)
-                        .iter()
-                        .all(|(r, amount)| self.stock(*r) + EPSILON >= *amount)
-            }
-            ContentId::Idea(i) => {
-                let def = content::idea_def(i);
-                self.idea_unlocked(i)
-                    && !self.ideas.contains(&i)
-                    && self.stock(ResourceId::Curiosity) + EPSILON >= def.cost
-                    && def
-                        .gate
-                        .iter()
-                        .all(|(r, amount)| self.stock(*r) + EPSILON >= *amount)
-            }
-            _ => unreachable!("guarded by is_reveal_tracked"),
-        };
+        // Actionable is the lock reason's answer, not a second reading of the
+        // price: the lock reason prices through the same modifiers and in the
+        // same precedence the command layer does, so Available and a command
+        // that succeeds can never disagree. @spec SIM-ENG-023
+        let actionable = self.lock_reason(id).is_none();
         if actionable {
             Availability::Available
         } else {
