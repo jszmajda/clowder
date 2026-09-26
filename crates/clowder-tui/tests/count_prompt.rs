@@ -924,3 +924,82 @@ fn a_per_unit_priced_rows_next_cost_is_the_cores_price_of_one_unit() {
     }
     assert!(seen > 1, "fixture: the Pounce row and the trade rows should be listed");
 }
+
+/// A drawing with every number replaced by one placeholder and whitespace
+/// collapsed: two drawings that mask alike said the same things about
+/// different amounts.
+fn masked(s: &str) -> String {
+    let mut out = String::new();
+    let mut in_number = false;
+    for c in s.chars() {
+        if c.is_ascii_digit() || (in_number && c == '.') {
+            if !in_number {
+                out.push('#');
+                in_number = true;
+            }
+        } else {
+            in_number = false;
+            out.push(c);
+        }
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// The core reports no lock reason for a Pounce or Trade row, and only a lock
+/// reason marks components, so the one-unit price's need and have stand
+/// unmarked and no wait stands beside them: the row reads the same whether the
+/// stock covers the unit or falls short, and the game speed — which would move
+/// any real-time wait — changes nothing on it. Quantified over the Pounce row
+/// and every colony's trade row.
+///
+/// @spec TUI-NAV-078
+#[test]
+fn a_per_unit_priced_rows_components_stand_unmarked_with_no_wait() {
+    let base = rich();
+    let mut seen = 0;
+    let mut growing = 0;
+    for (section, row) in every_row(&base) {
+        let RowKind::Act { command, .. } = row.kind else { continue };
+        if !matches!(command, Command::Pounce(_) | Command::Trade(..)) {
+            continue;
+        }
+        seen += 1;
+        let unit = base
+            .unit_price(&command)
+            .unwrap_or_else(|| panic!("fixture: {command:?} is open here, so the core prices it"));
+        let mut short = base.clone();
+        let mut enough = base.clone();
+        for (r, need) in &unit {
+            short.resources[r.ix()] = need * 0.25;
+            enough.resources[r.ix()] = need + 100.5;
+        }
+        if unit.iter().any(|(r, _)| short.net_rate(*r) > 0.0) {
+            growing += 1;
+        }
+        let view = focused(section, row.key.clone());
+        let a = pane_text(&short, &view);
+        let b = pane_text(&enough, &view);
+        assert_eq!(
+            masked(&a),
+            masked(&b),
+            "{:?}: stock marks nothing on a one-unit price, so short and covered must read alike but \
+             for their figures.\nshort:\n{a}\ncovered:\n{b}",
+            row.key
+        );
+        let mut fast = short.clone();
+        fast.speed = 8.0;
+        let mut slow = short.clone();
+        slow.speed = 0.25;
+        assert_eq!(
+            pane_text(&fast, &view),
+            pane_text(&slow, &view),
+            "{:?}: no wait stands beside a one-unit price, so the speed changes nothing on the row",
+            row.key
+        );
+    }
+    assert!(seen > 1, "fixture: the Pounce row and the trade rows should be listed");
+    assert!(
+        growing > 0,
+        "fixture: on some of these rows a component is growing, so a wait would have something to say"
+    );
+}

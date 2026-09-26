@@ -1065,3 +1065,1413 @@ fn the_inspector_states_each_items_own_mechanics() {
          the same words for both — that is a template, not a description.\n{shown_a}\n---\n{shown_b}"
     );
 }
+
+// ===========================================================================
+// TUI-NAV-018, TUI-NAV-078, TUI-NAV-080 — what the inspector states, whole
+//
+// The tests above pin the inspector's facts one example at a time. The tests
+// below pin each claim over the whole set it quantifies: every structure's
+// definition, every job, every recipe, every row that takes an item, every
+// store. Wording is still nobody's to pin, so four wording-free instruments
+// carry them:
+//
+// * **numbers** — the figures on screen, compared against `fmt::exact` of the
+//   value the spec names (TUI-RENDER-012's exact form). A claim that the
+//   inspector states *nothing but* certain figures is a subset test: every
+//   number on screen must be one the spec allows on that row.
+// * **masked text** — the drawing with every number replaced by one
+//   placeholder and whitespace collapsed. Two states whose masked drawings are
+//   equal said the same things about different amounts; two whose masked
+//   drawings differ said something different (a mark, a note, a wait).
+// * **waits** — a stretch of real time on screen, read as a number followed by
+//   a plain unit of time (`s`, `min`, `hours`, …), consecutive parts summed.
+//   The spec requires plain units of time, so any such rendering is found.
+// * **lines** — the non-blank lines of a drawing; the first is the name.
+// ===========================================================================
+
+use clowder_core::content as tables;
+use clowder_core::content::TICKS_PER_SECOND;
+use clowder_core::{ArchId, CraftId, DreamLoomId, IdeaId, RefinementId, RiteId, RuleId, SiteId};
+use clowder_tui::nav::rows::{Row, RowKind};
+
+/// Whitespace collapsed, so a sentence wrapped across the pane reads whole.
+fn flat(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// A drawing with every number — sign included — replaced by one placeholder,
+/// and whitespace collapsed.
+fn masked(s: &str) -> String {
+    let mut out = String::new();
+    let mut run = String::new();
+    let chars: Vec<char> = s.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        let starts_number = c.is_ascii_digit()
+            || ((c == '-' || c == '+' || c == '.')
+                && chars.get(i + 1).is_some_and(|n| n.is_ascii_digit()));
+        if starts_number || (!run.is_empty() && (c.is_ascii_digit() || c == '.')) {
+            run.push(c);
+        } else {
+            if !run.is_empty() {
+                out.push('#');
+                if run.ends_with('.') {
+                    out.push('.');
+                }
+                run.clear();
+            }
+            out.push(c);
+        }
+        i += 1;
+    }
+    if !run.is_empty() {
+        out.push('#');
+    }
+    flat(&out)
+}
+
+/// A figure as `numbers` reads it: the exact form, sign dropped.
+fn bare(x: f64) -> String {
+    fmt::exact(x).trim_start_matches('-').to_string()
+}
+
+fn per_second(per_tick: f64) -> String {
+    bare(per_tick * TICKS_PER_SECOND as f64)
+}
+
+fn percent(ratio: f64) -> String {
+    bare(ratio * 100.0)
+}
+
+/// The plain units of time a wait may be stated in, and their length in
+/// seconds.
+const TIME_UNITS: [(&str, f64); 18] = [
+    ("s", 1.0),
+    ("sec", 1.0),
+    ("secs", 1.0),
+    ("second", 1.0),
+    ("seconds", 1.0),
+    ("m", 60.0),
+    ("min", 60.0),
+    ("mins", 60.0),
+    ("minute", 60.0),
+    ("minutes", 60.0),
+    ("h", 3_600.0),
+    ("hr", 3_600.0),
+    ("hrs", 3_600.0),
+    ("hour", 3_600.0),
+    ("hours", 3_600.0),
+    ("d", 86_400.0),
+    ("day", 86_400.0),
+    ("days", 86_400.0),
+];
+
+fn unit_seconds(word: &str) -> Option<f64> {
+    TIME_UNITS.iter().find(|(u, _)| *u == word).map(|(_, s)| *s)
+}
+
+/// One stretch of time stated on screen.
+#[derive(Debug, Clone, Copy)]
+struct Wait {
+    /// What it says, in seconds.
+    seconds: f64,
+    /// The smallest unit it is stated in — how coarse its rounding can be.
+    granularity: f64,
+    /// Its byte range in the flattened drawing.
+    start: usize,
+    end: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum Tok {
+    Num(f64),
+    Word(String),
+    Other(char),
+}
+
+fn tokens(t: &str) -> Vec<(Tok, usize, usize)> {
+    let mut out = Vec::new();
+    let bytes: Vec<(usize, char)> = t.char_indices().collect();
+    let mut i = 0;
+    while i < bytes.len() {
+        let (start, c) = bytes[i];
+        if c.is_whitespace() {
+            i += 1;
+        } else if c.is_ascii_digit() {
+            let mut j = i;
+            while j < bytes.len() && (bytes[j].1.is_ascii_digit() || bytes[j].1 == '.') {
+                j += 1;
+            }
+            // A trailing full stop ends the sentence, not the number.
+            while j > i + 1 && bytes[j - 1].1 == '.' {
+                j -= 1;
+            }
+            let end = bytes.get(j).map(|b| b.0).unwrap_or(t.len());
+            let text = &t[start..end];
+            match text.parse::<f64>() {
+                Ok(n) => out.push((Tok::Num(n), start, end)),
+                Err(_) => out.push((Tok::Other(c), start, end)),
+            }
+            i = j;
+        } else if c.is_alphabetic() {
+            let mut j = i;
+            while j < bytes.len() && bytes[j].1.is_alphabetic() {
+                j += 1;
+            }
+            let end = bytes.get(j).map(|b| b.0).unwrap_or(t.len());
+            out.push((Tok::Word(t[start..end].to_lowercase()), start, end));
+            i = j;
+        } else {
+            let end = bytes.get(i + 1).map(|b| b.0).unwrap_or(t.len());
+            out.push((Tok::Other(c), start, end));
+            i += 1;
+        }
+    }
+    out
+}
+
+/// Every wait stated in a drawing: a number directly followed by a plain unit
+/// of time, with any further number-and-unit parts that follow it (separated
+/// by nothing, a comma, or "and") summed into the same wait.
+fn waits(text: &str) -> Vec<Wait> {
+    let t = flat(text);
+    let toks = tokens(&t);
+    let part = |k: usize| -> Option<(f64, f64, usize, usize)> {
+        match (toks.get(k), toks.get(k + 1)) {
+            (Some((Tok::Num(n), s, _)), Some((Tok::Word(w), _, e))) => {
+                unit_seconds(w).map(|u| (n * u, u, *s, *e))
+            }
+            _ => None,
+        }
+    };
+    let mut out = Vec::new();
+    let mut k = 0;
+    while k < toks.len() {
+        let Some((secs, gran, start, mut end)) = part(k) else {
+            k += 1;
+            continue;
+        };
+        let mut w = Wait { seconds: secs, granularity: gran, start, end };
+        k += 2;
+        loop {
+            let skip = match toks.get(k) {
+                Some((Tok::Other(','), _, _)) => 1,
+                Some((Tok::Word(a), _, _)) if a == "and" => 1,
+                _ => 0,
+            };
+            match part(k + skip) {
+                Some((s, g, _, e)) => {
+                    w.seconds += s;
+                    w.granularity = w.granularity.min(g);
+                    end = e;
+                    w.end = end;
+                    k += skip + 2;
+                }
+                None => break,
+            }
+        }
+        out.push(w);
+    }
+    out
+}
+
+/// The numbers of a drawing that are not part of a stated wait.
+fn numbers_outside_waits(text: &str) -> BTreeSet<String> {
+    let t = flat(text);
+    let mut kept = String::new();
+    let mut at = 0;
+    for w in waits(text) {
+        kept.push_str(&t[at..w.start]);
+        kept.push(' ');
+        at = w.end;
+    }
+    kept.push_str(&t[at..]);
+    numbers(&kept)
+}
+
+/// The non-blank lines of a drawing, trimmed, in order.
+fn lines_of(text: &str) -> Vec<String> {
+    text.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect()
+}
+
+/// The one line of a drawing that states `figure`.
+fn line_stating(text: &str, figure: &str) -> String {
+    let found: Vec<String> =
+        lines_of(text).into_iter().filter(|l| numbers(l).contains(figure)).collect();
+    assert_eq!(
+        found.len(),
+        1,
+        "expected exactly one line stating {figure}; found {found:?} in:\n{text}"
+    );
+    flat(&found[0])
+}
+
+fn def_name(id: ContentId) -> Option<&'static str> {
+    Some(match id {
+        ContentId::Structure(s) => tables::structure_def(s).name,
+        ContentId::Idea(i) => tables::idea_def(i).name,
+        ContentId::Craft(c) => tables::craft_def(c).name,
+        ContentId::Job(j) => tables::job_def(j).name,
+        ContentId::Rite(r) => tables::rite_def(r).name,
+        ContentId::Arch(a) => tables::arch_def(a).name,
+        ContentId::Refinement(r) => tables::refinement_def(r).name,
+        ContentId::Rule(r) => tables::rule_def(r).name,
+        ContentId::DreamLoom(l) => tables::dream_loom_def(l).name,
+        ContentId::Tradition(_) => return None,
+    })
+}
+
+/// The figures a name itself carries, which may appear on screen with it.
+fn name_numbers(state: &GameState, key: &RowKey) -> BTreeSet<String> {
+    match key {
+        RowKey::Content(id, _) => def_name(*id).map(numbers).unwrap_or_default(),
+        RowKey::Kitten(ix, _) => numbers(&state.kittens[*ix].name),
+        _ => BTreeSet::new(),
+    }
+}
+
+/// A stock distinct for every resource and exactly representable, so each
+/// "have" on screen is recognisably that resource's.
+fn distinct_stock(r: ResourceId) -> f64 {
+    1_000.5 + r.ix() as f64 * 0.25
+}
+
+fn named_kitten(i: usize) -> Kitten {
+    let mut k = plain_kitten();
+    k.name = format!("kitten-{i}");
+    k
+}
+
+/// A meadow where every kind of row is listed: every structure and idea
+/// revealed, curiosity storage built, every site reached, a generation passed,
+/// devotion far past every rite's gate, and idle kittens at home. Every
+/// structure is owned twice, so no structure's next price is its table price.
+/// With `ideas_held`, every idea is researched and one item of each kind held
+/// once is already the player's; without, the ideas are revealed but not yet
+/// researched.
+fn world(ideas_held: bool) -> GameState {
+    let mut s = GameState::new(11);
+    for r in ResourceId::ALL {
+        s.resources[r.ix()] = distinct_stock(r);
+    }
+    for b in StructureId::ALL {
+        s.structures[b.ix()] = 2;
+    }
+    s.revealed = StructureId::ALL
+        .into_iter()
+        .map(ContentId::Structure)
+        .chain(IdeaId::ALL.into_iter().map(ContentId::Idea))
+        .collect();
+    s.sites_reached = SiteId::ALL.into_iter().collect();
+    s.generation = 1;
+    s.peak_devotion = 1.0e12;
+    s.kittens = (0..6).map(named_kitten).collect();
+    if ideas_held {
+        s.ideas = IdeaId::ALL.into_iter().collect();
+        s.arches_bought.insert(ArchId::ALL[0]);
+        s.dream_looms.insert(DreamLoomId::ALL[0]);
+        s.traditions.insert(TraditionId::ALL[0]);
+        s.refinements.insert(RefinementId::ALL[0]);
+        s.rules.insert(RuleId::ALL[0]);
+        s.rite_counts[RiteId::ALL[0].ix()] = 1;
+    }
+    s
+}
+
+fn every_row(state: &GameState) -> Vec<(Section, Row)> {
+    Section::ALL
+        .into_iter()
+        .flat_map(|section| {
+            rows(state, section).into_iter().filter(|r| r.selectable()).map(move |r| (section, r))
+        })
+        .collect()
+}
+
+/// The next cost TUI-NAV-078 has the inspector state on this row, if any: the
+/// core's price for one more, on a row that takes a content item, unless that
+/// price names no component, the row is a craft's tinkerer count row, or the
+/// core reports the item already the player's.
+fn stated_next_cost(state: &GameState, key: &RowKey) -> Option<Vec<(ResourceId, f64)>> {
+    let RowKey::Content(id, tag) = key else { return None };
+    if *tag == "tinker" || state.lock_reason(*id) == Some(LockReason::AlreadyYours) {
+        return None;
+    }
+    let cost = state.cost_of_next(*id, 1);
+    (!cost.is_empty()).then_some(cost)
+}
+
+/// Every figure the next cost and the lock reason may put on this row.
+fn cost_and_reason_numbers(state: &GameState, key: &RowKey) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    if let Some(cost) = stated_next_cost(state, key) {
+        for (r, need) in cost {
+            out.insert(bare(need));
+            out.insert(bare(state.stock(r)));
+        }
+    }
+    if let RowKey::Content(id, tag) = key {
+        if *tag != "tinker" {
+            if let Some(LockReason::ShortBy { missing }) = state.lock_reason(*id) {
+                for (_, amount) in missing {
+                    out.insert(bare(amount));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Every field a structure's definition carries apart from its name, price,
+/// escalation, reveal threshold, and gate, where it departs from its baseline —
+/// each with the forms it may be stated in: per-tick fields per game second,
+/// ratios as the percentage they add, everything else as it stands.
+fn structure_fields(s: StructureId) -> Vec<(String, Vec<String>)> {
+    let d = tables::structure_def(s);
+    let mut out: Vec<(String, Vec<String>)> = Vec::new();
+    for (r, a) in d.productions {
+        out.push((format!("production of {r:?}"), vec![per_second(*a)]));
+    }
+    if d.housing != 0 {
+        out.push(("housing".into(), vec![bare(d.housing as f64)]));
+    }
+    for (r, a) in d.cap_bonuses {
+        out.push((format!("storage for {r:?}"), vec![bare(*a)]));
+    }
+    if d.happiness_points != 0.0 {
+        out.push(("mood points".into(), vec![bare(d.happiness_points)]));
+    }
+    if d.crowding_relief != 0.0 {
+        // A pooled fraction of crowding relieved: as it stands, or as a
+        // percentage.
+        out.push((
+            "crowding relief".into(),
+            vec![bare(d.crowding_relief), percent(d.crowding_relief)],
+        ));
+    }
+    for (r, a) in d.resource_ratios {
+        out.push((format!("ratio on {r:?}"), vec![percent(*a)]));
+    }
+    if d.craft_ratio != 0.0 {
+        out.push(("craft ratio".into(), vec![percent(d.craft_ratio)]));
+    }
+    if d.luxury_demand != 0.0 {
+        out.push(("luxury demand".into(), vec![percent(d.luxury_demand)]));
+    }
+    if d.jamboree_ratio != 0.0 {
+        out.push(("jamboree ratio".into(), vec![percent(d.jamboree_ratio)]));
+    }
+    if d.jamboree_arrival != 0.0 {
+        out.push(("jamboree arrival".into(), vec![percent(d.jamboree_arrival)]));
+    }
+    if d.global_ratio != 0.0 {
+        out.push(("global ratio".into(), vec![percent(d.global_ratio)]));
+    }
+    if let Some(conv) = &d.converter {
+        for (r, a) in conv.inputs {
+            out.push((format!("converter input {r:?}"), vec![per_second(*a)]));
+        }
+        for (r, a) in conv.outputs {
+            out.push((format!("converter output {r:?}"), vec![per_second(*a)]));
+        }
+    }
+    if d.mess != 0.0 {
+        out.push(("mess".into(), vec![per_second(d.mess)]));
+    }
+    if d.energy_prod != 0.0 {
+        out.push(("energy made".into(), vec![bare(d.energy_prod)]));
+    }
+    if d.energy_cons != 0.0 {
+        out.push(("energy used".into(), vec![bare(d.energy_cons)]));
+    }
+    if d.outdoor_ratio != 0.0 {
+        out.push(("outdoor ratio".into(), vec![percent(d.outdoor_ratio)]));
+    }
+    if d.long_sun_cap != 0.0 {
+        out.push(("long sun extension".into(), vec![bare(d.long_sun_cap)]));
+    }
+    out
+}
+
+/// Copies held of the structure under inspection in `structure_pane`.
+const HELD: u32 = 3;
+
+/// A structure's row with its gate open, `HELD` copies owned, and its next
+/// price covered — so the drawing holds its name, statement, copies, and a
+/// covered next cost, and no reason or wait.
+fn structure_pane(s: StructureId) -> (GameState, String) {
+    let mut state = meadow(&[s]);
+    state.ideas = IdeaId::ALL.into_iter().collect();
+    state.sites_reached = SiteId::ALL.into_iter().collect();
+    state.structures[s.ix()] = HELD;
+    for (r, need) in state.next_cost(s) {
+        state.resources[r.ix()] = need + 0.5;
+    }
+    assert_eq!(state.lock_reason(ContentId::Structure(s)), None, "fixture: {s:?} is open and covered");
+    assert_is_a_row(&state, Section::Meadow, &structure_row(s));
+    let shown = pane_text(&state, &looking_at(Section::Meadow, structure_row(s)), WIDE, TALL);
+    (state, shown)
+}
+
+/// The cursor's row is re-derived every frame from the row the list
+/// highlights. When the remembered row has left its list, the list highlights
+/// its first row, and the inspector must describe that row — not go blank.
+/// @spec TUI-NAV-018
+#[test]
+fn the_inspector_describes_the_row_the_list_falls_back_to_when_the_focused_row_leaves() {
+    let gone = producer();
+    let state = meadow(&[]);
+    let key = structure_row(gone);
+    assert!(
+        !rows(&state, Section::Meadow).iter().any(|r| r.key == key),
+        "fixture: {gone:?} is not listed in a meadow that has revealed nothing"
+    );
+    let first = rows(&state, Section::Meadow)
+        .into_iter()
+        .next()
+        .expect("fixture: a fresh meadow lists something");
+    assert!(first.selectable(), "fixture: the list's first row is one the cursor can rest on");
+
+    let fallen = pane_text(&state, &looking_at(Section::Meadow, key), WIDE, TALL);
+    let on_first = pane_text(&state, &looking_at(Section::Meadow, first.key.clone()), WIDE, TALL);
+    assert!(!on_first.trim().is_empty(), "fixture: the first row has something to say");
+    assert_eq!(
+        fallen, on_first,
+        "the focused row left the list, so the list highlights {:?}; the inspector describes the \
+         row the cursor is on and must describe that one",
+        first.key
+    );
+}
+
+/// The name, whole, on every row that has one — every piece of content with a
+/// named definition, and every kitten — so any name the list cut with an
+/// ellipsis can be read in full here.
+/// @spec TUI-NAV-018
+#[test]
+fn every_row_names_its_item_whole() {
+    let mut checked = 0;
+    for state in [world(true), world(false)] {
+        for (section, row) in every_row(&state) {
+            let name = match &row.key {
+                RowKey::Content(id, _) => match def_name(*id) {
+                    Some(n) => n.to_string(),
+                    None => continue,
+                },
+                RowKey::Kitten(ix, _) => state.kittens[*ix].name.clone(),
+                _ => continue,
+            };
+            let shown = pane_text(&state, &looking_at(section, row.key.clone()), WIDE, TALL);
+            assert!(
+                flat(&shown).contains(&flat(&name)),
+                "the inspector on {:?} must carry its whole name {name:?}; it read:\n{shown}",
+                row.key
+            );
+            assert!(!shown.contains('\u{2026}'), "nothing in the pane may be cut; it read:\n{shown}");
+            checked += 1;
+        }
+    }
+    assert!(checked > 50, "fixture: the world lists many named rows ({checked})");
+}
+
+/// A structure's statement is every field its definition sets apart from its
+/// name, price, escalation, reveal threshold, and gate — each wherever it
+/// departs from its baseline, per-tick fields per game second, ratios as
+/// percentages — and states nothing else: no table price beside the core's, no
+/// escalation, no total for the copies owned, no baseline field. Quantified
+/// over every structure the tables define.
+/// @spec TUI-NAV-018
+#[test]
+fn a_structures_statement_is_every_field_its_definition_sets_and_nothing_else() {
+    let mut failures = Vec::new();
+    for s in StructureId::ALL {
+        let (state, shown) = structure_pane(s);
+        let key = structure_row(s);
+        let on_screen = numbers_outside_waits(&shown);
+
+        let fields = structure_fields(s);
+        for (field, forms) in &fields {
+            if !forms.iter().any(|f| on_screen.contains(f)) {
+                failures.push(format!("{s:?}: its {field} ({forms:?}) is not stated"));
+            }
+        }
+
+        let mut allowed: BTreeSet<String> = fields.iter().flat_map(|(_, f)| f.clone()).collect();
+        allowed.extend(cost_and_reason_numbers(&state, &key));
+        allowed.extend(name_numbers(&state, &key));
+        allowed.insert(HELD.to_string());
+        let stray: Vec<&String> = on_screen.difference(&allowed).collect();
+        if !stray.is_empty() {
+            failures.push(format!(
+                "{s:?}: states {stray:?}, which is no field its definition sets, no figure of the \
+                 core's next cost, and not the copies held"
+            ));
+        }
+        if !failures.is_empty() && failures.len() < 4 {
+            failures.push(format!("  ({s:?} read:\n{shown})"));
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// The qualifiers that shape a structure's productions — seasonal, scaled by
+/// the energy surplus, routed through the outdoor channel — are stated exactly
+/// where the definition sets them. Wording-free: some word must appear on every
+/// structure carrying the qualifier and on no structure without it.
+/// @spec TUI-NAV-018
+#[test]
+fn a_structures_qualifiers_are_stated_exactly_where_its_definition_sets_them() {
+    let panes: Vec<(StructureId, BTreeSet<String>)> = StructureId::ALL
+        .into_iter()
+        .map(|s| {
+            let (_, shown) = structure_pane(s);
+            let said: BTreeSet<String> = words(&shown)
+                .difference(&words(tables::structure_def(s).name))
+                .cloned()
+                .collect::<BTreeSet<_>>()
+                .difference(&resource_words())
+                .cloned()
+                .collect();
+            (s, said)
+        })
+        .collect();
+
+    type Qualifier = (&'static str, fn(StructureId) -> bool);
+    let qualifiers: [Qualifier; 3] = [
+        ("seasonal", |s| tables::structure_def(s).seasonal),
+        ("scaled by the energy surplus", |s| tables::structure_def(s).surplus_scaled),
+        ("routed through the outdoor channel", |s| tables::structure_def(s).outdoor),
+    ];
+    for (label, has) in qualifiers {
+        let with: Vec<&BTreeSet<String>> = panes.iter().filter(|(s, _)| has(*s)).map(|(_, w)| w).collect();
+        let without: BTreeSet<String> =
+            panes.iter().filter(|(s, _)| !has(*s)).flat_map(|(_, w)| w.iter().cloned()).collect();
+        assert!(!with.is_empty(), "fixture: some structure is {label}");
+        let common: BTreeSet<String> = with
+            .iter()
+            .skip(1)
+            .fold(with[0].clone(), |acc, w| acc.intersection(w).cloned().collect());
+        let distinguishing: BTreeSet<&String> = common.difference(&without).collect();
+        assert!(
+            !distinguishing.is_empty(),
+            "no word is said of every structure that is {label} and of none that is not; the \
+             statement must carry that qualifier where the definition sets it"
+        );
+    }
+}
+
+/// A job's statement is its yield per worker per game second, and its count is
+/// the kittens in the meadow holding it — a kitten away keeps the job but is not
+/// counted. Nothing is worked out beside them: no total for the workers, no
+/// yield after mood, no next cost (a job's price names nothing), and no
+/// stand-in sentence — every line after the name carries a figure. Quantified
+/// over every job.
+/// @spec TUI-NAV-018
+#[test]
+fn a_jobs_row_states_its_yield_per_worker_per_second_and_the_workers_in_the_meadow() {
+    const HOME: usize = 3;
+    const AWAY: usize = 2;
+    for j in JobId::ALL {
+        let mut state = world(true);
+        let mut roster = Vec::new();
+        for i in 0..HOME {
+            let mut k = named_kitten(i);
+            k.job = Some(j);
+            roster.push(k);
+        }
+        for i in 0..AWAY {
+            let mut k = named_kitten(HOME + i);
+            k.job = Some(j);
+            k.location = Location::NeighborsYard;
+            roster.push(k);
+        }
+        roster.push(named_kitten(HOME + AWAY));
+        state.kittens = roster;
+
+        let key = RowKey::Content(ContentId::Job(j), "");
+        assert_is_a_row(&state, Section::Clowder, &key);
+        assert_eq!(state.effective_workers(j), HOME as u32, "fixture: {HOME} of {j:?} are in the meadow");
+        assert_eq!(state.lock_reason(ContentId::Job(j)), None, "fixture: a kitten is free");
+        assert!(state.cost_of_next(ContentId::Job(j), 1).is_empty(), "fixture: a job's price names nothing");
+
+        let shown = pane_text(&state, &looking_at(Section::Clowder, key.clone()), WIDE, TALL);
+        let on_screen = numbers_outside_waits(&shown);
+
+        let mut allowed = name_numbers(&state, &key);
+        allowed.insert(HOME.to_string());
+        assert!(
+            on_screen.contains(&HOME.to_string()),
+            "{j:?}: {HOME} kittens in the meadow hold this job and the inspector did not say so; \
+             it read:\n{shown}"
+        );
+        assert!(
+            !on_screen.contains(&(HOME + AWAY).to_string()),
+            "{j:?}: {AWAY} of the job's kittens are away and must not be counted; it read:\n{shown}"
+        );
+        if let Some((r, per_tick)) = tables::job_def(j).yield_per_tick {
+            let y = per_second(per_tick);
+            assert!(
+                on_screen.contains(&y),
+                "{j:?}: the yield per worker per game second is {y}; it read:\n{shown}"
+            );
+            for w in words(&spaced(&format!("{r:?}"))) {
+                assert!(words(&shown).contains(&w), "{j:?}: the yield names {r:?}; it read:\n{shown}");
+            }
+            allowed.insert(y);
+        }
+        let stray: Vec<&String> = on_screen.difference(&allowed).collect();
+        assert!(
+            stray.is_empty(),
+            "{j:?}: states {stray:?} — no yield per worker, no count in the meadow; a total, an \
+             after-mood yield, or a price is the core's to report. It read:\n{shown}"
+        );
+
+        let lines = lines_of(&shown);
+        for line in lines.iter().skip(1) {
+            assert!(
+                line.chars().any(|c| c.is_ascii_digit()),
+                "{j:?}: the line {line:?} carries no figure — a job's row states its name, its \
+                 yield, and its count, and no stand-in sentence or empty next cost. It read:\n{shown}"
+            );
+        }
+    }
+}
+
+/// A craft's rows state the resource the recipe makes and the work tier a
+/// tinkerer meets it at. The make row prices one more; the tinkerer count row
+/// binds rather than makes, so it states no next cost and no reason, and counts
+/// the tinkerers in the meadow bound to this recipe — not those away, not those
+/// bound elsewhere. Quantified over every recipe.
+/// @spec TUI-NAV-018, TUI-NAV-078
+#[test]
+fn a_crafts_rows_state_what_it_makes_and_the_tinker_row_counts_bound_tinkerers_in_the_meadow() {
+    const BOUND_HOME: usize = 7;
+    const BOUND_AWAY: usize = 4;
+    for c in CraftId::ALL {
+        let other = CraftId::ALL.into_iter().find(|o| *o != c).expect("fixture: two recipes");
+        let mut state = world(true);
+        let mut roster = Vec::new();
+        let tinkerer = |i: usize, bound: CraftId, away: bool| {
+            let mut k = named_kitten(i);
+            k.job = Some(JobId::Tinkerer);
+            k.tinkering = Some(bound);
+            if away {
+                k.location = Location::NeighborsYard;
+            }
+            k
+        };
+        for i in 0..BOUND_HOME {
+            roster.push(tinkerer(i, c, false));
+        }
+        for i in 0..BOUND_AWAY {
+            roster.push(tinkerer(BOUND_HOME + i, c, true));
+        }
+        roster.push(tinkerer(BOUND_HOME + BOUND_AWAY, other, false));
+        roster.push(tinkerer(BOUND_HOME + BOUND_AWAY + 1, other, false));
+        roster.push(named_kitten(BOUND_HOME + BOUND_AWAY + 2));
+        state.kittens = roster;
+
+        let def = tables::craft_def(c);
+        assert_ne!(def.tier as usize, BOUND_HOME, "fixture: the count must not read as the tier");
+        let output_words = words(&spaced(&format!("{:?}", tables::craft_output(c))));
+        let tier = (def.tier != 0).then(|| bare(def.tier as f64));
+
+        let make = RowKey::Content(ContentId::Craft(c), "craft");
+        let bind = RowKey::Content(ContentId::Craft(c), "tinker");
+        assert_is_a_row(&state, Section::Crafts, &make);
+        assert_is_a_row(&state, Section::Crafts, &bind);
+
+        for key in [&make, &bind] {
+            let shown = pane_text(&state, &looking_at(Section::Crafts, key.clone()), WIDE, TALL);
+            let on_screen = numbers_outside_waits(&shown);
+            for w in &output_words {
+                assert!(
+                    words(&shown).contains(w),
+                    "{key:?}: the statement names the resource the recipe makes; it read:\n{shown}"
+                );
+            }
+            let mut allowed = name_numbers(&state, key);
+            if let Some(t) = &tier {
+                assert!(on_screen.contains(t), "{key:?}: the work tier is {t}; it read:\n{shown}");
+                allowed.insert(t.clone());
+            }
+            if key == &bind {
+                allowed.insert(BOUND_HOME.to_string());
+                assert!(
+                    on_screen.contains(&BOUND_HOME.to_string()),
+                    "{key:?}: {BOUND_HOME} tinkerers in the meadow are bound to this recipe; it \
+                     read:\n{shown}"
+                );
+            } else {
+                allowed.extend(cost_and_reason_numbers(&state, key));
+            }
+            let stray: Vec<&String> = on_screen.difference(&allowed).collect();
+            assert!(
+                stray.is_empty(),
+                "{key:?} states {stray:?}; the make row states the recipe's tier and next cost, the \
+                 tinkerer row its tier and the bound tinkerers in the meadow — no away kittens, no \
+                 price, no reason. It read:\n{shown}"
+            );
+        }
+    }
+}
+
+/// For a kind whose definition carries a blurb — an idea, a refinement, a rule
+/// — the blurb is the statement, and none of the effect fields beside it is
+/// restated. An item held once states no count of copies. Quantified over every
+/// such row, researched and not.
+/// @spec TUI-NAV-018
+#[test]
+fn a_blurb_kinds_statement_is_its_blurb_and_nothing_restated_beside_it() {
+    let mut seen = 0;
+    for state in [world(true), world(false)] {
+        for (section, row) in every_row(&state) {
+            let RowKey::Content(id, _) = &row.key else { continue };
+            let blurb = match id {
+                ContentId::Idea(i) => tables::idea_def(*i).blurb,
+                ContentId::Refinement(r) => tables::refinement_def(*r).blurb,
+                ContentId::Rule(r) => tables::rule_def(*r).blurb,
+                _ => continue,
+            };
+            seen += 1;
+            let shown = pane_text(&state, &looking_at(section, row.key.clone()), WIDE, TALL);
+            if !blurb.is_empty() {
+                assert!(
+                    flat(&shown).contains(&flat(blurb)),
+                    "{id:?}: the statement is the definition's own blurb; it read:\n{shown}"
+                );
+            }
+            let mut allowed = numbers(blurb);
+            allowed.extend(cost_and_reason_numbers(&state, &row.key));
+            allowed.extend(name_numbers(&state, &row.key));
+            let stray: Vec<String> =
+                numbers_outside_waits(&shown).difference(&allowed).cloned().collect();
+            assert!(
+                stray.is_empty(),
+                "{id:?} states {stray:?}, which is in neither its blurb nor the core's next cost or \
+                 reason — an effect restated, a count of an item held once, or a price where the \
+                 item is already yours. It read:\n{shown}"
+            );
+        }
+    }
+    assert!(seen > 20, "fixture: many blurb rows are listed ({seen})");
+}
+
+/// A rite's, an arch's, a tradition's, and a dream loom's definitions carry
+/// nothing past name, price, and gate, so their rows have no statement — and no
+/// stand-in sentence for one. Wording-free: a line the row shows both when the
+/// item is already the player's and when it is open to take is neither the
+/// next cost (stated only when open) nor the reason (stated only when held), so
+/// beyond the name no such line may exist. A rite counts its copies; the
+/// others, held once, count nothing. Quantified over every item of the four
+/// kinds.
+/// @spec TUI-NAV-018
+#[test]
+fn rows_whose_definition_states_nothing_carry_no_statement_and_no_stand_in() {
+    let mut checked = 0;
+    let cover = |state: &mut GameState, id: ContentId| {
+        for (r, need) in state.cost_of_next(id, 1) {
+            state.resources[r.ix()] = need + 0.5;
+        }
+    };
+    let mut cases: Vec<(Section, ContentId, GameState, GameState, Option<&str>)> = Vec::new();
+    for r in RiteId::ALL {
+        let id = ContentId::Rite(r);
+        let mut open = GameState::new(11);
+        open.peak_devotion = 1.0e12;
+        cover(&mut open, id);
+        let mut held = open.clone();
+        held.rite_counts[r.ix()] = 1;
+        cases.push((Section::Sunbeams, id, held, open, Some("copies")));
+    }
+    for a in ArchId::ALL {
+        let id = ContentId::Arch(a);
+        let mut open = GameState::new(11);
+        open.ideas.insert(IdeaId::ParadeRoutes);
+        cover(&mut open, id);
+        let mut held = open.clone();
+        held.arches_bought.insert(a);
+        cases.push((Section::Wonders, id, held, open, None));
+    }
+    for t in TraditionId::ALL {
+        let id = ContentId::Tradition(t);
+        let mut open = GameState::new(11);
+        open.generation = 1;
+        open.elder_wisdom = 1.0e9;
+        let mut held = open.clone();
+        held.traditions.insert(t);
+        cases.push((Section::Legacy, id, held, open, None));
+    }
+    for l in DreamLoomId::ALL {
+        let id = ContentId::DreamLoom(l);
+        let mut open = GameState::new(11);
+        open.ideas.insert(IdeaId::DeepNapTheory);
+        cover(&mut open, id);
+        let mut held = open.clone();
+        held.dream_looms.insert(l);
+        cases.push((Section::Dreams, id, held, open, None));
+    }
+
+    for (section, id, held, open, counts) in cases {
+        let key = RowKey::Content(id, "");
+        assert_is_a_row(&held, section, &key);
+        assert_is_a_row(&open, section, &key);
+        assert_eq!(held.lock_reason(id), Some(LockReason::AlreadyYours), "fixture: {id:?} is held");
+        assert_eq!(open.lock_reason(id), None, "fixture: {id:?} is open to take");
+
+        let view = looking_at(section, key.clone());
+        let a = pane_text(&held, &view, WIDE, TALL);
+        let b = pane_text(&open, &view, WIDE, TALL);
+        let la = lines_of(&a);
+        let lb = lines_of(&b);
+        let common: Vec<&String> = la.iter().skip(1).filter(|l| lb.iter().skip(1).any(|m| m == *l)).collect();
+        assert!(
+            common.is_empty(),
+            "{id:?}: {common:?} is said whether the item is held or open — neither a next cost nor \
+             a reason, so a statement its definition does not carry.\nheld:\n{a}\nopen:\n{b}"
+        );
+
+        let mut allowed = name_numbers(&held, &key);
+        if counts.is_some() {
+            allowed.insert("1".to_string());
+        }
+        let held_numbers = numbers_outside_waits(&a);
+        let stray: Vec<&String> = held_numbers.difference(&allowed).collect();
+        assert!(
+            stray.is_empty(),
+            "{id:?} held states {stray:?} — no next cost for what is already yours, and a count of \
+             copies only for a rite. It read:\n{a}"
+        );
+        checked += 1;
+    }
+    assert!(checked > 20, "fixture: every rite, arch, tradition, and loom ({checked})");
+}
+
+/// A row whose action has no content definition — a fixed action, a kitten's
+/// rows, a site, an adventure, a pen pal — has nothing to state beyond its name:
+/// no statement, no stand-in, no price, no reason. (Pounce and Trade rows state
+/// the core's one-unit price instead, TUI-NAV-073.) Quantified over every such
+/// row a full meadow lists.
+/// @spec TUI-NAV-018
+#[test]
+fn a_row_with_no_definition_states_only_its_name() {
+    let mut checked = 0;
+    for state in [world(true), world(false)] {
+        for (section, row) in every_row(&state) {
+            if matches!(row.key, RowKey::Content(..) | RowKey::Resource(_)) {
+                continue;
+            }
+            if let RowKind::Act { command, .. } = &row.kind {
+                if matches!(command, clowder_core::Command::Pounce(_) | clowder_core::Command::Trade(..)) {
+                    continue;
+                }
+            }
+            let shown = pane_text(&state, &looking_at(section, row.key.clone()), WIDE, TALL);
+            let lines = lines_of(&shown);
+            assert_eq!(
+                lines.len(),
+                1,
+                "{:?} has no definition to state; the inspector names it and says nothing else. It \
+                 read:\n{shown}",
+                row.key
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked > 10, "fixture: a full meadow lists many rows with no definition ({checked})");
+}
+
+/// The copies held of a rite are stated — a rite is held in copies, like a
+/// structure (which `the_owned_count_is_on_screen` pins).
+/// @spec TUI-NAV-018
+#[test]
+fn the_copies_held_of_a_rite_are_on_screen() {
+    const COPIES: u32 = 13;
+    let r = RiteId::ALL
+        .into_iter()
+        .find(|r| tables::rite_restackable(*r))
+        .expect("fixture: some rite restacks");
+    let mut state = GameState::new(11);
+    state.peak_devotion = 1.0e12;
+    state.rites.insert(RiteId::Enlightenment);
+    state.rite_counts[r.ix()] = COPIES;
+    let key = RowKey::Content(ContentId::Rite(r), "");
+    assert_is_a_row(&state, Section::Sunbeams, &key);
+    let shown = pane_text(&state, &looking_at(Section::Sunbeams, key.clone()), WIDE, TALL);
+    assert!(
+        numbers_outside_waits(&shown).contains(&COPIES.to_string()),
+        "{COPIES} copies of this rite are held and the inspector did not say so; it read:\n{shown}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-078 — the next cost and the wait
+// ---------------------------------------------------------------------------
+
+/// On every row that takes a content item and whose price names a component,
+/// the next cost is the core's price for one more, each component with need and
+/// have. Quantified over every such row of a full meadow, ideas researched and
+/// not.
+/// @spec TUI-NAV-078
+#[test]
+fn every_row_that_takes_an_item_states_the_cores_price_for_one_more_with_need_and_have() {
+    let mut kinds = BTreeSet::new();
+    for state in [world(true), world(false)] {
+        for (section, row) in every_row(&state) {
+            let Some(cost) = stated_next_cost(&state, &row.key) else { continue };
+            let RowKey::Content(id, _) = &row.key else { unreachable!() };
+            kinds.insert(format!("{id:?}").split('(').next().unwrap_or_default().to_string());
+            let shown = pane_text(&state, &looking_at(section, row.key.clone()), WIDE, TALL);
+            let on_screen = numbers(&shown);
+            for (r, need) in cost {
+                assert!(
+                    on_screen.contains(&bare(need)) && on_screen.contains(&bare(state.stock(r))),
+                    "{:?}: the core prices one more at {} of {r:?}, with {} held; both must be \
+                     stated. It read:\n{shown}",
+                    row.key,
+                    bare(need),
+                    bare(state.stock(r))
+                );
+            }
+        }
+    }
+    assert!(kinds.len() >= 7, "fixture: every priced kind is listed ({} kinds)", kinds.len());
+}
+
+/// No next cost where there is none to state: on an item the core reports
+/// already the player's, on a craft's tinkerer count row, and where the core's
+/// price names no component — a tradition, priced outside the resource
+/// vocabulary, whose open row therefore states its name and nothing else.
+/// @spec TUI-NAV-078
+#[test]
+fn no_next_cost_is_stated_for_what_is_yours_on_a_tinker_row_or_where_the_price_names_nothing() {
+    let state = world(true);
+    let mut yours = 0;
+    let mut tinker = 0;
+    for (section, row) in every_row(&state) {
+        let RowKey::Content(id, tag) = &row.key else { continue };
+        let is_yours = state.lock_reason(*id) == Some(LockReason::AlreadyYours);
+        if !(is_yours || *tag == "tinker") {
+            continue;
+        }
+        let cost = state.cost_of_next(*id, 1);
+        if cost.is_empty() {
+            continue;
+        }
+        if is_yours {
+            yours += 1;
+        } else {
+            tinker += 1;
+        }
+        let shown = pane_text(&state, &looking_at(section, row.key.clone()), WIDE, TALL);
+        let on_screen = numbers_outside_waits(&shown);
+        let blurb = match id {
+            ContentId::Idea(i) => numbers(tables::idea_def(*i).blurb),
+            ContentId::Refinement(r) => numbers(tables::refinement_def(*r).blurb),
+            ContentId::Rule(r) => numbers(tables::rule_def(*r).blurb),
+            // A craft's tinker row states its own work tier (TUI-NAV-018), a
+            // figure of the recipe's own definition rather than a leaked
+            // price; exempted on the same footing as a blurb's own figures,
+            // since some recipe's tier happens to equal one of its own
+            // ingredient amounts.
+            ContentId::Craft(c) => {
+                let tier = tables::craft_def(*c).tier;
+                if tier != 0 { [bare(tier as f64)].into_iter().collect() } else { BTreeSet::new() }
+            }
+            _ => BTreeSet::new(),
+        };
+        for (r, need) in cost {
+            for figure in [bare(need), bare(state.stock(r))] {
+                assert!(
+                    !on_screen.contains(&figure) || blurb.contains(&figure),
+                    "{:?} ({}) states {figure}, a figure of the next cost of {r:?}; there is no next \
+                     cost to state here. It read:\n{shown}",
+                    row.key,
+                    if is_yours { "already yours" } else { "a tinkerer count row" }
+                );
+            }
+        }
+    }
+    assert!(yours > 3 && tinker > 3, "fixture: held items ({yours}) and tinker rows ({tinker}) are listed");
+
+    let t = TraditionId::ALL[0];
+    let mut open = GameState::new(11);
+    open.generation = 1;
+    open.elder_wisdom = 1.0e9;
+    let key = RowKey::Content(ContentId::Tradition(t), "");
+    assert!(open.cost_of_next(ContentId::Tradition(t), 1).is_empty(), "fixture: the core names no component");
+    assert_eq!(open.lock_reason(ContentId::Tradition(t)), None, "fixture: open to take");
+    let shown = pane_text(&open, &looking_at(Section::Legacy, key), WIDE, TALL);
+    assert_eq!(
+        lines_of(&shown).len(),
+        1,
+        "the core's price names no component, so no next cost is stated — not even a heading or a \
+         \"costs nothing\", which would be false for a price outside the vocabulary. It read:\n{shown}"
+    );
+}
+
+/// A structure with several components, its price covered with room to spare.
+fn covered(s: StructureId) -> GameState {
+    let mut state = meadow(&[s]);
+    for (r, need) in state.next_cost(s) {
+        state.resources[r.ix()] = need + 100.5;
+    }
+    state
+}
+
+/// The core's gate accepts a stock a hair under the need — its tolerance — and
+/// reports no reason. The marks come from that report, so the component is
+/// covered: the drawing must say the same things as with the price covered
+/// outright. A shell comparing stock to need would mark it short and give it a
+/// wait `Enter` would contradict.
+/// @spec TUI-NAV-078
+#[test]
+fn a_component_the_core_accepts_a_hair_under_its_need_is_marked_covered() {
+    let s = multi_component_structure();
+    let view = looking_at(Section::Meadow, structure_row(s));
+    let plain = covered(s);
+    let (r0, need0) = plain.next_cost(s)[0];
+    let mut hair = plain.clone();
+    hair.resources[r0.ix()] = need0 - 1.0e-10;
+    assert!(hair.stock(r0) < need0, "fixture: the stock is under the need");
+    assert_eq!(hair.lock_reason(ContentId::Structure(s)), None, "fixture: the core's gate accepts it");
+
+    let a = pane_text(&plain, &view, WIDE, TALL);
+    let b = pane_text(&hair, &view, WIDE, TALL);
+    assert_eq!(
+        masked(&a),
+        masked(&b),
+        "the core reports no reason, so every component is covered; the drawings must differ only \
+         in their figures.\ncovered:\n{a}\na hair under:\n{b}"
+    );
+    assert!(waits(&b).is_empty(), "no wait stands beside a covered component; it read:\n{b}");
+}
+
+/// Under a shortfall, each component it names is marked short by the amount it
+/// names, and each it leaves out is marked covered — exactly as it would be with
+/// no shortfall at all.
+/// @spec TUI-NAV-078
+#[test]
+fn a_shortfall_marks_short_exactly_the_components_it_names_by_the_amounts_it_names() {
+    let s = multi_component_structure();
+    let view = looking_at(Section::Meadow, structure_row(s));
+    let plain = covered(s);
+    let cost = plain.next_cost(s);
+    let (r0, need0) = cost[0];
+    let (r1, _) = cost[1];
+    let mut short = plain.clone();
+    short.resources[r0.ix()] = need0 * 0.25;
+    let missing = match short.lock_reason(ContentId::Structure(s)) {
+        Some(LockReason::ShortBy { missing }) => missing,
+        other => panic!("fixture: the core reports a shortfall, not {other:?}"),
+    };
+    assert_eq!(missing.len(), 1, "fixture: the shortfall names only {r0:?}");
+    let (named, amount) = missing[0];
+    assert_eq!(named, r0);
+
+    let a = pane_text(&plain, &view, WIDE, TALL);
+    let b = pane_text(&short, &view, WIDE, TALL);
+
+    let have1 = bare(plain.stock(r1));
+    assert_eq!(
+        line_stating(&b, &have1),
+        line_stating(&a, &have1),
+        "{r1:?} is left out of the shortfall, so it is covered, and its line must read as it does \
+         with nothing short.\nshort:\n{b}\ncovered:\n{a}"
+    );
+    let short_line = line_stating(&b, &bare(short.stock(r0)));
+    assert!(
+        numbers(&short_line).contains(&bare(amount)),
+        "{r0:?} is short by {}, and its component line must say by how much; it read {short_line:?}",
+        bare(amount)
+    );
+    assert_ne!(
+        masked(&short_line),
+        masked(&line_stating(&a, &bare(plain.stock(r0)))),
+        "{r0:?} short and {r0:?} covered must be marked differently"
+    );
+}
+
+/// Where a reason other than a shortfall holds the item back, need and have
+/// stand unmarked: the drawing is the same whether the stock covers the price or
+/// not, and a component's line differs from the covered mark the same
+/// component wears once the reason is gone.
+/// @spec TUI-NAV-078
+#[test]
+fn under_a_reason_other_than_a_shortfall_components_stand_unmarked() {
+    let (g, idea) = StructureId::ALL
+        .into_iter()
+        .find_map(|s| match structure_def(s).gate {
+            StructureGate::Idea(i) if !structure_def(s).base_costs.is_empty() => Some((s, i)),
+            _ => None,
+        })
+        .expect("fixture: some structure is gated on an idea");
+    let view = looking_at(Section::Meadow, structure_row(g));
+
+    let gated_covered = covered(g);
+    let mut gated_short = gated_covered.clone();
+    for (r, need) in gated_short.next_cost(g) {
+        gated_short.resources[r.ix()] = need * 0.25;
+    }
+    let mut open_covered = gated_covered.clone();
+    open_covered.ideas.insert(idea);
+    for st in [&gated_covered, &gated_short] {
+        assert_eq!(
+            st.lock_reason(ContentId::Structure(g)),
+            Some(LockReason::NotYetReached),
+            "fixture: the gate holds {g:?} back whatever the stock"
+        );
+        assert_is_a_row(st, Section::Meadow, &structure_row(g));
+    }
+    assert_eq!(open_covered.lock_reason(ContentId::Structure(g)), None, "fixture: gate open, covered");
+
+    let a = pane_text(&gated_covered, &view, WIDE, TALL);
+    let b = pane_text(&gated_short, &view, WIDE, TALL);
+    assert_eq!(
+        masked(&a),
+        masked(&b),
+        "another reason holds the item back, so stock marks nothing and no wait is stated.\n\
+         covered:\n{a}\nshort:\n{b}"
+    );
+    assert!(waits(&b).is_empty(), "no wait under another reason; it read:\n{b}");
+
+    let c = pane_text(&open_covered, &view, WIDE, TALL);
+    let (r, _) = gated_covered.next_cost(g)[0];
+    let have = bare(gated_covered.stock(r));
+    assert_ne!(
+        line_stating(&a, &have),
+        line_stating(&c, &have),
+        "with no reason reported the component is marked covered; under another reason it stands \
+         unmarked, so the two lines must differ.\nunmarked:\n{a}\ncovered:\n{c}"
+    );
+}
+
+/// A structure, a component of its price, and something else that makes that
+/// component — so the component can be short with the core's net rate for it
+/// positive and its need within the cap.
+fn waiting_fixture() -> (StructureId, ResourceId, GameState) {
+    for s in StructureId::ALL.into_iter().filter(|s| ungated(*s)) {
+        let costs = meadow(&[s]).next_cost(s);
+        for (r, need) in &costs {
+            for p in StructureId::ALL {
+                let pd = structure_def(p);
+                if p == s || pd.converter.is_some() || !pd.productions.iter().any(|(pr, a)| pr == r && *a > 0.0) {
+                    continue;
+                }
+                let mut state = meadow(&[s]);
+                state.structures[p.ix()] = 6;
+                for (o, n) in &costs {
+                    state.resources[o.ix()] = if o == r { 0.0 } else { n + 100.5 };
+                }
+                if state.net_rate(*r) > 0.0 && *need <= state.cap(*r) {
+                    return (s, *r, state);
+                }
+            }
+        }
+    }
+    panic!("fixture: some structure's component is made by another structure, within its cap");
+}
+
+/// Beside a component the core reports short stands a wait: the shortfall over
+/// the core's net rate and the current speed — real time — in plain units of
+/// time, never rounded to sooner than the rate gives. Checked at every notch
+/// from the slowest speed to the fastest.
+/// @spec TUI-NAV-078
+#[test]
+fn a_short_components_wait_is_its_shortfall_over_the_rate_and_the_speed_never_sooner() {
+    let (s, r, base) = waiting_fixture();
+    let view = looking_at(Section::Meadow, structure_row(s));
+    let shortfall = match base.lock_reason(ContentId::Structure(s)) {
+        Some(LockReason::ShortBy { missing }) => {
+            assert_eq!(missing.len(), 1, "fixture: only {r:?} is short");
+            missing[0].1
+        }
+        other => panic!("fixture: the core reports a shortfall, not {other:?}"),
+    };
+    let rate = base.net_rate(r);
+    for speed in [0.25, 0.5, 1.0, 2.0, 4.0, 8.0] {
+        let mut state = base.clone();
+        state.speed = speed;
+        let shown = pane_text(&state, &view, WIDE, TALL);
+        let found = waits(&shown);
+        assert_eq!(
+            found.len(),
+            1,
+            "at speed {speed}, one component is short and growing, so one wait is stated, in plain \
+             units of time; found {found:?} in:\n{shown}"
+        );
+        let expected = shortfall / (rate * speed);
+        let w = found[0];
+        assert!(
+            w.seconds >= expected * (1.0 - 1e-9),
+            "at speed {speed} the wait is {expected}s of real time; the inspector said {}s, which is \
+             sooner than the rate gives. It read:\n{shown}",
+            w.seconds
+        );
+        assert!(
+            w.seconds < expected + w.granularity,
+            "at speed {speed} the wait is {expected}s of real time; the inspector said {}s, more \
+             than one unit of its own rounding later. It read:\n{shown}",
+            w.seconds
+        );
+    }
+}
+
+/// Where the need exceeds the cap the core reports, the component says the
+/// stores cannot hold that much yet, with no wait — alone, even where the stock
+/// is not growing either. Otherwise, where the rate is zero or less, it says the
+/// stock is not growing, with no wait. Wording-free: no wait is found in either
+/// case, the cap note reads the same whether or not the stock grows, and it
+/// reads differently from the not-growing note.
+/// @spec TUI-NAV-078
+#[test]
+fn a_need_above_the_cap_or_a_stock_not_growing_gets_a_note_in_place_of_a_wait() {
+    // A structure costing a capped resource it does not itself touch, the
+    // copies that lift that component above the cap, a store that lifts the cap
+    // back over it, and a maker of that resource.
+    let mut found = None;
+    'search: for s in StructureId::ALL.into_iter().filter(|s| ungated(*s)) {
+        let sd = structure_def(s);
+        if sd.converter.is_some() {
+            continue;
+        }
+        for (r, _) in sd.base_costs {
+            let base_cap = GameState::new(11).cap(*r);
+            if !(base_cap > 0.0 && base_cap.is_finite()) || sd.productions.iter().any(|(p, _)| p == r) {
+                continue;
+            }
+            let Some(q) = StructureId::ALL.into_iter().find(|q| {
+                let d = structure_def(*q);
+                *q != s
+                    && d.cap_bonuses.iter().any(|(c, a)| c == r && *a > 0.0)
+                    && d.productions.is_empty()
+                    && d.converter.is_none()
+                    && d.energy_cons == 0.0
+            }) else {
+                continue;
+            };
+            let Some(p) = StructureId::ALL.into_iter().find(|p| {
+                let d = structure_def(*p);
+                *p != s && d.converter.is_none() && d.productions.iter().any(|(c, a)| c == r && *a > 0.0)
+            }) else {
+                continue;
+            };
+            for owned in 1..200u32 {
+                let mut st = meadow(&[s]);
+                st.structures[s.ix()] = owned;
+                let need = st.next_cost(s).iter().find(|(c, _)| c == r).map(|(_, n)| *n).unwrap();
+                if need > st.cap(*r) {
+                    found = Some((s, *r, owned, q, p));
+                    break 'search;
+                }
+            }
+        }
+    }
+    let (s, r, owned, q, p) = found.expect("fixture: some capped component can outgrow its cap");
+
+    let setup = |store: u32, maker: u32| {
+        let mut st = meadow(&[s]);
+        st.structures[s.ix()] = owned;
+        st.structures[q.ix()] = store;
+        st.structures[p.ix()] = maker;
+        for (c, n) in st.next_cost(s) {
+            st.resources[c.ix()] = if c == r { 0.0 } else { n + 100.5 };
+        }
+        st
+    };
+    let need = setup(0, 0).next_cost(s).iter().find(|(c, _)| *c == r).unwrap().1;
+    let store = (1..10_000u32)
+        .find(|m| setup(*m, 0).cap(r) >= need)
+        .expect("fixture: enough stores hold the need");
+
+    let above_growing = setup(0, 6);
+    let above_still = setup(0, 0);
+    let within_still = setup(store, 0);
+    assert!(need > above_growing.cap(r) && above_growing.net_rate(r) > 0.0, "fixture: above the cap, growing");
+    assert!(need > above_still.cap(r) && above_still.net_rate(r) <= 0.0, "fixture: above the cap, not growing");
+    assert!(need <= within_still.cap(r) && within_still.net_rate(r) <= 0.0, "fixture: within the cap, not growing");
+
+    let view = looking_at(Section::Meadow, structure_row(s));
+    let a = pane_text(&above_growing, &view, WIDE, TALL);
+    let b = pane_text(&above_still, &view, WIDE, TALL);
+    let c = pane_text(&within_still, &view, WIDE, TALL);
+    for (label, shown) in [("above the cap, growing", &a), ("above the cap, not growing", &b), ("not growing", &c)] {
+        assert!(waits(shown).is_empty(), "{label}: no wait is stated; it read:\n{shown}");
+    }
+    let mut fast = above_growing.clone();
+    fast.speed = 8.0;
+    assert_eq!(
+        a,
+        pane_text(&fast, &view, WIDE, TALL),
+        "above the cap no wait is stated, so the speed changes nothing on the row"
+    );
+    assert_eq!(
+        masked(&a),
+        masked(&b),
+        "above the cap the stores note stands alone, growing or not.\ngrowing:\n{a}\nnot growing:\n{b}"
+    );
+    assert_ne!(
+        masked(&b),
+        masked(&c),
+        "the stores note and the not-growing note must read differently.\nabove the cap:\n{b}\n\
+         within it:\n{c}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-080 — a stores row
+// ---------------------------------------------------------------------------
+
+/// The stock, exact; the cap the core reports, or that there is none; and the
+/// core's net rate per game second — not per real second, so the game speed
+/// (set away from 1 here) changes nothing. Quantified over every resource,
+/// each held so that its stores row is listed.
+/// @spec TUI-NAV-080
+#[test]
+fn a_stores_row_states_its_exact_stock_its_cap_or_none_and_its_net_rate_per_game_second() {
+    let mut state = world(true);
+    state.speed = 4.0;
+    let mut finite_body: Option<(ResourceId, Vec<String>)> = None;
+    let mut infinite: Vec<(ResourceId, Vec<String>, String)> = Vec::new();
+    for r in ResourceId::ALL {
+        let key = RowKey::Resource(r);
+        assert_is_a_row(&state, Section::Meadow, &key);
+        let shown = pane_text(&state, &looking_at(Section::Meadow, key.clone()), WIDE, TALL);
+        let on_screen = numbers(&shown);
+        let stock = bare(state.stock(r));
+        let rate = bare(state.net_rate(r));
+        let cap = state.cap(r);
+        assert!(on_screen.contains(&stock), "{r:?}: the exact stock {stock}; it read:\n{shown}");
+        assert!(on_screen.contains(&rate), "{r:?}: the net rate per game second {rate}; it read:\n{shown}");
+        let mut allowed: BTreeSet<String> = [stock, rate].into_iter().collect();
+        let body: Vec<String> = lines_of(&shown).into_iter().skip(1).map(|l| masked(&l)).collect();
+        if cap.is_finite() {
+            let c = bare(cap);
+            assert!(on_screen.contains(&c), "{r:?}: the cap the core reports, {c}; it read:\n{shown}");
+            allowed.insert(c);
+            finite_body.get_or_insert((r, body));
+        } else {
+            assert!(
+                !words(&shown).contains("inf"),
+                "{r:?} has no cap, which is said in words rather than as a figure; it read:\n{shown}"
+            );
+            infinite.push((r, body, shown.clone()));
+        }
+        let stray: Vec<&String> = on_screen.difference(&allowed).collect();
+        assert!(
+            stray.is_empty(),
+            "{r:?}: a stores row states its stock, cap, and net rate per game second; {stray:?} is \
+             none of them. It read:\n{shown}"
+        );
+    }
+    let (fr, fbody) = finite_body.expect("fixture: some resource is capped");
+    assert!(!infinite.is_empty(), "fixture: some resource is uncapped");
+    for (r, body, shown) in infinite {
+        assert_eq!(
+            body.len(),
+            fbody.len(),
+            "{r:?} has no cap and must say so where {fr:?} states its cap — the same facts, one \
+             worded differently. It read:\n{shown}"
+        );
+        assert_ne!(body, fbody, "{r:?}: saying there is no cap must not read as a cap; it read:\n{shown}");
+    }
+}
