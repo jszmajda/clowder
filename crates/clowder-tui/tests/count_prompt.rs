@@ -75,8 +75,13 @@ fn rich() -> GameState {
     for r in ResourceId::ALL {
         s.resources[r.ix()] = 1.0e12;
     }
-    for b in StructureId::ALL {
-        s.structures[b.ix()] = 5;
+    for (i, b) in StructureId::ALL.into_iter().enumerate() {
+        // Varied rather than uniform: an escalating price scales with the
+        // count owned, and every structure owned the same count otherwise
+        // makes unrelated structures' prices land on the same figure by
+        // construction rather than by chance — a coincidence a numbers-on-
+        // screen check (TUI-NAV-067's tests) cannot tell apart from a bug.
+        s.structures[b.ix()] = 5 + (i % 4) as u32;
     }
     s.ideas = IdeaId::ALL.iter().copied().collect::<BTreeSet<_>>();
     s.revealed = StructureId::ALL
@@ -268,10 +273,23 @@ fn shows_amount(on_screen: &BTreeSet<String>, amount: f64) -> bool {
 }
 
 /// What typing a count added to the frame: the numbers on screen with the count
-/// typed that were not there with the prompt open and empty.
+/// typed that were not there with the prompt open and empty. "On screen"
+/// reads the wide frame's list (whose persistent inspector never substitutes
+/// the prompt's preview, TUI-NAV-035) together with the narrow swap, whose
+/// inspector always carries the preview whole — since a component
+/// TUI-RENDER-021 cuts from the list's own row for room is still one
+/// keypress away in the swap, never off screen everywhere at once.
 fn typed_numbers(state: &GameState, section: Section, row: &Row, digits: &str) -> (BTreeSet<String>, BTreeSet<String>, String) {
-    let empty = frame_text(state, &prompt_on(section, row, "", state));
-    let typed = frame_text(state, &prompt_on(section, row, digits, state));
+    let empty = format!(
+        "{}\n{}",
+        frame_text(state, &prompt_on(section, row, "", state)),
+        swapped_text(state, &swapped_prompt_on(section, row, "", state))
+    );
+    let typed = format!(
+        "{}\n{}",
+        frame_text(state, &prompt_on(section, row, digits, state)),
+        swapped_text(state, &swapped_prompt_on(section, row, digits, state))
+    );
     let before = numbers(&empty);
     let after = numbers(&typed);
     let added: BTreeSet<String> = after.difference(&before).cloned().collect();
@@ -1316,4 +1334,281 @@ fn a_per_unit_priced_rows_components_stand_unmarked_with_no_wait() {
         growing > 0,
         "fixture: on some of these rows a component is growing, so a wait would have something to say"
     );
+}
+
+// ===========================================================================
+// TUI-RENDER-021 — the prompt's row
+// ===========================================================================
+
+use std::collections::HashMap;
+
+/// The list's space in a drawn frame, its pane divider(s) set aside.
+fn list_space_of(l: &clowder_tui::render::layout::Layout) -> Rect {
+    match l.body {
+        Body::Narrow { main, .. } => Rect::new(main.x + 1, main.y, main.width - 1, main.height),
+        Body::Wide { list, .. } => Rect::new(list.x + 1, list.y, list.width - 2, list.height),
+        Body::TooSmall(r) => panic!("fixture: {r:?} is below the floor"),
+    }
+}
+
+/// A drawn frame's list space, one vector of single-cell symbols per line.
+fn list_cells(state: &GameState, view: &ViewState, (w, h): (u16, u16)) -> Vec<Vec<String>> {
+    let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
+    let mut layout = None;
+    term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, view, None)))
+        .expect("TestBackend is infallible");
+    let space = list_space_of(&layout.expect("a layout"));
+    let buf = term.backend().buffer();
+    (space.y..space.bottom())
+        .map(|y| {
+            (space.x..space.right())
+                .map(|x| buf.cell((x, y)).map(|c| c.symbol().to_string()).unwrap_or_else(|| " ".into()))
+                .collect()
+        })
+        .collect()
+}
+
+/// A row's name in full, as the inspector's first line states it.
+fn full_row_name(state: &GameState, section: Section, key: &RowKey) -> String {
+    let rect = Rect::new(0, 0, 180, 6);
+    let mut term = Terminal::new(TestBackend::new(180, 6)).expect("TestBackend is infallible");
+    term.draw(|f| inspector::draw(f, rect, state, &focused(section, key.clone())))
+        .expect("TestBackend is infallible");
+    buffer_text(term.backend().buffer(), rect).lines().next().unwrap_or("").trim().to_string()
+}
+
+/// Every resource's stores-row spelling.
+fn stores_row_names() -> HashMap<ResourceId, String> {
+    let mut s = GameState::new(11);
+    for r in ResourceId::ALL {
+        s.resources[r.ix()] = 1.0;
+    }
+    ResourceId::ALL
+        .into_iter()
+        .map(|r| (r, full_row_name(&s, Section::Meadow, &RowKey::Resource(r))))
+        .collect()
+}
+
+/// Whether a section's list gives an owned-count field (TUI-RENDER-020),
+/// judged by the section alone.
+fn section_counts(section: Section) -> bool {
+    matches!(section, Section::Meadow | Section::Clowder | Section::Crafts | Section::Sunbeams)
+}
+
+/// The owned count the inspector states for a row, if it states one.
+fn owned_stated(state: &GameState, row: &Row) -> Option<u64> {
+    match &row.key {
+        RowKey::Content(ContentId::Structure(b), _) => Some(state.structures[b.ix()] as u64),
+        RowKey::Content(ContentId::Rite(r), _) => Some(state.rite_counts[r.ix()] as u64),
+        RowKey::Content(ContentId::Job(j), _) if matches!(row.kind, RowKind::Count { .. }) => {
+            Some(state.effective_workers(*j) as u64)
+        }
+        RowKey::Content(ContentId::Craft(c), "tinker") => Some(
+            state.kittens.iter().filter(|k| k.tinkering == Some(*c) && k.location == Location::Home).count()
+                as u64,
+        ),
+        _ => None,
+    }
+}
+
+/// The components TUI-NAV-067's preview prices for `digits`, or none where
+/// it is the count alone or nothing.
+fn preview_components(state: &GameState, row: &Row, digits: &str) -> Vec<(ResourceId, f64)> {
+    let n: u32 = digits.parse().unwrap_or(0);
+    if n == 0 {
+        return Vec::new();
+    }
+    match &row.kind {
+        RowKind::Act { semantics: CountSemantics::RepeatN, .. } => match row.key {
+            RowKey::Content(id, _) => state.cost_of_next(id, n),
+            _ => Vec::new(),
+        },
+        RowKind::Act { command, semantics: CountSemantics::CountTaking } if !row.heavy => state
+            .unit_price(command)
+            .map(|unit| unit.into_iter().map(|(r, each)| (r, each * n as f64)).collect())
+            .unwrap_or_default(),
+        _ => Vec::new(),
+    }
+}
+
+/// The prompt's text: `×` and the digits as typed, then — where the preview
+/// prices components — two blank columns and the components, each an exact
+/// figure, a space, and the stores-row name, apart by `, `.
+fn prompt_text(parts: &[String], digits: &str) -> String {
+    if parts.is_empty() {
+        format!("×{digits}")
+    } else {
+        format!("×{digits}  {}", parts.join(", "))
+    }
+}
+
+/// The prompt's text cut to a place `place` columns wide: whole where it
+/// fits; else the count whole and the longest leading run of components that
+/// fits, `, …` after it; else the count, two blank columns, and `…`.
+fn prompt_text_in(parts: &[String], digits: &str, place: usize) -> String {
+    let whole = prompt_text(parts, digits);
+    if whole.chars().count() <= place {
+        return whole;
+    }
+    for k in (1..parts.len()).rev() {
+        let run = format!("×{digits}  {}, …", parts[..k].join(", "));
+        if run.chars().count() <= place {
+            return run;
+        }
+    }
+    format!("×{digits}  …")
+}
+
+/// While a count prompt is open on a listed row, that row draws the prompt's
+/// text from the left edge of its cost field's place — or of the place one
+/// would take — `×` joined to the digits exactly as typed, then two blank
+/// columns and the priced components with exact figures; longer text moves
+/// the count field (keeping its figure and seven columns) and the name left,
+/// the name shortening to one character and its ellipsis at most; text that
+/// still does not fit keeps the count whole and draws whole components then
+/// `, …`, or the count, two blank columns, and `…`; every other row keeps its
+/// columns; and the narrow swap's inspector carries the same text. Quantified
+/// over every row the prompt opens on, over counts empty, zero, zero-led,
+/// small, and past any real price, at the floor and wide.
+/// @spec TUI-RENDER-021, TUI-RENDER-012
+#[test]
+fn an_open_prompt_draws_its_count_and_exact_preview_in_the_cost_fields_place() {
+    const DIGITS: [&str; 6] = ["", "0", "007", "37", "250", "10000"];
+    const SIZES: [(u16, u16); 2] = [(80, 24), (200, 60)];
+    let state = rich();
+    let names = stores_row_names();
+    let c = 6 + 1 + names.values().map(|n| n.chars().count()).max().expect("a vocabulary") + 3;
+    let targets = prompt_rows(&state);
+    assert!(!targets.is_empty(), "fixture: some row takes a count");
+
+    let mut seen = (0usize, 0usize, 0usize, 0usize); // fits, moves, cut, beyond reach
+    for (section, row) in &targets {
+        let full = full_row_name(&state, *section, &row.key);
+        let counted = section_counts(*section);
+        for size in SIZES {
+            let closed = list_cells(&state, &focused(*section, row.key.clone()), size);
+            let width = closed[0].len();
+            for digits in DIGITS {
+                let view = prompt_on(*section, row, digits, &state);
+                let open = list_cells(&state, &view, size);
+                let cy = open
+                    .iter()
+                    .position(|l| l[0] == "▸")
+                    .unwrap_or_else(|| panic!("fixture: the prompt's row is on screen for {:?}", row.key));
+                let at = format!("{:?} with {digits:?} typed, at {size:?}", row.key);
+                let drawn = open[cy].concat();
+
+                for (y, (o, cl)) in open.iter().zip(&closed).enumerate() {
+                    if y != cy {
+                        assert_eq!(
+                            o.concat(),
+                            cl.concat(),
+                            "{at}: line {y} changed; only the prompt's row gives way, and every other \
+                             row keeps its columns (TUI-RENDER-021)"
+                        );
+                    }
+                }
+                assert_eq!(cells(&open[cy], 0, 4), cells(&closed[cy], 0, 4), "{at}: the cursor and marker stay");
+
+                let comps = preview_components(&state, row, digits);
+                let parts: Vec<String> =
+                    comps.iter().map(|(r, a)| format!("{} {}", fmt::exact(*a), names[r])).collect();
+                if comps.iter().any(|(_, a)| !a.is_finite()) {
+                    seen.3 += 1;
+                }
+                let text = prompt_text(&parts, digits);
+                let len = text.chars().count();
+                let base_name = width - 4 - if counted { 8 } else { 0 } - 1 - c;
+                let (name_w, place, expected) = if len <= c {
+                    seen.0 += 1;
+                    (base_name, c, format!("{text:<c$}"))
+                } else if base_name >= 2 + (len - c) {
+                    seen.1 += 1;
+                    (base_name - (len - c), len, text.clone())
+                } else {
+                    seen.2 += 1;
+                    let place = c + base_name - 2;
+                    (2, place, format!("{:<place$}", prompt_text_in(&parts, digits, place)))
+                };
+
+                assert_eq!(
+                    cells(&open[cy], width - place, width),
+                    expected,
+                    "{at}: the prompt's text in the cost field's place, begun at its left edge — \
+                     `×` and the digits as typed, then two blank columns and the priced components \
+                     in exact figures — moving the fields left where it is longer, and cut to whole \
+                     components and `, …` where it still does not fit (TUI-RENDER-021).\n{drawn:?}"
+                );
+                assert_eq!(
+                    cells(&open[cy], 4, 4 + name_w),
+                    format!("{:<name_w$}", fmt::fit(&full, name_w)),
+                    "{at}: the name takes what the prompt's text leaves, one character and its \
+                     ellipsis at least (TUI-RENDER-021).\n{drawn:?}"
+                );
+                assert_eq!(cells(&open[cy], 4 + name_w, 5 + name_w), " ", "{at}: a blank column after the name.\n{drawn:?}");
+                if counted {
+                    let count = match owned_stated(&state, row) {
+                        Some(n) if n > 0 => format!("{:>7}", format!("×{}", fmt::compact(n as f64))),
+                        _ => " ".repeat(7),
+                    };
+                    assert_eq!(
+                        cells(&open[cy], 5 + name_w, 12 + name_w),
+                        count,
+                        "{at}: the count field keeps its figure and its seven columns, moved left by \
+                         what the text needs (TUI-RENDER-021).\n{drawn:?}"
+                    );
+                    assert_eq!(cells(&open[cy], 12 + name_w, 13 + name_w), " ", "{at}: a blank column before the text.\n{drawn:?}");
+                }
+            }
+        }
+
+        // The narrow swap's inspector carries the same text, whole.
+        for digits in DIGITS {
+            let view = swapped_prompt_on(*section, row, digits, &state);
+            // The swap's space, its divider column set aside.
+            let shown: String = swapped_text(&state, &view)
+                .lines()
+                .map(|l| l.strip_prefix('│').unwrap_or(l))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let comps = preview_components(&state, row, digits);
+            let parts: Vec<String> = comps.iter().map(|(r, a)| format!("{} {}", fmt::exact(*a), names[r])).collect();
+            let text = prompt_text(&parts, digits);
+            let inner = shown.lines().next().map(|l| l.chars().count()).unwrap_or(0);
+            // A text longer than a line wraps, a long figure mid-digit, so the
+            // fallback reads it with every break and blank taken out.
+            let flat = |s: &str| s.split_whitespace().collect::<String>();
+            if text.chars().count() <= inner {
+                assert!(
+                    shown.lines().any(|l| l.trim() == text),
+                    "{:?} with {digits:?} typed, in the narrow swap: the inspector carries the \
+                     prompt's text {text:?} (TUI-RENDER-021).\n{shown}",
+                    row.key
+                );
+            } else {
+                assert!(
+                    flat(&shown).contains(&flat(&text)),
+                    "{:?} with {digits:?} typed, in the narrow swap: the inspector carries the \
+                     prompt's text {text:?} (TUI-RENDER-021).\n{shown}",
+                    row.key
+                );
+            }
+            if comps.iter().any(|(_, a)| !a.is_finite()) {
+                let lower = shown.to_lowercase();
+                assert!(
+                    lower.contains("beyond reach")
+                        && !lower.split(|ch: char| !ch.is_alphabetic()).any(|w| w == "inf" || w == "nan"),
+                    "{:?} with {digits:?} typed: a preview figure that is not finite is stated in \
+                     words as beyond reach, never printed (TUI-RENDER-018).\n{shown}",
+                    row.key
+                );
+            }
+        }
+    }
+    assert!(seen.0 > 0 && seen.1 > 0 && seen.2 > 0, "fixture: text that fits, moves, and is cut: {seen:?}");
+    assert!(seen.3 > 0, "fixture: some preview figure past any real price is not finite");
+}
+
+fn cells(line: &[String], from: usize, to: usize) -> String {
+    line[from..to].concat()
 }

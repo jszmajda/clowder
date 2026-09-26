@@ -427,15 +427,25 @@ fn bound_tinkerers(state: &GameState, c: clowder_core::CraftId) -> usize {
 }
 
 /// A stores row: the resource's exact stock, the cap the core reports or that
-/// it has none, and the core's net rate for it per game second.
-/// @spec TUI-NAV-080
+/// it has none, and the core's net rate for it per game second — the exact
+/// form of its size behind `+` where it is above zero and `-` where it is
+/// below, with no sign where it stands still. @spec TUI-NAV-080,
+/// TUI-RENDER-012
 fn store_lines(state: &GameState, r: ResourceId) -> Vec<String> {
     let cap = state.cap(r);
     let cap_text = if cap.is_finite() { fmt::exact(cap) } else { "none".to_string() };
+    let rate = state.net_rate(r);
+    let size = fmt::exact(rate.abs());
+    let rate_text = if size == "0" {
+        size
+    } else if rate > 0.0 {
+        format!("+{size}")
+    } else {
+        format!("-{size}")
+    };
     vec![format!(
-        "Stock: {}. Cap: {cap_text}. Net rate: {} per game second.",
+        "Stock: {}. Cap: {cap_text}. Net rate: {rate_text} per game second.",
         fmt::exact(state.stock(r)),
-        fmt::exact(state.net_rate(r))
     )]
 }
 

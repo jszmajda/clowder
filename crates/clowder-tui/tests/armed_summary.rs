@@ -713,6 +713,94 @@ fn a_figure_that_is_not_finite_is_stated_as_beyond_reach_and_never_printed() {
 }
 
 // ---------------------------------------------------------------------------
+// TUI-RENDER-012 — a summary's figures are exact wherever it is drawn
+// ---------------------------------------------------------------------------
+
+/// Whether `text` carries a figure with a magnitude marker glued to it — the
+/// compact form's `K`, `M`, `B`, `T`, or `Q` — or the compact form's bounds.
+fn carries_a_compact_figure(text: &str) -> bool {
+    let chars: Vec<char> = text.chars().collect();
+    let marked = chars.windows(3).any(|w| {
+        w[0].is_ascii_digit() && "KMBTQ".contains(w[1]) && !w[2].is_alphanumeric()
+    }) || chars.last().is_some_and(|c| "KMBTQ".contains(*c))
+        && chars.len() >= 2
+        && chars[chars.len() - 2].is_ascii_digit();
+    marked || text.contains("<0.001") || text.contains(">999Q")
+}
+
+/// An armed row's consequence summary states every figure in the exact form
+/// (TUI-RENDER-018) — never abbreviated, since the row's description does not
+/// state them — both beneath the row in the list and in the narrow swap's
+/// inspector. Quantified over every heavy row that states a figure, with an
+/// elder wisdom stock whose compact and exact forms differ, and naps whose
+/// costs run past a thousand.
+/// @spec TUI-RENDER-012
+#[test]
+fn every_figure_of_a_consequence_summary_is_drawn_in_the_exact_form() {
+    let mut state = meadow();
+    state.elder_wisdom = 12_345.678_9;
+    let cases: Vec<(&str, ViewState, Vec<f64>)> = vec![
+        (
+            "GreatMeadowMove",
+            armed_by_enter(&state, Section::Legacy, &move_key(&state)),
+            vec![
+                state.kittens.len() as f64,
+                state.basket_capacity() as f64,
+                state.memory_chest_ratio() * 100.0,
+            ],
+        ),
+        (
+            "PassItDown",
+            armed_by_enter(&state, Section::Legacy, &pass_key(&state)),
+            vec![state.elder_wisdom],
+        ),
+        (
+            "DeepNap(4)",
+            nap_armed(&state, 4),
+            vec![4.0, state.starshard_cost(4), (state.year() + 4) as f64],
+        ),
+        (
+            "DeepNap(40)",
+            nap_armed(&state, 40),
+            vec![40.0, state.starshard_cost(40), (state.year() + 40) as f64],
+        ),
+    ];
+    assert_ne!(
+        fmt::exact(state.elder_wisdom),
+        fmt::compact(state.elder_wisdom),
+        "fixture: the wisdom stock's two forms differ"
+    );
+
+    for (name, view, figures) in cases {
+        let mut texts = vec![(format!("the list at {:?}", tall(&state)), summary_text(&state, &view, tall(&state)))];
+        for size in NARROW {
+            let swapped = ViewState { inspector_wanted: true, ..view.clone() };
+            let armed = draw(&state, &swapped, size);
+            let plain = draw(&state, &unarmed(&swapped), size);
+            let before: BTreeSet<String> = region_lines(&plain.buffer, list_rect(&plain.layout)).into_iter().collect();
+            let added: Vec<String> = region_lines(&armed.buffer, list_rect(&armed.layout))
+                .into_iter()
+                .filter(|l| !before.contains(l))
+                .collect();
+            texts.push((format!("the swapped inspector at {size:?}"), added.join("\n")));
+        }
+        for (where_, text) in texts {
+            for v in &figures {
+                let form = fmt::exact(*v);
+                assert!(
+                    has_form(&text, &form),
+                    "the armed {name} row's summary in {where_} does not state {v} in the exact form                      {form:?} (TUI-RENDER-012); it read {text:?}"
+                );
+            }
+            assert!(
+                !carries_a_compact_figure(&text),
+                "the armed {name} row's summary in {where_} abbreviates a figure; a summary is read,                  and every figure it states is exact (TUI-RENDER-012); it read {text:?}"
+            );
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // TUI-NAV-077 — where the summary shows, and that it goes when the arming does
 // ---------------------------------------------------------------------------
 

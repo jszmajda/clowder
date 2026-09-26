@@ -3955,3 +3955,322 @@ fn the_help_overlay_is_the_complete_key_map_and_glyph_legend() {
         keys_in_order(&bar)
     );
 }
+
+// ---------------------------------------------------------------------------
+// TUI-RENDER-019 / TUI-RENDER-022 — the sidebar's lines, and which stores it
+// draws
+// ---------------------------------------------------------------------------
+
+/// A store's name as its row in the stores group spells it: the first line of
+/// the inspector's description of that row (TUI-NAV-018 names the row in
+/// full), read in a state where the store is listed.
+fn stores_row_name(state: &GameState, r: ResourceId) -> String {
+    use clowder_tui::render::widgets::inspector;
+    let key = RowKey::Resource(r);
+    assert!(
+        rows(state, Section::Meadow).iter().any(|row| row.key == key),
+        "fixture: {r:?} must be listed in the stores group to be named"
+    );
+    let (w, h) = (160u16, 12u16);
+    let mut view = ViewState { section: Some(Section::Meadow), ..Default::default() };
+    view.focus[Section::Meadow.index()] = Some(key);
+    let mut term = terminal(w, h);
+    term.draw(|f| inspector::draw(f, Rect::new(0, 0, w, h), state, &view))
+        .expect("TestBackend is infallible");
+    region_lines(term.backend().buffer(), Rect::new(0, 0, w, h))[0].trim().to_string()
+}
+
+/// Every resource's stores-row spelling, in vocabulary order.
+fn stores_row_names() -> Vec<(ResourceId, String)> {
+    let mut state = GameState::new(11);
+    for r in ResourceId::ALL {
+        state.resources[r.ix()] = 1.0;
+    }
+    ResourceId::ALL.into_iter().map(|r| (r, stores_row_name(&state, r))).collect()
+}
+
+/// The narrowest name column at which every two names in the resource
+/// vocabulary that differ whole still differ when shortened to it.
+fn name_floor(names: &[String]) -> usize {
+    (1..=64)
+        .find(|w| {
+            names.iter().enumerate().all(|(i, a)| {
+                names.iter().skip(i + 1).all(|b| a == b || fmt::fit(a, *w) != fmt::fit(b, *w))
+            })
+        })
+        .expect("fixture: some width tells every name apart")
+}
+
+/// The stores the stores group lists, in its order.
+fn listed_stores(state: &GameState) -> Vec<ResourceId> {
+    rows(state, Section::Meadow)
+        .into_iter()
+        .filter_map(|row| match row.key {
+            RowKey::Resource(r) => Some(r),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Whether a store wears `full` (TUI-NAV-022): a cap above zero, reached.
+fn wears_full(state: &GameState, r: ResourceId) -> bool {
+    let cap = state.cap(r);
+    cap.is_finite() && cap > 0.0 && state.stock(r) >= cap
+}
+
+/// Draw the sidebar alone into a rectangle of exactly `w` × `h`.
+fn sidebar_in(state: &GameState, w: u16, h: u16) -> (Vec<String>, Buffer) {
+    let mut term = terminal(w, h);
+    term.draw(|f| chrome::sidebar(f, Rect::new(0, 0, w, h), state))
+        .expect("TestBackend is infallible");
+    let buf = term.backend().buffer().clone();
+    (region_lines(&buf, Rect::new(0, 0, w, h)), buf)
+}
+
+/// A store's two lines exactly as TUI-RENDER-019 lays them out in a sidebar
+/// `width` columns wide: the name at the left edge, shortened only as far as
+/// its column needs, then the stock right-aligned in six columns, `/`, and the
+/// cap left-aligned in six — the `/` and cap blank where the core reports the
+/// store uncapped; then the bar (read from the drawing, its four cells being
+/// TUI-NAV-022's), the rate right-aligned in seven columns, and `full` while
+/// capped, a space between each.
+fn expected_store_lines(
+    state: &GameState,
+    r: ResourceId,
+    name: &str,
+    rate: f64,
+    width: usize,
+    drawn_bar: &str,
+) -> (String, String) {
+    let name_col = width - 14;
+    let cap = state.cap(r);
+    let cap_part = if cap.is_infinite() {
+        " ".repeat(7)
+    } else {
+        format!("/{:<6}", fmt::compact(cap))
+    };
+    let first = format!(
+        "{:<name_col$} {:>6}{cap_part}",
+        fmt::fit(name, name_col),
+        fmt::compact(state.stock(r)),
+    );
+    let tag = if wears_full(state, r) { " full" } else { "" };
+    let second = format!("{drawn_bar} {:>7}{tag}", fmt::rate(rate));
+    (first, format!("{second:<width$}"))
+}
+
+/// Stocks that between them reach every width the compact form takes.
+const SIDEBAR_STOCKS: [f64; 10] = [0.0004, 3.0, 12.5, 999.95, 1234.5, 99_999.0, 1.0e7, 4.2e13, 1.0e20, 0.5];
+
+/// Every resource held, at a spread of stocks: some capped stores at their
+/// cap, some not, uncapped stores large and small, and zero-cap stores with
+/// something in them.
+fn every_store_held(seed: usize) -> GameState {
+    let mut s = every_section_revealed();
+    for (i, r) in ResourceId::ALL.into_iter().enumerate() {
+        let cap = s.cap(r);
+        s.resources[r.ix()] = if cap.is_finite() && cap > 0.0 && (i + seed).is_multiple_of(3) {
+            cap
+        } else {
+            SIDEBAR_STOCKS[(i + seed) % SIDEBAR_STOCKS.len()]
+        };
+    }
+    s
+}
+
+/// The sidebar is wide enough for its bar line — seventeen columns — and for
+/// the stock-and-cap pair's thirteen, a blank column, and the narrowest name
+/// column at which every two resource names that differ still differ when
+/// shortened: at every terminal size the body is drawn.
+/// @spec TUI-RENDER-019
+#[test]
+fn the_sidebar_is_as_wide_as_its_bar_line_and_its_name_floor_beside_the_pair() {
+    let names: Vec<String> = stores_row_names().into_iter().map(|(_, n)| n).collect();
+    let floor = name_floor(&names);
+    let least = 17.max(13 + 1 + floor);
+    for w in 80..=320u16 {
+        for h in [24u16, 40] {
+            let (_, _, side, _) = regions(w, h);
+            assert!(
+                side.width as usize >= least,
+                "at {w}x{h} the sidebar is {} columns; it must be at least {least}: seventeen for \
+                 the bar line, and the pair's thirteen, a blank column, and the {floor}-column name \
+                 floor (TUI-RENDER-019)",
+                side.width
+            );
+        }
+    }
+}
+
+/// Every store the sidebar draws is two lines laid out field by field — name,
+/// stock, `/`, cap; bar, rate, `full` — so every figure and the tag stand at
+/// one column down the sidebar, the bar line is never wider than seventeen
+/// columns, and only the name gives way. Quantified over every resource, at
+/// stocks reaching every compact width, capped and uncapped and zero-capped,
+/// with rates of both signs and none, at the floor and wide.
+/// @spec TUI-RENDER-019, TUI-RENDER-012
+#[test]
+fn every_store_in_the_sidebar_stands_field_by_field_at_one_column() {
+    let names: std::collections::HashMap<ResourceId, String> = stores_row_names().into_iter().collect();
+    let mut signs = [false; 3];
+    let mut uncapped_seen = false;
+    let mut full_seen = false;
+    for seed in 0..3 {
+        let mut state = every_store_held(seed);
+        // Kittens at work, so some stores gain and some drain.
+        state.kittens = employed(6);
+        let rates = state.net_rates();
+        let listed = listed_stores(&state);
+        assert_eq!(listed.len(), ResourceId::ALL.len(), "fixture: every store is listed");
+        for w in [FLOOR_W, 130, WIDE_W] {
+            let (_, _, side, _) = regions(w, 24);
+            let width = side.width as usize;
+            let height = (2 * listed.len() + 2) as u16;
+            let (lines, _) = sidebar_in(&state, side.width, height);
+            for (i, r) in listed.iter().enumerate() {
+                let rate = rates[r.ix()];
+                signs[if fmt::rate(rate) == "0" { 0 } else if rate > 0.0 { 1 } else { 2 }] = true;
+                uncapped_seen |= state.cap(*r).is_infinite();
+                full_seen |= wears_full(&state, *r);
+                let bar: String = lines[2 * i + 1].chars().take(4).collect();
+                assert!(
+                    bar.chars().all(|c| c == '▓' || c == '░'),
+                    "{r:?} at {w} columns: the second line starts with its four-cell fill bar; it \
+                     read {:?}",
+                    lines[2 * i + 1]
+                );
+                let (first, second) = expected_store_lines(&state, *r, &names[r], rate, width, &bar);
+                assert_eq!(
+                    lines[2 * i], first,
+                    "{r:?} at {w} columns (sidebar {width} wide): the name at the left edge, then \
+                     the stock right-aligned in six columns, `/`, and the cap left-aligned in six at \
+                     the right edge (TUI-RENDER-019)"
+                );
+                assert_eq!(
+                    lines[2 * i + 1], second,
+                    "{r:?} at {w} columns (sidebar {width} wide): the bar, the rate right-aligned in \
+                     seven columns, and `full` while capped, a space between each (TUI-RENDER-019)"
+                );
+                assert!(
+                    lines[2 * i + 1].trim_end().chars().count() <= 17,
+                    "{r:?} at {w} columns: the bar line is wider than seventeen columns"
+                );
+            }
+        }
+    }
+    assert!(signs.iter().all(|s| *s), "fixture: rates of every sign and none, got {signs:?}");
+    assert!(uncapped_seen && full_seen, "fixture: uncapped and full stores both drawn");
+}
+
+/// The sidebar draws the stores the stores group lists, in its order, each
+/// whole or not at all. Where its lines cannot hold every listed store, its
+/// last line is `+N more` in `dim`, N written in full, and the stores drawn are
+/// as many as the lines above the note hold — chosen first from the stores
+/// wearing `full`, then from the rest, each in the stores group's order, and
+/// drawn in that order. Checked at every sidebar height from one line to room
+/// for all, over meadows whose full stores sit early, late, and nowhere.
+/// @spec TUI-RENDER-022
+#[test]
+fn the_sidebar_draws_whole_stores_full_ones_first_and_counts_the_rest() {
+    let names: std::collections::HashMap<ResourceId, String> = stores_row_names().into_iter().collect();
+    let dim = clowder_tui::theme::Role::Dim.color();
+    let (_, _, side, _) = regions(FLOOR_W, FLOOR_H);
+    let width = side.width as usize;
+    let name_col = width.saturating_sub(14).max(1);
+
+    let mut meadows: Vec<GameState> = (0..3).map(every_store_held).collect();
+    // Only the last capped stores full, the rest held below their caps, and a
+    // handful of stores held at all.
+    let mut late = GameState::new(11);
+    let capped: Vec<ResourceId> =
+        ResourceId::ALL.into_iter().filter(|r| late.cap(*r).is_finite() && late.cap(*r) > 0.0).collect();
+    for r in ResourceId::ALL {
+        late.resources[r.ix()] = 0.0;
+    }
+    for (i, r) in capped.iter().enumerate() {
+        late.resources[r.ix()] = if i + 2 >= capped.len() { late.cap(*r) } else { late.cap(*r) / 2.0 };
+    }
+    let uncapped: Vec<ResourceId> =
+        ResourceId::ALL.into_iter().filter(|r| late.cap(*r).is_infinite()).take(5).collect();
+    for r in uncapped {
+        late.resources[r.ix()] = 7.0;
+    }
+    meadows.push(late);
+    // Nothing full at all.
+    let mut none_full = GameState::new(11);
+    for r in ResourceId::ALL {
+        let cap = none_full.cap(r);
+        none_full.resources[r.ix()] = if cap.is_finite() && cap > 0.0 { cap / 3.0 } else { 2.0 };
+    }
+    meadows.push(none_full);
+
+    for state in &meadows {
+        let listed = listed_stores(state);
+        let k = listed.len();
+        assert!(k >= 4, "fixture: enough stores listed to overflow a short sidebar");
+        for height in 1..=(2 * k + 3) {
+            let (lines, buf) = sidebar_in(state, side.width, height as u16);
+            let drawn_n = if 2 * k <= height { k } else { (height - 1) / 2 };
+            let chosen: Vec<ResourceId> = {
+                let mut pick: Vec<ResourceId> =
+                    listed.iter().copied().filter(|r| wears_full(state, *r)).take(drawn_n).collect();
+                let room = drawn_n - pick.len();
+                pick.extend(listed.iter().copied().filter(|r| !wears_full(state, *r)).take(room));
+                listed.iter().copied().filter(|r| pick.contains(r)).collect()
+            };
+            for (i, r) in chosen.iter().enumerate() {
+                let head = fmt::fit(&names[r], name_col);
+                assert!(
+                    lines[2 * i].starts_with(&head),
+                    "height {height}: line {} should begin store {i} of those drawn, {r:?}, chosen \
+                     first from the stores wearing `full` and kept in the stores group's order \
+                     (TUI-RENDER-022); it read {:?}.\n{}",
+                    2 * i,
+                    lines[2 * i],
+                    lines.join("\n")
+                );
+                assert!(
+                    draws_fill_bar(&lines[2 * i + 1]),
+                    "height {height}: {r:?} is drawn whole — its second line too (TUI-RENDER-022).\n{}",
+                    lines.join("\n")
+                );
+            }
+            let below_stores = &lines[2 * drawn_n..];
+            if drawn_n == k {
+                assert!(
+                    below_stores.iter().all(|l| l.trim().is_empty()),
+                    "height {height}: every listed store fits, so nothing follows them.\n{}",
+                    lines.join("\n")
+                );
+                continue;
+            }
+            let note = format!("+{} more", k - drawn_n);
+            let last = lines.last().expect("a sidebar has lines");
+            assert_eq!(
+                last.trim(),
+                note,
+                "height {height}: {k} stores listed and {drawn_n} drawn, so the last line is the \
+                 note {note:?} (TUI-RENDER-022).\n{}",
+                lines.join("\n")
+            );
+            assert!(
+                below_stores[..below_stores.len() - 1].iter().all(|l| l.trim().is_empty()),
+                "height {height}: only the note stands below the stores drawn — no store is drawn \
+                 in part.\n{}",
+                lines.join("\n")
+            );
+            let y = (height - 1) as u16;
+            for x in 0..side.width {
+                let cell = &buf[(x, y)];
+                if !cell.symbol().trim().is_empty() {
+                    assert_eq!(
+                        cell.fg,
+                        dim.unwrap_or(cell.fg),
+                        "height {height}: the note wears `dim` (TUI-RENDER-022)"
+                    );
+                }
+            }
+            assert!(dim.is_some(), "fixture: dim carries a colour");
+        }
+    }
+}

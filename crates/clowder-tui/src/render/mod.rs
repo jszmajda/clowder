@@ -9,7 +9,7 @@ pub mod fmt;
 pub mod widgets;
 pub mod layout;
 
-use clowder_core::{content, Command, ContentId, GameState};
+use clowder_core::{content, Command, ContentId, GameState, Location, LockReason, ResourceId};
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -80,73 +80,193 @@ fn marker_for(state: &GameState, row: &Row) -> Option<(&'static str, Role)> {
     Some((glyph, role))
 }
 
-/// How many of this the meadow already has, blank where the notion does not
-/// apply. @spec TUI-NAV-009
-fn owned_count(state: &GameState, row: &Row) -> String {
+/// A resource's stores-row spelling — the same name the sidebar and the
+/// inspector give it. @spec TUI-RENDER-020, TUI-RENDER-021
+fn resource_label(r: ResourceId) -> String {
+    humanize(&format!("{r:?}"))
+}
+
+/// The widest stores-row name in the resource vocabulary — what the cost
+/// field's width (TUI-RENDER-020) is sized against. Computed once: the
+/// vocabulary is fixed for the life of the process.
+fn widest_resource_name() -> usize {
+    use std::sync::OnceLock;
+    static WIDEST: OnceLock<usize> = OnceLock::new();
+    *WIDEST.get_or_init(|| {
+        ResourceId::ALL.iter().map(|r| resource_label(*r).chars().count()).max().unwrap_or(0)
+    })
+}
+
+/// The cost field's width: six columns of figure, a space, the widest
+/// stores-row name in the resource vocabulary, and three columns for `, …`.
+/// @spec TUI-RENDER-020
+fn cost_field_width() -> usize {
+    6 + 1 + widest_resource_name() + 3
+}
+
+/// Whether a section's list gives an owned-count field (TUI-NAV-018): the
+/// copies of a structure or a rite, the kittens on a job's count row, the
+/// tinkerers on a craft's tinkerer row — judged by the section alone, so the
+/// column is the same whatever is listed. @spec TUI-RENDER-020
+fn section_gives_count(section: Section) -> bool {
+    matches!(section, Section::Meadow | Section::Clowder | Section::Crafts | Section::Sunbeams)
+}
+
+/// Whether a section's list gives a next-cost field (TUI-NAV-078,
+/// TUI-NAV-073), judged by the section alone. @spec TUI-RENDER-020
+fn section_gives_cost(section: Section) -> bool {
+    !matches!(section, Section::Sky | Section::Legacy)
+}
+
+/// The owned count the inspector states for a row, if it states one — the
+/// same fact the count field draws (TUI-RENDER-020). @spec TUI-NAV-018
+fn stated_count(state: &GameState, row: &Row) -> Option<u64> {
     match &row.key {
-        RowKey::Content(ContentId::Structure(b), _) => {
-            let n = state.structures[b.ix()];
-            if n > 0 { format!("×{n}") } else { String::new() }
+        RowKey::Content(ContentId::Structure(b), _) => Some(state.structures[b.ix()] as u64),
+        RowKey::Content(ContentId::Rite(r), _) => Some(state.rite_counts[r.ix()] as u64),
+        RowKey::Content(ContentId::Job(j), _) if matches!(row.kind, RowKind::Count { .. }) => {
+            Some(state.effective_workers(*j) as u64)
         }
-        _ => String::new(),
+        RowKey::Content(ContentId::Craft(c), "tinker") => Some(
+            state
+                .kittens
+                .iter()
+                .filter(|k| k.tinkering == Some(*c) && k.location == Location::Home)
+                .count() as u64,
+        ),
+        _ => None,
     }
 }
 
-/// What an open count prompt on `row` previews, in the row list's cost slot:
-/// the core's per-component total for taking the count (a repeat-N row), N
-/// times the core's one-unit price (a Pounce or Trade row), or the typed
-/// count alone — DeepNap, a count row, a count row proper, or a row the core
-/// prices no other way — with nothing beyond the typed digits for an empty
-/// or zero count. Shared with the narrow-mode swap (TUI-NAV-035), which reads
-/// the cost the same way the list does.
+/// The next cost the inspector states for a row, if it states one: the
+/// core's price for one more on a row that takes a content item — none on a
+/// tinkerer row, where the item is already the player's, or where the price
+/// names no component — and the one-unit price on a Pounce or Trade row.
+/// @spec TUI-NAV-078, TUI-NAV-073
+fn stated_cost(state: &GameState, row: &Row) -> Option<Vec<(ResourceId, f64)>> {
+    let cost = match (&row.key, &row.kind) {
+        (RowKey::Content(_, "tinker"), _) => return None,
+        (RowKey::Content(id, _), _) => {
+            if state.lock_reason(*id) == Some(LockReason::AlreadyYours) {
+                return None;
+            }
+            state.cost_of_next(*id, 1)
+        }
+        (_, RowKind::Act { command, .. }) => state.unit_price(command)?,
+        _ => return None,
+    };
+    (!cost.is_empty()).then_some(cost)
+}
+
+/// The count field as TUI-RENDER-020 draws it: `×` joined to a compact
+/// figure, the two right-aligned in seven columns, blank for zero or where
+/// nothing is stated. @spec TUI-RENDER-020, TUI-RENDER-012
+fn count_field_text(count: Option<u64>) -> String {
+    match count {
+        Some(n) if n > 0 => format!("{:>7}", format!("×{}", fmt::compact(n as f64))),
+        _ => " ".repeat(7),
+    }
+}
+
+/// The cost field as TUI-RENDER-020 draws it, `width` columns wide: each
+/// component a compact figure, a space, and its stores-row name, apart by
+/// `, ` — the first figure right-aligned in the field's first six columns —
+/// and the longest leading run of whole components that fits, `, …` after it
+/// where any is left out. @spec TUI-RENDER-020, TUI-RENDER-012
+fn cost_field_text(cost: Option<&[(ResourceId, f64)]>, width: usize) -> String {
+    let Some(cost) = cost else { return " ".repeat(width) };
+    let parts: Vec<String> = cost
+        .iter()
+        .enumerate()
+        .map(|(i, (r, a))| {
+            if i == 0 {
+                format!("{:>6} {}", fmt::compact(*a), resource_label(*r))
+            } else {
+                format!("{} {}", fmt::compact(*a), resource_label(*r))
+            }
+        })
+        .collect();
+    let mut text = String::new();
+    for k in (1..=parts.len()).rev() {
+        let run = parts[..k].join(", ");
+        let tail = if k < parts.len() { ", …" } else { "" };
+        if run.chars().count() + tail.chars().count() <= width {
+            text = format!("{run}{tail}");
+            break;
+        }
+    }
+    format!("{text:<width$}")
+}
+
+/// The components an open count prompt's preview (TUI-NAV-067) prices for
+/// `digits`: the core's per-component total for taking the count (a
+/// repeat-N row), or N times the core's one-unit price (a Pounce or Trade
+/// row) — none for DeepNap, a count row, or an empty or zero count, where the
+/// preview is the count alone.
 /// @spec TUI-NAV-067
-pub(crate) fn count_prompt_preview(state: &GameState, row: &Row, digits: &str) -> String {
+fn prompt_preview_components(state: &GameState, row: &Row, digits: &str) -> Vec<(ResourceId, f64)> {
     use crate::nav::CountSemantics;
 
     let n: u32 = digits.parse().unwrap_or(0);
     if n == 0 {
-        return format!("×{digits}");
+        return Vec::new();
     }
-
-    let priced: Vec<(clowder_core::ResourceId, f64)> = match &row.kind {
-        RowKind::Act { semantics: CountSemantics::RepeatN, .. } => {
-            let RowKey::Content(id, _) = row.key else { return format!("×{n}") };
-            state.cost_of_next(id, n)
-        }
-        RowKind::Act { command, semantics: CountSemantics::CountTaking } if !row.heavy => {
-            match state.unit_price(command) {
-                Some(unit) => unit.into_iter().map(|(r, each)| (r, each * n as f64)).collect(),
-                None => return format!("×{n}"),
-            }
-        }
-        // DeepNap (heavy count-taking), a count row, and a row Single-tagged
-        // — x never opens on a Single row, so this arm is reached only by a
-        // count row's own `Count` kind. @spec TUI-NAV-067
-        _ => return format!("×{n}"),
-    };
-
-    if priced.is_empty() {
-        return format!("×{n}");
+    match &row.kind {
+        RowKind::Act { semantics: CountSemantics::RepeatN, .. } => match row.key {
+            RowKey::Content(id, _) => state.cost_of_next(id, n),
+            _ => Vec::new(),
+        },
+        RowKind::Act { command, semantics: CountSemantics::CountTaking } if !row.heavy => state
+            .unit_price(command)
+            .map(|unit| unit.into_iter().map(|(r, each)| (r, each * n as f64)).collect())
+            .unwrap_or_default(),
+        _ => Vec::new(),
     }
-    let parts: Vec<String> = priced
-        .iter()
-        .map(|(r, amount)| format!("{} {}", fmt::exact(*amount), format!("{r:?}").to_lowercase()))
-        .collect();
-    format!("×{n}  {}", parts.join(", "))
 }
 
-/// The next copy's price, compactly. @spec TUI-NAV-009, TUI-RENDER-012
-fn next_cost_text(state: &GameState, row: &Row) -> String {
-    let RowKey::Content(id, _) = &row.key else { return String::new() };
-    let costs = state.cost_of_next(*id, 1);
-    match costs.first() {
-        Some((r, amount)) => {
-            // Resource variants are already the player-facing names; lowered
-            // so a cost reads as prose rather than as an identifier.
-            format!("{} {}", fmt::compact(*amount), format!("{r:?}").to_lowercase())
-        }
-        None => String::new(),
+/// A priced component of an open prompt's preview, in the exact form: what
+/// TUI-RENDER-021 requires wherever the prompt's text is drawn.
+fn prompt_preview_parts(comps: &[(ResourceId, f64)]) -> Vec<String> {
+    comps.iter().map(|(r, a)| format!("{} {}", fmt::exact(*a), resource_label(*r))).collect()
+}
+
+/// `×` joined to the digits exactly as typed, then — where the preview prices
+/// components — two blank columns and those components, apart by `, `.
+/// @spec TUI-NAV-067, TUI-RENDER-021
+fn prompt_text(parts: &[String], digits: &str) -> String {
+    if parts.is_empty() {
+        format!("×{digits}")
+    } else {
+        format!("×{digits}  {}", parts.join(", "))
     }
+}
+
+/// The prompt's text cut to fit `place` columns: whole where it fits; else
+/// the count whole and the longest leading run of components that fits,
+/// `, …` after it; else the count, two blank columns, and `…`.
+/// @spec TUI-RENDER-021
+fn prompt_text_cut(parts: &[String], digits: &str, place: usize) -> String {
+    let whole = prompt_text(parts, digits);
+    if whole.chars().count() <= place {
+        return whole;
+    }
+    for k in (1..parts.len()).rev() {
+        let run = format!("×{digits}  {}, …", parts[..k].join(", "));
+        if run.chars().count() <= place {
+            return run;
+        }
+    }
+    format!("×{digits}  …")
+}
+
+/// What an open count prompt on `row` previews, in the row list's cost slot,
+/// or in the narrow swap's inspector (TUI-NAV-035): `×` and the digits as
+/// typed, then the priced components in the exact form. Shared by both, so
+/// neither ever disagrees with the other about what a prompt on the same row
+/// shows. @spec TUI-NAV-067, TUI-RENDER-021
+pub(crate) fn count_prompt_preview(state: &GameState, row: &Row, digits: &str) -> String {
+    let comps = prompt_preview_components(state, row, digits);
+    prompt_text(&prompt_preview_parts(&comps), digits)
 }
 
 /// A row's stable display name — the content name where the row is content,
@@ -214,18 +334,16 @@ pub(crate) fn armed_is_live(armed: &ArmedRow) -> bool {
     std::time::Instant::now() < armed.expires_at
 }
 
-/// A figure the core reports, or — when it is not a finite number — the
-/// plain words that say so instead of printing it. A cost or a stock this
-/// far past any real one overflows to infinity, and a bound the core has not
-/// yet reached (or a value fed by one, such as elder wisdom left non-finite
-/// by a test) can come back not a number at all; either prints as gibberish,
-/// so both are said in words instead. @spec TUI-NAV-075
+/// A figure the core reports, in the exact form — a summary is read, not
+/// glanced at, so nothing in it is abbreviated (TUI-RENDER-012) — or, when it
+/// is not a finite number, the plain words that say so instead of printing
+/// it. A cost or a stock this far past any real one overflows to infinity,
+/// and a bound the core has not yet reached (or a value fed by one, such as
+/// elder wisdom left non-finite by a test) can come back not a number at
+/// all; either prints as gibberish, so both are said in words instead.
+/// @spec TUI-NAV-075, TUI-RENDER-012
 fn figure(value: f64) -> String {
-    if value.is_finite() {
-        fmt::compact(value)
-    } else {
-        "beyond reach".to_string()
-    }
+    fmt::exact(value)
 }
 
 /// The consequence summary an armed heavy row expands to: only what the core
@@ -334,7 +452,7 @@ fn draw_list(
     for (i, row) in all.iter().enumerate().skip(win.start).take(win.len) {
         let focused = i == cursor && row.selectable();
         let on_this_row = prompt.filter(|_| prompt_key == Some(&row.key));
-        lines.push(row_line(state, row, focused, area.width as usize, on_this_row));
+        lines.push(row_line(state, row, focused, area.width as usize, section, on_this_row));
         // The row an arming holds expands in place, on the lines directly
         // beneath it — never anywhere else, and only while the arming still
         // holds. The expansion carries attention's colour so the row's own
@@ -360,19 +478,26 @@ fn draw_list(
 }
 
 /// One list row, drawn as the design's anatomy: cursor, availability marker,
-/// name, owned count, next cost.
+/// name, owned count, next cost — the count and cost each in a field of
+/// fixed width at the row's right, so the columns stand at one column
+/// whatever is listed, whatever the figures (TUI-RENDER-020). While a count
+/// prompt is open on this row, its count and exact preview take the cost
+/// field's place instead, moving the name (and, where it stands, the count
+/// field) left by what the longer text needs (TUI-RENDER-021).
 ///
 /// Colour is the *second* channel throughout — every marker is a distinct
 /// glyph before it is a colour, so the row reads the same to someone who
 /// cannot tell the colours apart. Focus is the cursor glyph plus reverse
 /// video, never a palette colour: the row's colour already says what its
 /// state is, and a second colour would be saying something else at the same
-/// time. @spec TUI-NAV-009, TUI-NAV-021, TUI-NAV-022, TUI-THEME-006, TUI-THEME-014
+/// time. @spec TUI-NAV-009, TUI-NAV-021, TUI-NAV-022, TUI-THEME-006,
+/// TUI-THEME-014, TUI-RENDER-020, TUI-RENDER-021
 fn row_line(
     state: &GameState,
     row: &Row,
     focused: bool,
     width: usize,
+    section: Section,
     prompt: Option<&CountPrompt>,
 ) -> Line<'static> {
     let label = row_label(state, row);
@@ -385,18 +510,39 @@ fn row_line(
 
     let (marker, role) = marker_for(state, row).unwrap_or((" ", Role::Inherited));
     let cursor = if focused { "▸ " } else { "  " };
-    let count = owned_count(state, row);
-    let cost = match prompt {
-        Some(p) => count_prompt_preview(state, row, &p.digits),
-        None => next_cost_text(state, row),
+    let counted = section_gives_count(section);
+    let costed = section_gives_cost(section);
+    let c = cost_field_width();
+
+    let text = if let Some(p) = prompt {
+        let fields = RowFields { width, counted, c };
+        prompt_row_text(state, row, cursor, marker, &label, &fields, &p.digits)
+    } else {
+        let count_text = count_field_text(stated_count(state, row));
+        let cost_text = cost_field_text(stated_cost(state, row).as_deref(), c);
+
+        let mut fixed = cursor.chars().count() + 2;
+        if counted {
+            fixed += 1 + 7;
+        }
+        if costed {
+            fixed += 1 + c;
+        }
+        let name_w = width.saturating_sub(fixed).max(4);
+        let name = fmt::fit(&label, name_w);
+
+        let mut text = format!("{cursor}{marker} {name:<name_w$}");
+        if counted {
+            text.push(' ');
+            text.push_str(&count_text);
+        }
+        if costed {
+            text.push(' ');
+            text.push_str(&cost_text);
+        }
+        text
     };
 
-    // Name gets whatever width the fixed parts leave.
-    let fixed = cursor.len() + 2 + count.len() + cost.len() + 2;
-    let name_w = width.saturating_sub(fixed).max(4);
-    let name = fmt::fit(&label, name_w);
-
-    let text = format!("{cursor}{marker} {name:<name_w$} {count} {cost}");
     let mut style = style_for(role);
     if focused {
         // Reverse the terminal's own pair — works in either polarity, and
@@ -404,6 +550,59 @@ fn row_line(
         style = style.add_modifier(Modifier::REVERSED);
     }
     Line::from(Span::styled(fmt::fit(&text, width), style))
+}
+
+/// A row's fixed-width fields (TUI-RENDER-020): the pane's width, whether its
+/// section gives an owned-count field, and the cost field's width — the
+/// context `prompt_row_text` needs to work out where a prompt's text begins
+/// and how far it may move the name.
+struct RowFields {
+    width: usize,
+    counted: bool,
+    c: usize,
+}
+
+/// The row an open count prompt is held to, drawn as TUI-RENDER-021: its
+/// count and exact preview begun at the left edge of the cost field's place
+/// (or, where the section gives none, of the place one would take), the name
+/// giving way to it first — down to one character and its ellipsis — and,
+/// where the section counts, the count field kept whole but moved left
+/// alongside it.
+fn prompt_row_text(
+    state: &GameState,
+    row: &Row,
+    cursor: &str,
+    marker: &str,
+    label: &str,
+    fields: &RowFields,
+    digits: &str,
+) -> String {
+    let &RowFields { width, counted, c } = fields;
+    let comps = prompt_preview_components(state, row, digits);
+    let parts = prompt_preview_parts(&comps);
+    let whole = prompt_text(&parts, digits);
+    let len = whole.chars().count();
+
+    let reserved = cursor.chars().count() + 2 + if counted { 1 + 7 } else { 0 } + 1;
+    let base_name = width.saturating_sub(reserved).saturating_sub(c);
+
+    let (name_w, field) = if len <= c {
+        (base_name, format!("{whole:<c$}"))
+    } else if base_name >= 2 + (len - c) {
+        (base_name - (len - c), whole)
+    } else {
+        let place = c + base_name.saturating_sub(2);
+        (2, format!("{:<place$}", prompt_text_cut(&parts, digits, place)))
+    };
+
+    let name = fmt::fit(label, name_w);
+    let mut text = format!("{cursor}{marker} {name:<name_w$} ");
+    if counted {
+        text.push_str(&count_field_text(stated_count(state, row)));
+        text.push(' ');
+    }
+    text.push_str(&field);
+    text
 }
 
 /// The space a narrow body's single pane leaves once its divider — taken

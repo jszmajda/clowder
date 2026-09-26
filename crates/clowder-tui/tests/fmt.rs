@@ -548,3 +548,374 @@ fn a_fitted_name_leaves_the_next_column_untouched() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// TUI-RENDER-017 — the compact form
+// ---------------------------------------------------------------------------
+
+/// Digits on show, whatever else the rendering carries.
+fn digit_count(s: &str) -> usize {
+    s.chars().filter(char::is_ascii_digit).count()
+}
+
+/// The compact form's magnitude markers, one per three decades, and the
+/// power of a thousand each stands for.
+const MARKERS: [(&str, i32); 5] = [("K", 1), ("M", 2), ("B", 3), ("T", 4), ("Q", 5)];
+
+/// A compact rendering read back as a value: its figure times its marker's
+/// power of a thousand. `None` for the two bound readings and anything else
+/// that is not a plain figure.
+fn read_compact(s: &str) -> Option<f64> {
+    let (figure, scale) = match MARKERS.iter().find(|(m, _)| s.ends_with(m)) {
+        Some((m, k)) => (&s[..s.len() - m.len()], 1000f64.powi(*k)),
+        None => (s, 1.0),
+    };
+    figure.parse::<f64>().ok().map(|f| f * scale)
+}
+
+/// A deterministic spread of values across every magnitude the compact form
+/// names and past both of its bounds, each with a ragged run of digits so no
+/// rounding is ever trivially exact.
+fn magnitude_sweep() -> Vec<f64> {
+    let mut out = Vec::new();
+    let mut seed: u64 = 0x2545_f491_4f6c_dd1d;
+    for decade in -12..=20 {
+        for _ in 0..40 {
+            seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+            let mantissa = 1.0 + (seed >> 11) as f64 / (1u64 << 53) as f64 * 9.0;
+            out.push(mantissa * 10f64.powi(decade));
+        }
+    }
+    out
+}
+
+/// The design's own examples and every edge the spec names, spelled out: four
+/// digits at most, a tie rounding away from zero, a marker per three decades
+/// with a rounding that reaches a thousand carrying into the next, three
+/// places at most below one, `<0.001` for a value at or above the display
+/// floor that rounds to nothing, `>999Q` past the last marker or for a value
+/// that is not finite, and `0` for zero of either sign, residue below the
+/// floor, and anything below zero.
+/// @spec TUI-RENDER-017
+#[test]
+fn the_compact_form_reads_as_the_spec_spells_it_at_every_edge() {
+    let cases: [(f64, &str); 48] = [
+        (0.0, "0"),
+        (-0.0, "0"),
+        (3.0, "3"),
+        (12.5, "12.5"),
+        (999.9, "999.9"),
+        (999.5, "999.5"),
+        // Rounded to four digits, a tie away from zero.
+        (1234.0, "1.234K"),
+        (1234.5, "1.235K"),
+        (12_345.0, "12.35K"),
+        (1000.5, "1.001K"),
+        (123_456_789.0, "123.5M"),
+        (4_294_967_295.0, "4.295B"),
+        // Each marker, once its rounded value reaches a thousand.
+        (1000.0, "1K"),
+        (1.0e6, "1M"),
+        (1.0e9, "1B"),
+        (1.0e12, "1T"),
+        (1.0e15, "1Q"),
+        // A rounding that reaches a thousand of one marker carries.
+        (999.95, "1K"),
+        (9_999.5, "10K"),
+        (999_949.0, "999.9K"),
+        (999_960.0, "1M"),
+        (999_960_000.0, "1B"),
+        (999_960_000_000.0, "1T"),
+        (999_960_000_000_000.0, "1Q"),
+        // Below one: three places at most, rounded to the nearest.
+        (0.5, "0.5"),
+        (0.125, "0.125"),
+        (0.004, "0.004"),
+        (0.1234, "0.123"),
+        (0.0625, "0.063"),
+        (0.9994, "0.999"),
+        (0.9996, "1"),
+        (0.0005, "0.001"),
+        (0.001, "0.001"),
+        // At or above the display floor, rounding to nothing in three places.
+        (0.0004, "<0.001"),
+        (0.000_012_3, "<0.001"),
+        (1.0e-9, "<0.001"),
+        // Past the last marker, or not finite.
+        (999.94e15, "999.9Q"),
+        (999.95e15, ">999Q"),
+        (1.0e18, ">999Q"),
+        (1.0e300, ">999Q"),
+        (f64::INFINITY, ">999Q"),
+        (f64::NAN, ">999Q"),
+        // Below the display floor, and below zero.
+        (0.9e-9, "0"),
+        (5.0e-17, "0"),
+        (-5.0e-17, "0"),
+        (-1.0e-12, "0"),
+        (-5.0, "0"),
+        (-12_345.0, "0"),
+    ];
+    for (value, expected) in cases {
+        assert_eq!(
+            compact(value),
+            expected,
+            "compact({value:e}) must read {expected:?} (TUI-RENDER-017)"
+        );
+    }
+}
+
+/// The quantified half of the form, over values at every magnitude it names
+/// and past both bounds: never more than four digits, never wider than six
+/// columns, never a figure of a thousand or more under a marker (the carry),
+/// and — for every value it states as a figure — rounded to the nearest, so
+/// the figure read back is within half a unit of its last digit of the value.
+/// @spec TUI-RENDER-017
+#[test]
+fn every_compact_figure_is_four_digits_at_most_rounded_to_the_nearest_and_six_columns_at_most() {
+    let floor = 1.0e-9;
+    let top = 999.95e15;
+    for value in magnitude_sweep() {
+        let rendered = compact(value);
+        assert!(
+            width(&rendered) <= COMPACT_MAX_WIDTH,
+            "compact({value:e}) = {rendered:?} is wider than six columns (TUI-RENDER-017)"
+        );
+        assert!(
+            digit_count(&rendered) <= 4,
+            "compact({value:e}) = {rendered:?} shows more than four digits (TUI-RENDER-017)"
+        );
+        if value < floor {
+            assert_eq!(rendered, "0", "compact({value:e}) is below the display floor (TUI-RENDER-017)");
+            continue;
+        }
+        if value >= top {
+            assert_eq!(rendered, ">999Q", "compact({value:e}) reaches a thousand Q once rounded (TUI-RENDER-017)");
+            continue;
+        }
+        if value < 0.0005 {
+            assert_eq!(rendered, "<0.001", "compact({value:e}) rounds to nothing in three places (TUI-RENDER-017)");
+            continue;
+        }
+        let figure = MARKERS
+            .iter()
+            .find(|(m, _)| rendered.ends_with(m))
+            .map(|(m, _)| &rendered[..rendered.len() - m.len()])
+            .unwrap_or(&rendered);
+        let f: f64 = figure.parse().unwrap_or_else(|_| {
+            panic!("compact({value:e}) = {rendered:?} is not a figure and a marker (TUI-RENDER-017)")
+        });
+        assert!(
+            f < 1000.0,
+            "compact({value:e}) = {rendered:?}: a rounding that reaches a thousand carries into the \
+             next marker (TUI-RENDER-017)"
+        );
+        if figure.len() != rendered.len() {
+            assert!(f >= 1.0, "compact({value:e}) = {rendered:?} wears a marker it has not reached");
+        }
+        let unit = if value < 1.0 { 0.001 } else { 10f64.powi(value.log10().floor() as i32 - 3) };
+        let back = read_compact(&rendered).expect("a figure reads back");
+        assert!(
+            (back - value).abs() <= unit * 0.5 * (1.0 + 1.0e-9),
+            "compact({value:e}) = {rendered:?} reads back as {back:e}, further than half a unit of \
+             its last digit from the value; the form rounds to the nearest (TUI-RENDER-017)"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RENDER-018 — the exact form
+// ---------------------------------------------------------------------------
+
+/// A long whole part as the spec writes it: the fewest digits that read back
+/// as the same float, and zeros in the places past them.
+fn shortest_whole(value: f64) -> String {
+    let sci = format!("{value:e}");
+    let (mantissa, exp) = sci.split_once('e').expect("scientific form");
+    let exp: usize = exp.parse().expect("a non-negative exponent");
+    let digits: String = mantissa.chars().filter(char::is_ascii_digit).collect();
+    assert!(digits.len() <= exp + 1, "fixture: {value:e} has a fraction");
+    format!("{digits}{}", "0".repeat(exp + 1 - digits.len()))
+}
+
+/// The design's own examples and every edge the spec names: every digit of
+/// the whole part with no marker, exponent, or grouping; the fraction at three
+/// places or at the fourth significant figure, whichever lies further, a tie
+/// rounding away from zero, trailing zeros dropped; binary noise rounded away;
+/// `0` for zero of either sign and for residue below the display floor; and a
+/// figure below zero behind `-`.
+/// @spec TUI-RENDER-018
+#[test]
+fn the_exact_form_reads_as_the_spec_spells_it_at_every_edge() {
+    let cases: Vec<(f64, String)> = vec![
+        (3.0, "3".into()),
+        (1234.5, "1234.5".into()),
+        (1_234_567.0, "1234567".into()),
+        (4_294_967_295.0, "4294967295".into()),
+        (1.0e12, "1000000000000".into()),
+        (0.25, "0.25".into()),
+        // Three places, or the fourth significant figure where that is further.
+        (0.1234, "0.1234".into()),
+        (0.001_234_56, "0.001235".into()),
+        (0.000_123_456_78, "0.0001235".into()),
+        (0.0625, "0.0625".into()),
+        (12_345.678_9, "12345.679".into()),
+        (1.234_567, "1.235".into()),
+        // A tie rounds away from zero.
+        (2.0625, "2.063".into()),
+        (12.0625, "12.063".into()),
+        (-2.0625, "-2.063".into()),
+        // A rounding that carries into the whole part.
+        (0.999_999_6, "1".into()),
+        (999.999_6, "1000".into()),
+        // Binary noise is not precision.
+        (0.1 + 0.2, "0.3".into()),
+        (1.1 * 1.1, "1.21".into()),
+        // Down to the display floor, and not past it.
+        (1.0e-9, "0.000000001".into()),
+        (1.5e-9, "0.0000000015".into()),
+        (0.9e-9, "0".into()),
+        (5.0e-17, "0".into()),
+        (-5.0e-17, "0".into()),
+        (0.0, "0".into()),
+        (-0.0, "0".into()),
+        // Below zero, behind `-`.
+        (-3.0, "-3".into()),
+        (-0.25, "-0.25".into()),
+        (-1234.5, "-1234.5".into()),
+        // A whole part longer than the float's precision.
+        (1.0e25, format!("1{}", "0".repeat(25))),
+        (1.234_567_890_123_456_7e25, shortest_whole(1.234_567_890_123_456_7e25)),
+        (123_456_789_012_345_680.0, shortest_whole(123_456_789_012_345_680.0)),
+        (-1.0e20, format!("-1{}", "0".repeat(20))),
+    ];
+    for (value, expected) in cases {
+        assert_eq!(exact(value), expected, "exact({value:e}) must read {expected:?} (TUI-RENDER-018)");
+    }
+}
+
+/// The quantified half, over values at every magnitude from the display floor
+/// up and of both signs: only digits, a point, and a leading `-` — no marker,
+/// exponent, or grouping; no trailing zero in the fraction and no dangling
+/// point; no more fraction than three places or the fourth significant figure
+/// allows; and rounded to the nearest at that place.
+/// @spec TUI-RENDER-018
+#[test]
+fn every_exact_figure_is_every_whole_digit_and_a_fraction_rounded_at_its_place() {
+    for magnitude in magnitude_sweep().into_iter().filter(|v| *v >= 1.0e-9 && *v < 1.0e15) {
+        for value in [magnitude, -magnitude] {
+            let rendered = exact(value);
+            let body = rendered.strip_prefix('-').unwrap_or(&rendered);
+            assert_eq!(
+                rendered.starts_with('-'),
+                value < 0.0,
+                "exact({value:e}) = {rendered:?}: a figure below zero, and only one, stands behind `-`"
+            );
+            assert!(
+                !body.is_empty() && body.chars().all(|c| c.is_ascii_digit() || c == '.'),
+                "exact({value:e}) = {rendered:?} holds something other than digits and a point: no \
+                 marker, exponent, or grouping (TUI-RENDER-018)"
+            );
+            assert_no_decimal_noise(&rendered, &format!("exact({value:e})"));
+            let e = magnitude.log10().floor() as i32;
+            let places = 3.max(3 - e) as usize;
+            assert!(
+                decimals(&rendered) <= places,
+                "exact({value:e}) = {rendered:?} carries more than {places} places, past both three \
+                 places and the fourth significant figure (TUI-RENDER-018)"
+            );
+            let back: f64 = rendered.parse().expect("an exact figure parses");
+            let half = 0.5 * 10f64.powi(-(places as i32));
+            assert!(
+                (back - value).abs() <= half * (1.0 + 1.0e-9) + value.abs() * 1.0e-15,
+                "exact({value:e}) = {rendered:?} is further than half a unit of its last place from \
+                 the value; the fraction rounds to the nearest (TUI-RENDER-018)"
+            );
+            let whole = body.split('.').next().unwrap_or("");
+            assert!(
+                whole == "0" || !whole.starts_with('0'),
+                "exact({value:e}) = {rendered:?} pads its whole part"
+            );
+        }
+    }
+}
+
+/// A figure that is not finite has no digits to state, and is said in words:
+/// never `inf`, `NaN`, `∞`, or any digit.
+/// @spec TUI-RENDER-018
+#[test]
+fn the_exact_form_says_a_figure_that_is_not_finite_in_words() {
+    for value in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN] {
+        let rendered = exact(value);
+        let lower = rendered.to_lowercase();
+        assert!(
+            !rendered.chars().any(|c| c.is_ascii_digit() || c == '∞'),
+            "exact({value}) = {rendered:?} prints a figure that is not finite (TUI-RENDER-018)"
+        );
+        assert!(
+            !lower.split(|c: char| !c.is_alphabetic()).any(|w| w == "inf" || w == "infinity" || w == "nan"),
+            "exact({value}) = {rendered:?} prints the float's own spelling (TUI-RENDER-018)"
+        );
+        assert!(
+            rendered.split_whitespace().count() >= 2 && rendered.chars().all(|c| c.is_alphabetic() || c == ' '),
+            "exact({value}) = {rendered:?}: a figure that is not finite is stated in words \
+             (TUI-RENDER-018)"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RENDER-012 — the sidebar's rate form
+// ---------------------------------------------------------------------------
+
+/// A store's net rate in the sidebar is the compact form of its size behind
+/// `+` above zero and `-` below, with no sign where its size reads `0` — zero
+/// of either sign, or residue below the display floor.
+/// @spec TUI-RENDER-012
+#[test]
+fn the_sidebar_rate_is_the_compact_size_behind_its_sign_and_unsigned_when_still() {
+    let cases: [(f64, &str); 16] = [
+        (1.5, "+1.5"),
+        (-1.5, "-1.5"),
+        (-12_345.0, "-12.35K"),
+        (1234.5, "+1.235K"),
+        (0.0004, "+<0.001"),
+        (-0.0004, "-<0.001"),
+        (1.0e-9, "+<0.001"),
+        (999.95e15, "+>999Q"),
+        (f64::INFINITY, "+>999Q"),
+        (f64::NEG_INFINITY, "->999Q"),
+        (0.0, "0"),
+        (-0.0, "0"),
+        (1.0e-12, "0"),
+        (-1.0e-12, "0"),
+        (5.0e-17, "0"),
+        (-0.9e-9, "0"),
+    ];
+    for (value, expected) in cases {
+        assert_eq!(rate(value), expected, "rate({value:e}) must read {expected:?} (TUI-RENDER-012)");
+    }
+}
+
+/// Quantified: at every magnitude and either sign, the sidebar rate is the
+/// compact form of the rate's size behind its sign, and so at most seven
+/// columns.
+/// @spec TUI-RENDER-012
+#[test]
+fn every_sidebar_rate_is_its_sign_and_the_compact_form_of_its_size() {
+    for magnitude in magnitude_sweep() {
+        for value in [magnitude, -magnitude] {
+            let rendered = rate(value);
+            let size = compact(value.abs());
+            let expected = if size == "0" {
+                "0".to_string()
+            } else if value > 0.0 {
+                format!("+{size}")
+            } else {
+                format!("-{size}")
+            };
+            assert_eq!(rendered, expected, "rate({value:e}) (TUI-RENDER-012)");
+            assert!(width(&rendered) <= 7, "rate({value:e}) = {rendered:?} is wider than seven columns");
+        }
+    }
+}

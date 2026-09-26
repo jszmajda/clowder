@@ -147,8 +147,10 @@ fn group_index(state: &GameState) -> usize {
 
 /// A view focused on the Meadow with the cursor on one row.
 fn looking_at(key: RowKey) -> ViewState {
-    let mut v = ViewState::default();
-    v.section = Some(Section::Meadow);
+    let mut v = ViewState {
+        section: Some(Section::Meadow),
+        ..Default::default()
+    };
     v.focus[Section::Meadow.index()] = Some(key);
     v
 }
@@ -958,15 +960,13 @@ fn a_row_that_exists_but_is_not_drawn_costs_far_less_than_one_that_is() {
     let mut state = GameState::new(11);
     state.kittens = roster(400);
 
-    let short_list = {
-        let mut v = ViewState::default();
-        v.section = Some(Section::Meadow);
-        v
+    let short_list = ViewState {
+        section: Some(Section::Meadow),
+        ..Default::default()
     };
-    let long_list = {
-        let mut v = ViewState::default();
-        v.section = Some(Section::Clowder);
-        v
+    let long_list = ViewState {
+        section: Some(Section::Clowder),
+        ..Default::default()
     };
 
     let short_rows = rows(&state, Section::Meadow).len();
@@ -1026,3 +1026,380 @@ fn a_frame_draws_no_more_rows_than_the_viewport_holds() {
     );
 }
 
+
+// ---------------------------------------------------------------------------
+// TUI-RENDER-020 — a list row's count and cost fields
+// ---------------------------------------------------------------------------
+
+use std::collections::HashMap;
+
+use clowder_core::content::MEADOW_MOVE_MIN_KITTENS;
+use clowder_core::{ArchId, ColonyId, CraftId, IdeaId, JobId, LockReason, RiteId};
+use clowder_tui::render::fmt;
+use clowder_tui::render::widgets::inspector;
+
+/// The list's space in a drawn frame: the list's rectangle — or the narrow
+/// body's single pane — with its pane divider(s) (TUI-RENDER-016) set aside.
+fn list_space(l: &Layout) -> Rect {
+    match l.body {
+        Body::Narrow { main, .. } => Rect::new(main.x + 1, main.y, main.width - 1, main.height),
+        Body::Wide { list, .. } => Rect::new(list.x + 1, list.y, list.width - 2, list.height),
+        Body::TooSmall(r) => panic!("fixture: {r:?} is below the floor"),
+    }
+}
+
+/// A rectangle's cells, one string of single-cell symbols per line.
+fn cell_lines(buf: &Buffer, rect: Rect) -> Vec<Vec<String>> {
+    (rect.y..rect.bottom())
+        .map(|y| {
+            (rect.x..rect.right())
+                .map(|x| buf.cell((x, y)).map(|c| c.symbol().to_string()).unwrap_or_else(|| " ".into()))
+                .collect()
+        })
+        .collect()
+}
+
+fn cells_text(cells: &[String], from: usize, to: usize) -> String {
+    cells[from..to].concat()
+}
+
+/// A row's name in full: the first line of the inspector's description of it
+/// (TUI-NAV-018), drawn wide enough that nothing is cut.
+fn inspector_name(state: &GameState, section: Section, key: &RowKey) -> String {
+    let (w, h) = (180u16, 6u16);
+    let mut view = ViewState { section: Some(section), ..Default::default() };
+    view.focus[section.index()] = Some(key.clone());
+    let mut term = terminal(w, h);
+    term.draw(|f| inspector::draw(f, area(w, h), state, &view)).expect("TestBackend is infallible");
+    cell_lines(term.backend().buffer(), area(w, h))[0].concat().trim().to_string()
+}
+
+/// Every resource's stores-row spelling, read from the inspector over its row
+/// in the stores group.
+fn store_names() -> HashMap<ResourceId, String> {
+    let mut s = GameState::new(11);
+    for r in ResourceId::ALL {
+        s.resources[r.ix()] = 1.0;
+    }
+    ResourceId::ALL
+        .into_iter()
+        .map(|r| (r, inspector_name(&s, Section::Meadow, &RowKey::Resource(r))))
+        .collect()
+}
+
+/// The cost field's width: six columns of figure, a space, the widest
+/// stores-row name in the resource vocabulary, and three columns for `, …`.
+fn cost_field_width(names: &HashMap<ResourceId, String>) -> usize {
+    6 + 1 + names.values().map(|n| n.chars().count()).max().expect("a vocabulary") + 3
+}
+
+/// Whether a section can list a row whose description states an owned count
+/// (TUI-NAV-018): the copies of a structure or a rite, the kittens on a job's
+/// count row, the tinkerers on a craft's tinkerer row. Judged by the section
+/// alone, from what its rows are — checked against real lists below.
+fn gives_count_field(section: Section) -> bool {
+    matches!(section, Section::Meadow | Section::Clowder | Section::Crafts | Section::Sunbeams)
+}
+
+/// Whether a section can list a row whose description states a next cost
+/// (TUI-NAV-078, TUI-NAV-073). Judged by the section alone.
+fn gives_cost_field(section: Section) -> bool {
+    !matches!(section, Section::Sky | Section::Legacy)
+}
+
+/// The owned count the inspector states for a row, if it states one.
+fn stated_count(state: &GameState, row: &Row) -> Option<u64> {
+    match &row.key {
+        RowKey::Content(ContentId::Structure(b), _) => Some(state.structures[b.ix()] as u64),
+        RowKey::Content(ContentId::Rite(r), _) => Some(state.rite_counts[r.ix()] as u64),
+        RowKey::Content(ContentId::Job(j), _) if matches!(row.kind, RowKind::Count { .. }) => {
+            Some(state.effective_workers(*j) as u64)
+        }
+        RowKey::Content(ContentId::Craft(c), "tinker") => Some(
+            state
+                .kittens
+                .iter()
+                .filter(|k| k.tinkering == Some(*c) && k.location == Location::Home)
+                .count() as u64,
+        ),
+        _ => None,
+    }
+}
+
+/// The next cost the inspector states for a row, if it states one: the core's
+/// price for one more on a row that takes a content item — none on a
+/// tinkerer row, where the item is already the player's, or where the price
+/// names no component — and the one-unit price on a Pounce or Trade row.
+fn stated_cost(state: &GameState, row: &Row) -> Option<Vec<(ResourceId, f64)>> {
+    let cost = match (&row.key, &row.kind) {
+        (RowKey::Content(_, "tinker"), _) => return None,
+        (RowKey::Content(id, _), _) => {
+            if state.lock_reason(*id) == Some(LockReason::AlreadyYours) {
+                return None;
+            }
+            state.cost_of_next(*id, 1)
+        }
+        (_, RowKind::Act { command, .. }) => state.unit_price(command)?,
+        _ => return None,
+    };
+    (!cost.is_empty()).then_some(cost)
+}
+
+/// The count field as TUI-RENDER-020 draws it: `×` joined to a compact
+/// figure, right-aligned together in seven columns, blank for zero or where
+/// nothing is stated.
+fn count_field(count: Option<u64>) -> String {
+    match count {
+        Some(n) if n > 0 => format!("{:>7}", format!("×{}", fmt::compact(n as f64))),
+        _ => " ".repeat(7),
+    }
+}
+
+/// The cost field as TUI-RENDER-020 draws it, `width` columns: the first
+/// figure right-aligned in six, then each component a compact figure, a space,
+/// and its stores-row name, apart by `, ` — the longest leading run that fits,
+/// with `, …` after it where any is left out.
+fn cost_field(
+    cost: Option<&[(ResourceId, f64)]>,
+    names: &HashMap<ResourceId, String>,
+    width: usize,
+) -> (String, bool) {
+    let Some(cost) = cost else { return (" ".repeat(width), false) };
+    let parts: Vec<String> = cost
+        .iter()
+        .enumerate()
+        .map(|(i, (r, a))| {
+            if i == 0 {
+                format!("{:>6} {}", fmt::compact(*a), names[r])
+            } else {
+                format!("{} {}", fmt::compact(*a), names[r])
+            }
+        })
+        .collect();
+    let mut text = String::new();
+    let mut cut = false;
+    for k in (1..=parts.len()).rev() {
+        let run = parts[..k].join(", ");
+        let tail = if k < parts.len() { ", …" } else { "" };
+        if run.chars().count() + tail.chars().count() <= width {
+            cut = k < parts.len();
+            text = format!("{run}{tail}");
+            break;
+        }
+    }
+    assert!(!text.is_empty(), "the field holds the widest single component and `, …` after it");
+    (format!("{text:<width$}"), cut)
+}
+
+fn kitten_named(name: &str, job: Option<JobId>) -> Kitten {
+    Kitten {
+        name: name.to_string(),
+        job,
+        location: Location::Home,
+        arrived_day: 0,
+        job_seq: job.map(|_| 1),
+        away_seq: None,
+        skills: [0.0; 8],
+        exp: 1.0e6,
+        rank: 0,
+        trait_id: KittenTrait::None,
+        tinkering: None,
+    }
+}
+
+/// Every section's surfaces open, everything affordable, every idea held.
+fn rich_meadow() -> GameState {
+    let mut s = GameState::new(7);
+    for r in ResourceId::ALL {
+        s.resources[r.ix()] = 1.0e12;
+    }
+    for b in StructureId::ALL {
+        s.structures[b.ix()] = 5;
+    }
+    s.ideas = IdeaId::ALL.iter().copied().collect();
+    s.revealed = StructureId::ALL
+        .iter()
+        .map(|b| ContentId::Structure(*b))
+        .chain(IdeaId::ALL.iter().map(|i| ContentId::Idea(*i)))
+        .collect();
+    s.roster_high_water = MEADOW_MOVE_MIN_KITTENS + 9;
+    let mut roster: Vec<Kitten> =
+        (0..MEADOW_MOVE_MIN_KITTENS + 9).map(|i| kitten_named(&format!("kitten-{i}"), None)).collect();
+    for k in roster.iter_mut().take(4) {
+        k.job = Some(JobId::Tinkerer);
+    }
+    roster[0].tinkering = Some(CraftId::ALL[0]);
+    s.kittens = roster;
+    s.elder = Some(0);
+    s.peak_devotion = 1.0e12;
+    s.devotion = 1.0e6;
+    s.serenity = 1.0e12;
+    s.rites = [RiteId::TheReverie, RiteId::Enlightenment].into_iter().collect();
+    s.rite_counts[RiteId::TheReverie.ix()] = 2;
+    s.arches_bought = [ArchId::EverdreamArch].into_iter().collect();
+    s.discovered = ColonyId::ALL.iter().copied().collect();
+    s.whale_visit_years = 5;
+    s.whale_contentment = 1;
+    s.generation = 1;
+    s.elder_wisdom = 1.0e9;
+    s.warm_memories = 1.0e3;
+    s
+}
+
+/// The same surfaces with nothing in the stores and no idea held: every price
+/// stated, none met.
+fn poor_meadow() -> GameState {
+    let mut s = rich_meadow();
+    for r in ResourceId::ALL {
+        s.resources[r.ix()] = 0.0;
+    }
+    s.ideas.clear();
+    s
+}
+
+/// Counts and stocks at every width the compact form takes: structures from
+/// none to thousands, stores from a trickle to past the last marker.
+fn ragged_meadow() -> GameState {
+    let mut s = rich_meadow();
+    let counts = [0u32, 1, 7, 42, 999, 1000, 12_345, 4_000_000_000];
+    for (i, b) in StructureId::ALL.into_iter().enumerate() {
+        s.structures[b.ix()] = counts[i % counts.len()];
+    }
+    let stocks = [0.0004, 3.0, 12.5, 1234.5, 1.0e7, 1.0e20];
+    for (i, r) in ResourceId::ALL.into_iter().enumerate() {
+        s.resources[r.ix()] = stocks[i % stocks.len()];
+    }
+    s
+}
+
+/// Every list row draws its owned count and next cost in fields of fixed
+/// width at the row's right, after its name, a blank column before each: the
+/// count as `×` joined to a compact figure right-aligned in seven columns,
+/// blank for zero; the cost as its components in the core's order, compact
+/// figure, space, stores-row name, apart by `, `, the first figure
+/// right-aligned in the field's first six columns, and the longest leading
+/// run of whole components that fits followed by `, …` where any is left
+/// out. Each field draws exactly what the inspector's description states,
+/// blank where it states nothing, and has width only where its section can
+/// list a row stating that heading — judged by the section alone, so the
+/// columns are the same whatever is listed, whatever the figures, and wherever
+/// the list is scrolled; the name takes the width the fields leave.
+/// Quantified over every section, over meadows rich, poor, ragged, and new,
+/// at the floor, narrow, three-pane, capped, and wide, scrolled to the top
+/// and the bottom.
+/// @spec TUI-RENDER-020, TUI-RENDER-012
+#[test]
+fn every_list_row_draws_its_count_and_cost_in_fixed_fields_at_its_right() {
+    let names = store_names();
+    let c = cost_field_width(&names);
+    let meadows = [rich_meadow(), poor_meadow(), ragged_meadow(), GameState::new(11)];
+
+    // The per-section table is the section's own: check it against what the
+    // sections really list, over every meadow here.
+    for section in Section::ALL {
+        let lists_count = meadows.iter().any(|s| rows(s, section).iter().any(|r| stated_count(s, r).is_some()));
+        let lists_cost = meadows.iter().any(|s| rows(s, section).iter().any(|r| stated_cost(s, r).is_some()));
+        assert_eq!(lists_count, gives_count_field(section), "fixture: {section:?} and owned counts");
+        assert_eq!(lists_cost, gives_cost_field(section), "fixture: {section:?} and next costs");
+    }
+
+    let mut seen = (0usize, 0usize, 0usize, 0usize); // rows, cut costs, marked counts, blank zero counts
+    let mut name_cache: HashMap<(usize, Section, String), String> = HashMap::new();
+    for (mi, state) in meadows.iter().enumerate() {
+        for section in Section::ALL {
+            let all = rows(state, section);
+            let selectable: Vec<usize> = (0..all.len()).filter(|i| all[*i].selectable()).collect();
+            let (Some(&first), Some(&last)) = (selectable.first(), selectable.last()) else { continue };
+            for (w, h) in [(FLOOR_W, FLOOR_H), (99, 30), (100, 30), (130, TALL), (200, 60)] {
+                for cursor in [first, last] {
+                    let mut view = ViewState { section: Some(section), ..Default::default() };
+                    view.focus[section.index()] = Some(all[cursor].key.clone());
+                    let d = cold(state, &view, w, h);
+                    let space = list_space(&d.layout);
+                    let width = space.width as usize;
+                    let lines = cell_lines(&d.buffer, space);
+                    let cy = lines
+                        .iter()
+                        .position(|l| l[0] == "▸")
+                        .unwrap_or_else(|| panic!("fixture: the cursor is drawn in {section:?}"));
+
+                    let counted = gives_count_field(section);
+                    let costed = gives_cost_field(section);
+                    let name_w = width - 4 - if counted { 8 } else { 0 } - if costed { c + 1 } else { 0 };
+                    let count_at = if costed { width - c - 8 } else { width - 7 };
+
+                    for (y, line) in lines.iter().enumerate() {
+                        if line[0].chars().next().is_some_and(|ch| ch.is_ascii_digit()) {
+                            continue; // an overflow note (TUI-RENDER-011)
+                        }
+                        let Some(ix) = (cursor + y).checked_sub(cy).filter(|ix| *ix < all.len()) else {
+                            continue;
+                        };
+                        let row = &all[ix];
+                        if matches!(row.kind, RowKind::Group) {
+                            continue;
+                        }
+                        seen.0 += 1;
+                        let key_text = format!("{:?}", row.key);
+                        let full = name_cache
+                            .entry((mi, section, key_text.clone()))
+                            .or_insert_with(|| inspector_name(state, section, &row.key))
+                            .clone();
+                        let at = format!("{section:?} row {key_text} at {w}x{h}");
+                        let drawn = line.concat();
+
+                        let name = fmt::fit(&full, name_w);
+                        assert_eq!(
+                            cells_text(line, 4, 4 + name_w),
+                            format!("{name:<name_w$}"),
+                            "{at}: the name takes the {name_w} columns the fields leave, at one \
+                             column on every row (TUI-RENDER-020).\n{drawn:?}"
+                        );
+                        if counted || costed {
+                            assert_eq!(line[4 + name_w], " ", "{at}: a blank column before the first field.\n{drawn:?}");
+                        }
+                        if counted {
+                            let count = stated_count(state, row);
+                            if count == Some(0) {
+                                seen.3 += 1;
+                            }
+                            if count.is_some_and(|n| n >= 1000) {
+                                seen.2 += 1;
+                            }
+                            assert_eq!(
+                                cells_text(line, count_at, count_at + 7),
+                                count_field(count),
+                                "{at}: the count field — what the inspector states as owned, `×` \
+                                 joined to a compact figure right-aligned in seven columns, blank \
+                                 for zero or for nothing stated (TUI-RENDER-020).\n{drawn:?}"
+                            );
+                            if costed {
+                                assert_eq!(line[count_at + 7], " ", "{at}: a blank column before the cost field.\n{drawn:?}");
+                            }
+                        }
+                        if costed {
+                            let cost = stated_cost(state, row);
+                            let (expected, cut) = cost_field(cost.as_deref(), &names, c);
+                            if cut {
+                                seen.1 += 1;
+                            }
+                            assert_eq!(
+                                cells_text(line, width - c, width),
+                                expected,
+                                "{at}: the cost field — the inspector's next cost, compact figures \
+                                 and stores-row names apart by `, `, the first figure right-aligned \
+                                 in six columns, whole components then `, …` where any is left \
+                                 out, in the {c}-column field at the row's right \
+                                 (TUI-RENDER-020).\n{drawn:?}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(seen.0 > 0, "fixture: rows were checked");
+    assert!(seen.1 > 0, "fixture: some cost too long for its field was drawn");
+    assert!(seen.2 > 0, "fixture: some count past a thousand was drawn");
+    assert!(seen.3 > 0, "fixture: some zero count was drawn");
+}

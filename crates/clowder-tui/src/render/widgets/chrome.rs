@@ -265,35 +265,101 @@ fn fill_bar(stock: f64, cap: f64) -> String {
     format!("{}{}", FILL_FULL.to_string().repeat(filled), FILL_EMPTY.to_string().repeat(FILL_CELLS - filled))
 }
 
-/// A curated glance: revealed resources with stock, a fill bar, and a signed
-/// rate. Display-only — the complete table is a list in the home section.
-/// The `full` tag alone wears `attention` (TUI-THEME-015); the rest of the
-/// line stays in the inherited foreground.
-/// @spec TUI-NAV-019, TUI-NAV-022, TUI-NAV-049, TUI-THEME-015
+/// Whether a store wears `full`: a cap above zero, reached. @spec TUI-NAV-022
+fn wears_full(state: &GameState, r: ResourceId) -> bool {
+    let cap = state.cap(r);
+    cap.is_finite() && cap > 0.0 && state.stock(r) >= cap
+}
+
+/// The stores the stores group lists, in its order — the same order the row
+/// model gives the meadow's stores group, so the sidebar can never disagree
+/// with the list about which stores exist or how they are ordered.
+/// @spec TUI-NAV-049
+fn listed_stores(state: &GameState) -> Vec<ResourceId> {
+    rows(state, Section::Meadow)
+        .into_iter()
+        .filter_map(|row| match row.key {
+            RowKey::Resource(r) => Some(r),
+            _ => None,
+        })
+        .collect()
+}
+
+/// As many of `listed`'s stores as `capacity` two-line slots hold, chosen
+/// first from those wearing `full` and then from the rest, each in the
+/// stores group's order — then handed back in that same order, so a store
+/// chosen for room is still drawn where the group places it.
+/// @spec TUI-RENDER-022
+fn choose_stores(state: &GameState, listed: &[ResourceId], capacity: usize) -> Vec<ResourceId> {
+    let mut chosen: Vec<ResourceId> =
+        listed.iter().copied().filter(|r| wears_full(state, *r)).take(capacity).collect();
+    let room = capacity - chosen.len();
+    chosen.extend(listed.iter().copied().filter(|r| !wears_full(state, *r)).take(room));
+    listed.iter().copied().filter(|r| chosen.contains(r)).collect()
+}
+
+/// A store's two lines: its name, stock, `/`, and cap at the right edge; then
+/// its fill bar, its rate, and — while capped — the `full` tag. Only the
+/// `full` tag wears `attention` (TUI-THEME-015); everything else, including
+/// the fill bar, stays in the inherited foreground so colour never carries a
+/// meaning the glyphs do not. @spec TUI-RENDER-019, TUI-NAV-022
+fn store_lines(state: &GameState, r: ResourceId, name_col: usize, width: usize) -> [Line<'static>; 2] {
+    let stock = state.stock(r);
+    let cap = state.cap(r);
+    let name = fmt::fit(&humanize(&format!("{r:?}")), name_col);
+    let cap_part = if cap.is_finite() { format!("/{:<6}", fmt::compact(cap)) } else { " ".repeat(7) };
+    let first = format!("{name:<name_col$} {:>6}{cap_part}", fmt::compact(stock));
+
+    let bar = fill_bar(stock, cap);
+    let rate = fmt::rate(state.net_rate(r));
+    let body = format!("{bar} {rate:>7}");
+    let capped = wears_full(state, r);
+    let mut spans = vec![Span::raw(body.clone())];
+    let mut drawn_len = body.chars().count();
+    if capped {
+        spans.push(Span::raw(" "));
+        spans.push(Span::styled("full", style_for(Role::Attention)));
+        drawn_len += " full".len();
+    }
+    if drawn_len < width {
+        spans.push(Span::raw(" ".repeat(width - drawn_len)));
+    }
+    [Line::from(first), Line::from(spans)]
+}
+
+/// A curated glance: the stores the stores group lists, each drawn whole
+/// (TUI-RENDER-019) or not at all, standing in the stores group's order. Where
+/// the sidebar's lines cannot hold every listed store, the last line is a
+/// `dim` note naming how many are left out, and the stores drawn are chosen
+/// first from those wearing `full`. Display-only — the complete table is a
+/// list in the home section.
+/// @spec TUI-NAV-019, TUI-NAV-022, TUI-NAV-049, TUI-RENDER-019, TUI-RENDER-022,
+/// TUI-THEME-015
 pub fn sidebar(f: &mut Frame, area: Rect, state: &GameState) {
-    let mut lines: Vec<Line<'static>> = Vec::new();
-    for r in ResourceId::ALL {
-        let stock = state.stock(r);
-        if stock <= 0.0 {
-            continue;
+    let width = area.width as usize;
+    let height = area.height as usize;
+    let name_col = width.saturating_sub(14).max(1);
+
+    let listed = listed_stores(state);
+    let k = listed.len();
+    let capacity_rows = 2 * k;
+    let (drawn_n, note) = if capacity_rows <= height {
+        (k, false)
+    } else {
+        (height.saturating_sub(1) / 2, true)
+    };
+    let chosen = choose_stores(state, &listed, drawn_n);
+
+    let mut lines: Vec<Line<'static>> = Vec::with_capacity(height);
+    for r in &chosen {
+        lines.extend(store_lines(state, *r, name_col, width));
+    }
+    if note {
+        while lines.len() + 1 < height {
+            lines.push(Line::from(""));
         }
-        let cap = state.cap(r);
-        let name = humanize(&format!("{r:?}"));
-        let bar = fill_bar(stock, cap);
-        let rate = fmt::rate(state.net_rate(r));
-        let capped = cap.is_finite() && cap > 0.0 && stock >= cap;
-        // Two lines per resource — a name and cap are wordy together, and the
-        // sidebar's fixed width has no room to spare for both on one line
-        // without risking the `full` tag (TUI-NAV-022's non-colour channel)
-        // being the part that gets clipped.
-        lines.push(Line::from(name));
-        let numbers = format!("{} {bar} {rate}", fmt::compact(stock));
-        let mut spans = vec![Span::raw(numbers)];
-        if capped {
-            spans.push(Span::raw(" "));
-            spans.push(Span::styled("full", style_for(Role::Attention)));
-        }
-        lines.push(Line::from(spans));
+        let left = k - chosen.len();
+        lines.push(Line::styled(format!("+{left} more"), style_for(Role::Dim)));
     }
     f.render_widget(Paragraph::new(lines), area);
 }

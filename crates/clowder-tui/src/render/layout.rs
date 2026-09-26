@@ -3,7 +3,10 @@
 //! height and no arithmetic drifts as the chrome changes.
 //! @spec TUI-RENDER-002, TUI-RENDER-004..008
 
+use clowder_core::ResourceId;
 use ratatui::layout::Rect;
+
+use crate::render::fmt;
 
 /// The body's horizontal division, chosen by width.
 ///
@@ -68,10 +71,47 @@ const CAP_BREAKPOINT: u16 = 120;
 /// @spec TUI-RENDER-008, TUI-NAV-047
 const DEAD_BAND: u16 = 4;
 
-/// The sidebar's fixed width. Exact value deferred to measurement (render
-/// design, Deferred 1); chosen wide enough for a resource name beside a
-/// compact number. @spec TUI-RENDER-005, TUI-RENDER-006
-const SIDEBAR_WIDTH: u16 = 20;
+/// Turn an identifier-shaped tag into a spaced label — the same treatment
+/// `render::humanize` gives a fixed row, kept local so this leaf does not
+/// reach across into `mod.rs` for it.
+fn humanize(tag: &str) -> String {
+    let mut out = String::with_capacity(tag.len() + 4);
+    for (i, c) in tag.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            out.push(' ');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// The narrowest name column at which every two names in the resource
+/// vocabulary that differ whole still differ when shortened to it — below
+/// this, the sidebar's `fit` (TUI-RENDER-014) could make two different
+/// stores read alike. Computed once: the vocabulary is fixed for the life of
+/// the process. @spec TUI-RENDER-019
+fn name_floor() -> usize {
+    use std::sync::OnceLock;
+    static FLOOR: OnceLock<usize> = OnceLock::new();
+    *FLOOR.get_or_init(|| {
+        let names: Vec<String> = ResourceId::ALL.iter().map(|r| humanize(&format!("{r:?}"))).collect();
+        (1..=64)
+            .find(|w| {
+                names.iter().enumerate().all(|(i, a)| {
+                    names.iter().skip(i + 1).all(|b| a == b || fmt::fit(a, *w) != fmt::fit(b, *w))
+                })
+            })
+            .unwrap_or(64)
+    })
+}
+
+/// The sidebar's width: at least seventeen columns for its bar line
+/// (TUI-RENDER-019), and at least the stock-and-cap pair's thirteen columns,
+/// a blank column, and the name floor beside them.
+/// @spec TUI-RENDER-005, TUI-RENDER-006, TUI-RENDER-019
+fn sidebar_width() -> u16 {
+    17u16.max(13 + 1 + name_floor() as u16)
+}
 
 /// The minimum the inspector is left in the 100-119 range, which in turn
 /// pins where the list's growth caps out at the 120 breakpoint. Exact value
@@ -82,7 +122,9 @@ const MIN_INSPECTOR_WIDTH: u16 = 20;
 /// The list's width once capped: the width it has grown to by
 /// `CAP_BREAKPOINT` columns, after which every extra column goes to the
 /// inspector instead. @spec TUI-RENDER-007
-const CAPPED_LIST_WIDTH: u16 = CAP_BREAKPOINT - SIDEBAR_WIDTH - MIN_INSPECTOR_WIDTH;
+fn capped_list_width() -> u16 {
+    CAP_BREAKPOINT - sidebar_width() - MIN_INSPECTOR_WIDTH
+}
 
 /// The ticker's row count at the floor. Whether it earns more rows where
 /// height allows is deferred (render design, Deferred 4).
@@ -132,31 +174,28 @@ pub fn compute(area: Rect, prev: Option<&Layout>, banner: bool) -> Layout {
     let pane_wide =
         w >= PANE_BREAKPOINT || (prev_was_wide && w >= PANE_BREAKPOINT - DEAD_BAND);
 
+    let sidebar_w = sidebar_width();
     let body = if !pane_wide {
-        let sidebar = Rect::new(area.x, body_top, SIDEBAR_WIDTH, body_height);
-        let main =
-            Rect::new(area.x + SIDEBAR_WIDTH, body_top, w - SIDEBAR_WIDTH, body_height);
+        let sidebar = Rect::new(area.x, body_top, sidebar_w, body_height);
+        let main = Rect::new(area.x + sidebar_w, body_top, w - sidebar_w, body_height);
         Body::Narrow { sidebar, main }
     } else {
         // @spec TUI-RENDER-007, TUI-RENDER-008
+        let capped_list_w = capped_list_width();
         let prev_was_capped = matches!(
             prev.map(|p| &p.body),
-            Some(Body::Wide { list, .. }) if list.width == CAPPED_LIST_WIDTH
+            Some(Body::Wide { list, .. }) if list.width == capped_list_w
         );
         let capped =
             w >= CAP_BREAKPOINT || (prev_was_capped && w >= CAP_BREAKPOINT - DEAD_BAND);
 
-        let list_width = if capped {
-            CAPPED_LIST_WIDTH
-        } else {
-            w - SIDEBAR_WIDTH - MIN_INSPECTOR_WIDTH
-        };
+        let list_width = if capped { capped_list_w } else { w - sidebar_w - MIN_INSPECTOR_WIDTH };
 
-        let sidebar = Rect::new(area.x, body_top, SIDEBAR_WIDTH, body_height);
-        let list = Rect::new(area.x + SIDEBAR_WIDTH, body_top, list_width, body_height);
-        let inspector_width = w - SIDEBAR_WIDTH - list_width;
+        let sidebar = Rect::new(area.x, body_top, sidebar_w, body_height);
+        let list = Rect::new(area.x + sidebar_w, body_top, list_width, body_height);
+        let inspector_width = w - sidebar_w - list_width;
         let inspector = Rect::new(
-            area.x + SIDEBAR_WIDTH + list_width,
+            area.x + sidebar_w + list_width,
             body_top,
             inspector_width,
             body_height,

@@ -138,12 +138,14 @@ fn truncated_note(report: &OfflineReport) -> Option<&'static str> {
 }
 
 /// The largest positive resource gains in a report, curated to a handful so a
-/// one-line banner has room for them. @spec TUI-NAV-055
+/// one-line banner has room for them. A gain below the display floor reads as
+/// `0` (TUI-RENDER-017), which is nothing gained, so it is left off rather
+/// than drawn as zero. @spec TUI-NAV-055, TUI-RENDER-017
 fn largest_gains(report: &OfflineReport) -> Vec<(ResourceId, f64)> {
     let mut gains: Vec<(ResourceId, f64)> = ResourceId::ALL
         .into_iter()
         .map(|r| (r, report.resource_deltas[r.ix()]))
-        .filter(|(_, delta)| *delta > 0.0)
+        .filter(|(_, delta)| *delta >= fmt::DISPLAY_FLOOR)
         .collect();
     gains.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     gains.truncate(3);

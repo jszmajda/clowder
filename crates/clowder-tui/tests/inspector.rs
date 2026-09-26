@@ -333,8 +333,10 @@ fn structure_row(s: StructureId) -> RowKey {
 
 /// A view focused on one row of one section, and nothing else going on.
 fn looking_at(section: Section, key: RowKey) -> ViewState {
-    let mut v = ViewState::default();
-    v.section = Some(section);
+    let mut v = ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     v.focus[section.index()] = Some(key.clone());
     assert!(
         v.focus[section.index()].is_some(),
@@ -2473,5 +2475,190 @@ fn a_stores_row_states_its_exact_stock_its_cap_or_none_and_its_net_rate_per_game
              worded differently. It read:\n{shown}"
         );
         assert_ne!(body, fbody, "{r:?}: saying there is no cap must not read as a cap; it read:\n{shown}");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RENDER-012 — the inspector's figures are exact, and hold every figure
+// the sidebar and the list abbreviate
+// ---------------------------------------------------------------------------
+
+/// Every figure on screen with the sign glued before it, if any: a maximal
+/// run of digits and dots, with a `+` or `-` directly before it kept.
+fn signed_numbers(s: &str) -> Vec<String> {
+    let chars: Vec<char> = s.chars().collect();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i].is_ascii_digit() {
+            let start = if i > 0 && (chars[i - 1] == '+' || chars[i - 1] == '-') { i - 1 } else { i };
+            let mut j = i;
+            while j < chars.len() && (chars[j].is_ascii_digit() || chars[j] == '.') {
+                j += 1;
+            }
+            out.push(chars[start..j].iter().collect::<String>().trim_end_matches('.').to_string());
+            i = j;
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+/// A meadow like `world(true)` with every store holding a ragged, noisy
+/// stock, so an exact figure has digits to round and a compact one would
+/// abbreviate.
+fn ragged_world() -> GameState {
+    let mut s = world(true);
+    for r in ResourceId::ALL {
+        s.resources[r.ix()] = 1234.5678912 * (1.0 + r.ix() as f64 * 0.37) + 0.1 + 0.2;
+    }
+    s
+}
+
+/// On a stores row, the store's net rate is drawn in the exact form of its
+/// size behind `+` where it is above zero and `-` where it is below, and with
+/// no sign where it is zero — the one signed figure the row states.
+/// Quantified over every resource, in meadows where stores gain, drain, and
+/// stand still.
+/// @spec TUI-RENDER-012
+#[test]
+fn a_stores_rows_net_rate_is_its_exact_size_behind_its_sign() {
+    let mut classes = [0usize; 3];
+    for state in [world(true), world(false), GameState::new(11)] {
+        let mut state = state;
+        for r in ResourceId::ALL {
+            state.resources[r.ix()] = state.resources[r.ix()].max(1.0);
+        }
+        let rates = state.net_rates();
+        for r in ResourceId::ALL {
+            let key = RowKey::Resource(r);
+            assert_is_a_row(&state, Section::Meadow, &key);
+            let shown = pane_text(&state, &looking_at(Section::Meadow, key), WIDE, TALL);
+            let signed: Vec<String> =
+                signed_numbers(&shown).into_iter().filter(|t| t.starts_with('+') || t.starts_with('-')).collect();
+            let rate = rates[r.ix()];
+            let size = fmt::exact(rate.abs());
+            if size == "0" {
+                classes[0] += 1;
+                assert!(
+                    signed.is_empty(),
+                    "{r:?} stands still (rate {rate:e}); its rate is stated with no sign, and it read \
+                     {signed:?}:\n{shown}"
+                );
+            } else {
+                let expected = format!("{}{size}", if rate > 0.0 { '+' } else { '-' });
+                classes[if rate > 0.0 { 1 } else { 2 }] += 1;
+                assert_eq!(
+                    signed,
+                    vec![expected.clone()],
+                    "{r:?}'s net rate {rate:e} is stated as {expected:?}, the exact form of its size \
+                     behind its sign, and is the row's one signed figure:\n{shown}"
+                );
+            }
+        }
+    }
+    assert!(classes.iter().all(|n| *n > 0), "fixture: stores still, gaining, and draining: {classes:?}");
+}
+
+/// Every figure the inspector states is in the exact form: no magnitude
+/// marker, no exponent, no grouping, no trailing zero, and no more fraction
+/// than three places or the fourth significant figure allows — over every
+/// row of every section of a meadow whose stocks carry binary noise. A stock
+/// that is not finite is said in words as beyond reach.
+/// @spec TUI-RENDER-012, TUI-RENDER-018
+#[test]
+fn every_figure_the_inspector_states_is_in_the_exact_form() {
+    let state = ragged_world();
+    let mut checked = 0;
+    for (section, row) in every_row(&state) {
+        let shown = pane_text(&state, &looking_at(section, row.key.clone()), WIDEST, TALL);
+        let body: String = lines_of(&shown).into_iter().skip(1).collect::<Vec<_>>().join("\n");
+        let chars: Vec<char> = format!("{body} ").chars().collect();
+        for w in chars.windows(3) {
+            let marker = w[0].is_ascii_digit() && "KMBTQ".contains(w[1]) && !w[2].is_alphanumeric();
+            let exponent = w[0].is_ascii_digit() && w[1] == 'e' && (w[2].is_ascii_digit() || w[2] == '-' || w[2] == '+');
+            let grouping = w[0].is_ascii_digit() && (w[1] == ',' || w[1] == '_') && w[2].is_ascii_digit();
+            assert!(
+                !(marker || exponent || grouping),
+                "{:?}: {:?} glues a marker, exponent, or grouping to a figure; the inspector's \
+                 figures are exact (TUI-RENDER-012):\n{shown}",
+                row.key,
+                w.iter().collect::<String>()
+            );
+        }
+        assert!(!body.contains("<0.001") && !body.contains(">999Q"), "{:?}: a compact bound in the inspector:\n{shown}", row.key);
+        for t in numbers(&body) {
+            checked += 1;
+            let v: f64 = t.parse().unwrap_or_else(|_| panic!("{:?}: {t:?} is not a figure", row.key));
+            if let Some((_, frac)) = t.split_once('.') {
+                assert!(!frac.ends_with('0'), "{:?}: {t:?} ends its fraction in a zero:\n{shown}", row.key);
+                let places = 3.max(3 - v.log10().floor() as i32) as usize;
+                assert!(
+                    frac.len() <= places,
+                    "{:?}: {t:?} carries more than {places} places — past both three places and \
+                     its fourth significant figure (TUI-RENDER-018):\n{shown}",
+                    row.key
+                );
+            }
+        }
+    }
+    assert!(checked > 0, "fixture: figures were read");
+
+    let mut endless = ragged_world();
+    endless.resources[ResourceId::ALL[0].ix()] = f64::INFINITY;
+    let shown = pane_text(&endless, &looking_at(Section::Meadow, RowKey::Resource(ResourceId::ALL[0])), WIDE, TALL);
+    let w = words(&shown);
+    assert!(
+        flat(&shown).to_lowercase().contains("beyond reach") && !w.contains("inf") && !w.contains("infinity"),
+        "a stock that is not finite is said in words as beyond reach, never printed \
+         (TUI-RENDER-018):\n{shown}"
+    );
+}
+
+/// Every figure the sidebar or a list row abbreviates has its exact form in
+/// the inspector, a row's on that row and the sidebar's on its store's row in
+/// the stores group: a row's owned count and each component of its next cost
+/// (the one-unit price on a Pounce or Trade row), and a store's stock, its cap
+/// where the core reports one, and its net rate. Quantified over every row of
+/// every section and every store.
+/// @spec TUI-RENDER-012
+#[test]
+fn every_abbreviated_figure_has_its_exact_form_on_its_rows_inspector() {
+    let state = ragged_world();
+    let rates = state.net_rates();
+    for (section, row) in every_row(&state) {
+        let shown = pane_text(&state, &looking_at(section, row.key.clone()), WIDEST, TALL);
+        let on_screen = numbers(&shown);
+        let mut owed: Vec<(String, f64)> = Vec::new();
+        match &row.key {
+            RowKey::Content(ContentId::Structure(b), _) => owed.push(("the owned count".into(), state.structures[b.ix()] as f64)),
+            RowKey::Content(ContentId::Rite(r), _) => owed.push(("the owned count".into(), state.rite_counts[r.ix()] as f64)),
+            RowKey::Resource(r) => {
+                owed.push(("the stock".into(), state.stock(*r)));
+                if state.cap(*r).is_finite() {
+                    owed.push(("the cap".into(), state.cap(*r)));
+                }
+                owed.push(("the net rate".into(), rates[r.ix()]));
+            }
+            _ => {}
+        }
+        let cost = stated_next_cost(&state, &row.key).or_else(|| match (&row.key, &row.kind) {
+            (RowKey::Content(..), _) => None,
+            (_, RowKind::Act { command, .. }) => state.unit_price(command).filter(|c| !c.is_empty()),
+            _ => None,
+        });
+        for (r, need) in cost.unwrap_or_default() {
+            owed.push((format!("the {r:?} component of the next cost"), need));
+        }
+        for (what, v) in owed {
+            let form = bare(v);
+            assert!(
+                on_screen.contains(&form),
+                "{section:?} {:?}: {what} ({v:e}) is abbreviated on the row or the sidebar, so its \
+                 exact form {form:?} is owed on this row's inspector (TUI-RENDER-012):\n{shown}",
+                row.key
+            );
+        }
     }
 }
