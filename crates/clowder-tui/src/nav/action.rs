@@ -30,6 +30,11 @@ pub enum Action {
     ObserveSky,
     SpeedUp,
     SpeedDown,
+    /// A lowercase letter outside the global table, in a context where a field
+    /// or full-screen overlay does not hold the keyboard: acts on whichever
+    /// row it is a live mnemonic for, or nothing if it is not one right now.
+    /// @spec TUI-NAV-046
+    Mnemonic(char),
     /// A printable character routed into an open field rather than to its
     /// global binding — which is exactly what stops a digit jumping sections
     /// mid-type. @spec TUI-NAV-037, TUI-NAV-038

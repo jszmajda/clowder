@@ -67,7 +67,7 @@ Why a cursor is the backbone: 53 structures + 59 ideas + 35 refinements cannot b
 
 In both fields every global single-key binding is suspended, which is how digits stop being section-jumps while typing. The palette is a field under this table, not a full-screen overlay: it captures the speed keys and `q` as query text, where the Journal and help keep them live. A field never expires — it waits, the sim ticking beneath it, until `Esc` closes it or an `Enter` the field acts on does: the count prompt's `Enter` always closes it, the palette's only when there is a result to jump to. Walking away mid-type blocks nothing and loses nothing. While a field is open the hint bar shows that field's keys, even over an armed row beneath it, because the field is what `Enter` will reach.
 
-### Per-screen mnemonics (shown in the hint bar; each mirrors a visible row)
+### Per-screen mnemonics (shown in the hint bar; each mirrors a listed row)
 
 | Section | Keys |
 |---|---|
@@ -76,7 +76,15 @@ In both fields every global single-key binding is suspended, which is how digits
 | Friends | `p` deepen the pen-pal with the focused colony |
 | others | none — rows + Enter suffice; letters are spent only where frequency demands |
 
-**Reserved keys that may never become a screen mnemonic:** `h j k l x e o q` and uppercase `X`, plus the digits and `/ < > ? Space Enter Esc Tab Backspace`. (Full hjkl was the player's choice; `h`/`l` cost two letters, but no screen wants them — mnemonics live on `g f r p n`.)
+**What a mnemonic stands for.** A mnemonic (a screen mnemonic: each belongs to one screen) is a lowercase letter that stands for one row listed on its screen — a row the cursor and `Enter` already reach, so the letter gates nothing (TUI-NAV-039). It comes in two kinds. A *fixed* mnemonic stands for one fixed row of its screen: the Meadow's gather, forage, and rummage rows. A *focused-item* mnemonic stands for a row of the item the cursor is on — the focused kitten's promote or Elder row, the focused colony's pen-pal row — an item being the thing a row is about, as the palette counts items (Resolved Edge Cases). On any screen a letter stands for at most one row at a time. A heavy row never carries a mnemonic: an arming belongs to the row under the cursor, whose distinct second `Enter` commits it (TUI-NAV-051), and a letter that armed a row elsewhere would leave that committing press aimed at a different row.
+
+**When a mnemonic is live.** A fixed mnemonic is live while its row is listed on the focused screen. A focused-item mnemonic is live while the cursor is on a row of an item whose rows include the one it stands for — either of a kitten's two rows for `p` and `n`, either of a colony's two rows for the Friends `p`. A mnemonic is bound only while it is live, and only where the global table is: an open field takes its letter as text, and a full-screen overlay suspends it with the other action keys. A letter that is not live is an unbound key, ignored with no footer note (TUI-NAV-042): a note would whisper about a row the player has not reached, or chide a letter pressed off the item it acts on. Every letter the hint bar names is live, so a letter the player is shown always answers; the bar need not name every live letter, and one it leaves unnamed (below) still acts.
+
+**What a mnemonic does.** A live mnemonic performs its row's primary action once, exactly as `Enter` on that row would: the core arbitrates, a refusal is the plain-language footer (TUI-NAV-014), and an owned item's row answers as TUI-NAV-041 has it. It moves neither the cursor nor the focused section, so it is an act, not navigation: the report banner and the layout stand as they were. Held, it acts no more than ten times a second, the pace a held `Enter` keeps, whatever the terminal's key-repeat rate.
+
+**Mnemonics in the hint bar.** Wherever the hint bar shows the focused row's keys — no field, full-screen overlay, or armed row holding it — it names every live mnemonic except one whose row is the focused row, where `Enter` already names that act. Letters rank by how near they sit to the cursor. A focused-item mnemonic is the other act on the item under the cursor — the item `Enter` acts on — so it is named directly after the key that names `Enter`, among that item's own keys, and outlasts the inspector and section keys when width runs short (TUI-NAV-045). A fixed mnemonic acts on a row the cursor is not on and serves a player who already knows the screen, so the fixed mnemonics are named after every other context key, in their rows' list order, just before the help key — the first keys dropped when width runs short. A live letter the bar leaves unnamed, its own row's or one dropped for width, still acts, and the help overlay lists every letter.
+
+**Reserved keys that may never become a mnemonic of either kind:** every key the global table binds — `h j k l i x e o q`, uppercase `X`, the digits, `[ ] + = - / < > ?`, and `Space Enter Esc Tab BackTab Backspace` and the arrows. (Full hjkl was the player's choice; `h`/`l` cost two letters, but no screen wants them — mnemonics live on `g f r p n`.)
 
 **The uppercase tier has one member: `X`.** Mnemonics are lowercase, and no other uppercase letter is bound — an uppercase mnemonic is an unbound key, ignored silently like any other. Caps Lock already turns `x` into `X`; it must not also turn every mnemonic press into a bulk spend the player never asked for. The one key that acts in bulk is the one the hint bar names as bulk.
 
@@ -162,17 +170,17 @@ Deliberately excluded: any "something is affordable now" chip — it would never
 
 ## Discoverability — the first 60 seconds
 
-Cold open: only Meadow exists, one focused row ("Gather catnip"). The hint bar reads, in full:
+Cold open: only Meadow exists, its gather row focused ("Gather catnip") with the forage row beneath it. The hint bar reads, in full:
 
 ```
- ↑↓ choose · Enter do · Space details · Tab next · ? all keys
+ ↑↓ choose · Enter do · Space details · Tab next · f forage · ? all keys
 ```
 
-The only possible actions teach the backbone. As surface grows, the hint bar adapts by context, most-relevant-first, always ending with `? keys`:
+The only possible actions teach the backbone, which leads the line; the one letter after it is the speed layer's first lesson, naming the Meadow action the cursor is not on (gather's own letter goes unnamed while `Enter` names that act). As surface grows, the hint bar adapts by context, most-relevant-first, always ending with `? keys`:
 
 - buildable focused: `Enter build · x amount · X max · Space details`
 - job row focused: `+ assign · - unassign · x amount · X max`
-- kitten focused: `p promote · n name Elder · Space details`
+- a kitten's promote row focused: `Enter do · n name Elder · Space details`
 - armed row: `Enter yes, truly · Esc not today`
 - count prompt: `digits amount · Enter go · Esc never mind`
 - palette: `type to find · Enter go · Esc never mind`
@@ -263,6 +271,9 @@ The shell renders from existing surface except for these read-only additions, wh
 | Modifier substitute | Uppercase as the shift tier (`x`→`X`) | Chord emulation | Shift emits plain printable chars — tmux-safe by construction |
 | Count entry | `x` prompt captures digits; `X` = max | Vim count-prefix (`10Enter`) | Prefix digits collide with section jumps, the higher-value use |
 | Uppercase tier scope | `X` alone; uppercase mnemonics unbound | An uppercase mnemonic as that row's ×max | Caps Lock would turn every mnemonic press into a bulk spend; one bulk key, named in the hint bar, keeps bulk deliberate |
+| A mnemonic's press | Acts on its row in place; the cursor stays | Moving the cursor to the row, then acting | An accelerator's worth is acting without leaving one's place. A move would be navigation, so an act would dismiss the report banner as a side effect, and every press would pull the list out from under the player |
+| A mnemonic that is not live | An unbound key, ignored in silence | A footer note that its row is not here | The hint bar names only live letters, so a letter it names always answers and silence never contradicts what the player was shown; a note would name an action the player has not reached, or chide a letter pressed off the item it acts on |
+| Mnemonics in the hint bar | Every live one but the focused row's own; a focused-item letter beside `Enter`'s key, the fixed letters ranked last | Naming the focused row's letter beside `Enter`; ranking a focused-item letter with the fixed letters, after the backbone keys; ranking the fixed letters ahead of the cursor and section keys | `Enter` already names the focused row's act, and width at 80 columns is scarce. Letters rank by nearness to the cursor: a focused-item letter is the one other act on the item the player chose, so it outlasts the inspector and section keys when width runs short — a cost accepted because such a letter lives only on screens revealed after the cold open, whose bar has already taught those keys, and the help overlay keeps them. A fixed letter acts on a row elsewhere and serves a player who already knows the screen, where the cursor and section keys serve one still learning the backbone, so it is dropped first |
 | `X` on a count-taking row | One call per unit, each passing a count of one, until the core refuses or the cap is reached | One call passing the cap; one call passing a maximum the shell works out from the one-unit price and the stock | The core takes a count whole or rejects it whole, so a call passing the cap is refused outright whenever the stock falls short of it, which is nearly always; a maximum worked out in the shell is affordability judged outside the core, the one arbiter of it. One unit per call stops at the first refusal and reports how many were done, as every `X` run does. Its cost is one journaled event per call, so a long run fills the journal's rolling window with its own entries and pushes older ordinary ones out (milestones are never evicted), the ticker showing only the last; that cost is the one `X` already carries on every repeat-N row, and lifting it needs a core-reported maximum count (Deferred) |
 | Count tags | Three per command: count-taking (Pounce, Trade, DeepNap), repeat-N (Build, Craft, the buys), single (the rest); a count row untagged, its assign repeat-called | Every command not count-taking as repeat-N; buys split by whether their item restacks | ×N and ×max are for a quantity a player plans a spend around — units of a count argument, or copies of a content item; a single command takes neither, and held Enter already repeats it at a pace the player watches. Which items restack is a core rule that changes with state, so a tag split along it would restate that rule in the shell and go stale when it changed; the buy command carries one tag, and the core's per-item ownership report and per-call refusal decide how many copies each item takes |
 | Preview of a buy the core will stop at one | The core's total for the count as typed | Pricing a one-shot at a single copy | Telling a one-shot from a restacking item before the core reports it owned means restating the core's restack rule. The preview then overstates such a count, a clarity cost accepted because nothing is lost to it: each call is all-or-nothing, so nothing past the refusal is spent, and the run's stop names the refusal and how many were bought, so the player learns the item was a one-shot at the moment it matters |

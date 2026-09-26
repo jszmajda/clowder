@@ -1121,6 +1121,491 @@ fn the_cursor_does_not_move_on_action() {
 }
 
 // ---------------------------------------------------------------------------
+// TUI-NAV-046 / TUI-NAV-081 — the per-screen mnemonics
+//
+// A mnemonic is a lowercase letter the global table leaves unbound, standing
+// for one row listed on its screen. These tests drive it as a keypress — the
+// key resolved against the view, then folded — because whether a letter is
+// live depends on the rows current state lists and on the item under the
+// cursor, and a claim about "a letter that is not live is an unbound key"
+// is a claim about the whole path from key to outcome, whichever half of it
+// decides.
+//
+// The oracle below is the design's mnemonic table restated: a fixed
+// mnemonic for each of the Meadow's gather, forage, and rummage rows, live
+// while its row is listed; and the focused-item mnemonics — the focused
+// kitten's promote and Elder rows on the Clowder screen, the focused colony's
+// pen-pal row on the Friends screen — live while the cursor is on a row of
+// that item.
+// ---------------------------------------------------------------------------
+
+/// Every key the global table binds among the printables: the reserved set
+/// no mnemonic may take (Space included). Anything outside it and outside the
+/// live mnemonics is an unbound key.
+const GLOBAL_PRINTABLES: &str = "hjklixeoqX0123456789[]+=-/<>? ";
+
+/// The Meadow's fixed mnemonics, in their rows' list order.
+const FIXED_MNEMONICS: [(char, &str); 3] =
+    [('g', "GatherCatnip"), ('f', "Forage"), ('r', "Rummage")];
+
+/// The mnemonics live in `section` with `focus` under the cursor, each with
+/// the row it stands for — the design's table, as a function of state.
+fn live_mnemonics(
+    state: &GameState,
+    section: Section,
+    focus: Option<&RowKey>,
+) -> Vec<(char, RowKey)> {
+    let listed = rows(state, section);
+    let is_listed = |k: &RowKey| listed.iter().any(|r| &r.key == k);
+    let mut out = Vec::new();
+    match section {
+        Section::Meadow => {
+            for (c, tag) in FIXED_MNEMONICS {
+                let key = RowKey::Fixed(tag);
+                if is_listed(&key) {
+                    out.push((c, key));
+                }
+            }
+        }
+        Section::Clowder => {
+            if let Some(RowKey::Kitten(ix, _)) = focus {
+                for (c, tag) in [('p', "promote"), ('n', "elder")] {
+                    let key = RowKey::Kitten(*ix, tag);
+                    if is_listed(&key) {
+                        out.push((c, key));
+                    }
+                }
+            }
+        }
+        Section::Friends => {
+            if let Some(RowKey::Colony(colony, _)) = focus {
+                let key = RowKey::Colony(*colony, "penpal");
+                if is_listed(&key) {
+                    out.push(('p', key));
+                }
+            }
+        }
+        _ => {}
+    }
+    out
+}
+
+/// Every context a mnemonic can be pressed in, in a state: each revealed
+/// section with each of its selectable rows under the cursor, and with no row
+/// focused at all.
+fn mnemonic_contexts(state: &GameState) -> Vec<(Section, Option<RowKey>)> {
+    let mut out = Vec::new();
+    for section in Section::ALL {
+        let listed = rows(state, section);
+        if listed.is_empty() {
+            continue;
+        }
+        out.push((section, None));
+        for r in listed.into_iter().filter(|r| r.selectable()) {
+            out.push((section, Some(r.key)));
+        }
+    }
+    out
+}
+
+/// A view on `section` with `focus` under the cursor — and an unread report
+/// banner up and the inspector asked for, so "the press is not navigation and
+/// leaves the banner and the layout as they stood" has something to leave.
+fn mnemonic_view(section: Section, focus: Option<RowKey>) -> ViewState {
+    let mut v = ViewState { section: Some(section), ..Default::default() };
+    v.focus[section.index()] = focus;
+    v.reports = vec![PendingReport { entry: 0, dismissed: false }];
+    v.inspector_wanted = true;
+    v
+}
+
+fn footer_text(view: &ViewState) -> Option<String> {
+    view.footer.as_ref().map(|(m, _)| m.clone())
+}
+
+/// Everything the view holds, as text, less the Enter clock and the footer —
+/// the footer is compared on its own, against what Enter on the row says.
+fn observable_but_footer(view: &ViewState) -> String {
+    let mut v = view.clone();
+    v.last_repeat = None;
+    v.footer = None;
+    format!("{v:?}")
+}
+
+/// What Enter on `target`, in `view`'s section, does: the outcome, and the
+/// footer it leaves. The oracle a live mnemonic is held to.
+fn enter_on(view: &ViewState, target: &RowKey, state: &GameState) -> (Outcome, Option<String>) {
+    let mut v = view.clone();
+    let section = v.section.expect("a mnemonic view has a section");
+    v.focus[section.index()] = Some(target.clone());
+    let out = press(key(KeyCode::Enter), &mut v, state);
+    (out, footer_text(&v))
+}
+
+fn describe(section: Section, focus: &Option<RowKey>) -> String {
+    match focus {
+        Some(k) => format!("on the {} screen with {k:?} focused", section.title()),
+        None => format!("on the {} screen with no row focused", section.title()),
+    }
+}
+
+/// The fixture the mnemonic sweeps stand on: a meadow where every mnemonic in
+/// the table has its row listed somewhere, and none of them is heavy.
+fn assert_mnemonic_fixture(state: &GameState) {
+    let meadow = rows(state, Section::Meadow);
+    for (c, tag) in FIXED_MNEMONICS {
+        assert!(
+            meadow.iter().any(|r| r.key == RowKey::Fixed(tag)),
+            "fixture: the Meadow row `{c}` stands for is not listed"
+        );
+    }
+    assert!(
+        rows(state, Section::Clowder).iter().any(|r| matches!(r.key, RowKey::Kitten(..))),
+        "fixture: no kitten rows are listed on the Clowder screen"
+    );
+    assert!(
+        rows(state, Section::Friends).iter().any(|r| matches!(r.key, RowKey::Colony(..))),
+        "fixture: no colony rows are listed on the Friends screen"
+    );
+    for (section, focus) in mnemonic_contexts(state) {
+        for (c, target) in live_mnemonics(state, section, focus.as_ref()) {
+            let row = rows(state, section)
+                .into_iter()
+                .find(|r| r.key == target)
+                .expect("a live mnemonic's row is listed by construction");
+            assert!(
+                !row.heavy,
+                "fixture: `{c}` {} stands for the heavy row {target:?}; a heavy row never \
+                 carries a mnemonic",
+                describe(section, &focus)
+            );
+        }
+    }
+}
+
+/// The whole of the binding rule, swept over every printable key in every
+/// context a revealed screen offers, in a meadow with every mnemonic's row
+/// listed and in a new one where the rummage row is not yet: a key outside the
+/// global table acts exactly where it is a live mnemonic — a lowercase letter
+/// standing for one row listed on its screen, a fixed one while its row is
+/// listed, a focused-item one while the cursor is on a row of its item — and
+/// everywhere else it is an unbound key, ignored with nothing changed and no
+/// footer note. An uppercase letter is never a mnemonic, so Caps Lock never
+/// turns one into anything.
+///
+/// @spec TUI-NAV-046
+#[test]
+fn a_letter_acts_exactly_where_it_is_a_live_mnemonic_and_is_silent_everywhere_else() {
+    let mut live_seen = 0u32;
+    for (label, state) in [("a meadow far along", rich()), ("a new meadow", fresh())] {
+        if label == "a meadow far along" {
+            assert_mnemonic_fixture(&state);
+        } else {
+            assert!(
+                !rows(&state, Section::Meadow).iter().any(|r| r.key == RowKey::Fixed("Rummage")),
+                "fixture: a new meadow does not yet list the rummage row"
+            );
+        }
+
+        for (section, focus) in mnemonic_contexts(&state) {
+            let live = live_mnemonics(&state, section, focus.as_ref());
+            for c in (' '..='~').filter(|c| !GLOBAL_PRINTABLES.contains(*c)) {
+                let before = mnemonic_view(section, focus.clone());
+                let mut view = before.clone();
+                let out = press_char(c, &mut view, &state);
+                let whr = format!("in {label}, {}", describe(section, &focus));
+
+                match live.iter().find(|(m, _)| *m == c) {
+                    Some((_, target)) => {
+                        live_seen += 1;
+                        let (enter_out, enter_footer) = enter_on(&before, target, &state);
+                        assert_eq!(
+                            out, enter_out,
+                            "{whr}, the live mnemonic {c:?} answered {out:?}, but Enter on the \
+                             row it stands for, {target:?}, answers {enter_out:?}; a mnemonic \
+                             performs its row's primary action exactly as Enter on that row would"
+                        );
+                        assert_eq!(
+                            footer_text(&view),
+                            enter_footer,
+                            "{whr}, the live mnemonic {c:?} left a different footer than Enter on \
+                             {target:?} does"
+                        );
+                    }
+                    None => {
+                        assert_eq!(
+                            out,
+                            Outcome::Handled,
+                            "{whr}, {c:?} is no live mnemonic and yet told the core {out:?}"
+                        );
+                        assert_eq!(
+                            footer_text(&view),
+                            None,
+                            "{whr}, {c:?} is no live mnemonic and yet earned a footer note; a \
+                             letter that is not live is an unbound key, ignored in silence"
+                        );
+                        assert_eq!(
+                            observable_but_footer(&view),
+                            observable_but_footer(&before),
+                            "{whr}, {c:?} is no live mnemonic and yet changed the view"
+                        );
+                    }
+                }
+            }
+        }
+    }
+    assert!(live_seen > 0, "fixture: the sweep never met a live mnemonic");
+}
+
+/// A mnemonic is bound only where the global key table is. An open field takes
+/// its letter as text — the palette into its query, the count prompt as a
+/// non-digit it ignores — and a full-screen overlay suspends it with the other
+/// action keys. Quantified over every live mnemonic in every context of a
+/// meadow where every one of them has its row, under each of the four things
+/// that can hold the keyboard.
+///
+/// @spec TUI-NAV-046
+#[test]
+fn a_mnemonic_never_acts_while_a_field_or_full_screen_overlay_holds_the_keyboard() {
+    let state = rich();
+    assert_mnemonic_fixture(&state);
+    let (prompt_row, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
+
+    type Holder = (&'static str, fn(&mut ViewState, RowKey));
+    let holders: [Holder; 4] = [
+        ("the palette", |v, _| v.overlay = Some(Overlay::Palette { query: String::new(), selected: 0 })),
+        ("the count prompt", |v, row| {
+            v.prompt = Some(clowder_tui::nav::CountPrompt { digits: String::new(), row: Some(row) })
+        }),
+        ("the Journal", |v, _| v.overlay = Some(Overlay::Journal { anchor: 0 })),
+        ("the help overlay", |v, _| v.overlay = Some(Overlay::Help)),
+    ];
+
+    let mut checked = 0u32;
+    for (section, focus) in mnemonic_contexts(&state) {
+        for (c, target) in live_mnemonics(&state, section, focus.as_ref()) {
+            for (holder, open) in holders {
+                let mut before = mnemonic_view(section, focus.clone());
+                open(&mut before, prompt_row.clone());
+                let mut view = before.clone();
+                let out = press_char(c, &mut view, &state);
+                let whr = format!("{} with {holder} open", describe(section, &focus));
+
+                assert_eq!(
+                    out,
+                    Outcome::Handled,
+                    "{whr}, the mnemonic {c:?} (for {target:?}) told the core {out:?}; a \
+                     mnemonic is bound only where the global key table applies"
+                );
+                let mut expected = before.clone();
+                if let Some(Overlay::Palette { query, .. }) = expected.overlay.as_mut() {
+                    query.push(c);
+                }
+                assert_eq!(
+                    observable_but_footer(&view),
+                    observable_but_footer(&expected),
+                    "{whr}, the mnemonic {c:?} did something other than what {holder} makes of \
+                     the letter: the palette takes it as query text, and the count prompt and \
+                     a full-screen overlay leave it unbound"
+                );
+                assert_eq!(footer_text(&view), None, "{whr}, the letter {c:?} earned a footer note");
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked > 0, "fixture: no live mnemonic was checked");
+}
+
+/// A mnemonic is an act, not navigation: it moves neither the cursor nor the
+/// focused section, so the report banner stays up, the inspector stays asked
+/// for, and nothing about where the player stands changes — the view after
+/// the press is the view before it, but for what Enter on its row would have
+/// left in the footer. Quantified over every live mnemonic in every context.
+///
+/// @spec TUI-NAV-081
+#[test]
+fn a_mnemonic_press_acts_in_place_and_leaves_cursor_section_banner_and_layout_as_they_stood() {
+    let state = rich();
+    assert_mnemonic_fixture(&state);
+
+    let mut checked = 0u32;
+    for (section, focus) in mnemonic_contexts(&state) {
+        for (c, target) in live_mnemonics(&state, section, focus.as_ref()) {
+            let before = mnemonic_view(section, focus.clone());
+            let mut view = before.clone();
+            let out = press_char(c, &mut view, &state);
+            let whr = describe(section, &focus);
+
+            let (enter_out, _) = enter_on(&before, &target, &state);
+            assert_eq!(
+                out, enter_out,
+                "{whr}, the mnemonic {c:?} answered {out:?} where Enter on {target:?} answers \
+                 {enter_out:?}"
+            );
+            assert!(
+                commands_of(&out).is_some(),
+                "fixture: {whr}, Enter on {target:?} asks the core for nothing, so this press \
+                 proves nothing about acting in place"
+            );
+            assert_eq!(view.section, Some(section), "{whr}, the mnemonic {c:?} changed the focused section");
+            assert_eq!(
+                view.focus, before.focus,
+                "{whr}, the mnemonic {c:?} moved the cursor; a mnemonic acts on its row in place"
+            );
+            assert_eq!(
+                view.reports, before.reports,
+                "{whr}, the mnemonic {c:?} dismissed the report banner; the press is an act, not \
+                 navigation"
+            );
+            assert_eq!(
+                view.inspector_wanted, before.inspector_wanted,
+                "{whr}, the mnemonic {c:?} changed the layout"
+            );
+            assert_eq!(
+                observable_but_footer(&view),
+                observable_but_footer(&before),
+                "{whr}, the mnemonic {c:?} changed the view beyond acting on {target:?}"
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "fixture: no live mnemonic was checked");
+}
+
+/// One context per mnemonic in the table: each fixed letter with the cursor on
+/// a row that is not its own, and each focused-item letter with the cursor on
+/// its item's other row.
+fn one_context_per_mnemonic(state: &GameState) -> Vec<(char, Section, RowKey, RowKey)> {
+    let (build, _) = find_row(state, Section::Meadow, |c| matches!(c, Command::Build(_)));
+    let mut out: Vec<(char, Section, RowKey, RowKey)> = FIXED_MNEMONICS
+        .iter()
+        .map(|(c, tag)| (*c, Section::Meadow, build.clone(), RowKey::Fixed(tag)))
+        .collect();
+    out.push(('p', Section::Clowder, RowKey::Kitten(1, "elder"), RowKey::Kitten(1, "promote")));
+    out.push(('n', Section::Clowder, RowKey::Kitten(1, "promote"), RowKey::Kitten(1, "elder")));
+    let colony = rows(state, Section::Friends)
+        .into_iter()
+        .find_map(|r| match r.key {
+            RowKey::Colony(c, _) => Some(c),
+            _ => None,
+        })
+        .expect("fixture: a colony is listed on the Friends screen");
+    out.push(('p', Section::Friends, RowKey::Colony(colony, "trade"), RowKey::Colony(colony, "penpal")));
+    for (c, section, focus, target) in &out {
+        assert_eq!(
+            live_mnemonics(state, *section, Some(focus)).iter().find(|(m, _)| m == c).map(|(_, t)| t),
+            Some(target),
+            "fixture: `{c}` is not live for {target:?} with {focus:?} focused"
+        );
+    }
+    out
+}
+
+/// Hold a mnemonic for a second, one press every `pace` (or as fast as the
+/// loop runs), and return the instants it acted at.
+fn hold_mnemonic(
+    c: char,
+    section: Section,
+    focus: &RowKey,
+    target: &RowKey,
+    pace: Option<Duration>,
+    state: &GameState,
+) -> (u32, Vec<Instant>) {
+    let mut view = focused(section, focus.clone());
+    let (primary, _) = enter_on(&view, target, state);
+    let primary = commands_of(&primary).expect("fixture: Enter on the mnemonic's row asks for a command");
+    let start = Instant::now();
+    let mut presses = 0u32;
+    let mut fired = Vec::new();
+    while start.elapsed() < Duration::from_secs(1) {
+        presses += 1;
+        if would_fire(&press_char(c, &mut view, state), primary) {
+            fired.push(Instant::now());
+        }
+        if let Some(p) = pace {
+            std::thread::sleep(p);
+        }
+    }
+    (presses, fired)
+}
+
+fn assert_no_faster_than_ten_a_second(fired: &[Instant], what: &str) {
+    assert!(
+        fired.len() >= 2,
+        "{what}: a held mnemonic acted {} times in a second; held, it must still repeat, as a \
+         held Enter does",
+        fired.len()
+    );
+    assert!(
+        fired.len() <= 11,
+        "{what}: a held mnemonic acted {} times in a second; it acts no more than ten times a \
+         second",
+        fired.len()
+    );
+    for pair in fired.windows(2) {
+        let gap = pair[1].duration_since(pair[0]);
+        assert!(
+            gap >= Duration::from_millis(95),
+            "{what}: a held mnemonic acted twice {gap:?} apart; it acts no more than ten times a \
+             second, the pace a held Enter keeps"
+        );
+    }
+}
+
+/// Held or auto-repeating, a mnemonic acts no more than ten times a second —
+/// the pace a held Enter keeps — for every mnemonic in the table, under a
+/// stream of presses far denser than any terminal's key repeat.
+///
+/// @spec TUI-NAV-081
+#[test]
+fn a_held_mnemonic_acts_no_more_than_ten_times_a_second() {
+    let state = rich();
+    assert_mnemonic_fixture(&state);
+    for (c, section, focus, target) in one_context_per_mnemonic(&state) {
+        let (presses, fired) = hold_mnemonic(c, section, &focus, &target, None, &state);
+        assert!(
+            presses > 100,
+            "fixture: only {presses} presses in a second — the stream must outrun any terminal's \
+             key repeat for the limit to be under test"
+        );
+        assert_no_faster_than_ten_a_second(
+            &fired,
+            &format!("`{c}` on the {} screen for {target:?}", section.title()),
+        );
+    }
+}
+
+/// The same pace whatever the terminal's key-repeat rate: a fast repeat and a
+/// slower one both land at no more than ten acts a second, and a repeat
+/// slower than that acts on every press.
+///
+/// @spec TUI-NAV-081
+#[test]
+fn a_held_mnemonics_pace_does_not_depend_on_the_key_repeat_rate() {
+    let state = rich();
+    assert_mnemonic_fixture(&state);
+    let (c, section, focus, target) = one_context_per_mnemonic(&state)
+        .into_iter()
+        .next()
+        .expect("fixture: the table has a mnemonic");
+    for rate_ms in [15u64, 40] {
+        let (presses, fired) =
+            hold_mnemonic(c, section, &focus, &target, Some(Duration::from_millis(rate_ms)), &state);
+        assert!(presses > 11, "fixture: only {presses} presses at one per {rate_ms}ms");
+        assert_no_faster_than_ten_a_second(&fired, &format!("`{c}` repeating every {rate_ms}ms"));
+    }
+    let (presses, fired) =
+        hold_mnemonic(c, section, &focus, &target, Some(Duration::from_millis(150)), &state);
+    assert_eq!(
+        fired.len() as u32,
+        presses,
+        "`{c}` repeating every 150ms acted {} times from {presses} presses; a repeat slower than \
+         ten a second is slower than the cap, so every press acts",
+        fired.len()
+    );
+}
+
+// ---------------------------------------------------------------------------
 // TUI-NAV-011 / TUI-NAV-012 — ×N and ×max
 // ---------------------------------------------------------------------------
 

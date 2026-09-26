@@ -212,6 +212,16 @@ pub fn help(f: &mut Frame, area: Rect) {
         ("Esc", "Close the topmost transient"),
         ("Ctrl-C", "Emergency quit (saves first)"),
     ];
+    // The design's per-screen mnemonic table (TUI-NAV-046), listed here in
+    // full: a mnemonic is live only on its own screen, so it never earns a
+    // permanent line in the hint bar, and the help overlay is the only place
+    // every one of them is named at once, whatever screen the player is on.
+    // @spec TUI-NAV-025, TUI-NAV-046
+    const MNEMONICS: &[(&str, &str)] = &[
+        ("Meadow", "g gather / f forage / r rummage"),
+        ("Clowder", "p promote focused kitten / n appoint focused kitten Elder"),
+        ("Friends", "p deepen pen-pal with focused colony"),
+    ];
     const LEGEND: &[(&str, &str)] = &[
         ("\u{25cf}", "affordable now"),
         ("\u{25d0}", "partially affordable"),
@@ -229,6 +239,10 @@ pub fn help(f: &mut Frame, area: Rect) {
     let mut lines: Vec<Line<'static>> = Vec::new();
     for (key, action) in KEYS {
         lines.push(Line::raw(format!("{key:<14} {action}")));
+    }
+    lines.push(Line::raw(String::new()));
+    for (section, keys) in MNEMONICS {
+        lines.push(Line::raw(format!("{section:<10} {keys}")));
     }
     lines.push(Line::raw(String::new()));
     for (glyph, meaning) in LEGEND {

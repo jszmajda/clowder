@@ -7,6 +7,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::action::Action;
+use super::mnemonics;
 use super::section::Section;
 use super::view::{Overlay, ViewState};
 
@@ -101,8 +102,15 @@ pub fn resolve(key: KeyEvent, view: &ViewState) -> Action {
         KeyCode::Char('>') => Action::SpeedUp,
         KeyCode::Char('?') => Action::OpenHelp,
         KeyCode::Char('q') => Action::Quit,
+        // Everything left is either a digit's section jump, a letter the
+        // design spends on *this* screen's mnemonics — live or not; whether
+        // its row is actually listed is `update`'s to read from game state —
+        // or an unbound key. @spec TUI-NAV-046
         KeyCode::Char(c) => match Section::from_digit(c) {
             Some(section) => Action::SectionJump(section),
+            None if view.section.is_some_and(|s| mnemonics::section_letters(s).contains(&c)) => {
+                Action::Mnemonic(c)
+            }
             None => Action::Ignored,
         },
         _ => Action::Ignored,

@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 use clowder_core::{Command, GameState, LockReason};
 
 use super::action::{Action, CountSemantics};
+use super::mnemonics;
 use super::palette;
 use super::rows::{revealed_sections, rows, Row, RowKey, RowKind};
 use super::section::Section;
@@ -93,6 +94,7 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
         Action::MaxAffordable => handle_max_affordable(view, state),
         Action::Increment => handle_increment_decrement(view, state, true),
         Action::Decrement => handle_increment_decrement(view, state, false),
+        Action::Mnemonic(c) => handle_mnemonic(view, state, c),
         Action::Type(c) => handle_type(view, c),
         Action::Erase => handle_erase(view),
         Action::Dismiss => handle_dismiss(view),
@@ -366,8 +368,15 @@ fn handle_activate(view: &mut ViewState, state: &GameState) -> Outcome {
     let Some(row) = current_row(view, state) else {
         return Outcome::Handled;
     };
+    activate_row(view, state, &row)
+}
 
-    if owned_one_shot(state, &row) {
+/// Acts on `row` exactly as Enter on it would: the owned check, then dispatch
+/// by row kind, arming rather than firing a heavy one. Shared by Enter's own
+/// activation of the cursor's row and by a live mnemonic, which reaches the
+/// same row without moving the cursor there. @spec TUI-NAV-002, TUI-NAV-046
+fn activate_row(view: &mut ViewState, state: &GameState, row: &Row) -> Outcome {
+    if owned_one_shot(state, row) {
         set_footer(view, "You already have that.");
         return Outcome::Handled;
     }
@@ -383,6 +392,27 @@ fn handle_activate(view: &mut ViewState, state: &GameState) -> Outcome {
         RowKind::Count { increment, .. } => fire_once(view, *increment),
         RowKind::Display | RowKind::Group => Outcome::Handled,
     }
+}
+
+/// A live mnemonic performs its row's action exactly as Enter would: it looks
+/// up the row the letter stands for — never the row under the cursor — so
+/// the press moves neither the cursor nor the focused section. Bound only
+/// where `resolve` reaches the global table at all, so a field or full-screen
+/// overlay never sees this action; an unbound or not-currently-live letter is
+/// silently ignored, the same as any other key with no meaning here.
+/// @spec TUI-NAV-046, TUI-NAV-081
+fn handle_mnemonic(view: &mut ViewState, state: &GameState, c: char) -> Outcome {
+    let Some(section) = view.section else {
+        return Outcome::Handled;
+    };
+    let focus = view.focus[section.index()].clone();
+    let Some(target) = mnemonics::target(state, section, focus.as_ref(), c) else {
+        return Outcome::Handled;
+    };
+    let Some(row) = by_key(view, state, &target) else {
+        return Outcome::Handled;
+    };
+    activate_row(view, state, &row)
 }
 
 /// Fire an ordinary row's command once, rate-limited to ~10/s so a held key

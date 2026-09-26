@@ -8,6 +8,7 @@
 use clowder_core::{GameState, Location, MoodTier, ResourceId};
 use ratatui::{layout::Rect, text::Line, widgets::Paragraph, Frame};
 
+use crate::nav::mnemonics::{self, MnemonicKind};
 use crate::nav::rows::{rows, Row, RowKey, RowKind};
 use crate::nav::{Overlay, Section, ViewState};
 use crate::render::fmt;
@@ -254,12 +255,12 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
             std::time::Instant::now() < a.expires_at && crate::nav::row_still_listed(state, &a.key)
         });
 
-    let items: Vec<&str> = if view.prompt.is_some() {
-        vec!["digits amount", "Enter go", "Esc never mind"]
+    let items: Vec<String> = if view.prompt.is_some() {
+        strs(&["digits amount", "Enter go", "Esc never mind"])
     } else if matches!(view.overlay, Some(Overlay::Palette { .. })) {
-        vec!["type to find", "Enter jump", "Esc close"]
+        strs(&["type to find", "Enter jump", "Esc close"])
     } else if armed_and_live {
-        vec!["Enter yes, truly", "Esc not today"]
+        strs(&["Enter yes, truly", "Esc not today"])
     } else {
         // x opens the count prompt, and X runs to the maximum affordable,
         // exactly on the rows TUI-NAV-011 and TUI-NAV-012 name: a row tagged
@@ -268,7 +269,7 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
         // the core reports the row's item as already the player's.
         // @spec TUI-NAV-023, TUI-NAV-074
         let plain = vec!["↑↓ choose", "Enter do", "Space details", "Tab next"];
-        match focused_row(state, view) {
+        let base: Vec<&str> = match focused_row(state, view) {
             Some(row) => {
                 let owned = match &row.key {
                     RowKey::Content(id, _) => state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours),
@@ -304,13 +305,22 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
                 }
             }
             None => plain,
-        }
+        };
+
+        // Every live mnemonic but the focused row's own — TUI-NAV-082. A
+        // focused-item letter is the other act on the item Enter acts on, so
+        // it takes the slot right after the key that names Enter; a fixed
+        // letter acts on a row the cursor is not on, so the fixed letters are
+        // named last, in their rows' list order, just before the help key.
+        let mut items: Vec<String> = strs(&base);
+        add_mnemonics(&mut items, state, view);
+        items
     };
 
     let width = area.width as usize;
     let mut line = HELP.to_string();
     for take in (0..=items.len()).rev() {
-        let mut parts: Vec<&str> = items[..take].to_vec();
+        let mut parts: Vec<&str> = items[..take].iter().map(String::as_str).collect();
         parts.push(HELP);
         let candidate = parts.join(" · ");
         if candidate.chars().count() <= width {
@@ -319,4 +329,64 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
         }
     }
     draw_line(f, area, line);
+}
+
+fn strs(items: &[&str]) -> Vec<String> {
+    items.iter().map(|s| s.to_string()).collect()
+}
+
+/// The word a mnemonic's item names it by, matching the design's own hint-bar
+/// phrasing for each row it can stand for.
+fn mnemonic_label(key: &RowKey) -> &'static str {
+    match key {
+        RowKey::Fixed("GatherCatnip") => "gather",
+        RowKey::Fixed("Forage") => "forage",
+        RowKey::Fixed("Rummage") => "rummage",
+        RowKey::Kitten(_, "promote") => "promote",
+        RowKey::Kitten(_, "elder") => "Elder",
+        RowKey::Colony(_, "penpal") => "pen-pal",
+        _ => "",
+    }
+}
+
+/// Every live mnemonic on the focused screen but the one whose row is the
+/// focused row — Enter already names that act. A focused-item letter is
+/// inserted directly after the item naming Enter, among that item's own
+/// keys; the fixed letters are appended last, in their rows' list order,
+/// after every other context key. @spec TUI-NAV-082
+fn add_mnemonics(items: &mut Vec<String>, state: &GameState, view: &ViewState) {
+    // A full-screen overlay suspends every mnemonic the same way it suspends
+    // the rest of the global table (`keys::resolve` leaves every letter
+    // unbound there), so the bar must not name one as live. @spec TUI-NAV-046
+    if view.overlay.is_some() {
+        return;
+    }
+    let Some(section) = view.section else { return };
+    let focus = view.focus[section.index()].clone();
+
+    let mut fixed: Vec<String> = Vec::new();
+    let mut focused_item: Vec<String> = Vec::new();
+    for (c, target, kind) in mnemonics::live(state, section, focus.as_ref()) {
+        if Some(&target) == focus.as_ref() {
+            continue;
+        }
+        let entry = format!("{c} {}", mnemonic_label(&target));
+        match kind {
+            MnemonicKind::Fixed => fixed.push(entry),
+            MnemonicKind::FocusedItem => focused_item.push(entry),
+        }
+    }
+
+    if !focused_item.is_empty() {
+        let after_enter = items.iter().position(|i| i.split_whitespace().next() == Some("Enter"));
+        match after_enter {
+            Some(at) => {
+                for (offset, entry) in focused_item.into_iter().enumerate() {
+                    items.insert(at + 1 + offset, entry);
+                }
+            }
+            None => items.extend(focused_item),
+        }
+    }
+    items.extend(fixed);
 }

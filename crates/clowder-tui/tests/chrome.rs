@@ -1436,6 +1436,252 @@ fn the_hint_bar_names_x_and_x_max_exactly_beside_the_rows_they_act_on() {
     assert!(owned_rows > 0, "fixture: no row the core reports as the player's is listed");
 }
 
+// ---------------------------------------------------------------------------
+// TUI-NAV-082 — the mnemonics the hint bar names
+// ---------------------------------------------------------------------------
+
+/// The Meadow's fixed mnemonics, in their rows' list order — the design's
+/// table.
+const FIXED_MNEMONICS: [(char, &str); 3] =
+    [('g', "GatherCatnip"), ('f', "Forage"), ('r', "Rummage")];
+
+/// The letters the global key table binds. A single lowercase letter on the
+/// hint bar that is not one of these can only be naming a mnemonic.
+const GLOBAL_LETTERS: [char; 9] = ['h', 'j', 'k', 'l', 'i', 'x', 'e', 'o', 'q'];
+
+/// Whether a mnemonic is fixed (stands for one fixed row of its screen) or
+/// stands for a row of the item under the cursor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MnemonicKind {
+    Fixed,
+    FocusedItem,
+}
+
+/// The mnemonics live on `section` with `focus` under the cursor, each with
+/// the row it stands for and its kind, fixed ones in list order — the design's
+/// table as a function of state.
+fn live_mnemonics(
+    state: &GameState,
+    section: Section,
+    focus: Option<&RowKey>,
+) -> Vec<(char, RowKey, MnemonicKind)> {
+    let listed = rows(state, section);
+    let is_listed = |k: &RowKey| listed.iter().any(|r| &r.key == k);
+    let mut out = Vec::new();
+    match section {
+        Section::Meadow => {
+            for (c, tag) in FIXED_MNEMONICS {
+                let key = RowKey::Fixed(tag);
+                if is_listed(&key) {
+                    out.push((c, key, MnemonicKind::Fixed));
+                }
+            }
+        }
+        Section::Clowder => {
+            if let Some(RowKey::Kitten(ix, _)) = focus {
+                for (c, tag) in [('p', "promote"), ('n', "elder")] {
+                    let key = RowKey::Kitten(*ix, tag);
+                    if is_listed(&key) {
+                        out.push((c, key, MnemonicKind::FocusedItem));
+                    }
+                }
+            }
+        }
+        Section::Friends => {
+            if let Some(RowKey::Colony(colony, _)) = focus {
+                let key = RowKey::Colony(*colony, "penpal");
+                if is_listed(&key) {
+                    out.push(('p', key, MnemonicKind::FocusedItem));
+                }
+            }
+        }
+        _ => {}
+    }
+    out
+}
+
+/// The keys a line names, in order and with repeats kept: the probe keys, and
+/// every single lowercase letter standing as a token of its own.
+fn named_keys(line: &str) -> Vec<String> {
+    tokens(line)
+        .into_iter()
+        .filter(|t| {
+            PROBE_KEYS.contains(&t.as_str())
+                || (t.chars().count() == 1 && t.chars().all(|c| c.is_ascii_lowercase()))
+        })
+        .collect()
+}
+
+/// Wherever the hint bar shows the focused row's keys, it names every live
+/// mnemonic but the one whose row is the focused row, and no other letter as
+/// a mnemonic; a focused-item letter comes directly after the key that names
+/// Enter, and the fixed letters come in their rows' list order after every
+/// other context key and just before the help key. Quantified over every
+/// selectable row of every revealed screen — and each screen with no row
+/// focused — in a meadow where every mnemonic's row is listed and in a new
+/// meadow where the rummage row is not yet, with nothing open or armed to take
+/// the bar, at a width where nothing need be dropped.
+///
+/// @spec TUI-NAV-082
+#[test]
+fn the_hint_bar_names_every_live_mnemonic_but_the_focused_rows_own_in_its_place() {
+    let far = every_section_revealed();
+    let fresh = GameState::new(3);
+    assert!(
+        rows(&far, Section::Meadow).iter().any(|r| r.key == RowKey::Fixed("Rummage")),
+        "fixture: the meadow far along lists the rummage row"
+    );
+    assert!(
+        !rows(&fresh, Section::Meadow).iter().any(|r| r.key == RowKey::Fixed("Rummage")),
+        "fixture: a new meadow does not yet list the rummage row"
+    );
+
+    let (mut fixed_named, mut item_named, mut own_unnamed) = (0u32, 0u32, 0u32);
+    for (label, state) in [("a meadow far along", &far), ("a new meadow", &fresh)] {
+        for section in Section::ALL {
+            let listed = rows(state, section);
+            if listed.is_empty() {
+                continue;
+            }
+            let mut contexts: Vec<Option<RowKey>> = vec![None];
+            contexts.extend(listed.iter().filter(|r| r.selectable()).map(|r| Some(r.key.clone())));
+
+            for focus in contexts {
+                let view = match &focus {
+                    Some(k) => focus_on(state, section, k.clone()),
+                    None => calm_view(state),
+                };
+                let view = ViewState { section: Some(section), ..view };
+                let line = hint_line(state, &view, WIDE_W);
+                let keys = named_keys(&line);
+                let whr = match &focus {
+                    Some(k) => format!("in {label}, on the {} screen with {k:?} focused", section.title()),
+                    None => format!("in {label}, on the {} screen with no row focused", section.title()),
+                };
+
+                let live = live_mnemonics(state, section, focus.as_ref());
+                let expected: Vec<(char, MnemonicKind)> = live
+                    .iter()
+                    .filter(|(_, target, _)| Some(target) != focus.as_ref())
+                    .map(|(c, _, kind)| (*c, *kind))
+                    .collect();
+                own_unnamed += (live.len() - expected.len()) as u32;
+
+                // Exactly the expected letters, each once, and no other letter
+                // outside the global table.
+                let mut named_letters: Vec<char> = keys
+                    .iter()
+                    .filter_map(|k| k.chars().next().filter(|_| k.chars().count() == 1))
+                    .filter(|c| c.is_ascii_lowercase() && !GLOBAL_LETTERS.contains(c))
+                    .collect();
+                named_letters.sort_unstable();
+                let mut want: Vec<char> = expected.iter().map(|(c, _)| *c).collect();
+                want.sort_unstable();
+                assert_eq!(
+                    named_letters, want,
+                    "{whr}, the hint bar names the mnemonic letters {named_letters:?}, but the \
+                     live mnemonics whose row is not the focused row are {want:?}; the bar names \
+                     every one of those and no other letter as a mnemonic.\nhint bar: {line:?}"
+                );
+
+                // A focused-item letter sits directly after the key naming Enter.
+                for (c, _) in expected.iter().filter(|(_, k)| *k == MnemonicKind::FocusedItem) {
+                    let at = keys.iter().position(|k| k == "Enter").unwrap_or_else(|| {
+                        panic!("fixture: {whr}, the hint bar names no Enter key: {line:?}")
+                    });
+                    assert_eq!(
+                        keys.get(at + 1).map(String::as_str),
+                        Some(c.to_string().as_str()),
+                        "{whr}, the focused-item mnemonic `{c}` is not named directly after the \
+                         key that names Enter; it is the other act on the item Enter acts on.\n\
+                         keys in order: {keys:?}\nhint bar: {line:?}"
+                    );
+                    item_named += 1;
+                }
+
+                // The fixed letters, in list order, are the last keys before
+                // the help key, after every other context key.
+                let fixed: Vec<String> = expected
+                    .iter()
+                    .filter(|(_, k)| *k == MnemonicKind::Fixed)
+                    .map(|(c, _)| c.to_string())
+                    .collect();
+                if !fixed.is_empty() {
+                    assert_eq!(
+                        keys.last().map(String::as_str),
+                        Some("?"),
+                        "{whr}, the hint bar does not end with the help key: {line:?}"
+                    );
+                    let tail_start = keys.len().checked_sub(1 + fixed.len()).unwrap_or_else(|| {
+                        panic!("{whr}, the hint bar names too few keys to hold {fixed:?}: {line:?}")
+                    });
+                    assert_eq!(
+                        &keys[tail_start..keys.len() - 1],
+                        &fixed[..],
+                        "{whr}, the fixed mnemonics are not named in their rows' list order after \
+                         every other context key and just before the help key.\nkeys in order: \
+                         {keys:?}\nhint bar: {line:?}"
+                    );
+                    fixed_named += fixed.len() as u32;
+                }
+            }
+        }
+    }
+
+    assert!(fixed_named > 0, "fixture: no fixed mnemonic was ever expected on the bar");
+    assert!(item_named > 0, "fixture: no focused-item mnemonic was ever expected on the bar");
+    assert!(own_unnamed > 0, "fixture: no context focused a mnemonic's own row");
+
+    // A full-screen overlay suspends every mnemonic the same way it suspends
+    // the rest of the global table, so no letter it would otherwise name is
+    // live, and the bar must not name one: `keys::resolve` leaves every
+    // mnemonic letter unbound while an overlay is open.
+    let meadow_focus = first_row_where(&far, Section::Meadow, "the gather row", |r| {
+        r.key == RowKey::Fixed("GatherCatnip")
+    });
+    assert!(
+        !live_mnemonics(&far, Section::Meadow, Some(&meadow_focus)).is_empty(),
+        "fixture: the Meadow has a live mnemonic other than gather's own"
+    );
+    for overlay in [Overlay::Journal { anchor: 0 }, Overlay::Help] {
+        let mut view = focus_on(&far, Section::Meadow, meadow_focus.clone());
+        view.overlay = Some(overlay);
+        let line = hint_line(&far, &view, WIDE_W);
+        let keys = named_keys(&line);
+        let named_letters: Vec<char> = keys
+            .iter()
+            .filter_map(|k| k.chars().next().filter(|_| k.chars().count() == 1))
+            .filter(|c| c.is_ascii_lowercase() && !GLOBAL_LETTERS.contains(c))
+            .collect();
+        assert!(
+            named_letters.is_empty(),
+            "with a full-screen overlay open, the hint bar named the mnemonic letters \
+             {named_letters:?}, but `keys::resolve` leaves every mnemonic unbound while an \
+             overlay holds the keyboard.\nhint bar: {line:?}"
+        );
+    }
+}
+
+/// The cold open's line, stated in the design in full: the backbone leads,
+/// and the one letter after it names the Meadow action the cursor is not on —
+/// gather's own letter unnamed while Enter names that act — before the help
+/// key, at the supported floor.
+///
+/// @spec TUI-NAV-082, TUI-NAV-024
+#[test]
+fn the_cold_open_names_the_other_fixed_letter_after_the_backbone_and_not_the_focused_rows_own() {
+    let state = GameState::new(3);
+    let view = focus_on(&state, Section::Meadow, RowKey::Fixed("GatherCatnip"));
+    let line = hint_line(&state, &view, FLOOR_W);
+    let keys = named_keys(&line);
+    assert_eq!(
+        keys,
+        ["↑↓", "Enter", "Space", "Tab", "f", "?"].map(String::from).to_vec(),
+        "the cold-open hint bar names the backbone, then the forage mnemonic, then the help key — \
+         and not the gather mnemonic, whose row is the focused row.\nhint bar: {line:?}"
+    );
+}
+
 /// An open field holds the keyboard, so the hint bar speaks for the field and
 /// nothing else: the same line whatever lies beneath it — any kind of focused
 /// row, or an armed heavy row whose own `Enter yes, truly` would otherwise be
@@ -1816,6 +2062,12 @@ const LEGEND_GLYPHS: [char; 9] = ['●', '◐', '○', '✓', '▸', '★', '◦
 const HELP_WORDS: [&str; 4] = ["Enter", "Space", "Tab", "Esc"];
 const HELP_KEYS: [&str; 9] = ["?", "/", "x", "X", "q", "e", "o", "<", ">"];
 
+/// Every letter the design's per-screen mnemonic table spends (TUI-NAV-046) —
+/// live only on its own screen, so the hint bar never carries a permanent
+/// line for it and the help overlay is the one place a player can find them
+/// all, whatever screen they are on.
+const MNEMONIC_LETTERS: [char; 5] = ['g', 'f', 'r', 'p', 'n'];
+
 /// `?` is the whole manual: the complete key map, and the legend for every
 /// glyph the chrome and the rows put on screen. The hint bar shows what is live
 /// here; this shows what exists at all, which is why nothing may be reachable
@@ -1853,6 +2105,15 @@ fn the_help_overlay_is_the_complete_key_map_and_glyph_legend() {
             has_key(&text, key),
             "the help overlay does not list the `{key}` key. `?` is the complete key map — there \
              is no other manual for it to be in."
+        );
+    }
+    for letter in MNEMONIC_LETTERS {
+        assert!(
+            has_key(&text, &letter.to_string()),
+            "the help overlay does not list the mnemonic letter `{letter}`. A mnemonic is live \
+             only on its own screen, so a letter the hint bar dropped for width — or never shows \
+             because the player is elsewhere — must still be found here: `?` is the one place \
+             every mnemonic is named at once."
         );
     }
 
