@@ -756,7 +756,6 @@ fn the_inspector_names_the_item_in_full() {
 fn later_row_label(key: &RowKey) -> Option<&'static str> {
     match key {
         RowKey::Content(ContentId::Craft(_), "tinker") => Some("tinkerers"),
-        RowKey::Kitten(_, "elder") => Some("appoint Elder"),
         RowKey::Colony(_, "penpal") => Some("send a pen-pal"),
         _ => None,
     }
@@ -808,7 +807,7 @@ fn inspector_lines_in_frame(state: &GameState, view: &ViewState, w: u16, h: u16)
 fn the_inspector_states_a_later_rows_label_beneath_the_name_at_every_width() {
     let mut state = world(true);
     state.discovered = clowder_core::ColonyId::ALL.into_iter().collect();
-    let labels = ["tinkerers", "appoint Elder", "send a pen-pal"];
+    let labels = ["tinkerers", "send a pen-pal"];
 
     let mut labelled = std::collections::BTreeMap::<&str, usize>::new();
     for w in [FLOOR_W, 90, PANE_BREAKPOINT - 1, PANE_BREAKPOINT, CAP_BREAKPOINT, WIDE, WIDEST] {
