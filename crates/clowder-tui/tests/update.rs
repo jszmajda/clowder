@@ -1141,8 +1141,10 @@ fn the_cursor_does_not_move_on_action() {
 
 /// Every key the global table binds among the printables: the reserved set
 /// no mnemonic may take (Space included). Anything outside it and outside the
-/// live mnemonics is an unbound key.
-const GLOBAL_PRINTABLES: &str = "hjklixeoqX0123456789[]+=-/<>? ";
+/// live mnemonics is an unbound key. `n` is reserved here too, though not a
+/// mnemonic (TUI-NAV-046): it is the row-bound key TUI-NAV-094 states, whose
+/// own tests cover it in full.
+const GLOBAL_PRINTABLES: &str = "hjklixeoqnX0123456789[]+=-/<>? ";
 
 /// The Meadow's fixed mnemonics, in their rows' list order.
 const FIXED_MNEMONICS: [(char, &str); 3] =
@@ -1168,12 +1170,13 @@ fn live_mnemonics(
             }
         }
         Section::Clowder => {
-            if let Some(RowKey::Kitten(ix, _)) = focus {
-                for (c, tag) in [('p', "promote"), ('n', "elder")] {
-                    let key = RowKey::Kitten(*ix, tag);
-                    if is_listed(&key) {
-                        out.push((c, key));
-                    }
+            // A kitten is one row (TUI-NAV-093); `p` stands for that very
+            // row. `n` is bound there too, but as the row-bound key
+            // TUI-NAV-094 states, not as a mnemonic (TUI-NAV-046) — so it is
+            // never in this list.
+            if let Some(key @ RowKey::Kitten(..)) = focus {
+                if is_listed(key) {
+                    out.push(('p', key.clone()));
                 }
             }
         }
@@ -1481,8 +1484,10 @@ fn one_context_per_mnemonic(state: &GameState) -> Vec<(char, Section, RowKey, Ro
         .iter()
         .map(|(c, tag)| (*c, Section::Meadow, build.clone(), RowKey::Fixed(tag)))
         .collect();
-    out.push(('p', Section::Clowder, RowKey::Kitten(1, "elder"), RowKey::Kitten(1, "promote")));
-    out.push(('n', Section::Clowder, RowKey::Kitten(1, "promote"), RowKey::Kitten(1, "elder")));
+    // A kitten is one row (TUI-NAV-093): its own `p` is always live only on
+    // its own row, so there is no other row of the same item to focus it
+    // from, and `n` is not a mnemonic at all (TUI-NAV-046, TUI-NAV-094) — so
+    // neither belongs in this table.
     let colony = rows(state, Section::Friends)
         .into_iter()
         .find_map(|r| match r.key {
@@ -1603,6 +1608,323 @@ fn a_held_mnemonics_pace_does_not_depend_on_the_key_repeat_rate() {
          ten a second is slower than the cap, so every press acts",
         fired.len()
     );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-093 / TUI-NAV-094 — a kitten's one row, and its row-bound key
+//
+// A kitten is one row in the Clowder section: its Enter promotes it, the
+// Clowder `p` stands for that same row, and appointing the kitten Elder is
+// taken from that row by `n` alone — a key bound to the row without standing
+// for a row of its own. These tests find a kitten's row by the kitten it is
+// about (`RowKey::Kitten(ix, _)`), never by a tag, so they hold whatever the
+// row's identity is spelled as.
+//
+// The core opens the command gate of AppointElder whenever the roster is not
+// empty (SIM-ENG-045), so every listed kitten row stands under an open gate;
+// no reachable meadow lists a kitten row with that gate shut. The sweeps below
+// still read the gate per row rather than assuming it, so a later gate that
+// can shut on a listed kitten is judged by the same claim.
+// ---------------------------------------------------------------------------
+
+/// Every kitten row the Clowder section lists, with the roster position of the
+/// kitten it is about, in list order.
+fn kitten_rows(state: &GameState) -> Vec<(usize, RowKey)> {
+    rows(state, Section::Clowder)
+        .into_iter()
+        .filter_map(|r| match r.key {
+            RowKey::Kitten(ix, _) => Some((ix, r.key)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A meadow a few kittens old with nobody yet appointed Elder, beside `rich`'s
+/// long roster with an Elder standing — so the sweeps meet both.
+fn small_clowder() -> GameState {
+    let mut s = fresh();
+    s.kittens = ["Biscuit", "Clover", "Dumpling"].iter().map(|n| kitten(n, None)).collect();
+    s.roster_high_water = s.kittens.len();
+    s.elder = None;
+    s
+}
+
+/// Every kitten row's Enter promotes the kitten the row is about, and the
+/// Clowder `p` — a focused-item mnemonic standing for that very row — is live
+/// on it and answers exactly as that Enter does, in place. Quantified over
+/// every kitten row of a long roster with an Elder standing and of a small one
+/// with none.
+///
+/// @spec TUI-NAV-093
+#[test]
+fn every_kitten_rows_enter_promotes_it_and_the_clowder_p_answers_as_that_enter_does() {
+    let mut checked = 0u32;
+    for (label, state) in [("a meadow far along", rich()), ("a small clowder", small_clowder())] {
+        let kittens = kitten_rows(&state);
+        assert!(!kittens.is_empty(), "fixture: {label} lists kitten rows");
+        for (ix, key) in kittens {
+            let before = mnemonic_view(Section::Clowder, Some(key.clone()));
+            let whr = format!("in {label}, with the kitten row {key:?} focused");
+
+            let mut on_enter = before.clone();
+            let entered = press(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &mut on_enter, &state);
+            assert_eq!(
+                entered,
+                Outcome::Apply(Command::Promote(ix)),
+                "{whr}, Enter answered {entered:?}; a kitten's one row promotes the kitten it is \
+                 about"
+            );
+
+            let mut on_p = before.clone();
+            let pressed = press_char('p', &mut on_p, &state);
+            assert_eq!(
+                pressed, entered,
+                "{whr}, `p` answered {pressed:?} where the row's Enter answers {entered:?}; the \
+                 Clowder `p` stands for the kitten's own row and is live on it"
+            );
+            assert_eq!(footer_text(&on_p), None, "{whr}, `p` left a footer note");
+            assert_eq!(
+                observable_but_footer(&on_p),
+                observable_but_footer(&before),
+                "{whr}, `p` changed the view; a mnemonic acts on its row in place"
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "fixture: no kitten row was checked");
+}
+
+/// While the cursor is on a kitten's row with the gate of AppointElder open for
+/// its kitten and nothing holding the keyboard, `n` issues AppointElder for
+/// that kitten, once, through the same path Enter's commands take — so the
+/// core arbitrates and a refusal comes back as the footer — and moves neither
+/// the cursor nor the focused section, leaving the report banner up and the
+/// inspector call, which the narrow layout answers with its swap, as it stood.
+/// Quantified over every kitten row of a long roster with an Elder standing
+/// and of a small one with none.
+///
+/// @spec TUI-NAV-094
+#[test]
+fn n_on_every_kitten_row_appoints_that_kitten_once_and_in_place() {
+    let mut checked = 0u32;
+    for (label, state) in [("a meadow far along", rich()), ("a small clowder", small_clowder())] {
+        let kittens = kitten_rows(&state);
+        assert!(!kittens.is_empty(), "fixture: {label} lists kitten rows");
+        for (ix, key) in kittens {
+            assert!(
+                state.command_gate_open(&Command::AppointElder(ix)),
+                "fixture: in {label} the core reports the gate of AppointElder for kitten {ix} \
+                 open"
+            );
+            let before = mnemonic_view(Section::Clowder, Some(key.clone()));
+            let mut view = before.clone();
+            let out = press_char('n', &mut view, &state);
+            let whr = format!("in {label}, with the kitten row {key:?} focused");
+
+            assert_eq!(
+                out,
+                Outcome::Apply(Command::AppointElder(ix)),
+                "{whr}, `n` answered {out:?}; it issues AppointElder for the kitten the row is \
+                 about, once, for the core to arbitrate"
+            );
+            assert_eq!(view.section, Some(Section::Clowder), "{whr}, `n` changed the focused section");
+            assert_eq!(view.focus, before.focus, "{whr}, `n` moved the cursor; it is an act, not navigation");
+            assert_eq!(
+                view.reports, before.reports,
+                "{whr}, `n` dismissed the report banner; the press is an act, not navigation"
+            );
+            assert_eq!(
+                view.inspector_wanted, before.inspector_wanted,
+                "{whr}, `n` changed the inspector call, and with it the narrow layout's swap"
+            );
+            assert_eq!(footer_text(&view), None, "{whr}, `n` left a footer note of its own");
+            assert_eq!(
+                observable_but_footer(&view),
+                observable_but_footer(&before),
+                "{whr}, `n` changed the view beyond issuing its command"
+            );
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "fixture: no kitten row was checked");
+}
+
+/// Hold `n` on `key` for a second, one press every `pace` (or as fast as the
+/// loop runs), and return how many presses there were and the instants the
+/// press asked the core for AppointElder.
+fn hold_n(state: &GameState, ix: usize, key: &RowKey, pace: Option<Duration>) -> (u32, Vec<Instant>) {
+    let mut view = focused(Section::Clowder, key.clone());
+    let start = Instant::now();
+    let mut presses = 0u32;
+    let mut fired = Vec::new();
+    while start.elapsed() < Duration::from_secs(1) {
+        presses += 1;
+        if would_fire(&press_char('n', &mut view, state), Command::AppointElder(ix)) {
+            fired.push(Instant::now());
+        }
+        if let Some(p) = pace {
+            std::thread::sleep(p);
+        }
+    }
+    (presses, fired)
+}
+
+/// Held or auto-repeating, `n` acts no more than ten times a second, whatever
+/// the terminal's key-repeat rate: a stream far denser than any key repeat, a
+/// fast repeat, and a slower one all land at ten or fewer, and a repeat slower
+/// than the cap acts on every press.
+///
+/// @spec TUI-NAV-094
+#[test]
+fn a_held_n_acts_no_more_than_ten_times_a_second_whatever_the_repeat_rate() {
+    let state = small_clowder();
+    let (ix, key) = kitten_rows(&state).into_iter().next().expect("fixture: a kitten row is listed");
+
+    for pace in [None, Some(Duration::from_millis(15)), Some(Duration::from_millis(40))] {
+        let (presses, fired) = hold_n(&state, ix, &key, pace);
+        let what = format!("`n` held on {key:?}, one press every {pace:?}");
+        assert!(presses > 11, "fixture: {what} made only {presses} presses in a second");
+        assert!(
+            fired.len() >= 2,
+            "{what} acted {} times in a second; held, it still repeats, as a held Enter does",
+            fired.len()
+        );
+        assert!(
+            fired.len() <= 11,
+            "{what} acted {} times in a second; it acts no more than ten times a second",
+            fired.len()
+        );
+        for pair in fired.windows(2) {
+            let gap = pair[1].duration_since(pair[0]);
+            assert!(
+                gap >= Duration::from_millis(95),
+                "{what} acted twice {gap:?} apart; it acts no more than ten times a second"
+            );
+        }
+    }
+
+    let (presses, fired) = hold_n(&state, ix, &key, Some(Duration::from_millis(150)));
+    assert_eq!(
+        fired.len() as u32,
+        presses,
+        "`n` repeating every 150ms acted {} times from {presses} presses; a repeat slower than \
+         ten a second is slower than the cap, so every press acts",
+        fired.len()
+    );
+}
+
+/// `n` is bound only where the global key table is. An open field takes it as
+/// its own — the palette as query text, the count prompt as a non-digit it
+/// ignores — and a full-screen overlay suspends it with the other action keys,
+/// so under each of the four things that can hold the keyboard it asks the
+/// core for nothing. Quantified over every kitten row.
+///
+/// @spec TUI-NAV-094
+#[test]
+fn n_never_acts_while_a_field_or_full_screen_overlay_holds_the_keyboard() {
+    let state = small_clowder();
+    let kittens = kitten_rows(&state);
+    assert!(!kittens.is_empty(), "fixture: kitten rows are listed");
+
+    type Holder = (&'static str, fn(&mut ViewState, RowKey));
+    let holders: [Holder; 4] = [
+        ("the palette", |v, _| v.overlay = Some(Overlay::Palette { query: String::new(), selected: 0 })),
+        ("the count prompt", |v, row| {
+            v.prompt = Some(clowder_tui::nav::CountPrompt { digits: String::new(), row: Some(row) })
+        }),
+        ("the Journal", |v, _| v.overlay = Some(Overlay::Journal { anchor: 0 })),
+        ("the help overlay", |v, _| v.overlay = Some(Overlay::Help)),
+    ];
+
+    for (ix, key) in kittens {
+        for (holder, open) in holders {
+            let mut before = mnemonic_view(Section::Clowder, Some(key.clone()));
+            open(&mut before, key.clone());
+            let mut view = before.clone();
+            let out = press_char('n', &mut view, &state);
+            let whr = format!("with the kitten row {key:?} focused and {holder} open");
+
+            assert!(
+                !would_fire(&out, Command::AppointElder(ix)),
+                "{whr}, `n` issued AppointElder; the key is bound only where the global table is"
+            );
+            assert_eq!(out, Outcome::Handled, "{whr}, `n` told the core {out:?}");
+            let mut expected = before.clone();
+            if let Some(Overlay::Palette { query, .. }) = expected.overlay.as_mut() {
+                query.push('n');
+            }
+            assert_eq!(
+                observable_but_footer(&view),
+                observable_but_footer(&expected),
+                "{whr}, `n` did something other than what {holder} makes of the letter"
+            );
+            assert_eq!(footer_text(&view), None, "{whr}, `n` earned a footer note");
+        }
+    }
+}
+
+/// Everywhere but a kitten's row under an open gate, `n` is an unbound key:
+/// ignored, asking the core for nothing, changing nothing, and leaving no
+/// footer note. Quantified over every screen that lists rows, with each of its
+/// selectable rows focused and with none, in a meadow far along and a new one;
+/// over the Clowder section of a new meadow, which lists nothing, remembering
+/// a kitten row or nothing; and over a Sky that lists nothing.
+///
+/// @spec TUI-NAV-094
+#[test]
+fn n_is_an_unbound_key_everywhere_but_a_kitten_row_whose_gate_is_open() {
+    let mut contexts: Vec<(String, GameState, ViewState)> = Vec::new();
+    for (label, state) in [("a meadow far along", rich()), ("a new meadow", fresh())] {
+        for (section, focus) in mnemonic_contexts(&state) {
+            let view = mnemonic_view(section, focus.clone());
+            contexts.push((format!("in {label}, {}", describe(section, &focus)), state.clone(), view));
+        }
+    }
+    let new_meadow = fresh();
+    assert!(rows(&new_meadow, Section::Clowder).is_empty(), "fixture: a new meadow's Clowder lists nothing");
+    for memory in [None, Some(RowKey::Kitten(0, "")), Some(RowKey::Kitten(0, "promote"))] {
+        let view = mnemonic_view(Section::Clowder, memory.clone());
+        contexts.push((
+            format!("in a new meadow, on an empty Clowder remembering {memory:?}"),
+            new_meadow.clone(),
+            view,
+        ));
+    }
+    let sky = sky_emptied();
+    for (what, view) in standing_in_an_empty_sky() {
+        contexts.push((format!("in an empty Sky, {what}"), sky.clone(), view));
+    }
+
+    let (mut silent, mut live) = (0u32, 0u32);
+    for (whr, state, before) in contexts {
+        let section = before.section.expect("every context has a section");
+        let focus = before.focus[section.index()].clone();
+        let on_live_kitten_row = section == Section::Clowder
+            && kitten_rows(&state).iter().any(|(ix, k)| {
+                Some(k) == focus.as_ref() && state.command_gate_open(&Command::AppointElder(*ix))
+            });
+        if on_live_kitten_row {
+            live += 1;
+            continue;
+        }
+        let mut view = before.clone();
+        let out = press_char('n', &mut view, &state);
+        assert_eq!(out, Outcome::Handled, "{whr}, `n` is unbound here and yet told the core {out:?}");
+        assert_eq!(
+            footer_text(&view),
+            None,
+            "{whr}, `n` is unbound here and yet earned a footer note; an unbound key is ignored \
+             in silence"
+        );
+        assert_eq!(
+            observable_but_footer(&view),
+            observable_but_footer(&before),
+            "{whr}, `n` is unbound here and yet changed the view"
+        );
+        silent += 1;
+    }
+    assert!(silent > 0, "fixture: no context where `n` is unbound was checked");
+    assert!(live > 0, "fixture: the sweep met no kitten row, so it told nothing apart");
 }
 
 // ---------------------------------------------------------------------------

@@ -270,6 +270,13 @@ fn global_bindings() -> Vec<(KeyEvent, Action, &'static str)> {
         (ch('?'), Action::OpenHelp, "? opens the help overlay"),
         (ch('q'), Action::Quit, "q quits immediately; the shell saves first"),
         (ctrl_c(), Action::Quit, "Ctrl-C is the emergency quit"),
+        (
+            ch('n'),
+            Action::AppointElder,
+            "n is the row-bound key TUI-NAV-094 states, not a mnemonic (TUI-NAV-046): bound \
+             everywhere, live only on a kitten's row under an open gate, and unbound everywhere \
+             else — `update` decides that part, not this map",
+        ),
     ];
     for s in Section::ALL {
         out.push((
@@ -316,8 +323,9 @@ const NO_MNEMONIC_SECTIONS: [Section; 7] = [
 /// The letters the design spends on per-screen mnemonics, on the screens that
 /// spend them. Not asserted as bindings here — they are `update`'s to aim at a
 /// row — but excluded from the "unbound is silent" sweep so that this file does
-/// not forbid them.
-const MNEMONIC_LETTERS: [char; 5] = ['g', 'f', 'r', 'p', 'n'];
+/// not forbid them. `n` is not among them: it is a global binding
+/// (`global_bindings` above), not a mnemonic (TUI-NAV-046).
+const MNEMONIC_LETTERS: [char; 4] = ['g', 'f', 'r', 'p'];
 
 // ---------------------------------------------------------------------------
 // TUI-NAV-001 — the admissible set, and its closure

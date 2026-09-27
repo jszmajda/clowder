@@ -378,6 +378,12 @@ fn every_sectioned_command_is_reachable_as_a_row_in_its_section() {
     let state = maximal();
 
     for (name, section) in sectioned_commands() {
+        // AppointElder is this table's one exception (TUI-NAV-039): it is
+        // reachable only by the row-bound `n` key TUI-NAV-094 states, never by
+        // a row of its own; TUI-NAV-094's own tests cover its reachability.
+        if name == "AppointElder" {
+            continue;
+        }
         let offered = command_names(&rows(&state, section));
         assert!(
             offered.contains(name),
@@ -1326,9 +1332,7 @@ fn every_row_the_core_reports_no_lock_reason_for_wears_ready_whatever_the_stock(
                 RowKey::Content(..) => continue,
                 RowKey::Fixed("Pounce") => "the fixed count-taking row priced per unit",
                 RowKey::Fixed(_) => "a fixed action row",
-                RowKey::Kitten(_, "promote") => "a kitten's promote row",
-                RowKey::Kitten(_, "elder") => "a kitten's Elder row",
-                RowKey::Kitten(..) => "a kitten row of another shape",
+                RowKey::Kitten(..) => "a kitten's row",
                 RowKey::Colony(_, "trade") => "a colony's trade row",
                 RowKey::Colony(_, "penpal") => "a colony's pen-pal row",
                 RowKey::Colony(..) => "a colony row of another shape",
@@ -1365,8 +1369,7 @@ fn every_row_the_core_reports_no_lock_reason_for_wears_ready_whatever_the_stock(
         "a tinkerer row with every stock emptied",
         "a fixed action row",
         "the fixed count-taking row priced per unit",
-        "a kitten's promote row",
-        "a kitten's Elder row",
+        "a kitten's row",
         "a colony's trade row",
         "a colony's pen-pal row",
         "a site's row",
@@ -1516,7 +1519,6 @@ fn every_content_row_is_actionable() {
 fn act_label(key: &RowKey) -> Option<&'static str> {
     match key {
         RowKey::Content(ContentId::Craft(_), "tinker") => Some("tinkerers"),
-        RowKey::Kitten(_, "elder") => Some("appoint Elder"),
         RowKey::Colony(_, "penpal") => Some("send a pen-pal"),
         _ => None,
     }
@@ -1642,7 +1644,7 @@ fn an_items_first_listed_row_draws_its_name_and_each_later_row_its_own_label() {
     let crafts_revealed =
         CraftId::ALL.iter().filter(|c| state.availability(ContentId::Craft(**c)) != Availability::Hidden).count();
     assert!(crafts_revealed > 1, "fixture: several recipes are listed");
-    assert!(state.kittens.len() > 1 && state.discovered.len() > 1, "fixture: several kittens and colonies");
+    assert!(state.discovered.len() > 1, "fixture: several colonies");
 
     for (w, h) in [(200u16, 150u16), (80, 150)] {
         let mut multi_items: HashMap<&'static str, usize> = HashMap::new();
@@ -1662,7 +1664,6 @@ fn an_items_first_listed_row_draws_its_name_and_each_later_row_its_own_label() {
             for (item, item_rows) in items.iter().filter(|(_, rs)| rs.len() > 1) {
                 let kind = match &item_rows[0].0.key {
                     RowKey::Content(ContentId::Craft(_), _) => "recipe",
-                    RowKey::Kitten(..) => "kitten",
                     RowKey::Colony(..) => "colony",
                     _ => "other",
                 };
@@ -1728,10 +1729,8 @@ fn an_items_first_listed_row_draws_its_name_and_each_later_row_its_own_label() {
         }
 
         let craft_rows = multi_items.get("recipe").copied().unwrap_or(0);
-        let kitten_rows = multi_items.get("kitten").copied().unwrap_or(0);
         let colony_rows = multi_items.get("colony").copied().unwrap_or(0);
         assert_eq!(craft_rows, crafts_revealed, "at {w}x{h}: every listed recipe carries several rows");
-        assert_eq!(kitten_rows, state.kittens.len(), "at {w}x{h}: every kitten carries several rows");
         let colonies = rows(&state, Section::Friends)
             .iter()
             .filter_map(|r| match r.key {
@@ -1745,8 +1744,136 @@ fn an_items_first_listed_row_draws_its_name_and_each_later_row_its_own_label() {
         assert_eq!(
             multi_items.get("other").copied().unwrap_or(0),
             0,
-            "at {w}x{h}: an item carries several rows beyond the three kinds TUI-NAV-089 names"
+            "at {w}x{h}: an item carries several rows beyond the two kinds TUI-NAV-089 names"
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-093 — a kitten's one row
+// ---------------------------------------------------------------------------
+
+/// Each kitten in the roster is exactly one row, in the Clowder section and in
+/// no other, whose Enter promotes that kitten; no row anywhere takes
+/// AppointElder as its Enter or as a `+`/`-`, since that act is the row-bound
+/// key's alone. Quantified over every kitten of a long roster with every
+/// surface open, the same roster with nothing affordable, and a short roster.
+///
+/// @spec TUI-NAV-093
+#[test]
+fn each_kitten_is_exactly_one_clowder_row_whose_enter_promotes_it() {
+    for (label, state) in [
+        ("a maximal meadow", maximal()),
+        ("everything unlocked, nothing affordable", poor_but_unlocked()),
+        ("a short roster", every_multi_row_item_listed()),
+    ] {
+        assert!(state.kittens.len() > 1, "fixture: {label} has several kittens");
+        let mut per_kitten: HashMap<usize, Vec<(Section, Row)>> = HashMap::new();
+        for (section, row) in all_rows(&state) {
+            if let RowKey::Kitten(ix, _) = row.key {
+                per_kitten.entry(ix).or_default().push((section, row.clone()));
+            }
+            let takes_elder = match &row.kind {
+                RowKind::Act { command, .. } => matches!(command, Command::AppointElder(_)),
+                RowKind::Count { increment, decrement } => {
+                    matches!(increment, Command::AppointElder(_))
+                        || matches!(decrement, Command::AppointElder(_))
+                }
+                RowKind::Display | RowKind::Group => false,
+            };
+            assert!(
+                !takes_elder,
+                "in {label}, the {} row {:?} takes AppointElder; that act is taken only by the \
+                 row-bound key on a kitten's row, never as a row of its own",
+                section.title(),
+                row.key
+            );
+        }
+
+        for ix in 0..state.kittens.len() {
+            let listed = per_kitten.remove(&ix).unwrap_or_default();
+            assert_eq!(
+                listed.len(),
+                1,
+                "in {label}, kitten {ix} is listed as {} rows ({:?}); each kitten is exactly one \
+                 row",
+                listed.len(),
+                listed.iter().map(|(s, r)| (s.title(), r.key.clone())).collect::<Vec<_>>()
+            );
+            let (section, row) = &listed[0];
+            assert_eq!(*section, Section::Clowder, "in {label}, kitten {ix}'s row is not in the Clowder section");
+            match &row.kind {
+                RowKind::Act { command, .. } => assert_eq!(
+                    *command,
+                    Command::Promote(ix),
+                    "in {label}, kitten {ix}'s one row fires {command:?}; its Enter promotes that \
+                     kitten"
+                ),
+                other => panic!("in {label}, kitten {ix}'s one row is {other:?}; its Enter promotes that kitten"),
+            }
+            assert!(!row.heavy, "in {label}, kitten {ix}'s row is heavy; a kitten's row never is");
+        }
+        assert!(
+            per_kitten.is_empty(),
+            "in {label}, rows are listed for kittens not in the roster: {:?}",
+            per_kitten.keys().collect::<Vec<_>>()
+        );
+    }
+}
+
+/// A kitten's row is drawn with the kitten's name — the whole of it, followed
+/// at most by the row-bound key's own `(n: Elder)` hint — and with no label in
+/// the name's place, and no list shows one kitten's name on two rows.
+/// Quantified over every kitten of a short, distinctly named roster, over
+/// every section's list, in both the wide and the narrow layout.
+///
+/// @spec TUI-NAV-093
+#[test]
+fn a_kittens_row_is_drawn_with_its_name_and_no_list_shows_a_kitten_twice() {
+    let state = every_multi_row_item_listed();
+    let names: Vec<String> = state.kittens.iter().map(|k| k.name.clone()).collect();
+    assert!(names.len() > 1, "fixture: several kittens");
+
+    for (w, h) in [(200u16, 150u16), (80, 150)] {
+        let mut shown: HashMap<String, Vec<String>> = HashMap::new();
+        for section in Section::ALL {
+            for (row, field) in drawn_name_fields(&state, section, w, h) {
+                if !row.selectable() {
+                    continue;
+                }
+                let bare = field.strip_suffix("(n: Elder)").map(str::trim_end).unwrap_or(&field);
+                for name in &names {
+                    if reads_as(bare, name) {
+                        shown.entry(name.clone()).or_default().push(format!("{} {:?}", section.title(), row.key));
+                    }
+                }
+                let RowKey::Kitten(ix, _) = row.key else { continue };
+                let name = &state.kittens[ix].name;
+                let whr = format!("at {w}x{h}, kitten {ix}'s row {:?}", row.key);
+                let rest = field.strip_prefix(name.as_str()).unwrap_or_else(|| {
+                    panic!(
+                        "{whr} draws {field:?} in its name column; a kitten's one row is drawn \
+                         with the kitten's name {name:?} and no label"
+                    )
+                });
+                assert!(
+                    rest.trim().is_empty() || rest.trim() == "(n: Elder)",
+                    "{whr} draws {field:?}: after the kitten's name it carries {rest:?}, but a \
+                     kitten's row carries no label — only, where it is drawn, the `(n: Elder)` hint"
+                );
+            }
+        }
+        for name in &names {
+            let on = shown.get(name).cloned().unwrap_or_default();
+            assert_eq!(
+                on.len(),
+                1,
+                "at {w}x{h}, the kitten {name:?} is shown on {} rows ({on:?}); no list shows one \
+                 kitten twice",
+                on.len()
+            );
+            assert!(on[0].starts_with("Clowder"), "at {w}x{h}, the kitten {name:?} is shown outside the Clowder list: {on:?}");
+        }
     }
 }
 

@@ -299,7 +299,13 @@ fn typed_numbers(state: &GameState, section: Section, row: &Row, digits: &str) -
 /// A count-alone preview: the count is on screen, and nothing else the count
 /// added is a number.
 fn assert_count_alone(state: &GameState, section: Section, row: &Row, what: &str) {
-    const N: &str = "37";
+    // A kitten is one row now (TUI-NAV-093), not two, so a fixture roster that
+    // used to run too deep for `MEADOW_MOVE_MIN_KITTENS + 9` kittens to fit
+    // the frame's viewport at `assert_count_alone`'s test height now often
+    // does — and a kitten is named `kitten-{i}`, so a marker equal to any
+    // roster index risks reading the same as a kitten's own name on screen.
+    // 823 sits well past the roster this fixture ever grows to.
+    const N: &str = "823";
     let baseline = numbers(&frame_text(state, &prompt_on(section, row, "", state)));
     assert!(
         !baseline.contains(N),

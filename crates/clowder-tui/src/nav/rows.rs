@@ -81,7 +81,6 @@ impl Row {
 pub fn later_row_label(key: &RowKey) -> Option<&'static str> {
     match key {
         RowKey::Content(ContentId::Craft(_), "tinker") => Some("tinkerers"),
-        RowKey::Kitten(_, "elder") => Some("appoint Elder"),
         RowKey::Colony(_, "penpal") => Some("send a pen-pal"),
         _ => None,
     }
@@ -181,15 +180,14 @@ fn clowder_rows(state: &GameState) -> Vec<Row> {
             });
         }
     }
+    // Each kitten is exactly one row, drawn with its name and no label; its
+    // Enter promotes it. AppointElder is never a row of its own — it is taken
+    // only by this row's own row-bound `n` key (TUI-NAV-094).
+    // @spec TUI-NAV-093
     for (ix, _k) in state.kittens.iter().enumerate() {
         out.push(Row {
-            key: RowKey::Kitten(ix, "promote"),
+            key: RowKey::Kitten(ix, ""),
             kind: act(Command::Promote(ix), CountSemantics::Single),
-            heavy: false,
-        });
-        out.push(Row {
-            key: RowKey::Kitten(ix, "elder"),
-            kind: act(Command::AppointElder(ix), CountSemantics::Single),
             heavy: false,
         });
     }

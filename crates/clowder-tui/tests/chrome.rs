@@ -3702,8 +3702,11 @@ const FIXED_MNEMONICS: [(char, &str); 3] =
     [('g', "GatherCatnip"), ('f', "Forage"), ('r', "Rummage")];
 
 /// The letters the global key table binds. A single lowercase letter on the
-/// hint bar that is not one of these can only be naming a mnemonic.
-const GLOBAL_LETTERS: [char; 9] = ['h', 'j', 'k', 'l', 'i', 'x', 'e', 'o', 'q'];
+/// hint bar that is not one of these can only be naming a mnemonic — `n` is
+/// one of these, not a mnemonic: TUI-NAV-046 carves it out as the one letter
+/// the global table binds to a kitten's row without standing for a row of its
+/// own (TUI-NAV-094), and TUI-NAV-082/096 name it on the bar by that rule.
+const GLOBAL_LETTERS: [char; 10] = ['h', 'j', 'k', 'l', 'i', 'x', 'e', 'o', 'q', 'n'];
 
 /// Whether a mnemonic is fixed (stands for one fixed row of its screen) or
 /// stands for a row of the item under the cursor.
@@ -3734,12 +3737,13 @@ fn live_mnemonics(
             }
         }
         Section::Clowder => {
-            if let Some(RowKey::Kitten(ix, _)) = focus {
-                for (c, tag) in [('p', "promote"), ('n', "elder")] {
-                    let key = RowKey::Kitten(*ix, tag);
-                    if is_listed(&key) {
-                        out.push((c, key, MnemonicKind::FocusedItem));
-                    }
+            // A kitten is one row (TUI-NAV-093); `p` stands for that very
+            // row. `n`, the row-bound key TUI-NAV-094 states, is not a
+            // mnemonic under this table's rule (TUI-NAV-046) and so is never
+            // in this list.
+            if let Some(key @ RowKey::Kitten(..)) = focus {
+                if is_listed(key) {
+                    out.push(('p', key.clone(), MnemonicKind::FocusedItem));
                 }
             }
         }
@@ -3785,7 +3789,6 @@ fn hint_entries(line: &str) -> Vec<String> {
 fn later_row_label(key: &RowKey) -> Option<&'static str> {
     match key {
         RowKey::Content(ContentId::Craft(_), "tinker") => Some("tinkerers"),
-        RowKey::Kitten(_, "elder") => Some("appoint Elder"),
         RowKey::Colony(_, "penpal") => Some("send a pen-pal"),
         _ => None,
     }
@@ -3872,8 +3875,8 @@ fn the_hint_bar_words_a_later_rows_letter_by_that_rows_label() {
         }
     }
     assert!(
-        named.contains(&('n', "appoint Elder")) && named.contains(&('p', "send a pen-pal")),
-        "fixture: both later-row letters were named on the bar somewhere; named {named:?}"
+        named.contains(&('p', "send a pen-pal")),
+        "fixture: the later-row letter was named on the bar somewhere; named {named:?}"
     );
 }
 
@@ -3906,8 +3909,8 @@ fn the_help_overlay_words_a_later_rows_letter_by_its_label_and_names_its_item() 
         }
     }
     assert!(
-        later.iter().any(|(_, c, _, _)| *c == 'n') && later.iter().any(|(s, c, _, _)| *s == Section::Friends && *c == 'p'),
-        "fixture: the later-row letters of both screens were found; found {later:?}"
+        later.iter().any(|(s, c, _, _)| *s == Section::Friends && *c == 'p'),
+        "fixture: the later-row letter was found; found {later:?}"
     );
 
     let (w, h) = (120u16, 60u16);
@@ -4563,6 +4566,145 @@ fn the_help_overlay_is_the_complete_key_map_and_glyph_legend() {
          full key map is not actually anywhere",
         keys_in_order(&text),
         keys_in_order(&bar)
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-096 — the row-bound key, named on the hint bar and in the help
+// overlay
+// ---------------------------------------------------------------------------
+
+/// Every kitten row the Clowder section lists, with the roster position of the
+/// kitten it is about — found by the kitten, never by a tag.
+fn kitten_rows(state: &GameState) -> Vec<(usize, RowKey)> {
+    rows(state, Section::Clowder)
+        .into_iter()
+        .filter_map(|r| match r.key {
+            RowKey::Kitten(ix, _) => Some((ix, r.key)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Wherever the hint bar shows the focused row's keys with the cursor on a
+/// kitten's row whose AppointElder gate is open — the bare screen, the
+/// inspector asked for, a report banner up — it names the row-bound key as
+/// `n appoint Elder`, directly after the key that names Enter, ranked for
+/// width as a focused-item mnemonic is: as the bar narrows it outlasts every
+/// key named after it, the inspector and section keys among them, and where
+/// it is named it is still directly after Enter. Quantified over every kitten
+/// row, from past the widest bar down to where keys are shed.
+///
+/// @spec TUI-NAV-096
+#[test]
+fn the_hint_bar_names_n_appoint_elder_directly_after_enter_on_every_kitten_row() {
+    let state = every_section_revealed();
+    let kittens = kitten_rows(&state);
+    assert!(!kittens.is_empty(), "fixture: kitten rows are listed");
+
+    let widths = [WIDE_W, 120, 100, FLOOR_W, 60, 44, 32, 24, 16];
+    let (mut named_wide, mut shed_after_n) = (0u32, 0u32);
+    for (ix, key) in kittens {
+        assert!(
+            state.command_gate_open(&Command::AppointElder(ix)),
+            "fixture: the core reports the gate of AppointElder open for kitten {ix}"
+        );
+        let bare = focus_on(&state, Section::Clowder, key.clone());
+        let contexts: [(&str, ViewState); 3] = [
+            ("nothing else", bare.clone()),
+            ("the inspector asked for", ViewState { inspector_wanted: true, ..bare.clone() }),
+            (
+                "a report banner up",
+                ViewState { reports: vec![PendingReport { entry: 0, dismissed: false }], ..bare.clone() },
+            ),
+        ];
+        for (what, view) in contexts {
+            let mut widest: Option<Vec<String>> = None;
+            for w in widths {
+                let line = hint_line(&state, &view, w);
+                let keys = named_keys(&line);
+                let whr = format!("at {w} columns with the kitten row {key:?} focused and {what}");
+                let n_entries: Vec<String> =
+                    hint_entries(&line).into_iter().filter(|e| e.split_whitespace().next() == Some("n")).collect();
+
+                for entry in &n_entries {
+                    assert_eq!(
+                        entry, "n appoint Elder",
+                        "{whr}, the hint bar names `n` as {entry:?}; the row-bound key is named \
+                         `n appoint Elder`.\nhint bar: {line:?}"
+                    );
+                }
+                if let Some(at) = keys.iter().position(|k| k == "n") {
+                    assert!(
+                        at > 0 && keys[at - 1] == "Enter",
+                        "{whr}, `n` is not named directly after the key that names Enter.\nkeys in \
+                         order: {keys:?}\nhint bar: {line:?}"
+                    );
+                }
+
+                match &widest {
+                    None => {
+                        assert_eq!(
+                            n_entries.len(),
+                            1,
+                            "{whr}, where nothing need be dropped, the hint bar names `n` {} times; \
+                             while `n` is live on the focused kitten's row the bar names it once.\n\
+                             hint bar: {line:?}",
+                            n_entries.len()
+                        );
+                        named_wide += 1;
+                        widest = Some(keys.clone());
+                    }
+                    Some(wide) => {
+                        let n_at = wide.iter().position(|k| k == "n").expect("named at the widest");
+                        let after_n = &wide[n_at + 1..];
+                        let kept_after = keys.iter().any(|k| after_n.contains(k) && k != "?");
+                        if kept_after {
+                            assert!(
+                                keys.iter().any(|k| k == "n"),
+                                "{whr}, the hint bar keeps a key named after `n` at full width \
+                                 but drops `n`; ranked as a focused-item mnemonic, it outlasts \
+                                 every key after it, the inspector and section keys among them.\n\
+                                 keys in order: {keys:?}\nat full width: {wide:?}\nhint bar: {line:?}"
+                            );
+                        } else if keys.iter().any(|k| k == "n") && after_n.iter().any(|k| k != "?") {
+                            shed_after_n += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(named_wide > 0, "fixture: no kitten row was checked");
+    assert!(
+        shed_after_n > 0,
+        "fixture: no width shed the keys after `n` while keeping `n`, so its ranking was never \
+         under test"
+    );
+}
+
+/// The help overlay lists the row-bound key among the Clowder screen's keys,
+/// worded `n appoint Elder (kitten)`.
+///
+/// @spec TUI-NAV-096
+#[test]
+fn the_help_overlay_lists_n_appoint_elder_kitten_among_the_clowder_keys() {
+    let (w, h) = (120u16, 60u16);
+    let mut term = terminal(w, h);
+    term.draw(|f| {
+        let area = f.area();
+        overlays::help(f, area);
+    })
+    .expect("TestBackend is infallible");
+    let lines = region_lines(term.backend().buffer(), Rect::new(0, 0, w, h));
+    let clowder = lines
+        .iter()
+        .find(|l| l.trim_start().starts_with(Section::Clowder.title()))
+        .unwrap_or_else(|| panic!("the help overlay has no line for the Clowder screen's keys"));
+    assert!(
+        clowder.contains("n appoint Elder (kitten)"),
+        "the help overlay's Clowder line does not list the row-bound key as `n appoint Elder \
+         (kitten)`.\nline: {clowder:?}"
     );
 }
 

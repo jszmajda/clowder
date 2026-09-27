@@ -35,6 +35,11 @@ pub enum Action {
     /// row it is a live mnemonic for, or nothing if it is not one right now.
     /// @spec TUI-NAV-046
     Mnemonic(char),
+    /// `n` — a kitten's own row-bound key, standing for no row of its own:
+    /// while the cursor is on a kitten's row and the core reports the command
+    /// gate of AppointElder for that kitten open, issues AppointElder for it;
+    /// everywhere else it is an unbound key. @spec TUI-NAV-094
+    AppointElder,
     /// A printable character routed into an open field rather than to its
     /// global binding — which is exactly what stops a digit jumping sections
     /// mid-type. @spec TUI-NAV-037, TUI-NAV-038

@@ -100,6 +100,7 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
         Action::Increment => handle_increment_decrement(view, state, true),
         Action::Decrement => handle_increment_decrement(view, state, false),
         Action::Mnemonic(c) => handle_mnemonic(view, state, c),
+        Action::AppointElder => handle_appoint_elder(view, state),
         Action::Type(c) => handle_type(view, c),
         Action::Erase => handle_erase(view),
         Action::Dismiss => handle_dismiss(view),
@@ -515,6 +516,28 @@ fn handle_mnemonic(view: &mut ViewState, state: &GameState, c: char) -> Outcome 
         return Outcome::Handled;
     };
     activate_row(view, state, &row)
+}
+
+/// `n` — the row-bound key TUI-NAV-093 leaves AppointElder to. While the
+/// cursor sits on a kitten's row and the core reports that kitten's
+/// AppointElder gate open, it issues AppointElder for that kitten exactly as
+/// `fire_once` would: once, rate-limited on the same clock Enter's own row
+/// actions share, moving neither the cursor nor the focused section. On any
+/// other row, on a row-less screen, or with the gate shut, it is an unbound
+/// key — handled, but silent, asking the core for nothing.
+/// @spec TUI-NAV-094
+fn handle_appoint_elder(view: &mut ViewState, state: &GameState) -> Outcome {
+    let Some(row) = current_row(view, state) else {
+        return Outcome::Handled;
+    };
+    let RowKey::Kitten(ix, _) = row.key else {
+        return Outcome::Handled;
+    };
+    let command = Command::AppointElder(ix);
+    if !state.command_gate_open(&command) {
+        return Outcome::Handled;
+    }
+    fire_once(view, command)
 }
 
 /// Fire an ordinary row's command once, rate-limited to ~10/s so a held key

@@ -34,7 +34,11 @@ const FIXED: [(char, &str); 3] = [('g', "GatherCatnip"), ('f', "Forage"), ('r', 
 pub fn section_letters(section: Section) -> &'static [char] {
     match section {
         Section::Meadow => &['g', 'f', 'r'],
-        Section::Clowder => &['p', 'n'],
+        // `n` is bound on a kitten's row too, but as the row-bound key
+        // TUI-NAV-094 states, not as a mnemonic under this table's rule
+        // (TUI-NAV-046) — `resolve` binds it on its own, never through this
+        // list.
+        Section::Clowder => &['p'],
         Section::Friends => &['p'],
         _ => &[],
     }
@@ -61,12 +65,11 @@ pub fn live(
             }
         }
         Section::Clowder => {
-            if let Some(RowKey::Kitten(ix, _)) = focus {
-                for (c, tag) in [('p', "promote"), ('n', "elder")] {
-                    let key = RowKey::Kitten(*ix, tag);
-                    if is_listed(&key) {
-                        out.push((c, key, MnemonicKind::FocusedItem));
-                    }
+            // A kitten is one row (TUI-NAV-093); `p` stands for that very
+            // row, live only while the cursor is on it.
+            if let Some(key @ RowKey::Kitten(..)) = focus {
+                if is_listed(key) {
+                    out.push(('p', key.clone(), MnemonicKind::FocusedItem));
                 }
             }
         }

@@ -468,3 +468,89 @@ fn an_armed_row_that_stops_being_listed_ends_its_arming_for_good() {
         "the row came back still carrying the arming it had before it left its list"
     );
 }
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-094 — the row-bound key, through the loop
+//
+// Whether a press leaves the narrow-mode inspector swap standing is a fact of
+// the drawn layout, which only the loop holds; so is the core's answer to the
+// command the press issues. Both are asserted through `step`.
+// ---------------------------------------------------------------------------
+
+fn roster_kitten(name: &str) -> clowder_core::Kitten {
+    clowder_core::Kitten {
+        name: name.to_string(),
+        job: None,
+        location: clowder_core::Location::Home,
+        arrived_day: 0,
+        job_seq: None,
+        away_seq: None,
+        skills: [0.0; 8],
+        exp: 0.0,
+        rank: 0,
+        trait_id: clowder_core::KittenTrait::None,
+        tinkering: None,
+    }
+}
+
+/// At the narrow layout with the inspector swapped in for the list, `n` on a
+/// kitten's row — every kitten's in turn — reaches the core as AppointElder
+/// for that kitten, which the core accepts, and the swap, the cursor, the
+/// focused section, and the report banner all stand as they did.
+///
+/// @spec TUI-NAV-094
+#[test]
+fn n_through_the_loop_appoints_each_kitten_and_leaves_the_narrow_swap_standing() {
+    use clowder_tui::nav::rows::rows;
+    use clowder_tui::nav::{PendingReport, RowKey, Section};
+    use clowder_tui::render::layout::Body;
+    use crossterm::event::KeyCode;
+
+    let mut state = GameState::new(4242);
+    state.kittens = ["Biscuit", "Clover", "Dumpling"].iter().map(|n| roster_kitten(n)).collect();
+    state.roster_high_water = state.kittens.len();
+    state.elder = None;
+    let kittens: Vec<(usize, RowKey)> = rows(&state, Section::Clowder)
+        .into_iter()
+        .filter_map(|r| match r.key {
+            RowKey::Kitten(ix, _) => Some((ix, r.key)),
+            _ => None,
+        })
+        .collect();
+    assert!(!kittens.is_empty(), "fixture: kitten rows are listed");
+
+    for (ix, row_key) in kittens {
+        let mut term = Terminal::new(TestBackend::new(80, 30)).unwrap();
+        let mut a = app(scratch(&format!("row-bound-n-{ix}")));
+        a.state = state.clone();
+        a.view.section = Some(Section::Clowder);
+        a.view.focus[Section::Clowder.index()] = Some(row_key.clone());
+        a.view.inspector_wanted = true;
+        a.view.reports = vec![PendingReport { entry: 0, dismissed: false }];
+        a.step(&mut term, elapsed(0.0), &[]).expect("a first frame draws");
+        assert!(
+            matches!(a.prev_layout.map(|l| l.body), Some(Body::Narrow { .. })),
+            "fixture: 80 columns lays out the narrow body, where the inspector call is a swap"
+        );
+        let before = a.view.clone();
+
+        a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))]).expect("a step with `n` does not fail");
+
+        let whr = format!("with the kitten row {row_key:?} focused in the narrow swap");
+        assert_eq!(
+            a.state.elder,
+            Some(ix),
+            "{whr}, `n` did not appoint kitten {ix} Elder; it issues AppointElder for the kitten \
+             the row is about"
+        );
+        assert_eq!(a.view.footer, None, "{whr}, an accepted appointment left a footer note");
+        assert_eq!(a.view.section, before.section, "{whr}, `n` changed the focused section");
+        assert_eq!(a.view.focus, before.focus, "{whr}, `n` moved the cursor");
+        assert_eq!(a.view.reports, before.reports, "{whr}, `n` dismissed the report banner");
+        assert!(a.view.inspector_wanted, "{whr}, `n` ended the narrow-mode inspector swap");
+        assert!(
+            matches!(a.prev_layout.map(|l| l.body), Some(Body::Narrow { .. })),
+            "{whr}, `n` changed the layout"
+        );
+    }
+}

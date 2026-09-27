@@ -5,7 +5,7 @@
 //! works if the eye has learned that something appearing there is information.
 //! @spec TUI-NAV-019..025, TUI-NAV-034, TUI-NAV-044, TUI-NAV-045, TUI-NAV-054
 
-use clowder_core::{GameState, Location, MoodTier, ResourceId};
+use clowder_core::{Command, GameState, Location, MoodTier, ResourceId};
 use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
@@ -481,6 +481,7 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
         // named last, in their rows' list order, just before the help key.
         let mut items: Vec<String> = strs(&base);
         add_mnemonics(&mut items, state, view);
+        add_appoint_elder(&mut items, state, view);
         items
     };
 
@@ -558,4 +559,32 @@ fn add_mnemonics(items: &mut Vec<String>, state: &GameState, view: &ViewState) {
         }
     }
     items.extend(fixed);
+}
+
+/// Names the row-bound `n` key directly after the key that names Enter,
+/// ranked as a focused-item mnemonic is — so it outlasts every context key
+/// after it as the bar sheds width — while the cursor sits on a kitten's row
+/// whose AppointElder gate the core reports open. Not itself a mnemonic
+/// (TUI-NAV-046), so it is named here rather than by `add_mnemonics`.
+/// @spec TUI-NAV-096
+fn add_appoint_elder(items: &mut Vec<String>, state: &GameState, view: &ViewState) {
+    if view.overlay.is_some() {
+        return;
+    }
+    if view.section != Some(Section::Clowder) {
+        return;
+    }
+    let Some(RowKey::Kitten(ix, _)) = &view.focus[Section::Clowder.index()] else {
+        return;
+    };
+    if !state.command_gate_open(&Command::AppointElder(*ix)) {
+        return;
+    }
+
+    let entry = "n appoint Elder".to_string();
+    let after_enter = items.iter().position(|i| i.split_whitespace().next() == Some("Enter"));
+    match after_enter {
+        Some(at) => items.insert(at + 1, entry),
+        None => items.push(entry),
+    }
 }

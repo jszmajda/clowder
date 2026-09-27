@@ -102,6 +102,12 @@ pub fn resolve(key: KeyEvent, view: &ViewState) -> Action {
         KeyCode::Char('>') => Action::SpeedUp,
         KeyCode::Char('?') => Action::OpenHelp,
         KeyCode::Char('q') => Action::Quit,
+        // `n` is the one letter bound outside the mnemonic table (TUI-NAV-046):
+        // a kitten's own row-bound key, live only on that row and gated by the
+        // core, never a mnemonic standing for a row of its own. `update`
+        // reads the focused row and its gate to decide whether it acts.
+        // @spec TUI-NAV-094
+        KeyCode::Char('n') => Action::AppointElder,
         // Everything left is either a digit's section jump, a letter the
         // design spends on *this* screen's mnemonics — live or not; whether
         // its row is actually listed is `update`'s to read from game state —

@@ -518,43 +518,89 @@ fn row_line(
     let costed = section_gives_cost(section);
     let c = cost_field_width();
 
-    let text = if let Some(p) = prompt {
-        let fields = RowFields { width, counted, c };
-        prompt_row_text(state, row, cursor, marker, &label, &fields, &p.digits)
-    } else {
-        let count_text = count_field_text(stated_count(state, row));
-        let cost_text = cost_field_text(stated_cost(state, row).as_deref(), c);
-
-        let mut fixed = cursor.chars().count() + 2;
-        if counted {
-            fixed += 1 + 7;
-        }
-        if costed {
-            fixed += 1 + c;
-        }
-        let name_w = width.saturating_sub(fixed).max(4);
-        let name = fmt::fit(&label, name_w);
-
-        let mut text = format!("{cursor}{marker} {name:<name_w$}");
-        if counted {
-            text.push(' ');
-            text.push_str(&count_text);
-        }
-        if costed {
-            text.push(' ');
-            text.push_str(&cost_text);
-        }
-        text
-    };
-
     let mut style = style_for(role);
     if focused {
         // Reverse the terminal's own pair — works in either polarity, and
         // needs no colour of its own. @spec TUI-THEME-007
         style = style.add_modifier(Modifier::REVERSED);
     }
-    Line::from(Span::styled(fmt::fit(&text, width), style))
+
+    if let Some(p) = prompt {
+        let fields = RowFields { width, counted, c };
+        let text = prompt_row_text(state, row, cursor, marker, &label, &fields, &p.digits);
+        return Line::from(Span::styled(fmt::fit(&text, width), style));
+    }
+
+    let count_text = count_field_text(stated_count(state, row));
+    let cost_text = cost_field_text(stated_cost(state, row).as_deref(), c);
+
+    let mut fixed = cursor.chars().count() + 2;
+    if counted {
+        fixed += 1 + 7;
+    }
+    if costed {
+        fixed += 1 + c;
+    }
+    let name_w = width.saturating_sub(fixed).max(4);
+
+    let mut suffix = String::new();
+    if counted {
+        suffix.push(' ');
+        suffix.push_str(&count_text);
+    }
+    if costed {
+        suffix.push(' ');
+        suffix.push_str(&cost_text);
+    }
+
+    // A kitten's row carries no label (TUI-NAV-093), but where the name's
+    // column has room for the whole name, a blank, and the whole hint, it
+    // draws that hint in the dim role — a colour the row's own focus reverse
+    // never overrides — and never in part. @spec TUI-NAV-095
+    let name_len = label.chars().count();
+    let hint = kitten_elder_hint(state, row)
+        .filter(|hint| name_len + 1 + hint.chars().count() <= name_w);
+
+    let Some(hint) = hint else {
+        let name = fmt::fit(&label, name_w);
+        let mut text = format!("{cursor}{marker} {name:<name_w$}");
+        text.push_str(&suffix);
+        return Line::from(Span::styled(fmt::fit(&text, width), style));
+    };
+
+    let hint_w = hint.chars().count();
+    let trailing = name_w - name_len - 1 - hint_w;
+    let mut hint_style = style_for(Role::Dim);
+    if focused {
+        hint_style = hint_style.add_modifier(Modifier::REVERSED);
+    }
+    let mut spans = vec![
+        Span::styled(format!("{cursor}{marker} {label} "), style),
+        Span::styled(hint.to_string(), hint_style),
+    ];
+    if trailing > 0 {
+        spans.push(Span::styled(" ".repeat(trailing), style));
+    }
+    if !suffix.is_empty() {
+        spans.push(Span::styled(suffix, style));
+    }
+    Line::from(spans)
 }
+
+/// The `(n: Elder)` hint a listed kitten row carries after its name while the
+/// core reports the command gate of AppointElder for that kitten open — never
+/// drawn at all where the gate is shut. Whether the row's own column has room
+/// for it is the caller's to judge (TUI-NAV-095); this states only whether the
+/// row earns the hint at all.
+/// @spec TUI-NAV-095
+fn kitten_elder_hint(state: &GameState, row: &Row) -> Option<&'static str> {
+    let RowKey::Kitten(ix, _) = row.key else { return None };
+    state.command_gate_open(&Command::AppointElder(ix)).then_some(ELDER_HINT)
+}
+
+/// The row-bound hint a kitten's row carries after its name, whole or not at
+/// all. @spec TUI-NAV-095
+const ELDER_HINT: &str = "(n: Elder)";
 
 /// A row's fixed-width fields (TUI-RENDER-020): the pane's width, whether its
 /// section gives an owned-count field, and the cost field's width — the
