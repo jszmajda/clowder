@@ -764,3 +764,666 @@ fn a_v3_save_migrates_owing_nothing_with_its_meadow_otherwise_exact() {
         );
     }
 }
+
+// =====================================================================
+// Paced catch-up — SAVE-018 to SAVE-022
+//
+// A load hands back its catch-up pending, and the caller advances it by
+// counts of its own choosing (`begin_load` → `CatchUp`). The catch-up either
+// finishes — `Advance::Finished` carrying exactly what a one-call
+// `load_string` returns — or is set down early (`CatchUp::set_down` →
+// `SetDown`), and the save written from a set-down carries its report so far
+// (`save_string_carrying` / `write_save_carrying`) for the next load to
+// continue.
+//
+// The surface these tests address, which the code stage adds:
+//
+//   pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError>
+//   impl CatchUp {
+//       pub fn total_ticks(&self) -> u64
+//       pub fn remaining_ticks(&self) -> u64
+//       pub fn advance(self, max_ticks: u64) -> Advance
+//       pub fn set_down(self) -> SetDown
+//   }
+//   pub enum Advance { Pending(CatchUp), Finished(LoadedGame) }
+//   pub struct SetDown { pub state: GameState, pub owed_ticks: u64,
+//                        pub report_so_far: OfflineReport }
+//   pub fn save_string_carrying(state: &GameState, saved_at_unix: u64,
+//       owed_ticks: u64, report_so_far: Option<&OfflineReport>) -> String
+//   pub fn write_save_carrying(path: &Path, state: &GameState,
+//       saved_at_unix: u64, owed_ticks: u64,
+//       report_so_far: Option<&OfflineReport>) -> std::io::Result<()>
+//
+// An advance on a catch-up with nothing left to replay (no absence, a
+// backwards clock) finishes it: there is no last tick to wait for.
+// =====================================================================
+
+/// The catch-up was still owed ticks; the test needed it finished.
+fn finished(a: Advance) -> LoadedGame {
+    match a {
+        Advance::Finished(g) => g,
+        Advance::Pending(c) => {
+            panic!("the catch-up should have finished, but {} ticks remain", c.remaining_ticks())
+        }
+    }
+}
+
+/// The catch-up finished; the test needed it still pending.
+fn pending(a: Advance) -> CatchUp {
+    match a {
+        Advance::Pending(c) => c,
+        Advance::Finished(_) => panic!("the catch-up finished early"),
+    }
+}
+
+/// Advance in the given chunk sizes, cycling them, until the catch-up
+/// finishes.
+fn drive(mut c: CatchUp, chunks: &[u64]) -> LoadedGame {
+    let mut i = 0usize;
+    loop {
+        match c.advance(chunks[i % chunks.len()]) {
+            Advance::Finished(g) => return g,
+            Advance::Pending(next) => c = next,
+        }
+        i += 1;
+        assert!(i < 10_000_000, "a catch-up that never finishes");
+    }
+}
+
+/// Advance until exactly `target` ticks have been replayed, in chunks of at
+/// most `chunk`, and return the catch-up still pending.
+fn advance_to(mut c: CatchUp, target: u64, chunk: u64) -> CatchUp {
+    let total = c.total_ticks();
+    assert!(target < total, "fixture: set-down point must precede the last tick");
+    loop {
+        let replayed = total - c.remaining_ticks();
+        if replayed == target {
+            return c;
+        }
+        assert!(replayed < target, "an advance replayed more than it was asked to");
+        c = pending(c.advance(chunk.min(target - replayed)));
+    }
+}
+
+fn state_bytes(s: &GameState) -> String {
+    save_string(s, 0)
+}
+
+/// A meadow whose absence has a tale: three kittens with no food and no jobs,
+/// so kittens wander and seasons turn while it is away (SAVE-008's fixture).
+fn famine_state(seed: u64) -> GameState {
+    let mut s = GameState::new(seed);
+    adopt(&mut s, 3);
+    for k in &mut s.kittens {
+        k.job = None;
+    }
+    give(&mut s, ResourceId::Catnip, 0.0);
+    s
+}
+
+/// Float deltas folded in two parts are the same sum to within rounding.
+fn close(a: f64, b: f64) -> bool {
+    (a - b).abs() <= 1e-9 * a.abs().max(b.abs()).max(1.0)
+}
+
+fn assert_same_tale(got: &OfflineReport, want: &OfflineReport, ctx: &str) {
+    assert_eq!(got.elapsed_seconds, want.elapsed_seconds, "{ctx}: span");
+    assert_eq!(got.truncated, want.truncated, "{ctx}: truncated");
+    assert_eq!(got.arrived, want.arrived, "{ctx}: arrivals");
+    assert_eq!(got.wandered, want.wandered, "{ctx}: wanderings");
+    assert_eq!(got.returned, want.returned, "{ctx}: returns");
+    assert_eq!(got.seasons_passed, want.seasons_passed, "{ctx}: seasons");
+    for r in ResourceId::ALL {
+        assert!(
+            close(got.resource_deltas[r.ix()], want.resource_deltas[r.ix()]),
+            "{ctx}: net delta for {r:?}: {} vs {}",
+            got.resource_deltas[r.ix()],
+            want.resource_deltas[r.ix()]
+        );
+    }
+}
+
+/// A report a set-down catch-up might have carried, with names and fractions
+/// that a fresh fold could not produce by accident.
+fn carried_report(elapsed_seconds: u64, truncated: bool) -> OfflineReport {
+    let mut r = OfflineReport { elapsed_seconds, truncated, ..OfflineReport::default() };
+    for (i, d) in r.resource_deltas.iter_mut().enumerate() {
+        *d = 0.375 * (i as f64 + 1.0) - 1.5;
+    }
+    r.arrived = vec![("Pemberly".into(), 2)];
+    r.wandered = vec![("Pemberly".into(), 1)];
+    r.returned = vec![("Quillon".into(), 3)];
+    r.seasons_passed = 3;
+    r
+}
+
+fn count_of(list: &[(String, u32)], name: &str) -> u32 {
+    list.iter().filter(|(n, _)| n == name).map(|(_, c)| *c).sum()
+}
+
+// ---------------------------------------------------------------------
+// SAVE-018 — the caller paces the catch-up
+// ---------------------------------------------------------------------
+
+/// The total is the interval's ticks at the save's own speed plus the ticks
+/// the save carried as owed, and load replays none of them before it returns.
+/// @spec SAVE-018
+#[test]
+fn a_paced_load_owes_the_intervals_ticks_plus_the_carried_count_and_has_replayed_none() {
+    for (speed, owed) in [(1.0, 0u64), (1.0, 37), (2.0, 37), (0.25, 5)] {
+        let mut s = played_state(18_001);
+        s.apply(Command::SetSpeed(speed)).unwrap();
+        let json = save_string_owing(&s, 50_000, owed);
+        let c = begin_load(&json, 50_000 + 600).expect("the save loads");
+        let interval_ticks = (600.0 * 4.0 * speed) as u64;
+        assert_eq!(
+            c.total_ticks(),
+            interval_ticks + owed,
+            "at speed {speed} with {owed} owed: the interval's ticks plus the carried count"
+        );
+        assert_eq!(c.remaining_ticks(), c.total_ticks(), "load returns before replaying any of them");
+
+        // Setting it down at once shows the state exactly as saved.
+        let sd = c.set_down();
+        assert_eq!(sd.state.ticks, s.ticks, "no tick ran inside load");
+        assert_eq!(sd.owed_ticks, interval_ticks + owed, "and every one is still owed");
+    }
+}
+
+/// Each advance replays at most the count the caller chose, and how many it
+/// replays is decided by that count alone — two identical catch-ups advanced
+/// by the same counts stand at the same place after every call.
+/// @spec SAVE-018
+#[test]
+fn an_advance_replays_at_most_the_callers_count_and_the_count_alone_decides() {
+    let s = played_state(18_002);
+    let json = save_string(&s, 60_000);
+    let counts = [1u64, 0, 7, 250, 3, 1_000, 2];
+    let mut a = begin_load(&json, 60_000 + 600).unwrap();
+    let mut b = begin_load(&json, 60_000 + 600).unwrap();
+    assert_eq!(a.total_ticks(), 2_400);
+    for &n in &counts {
+        let before = a.remaining_ticks();
+        a = pending(a.advance(n));
+        // A deliberate pause between the twins: a pace decided by a clock
+        // would read it; a pace decided by the count cannot.
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        b = pending(b.advance(n));
+        let replayed = before - a.remaining_ticks();
+        assert!(replayed <= n, "asked for at most {n}, replayed {replayed}");
+        assert_eq!(a.remaining_ticks(), b.remaining_ticks(), "the same counts, the same place");
+        assert_eq!(a.total_ticks(), 2_400, "the total never moves");
+    }
+    let replayed = a.total_ticks() - a.remaining_ticks();
+    let sa = a.set_down();
+    let sb = b.set_down();
+    assert_eq!(sa.state.ticks, s.ticks + replayed, "remaining counts exactly the ticks not yet run");
+    assert_eq!(state_bytes(&sa.state), state_bytes(&sb.state));
+}
+
+/// However the catch-up is divided into calls, the same ticks run in the same
+/// order and fold the same report — at the end, and at every point it could
+/// be set down along the way.
+/// @spec SAVE-018
+#[test]
+fn how_a_catch_up_is_divided_changes_nothing_it_produces() {
+    let s = famine_state(18_003);
+    let json = save_string(&s, 70_000);
+    let now = 70_000 + 150; // 600 ticks: wanderings and a season turn
+    let divisions: [&[u64]; 5] = [&[u64::MAX], &[1], &[7, 1, 120], &[599, 1], &[300, 0, 300]];
+
+    let whole = finished(begin_load(&json, now).unwrap().advance(u64::MAX));
+    assert!(
+        !whole.report.wandered.is_empty() && whole.report.seasons_passed > 0,
+        "fixture: the absence must have a tale for the fold to be compared"
+    );
+    for d in divisions {
+        let g = drive(begin_load(&json, now).unwrap(), d);
+        assert_eq!(state_bytes(&g.state), state_bytes(&whole.state), "division {d:?}: state");
+        assert_eq!(g.report, whole.report, "division {d:?}: report");
+    }
+
+    for k in [1u64, 150, 333, 599] {
+        let reference = advance_to(begin_load(&json, now).unwrap(), k, u64::MAX).set_down();
+        for chunk in [1u64, 13, 100] {
+            let sd = advance_to(begin_load(&json, now).unwrap(), k, chunk).set_down();
+            assert_eq!(
+                state_bytes(&sd.state),
+                state_bytes(&reference.state),
+                "set down after {k} ticks in chunks of {chunk}: state"
+            );
+            assert_eq!(sd.owed_ticks, reference.owed_ticks);
+            assert_eq!(
+                sd.report_so_far, reference.report_so_far,
+                "set down after {k} ticks in chunks of {chunk}: report so far"
+            );
+        }
+    }
+}
+
+// ---------------------------------------------------------------------
+// SAVE-019 — the advance that replays the last tick finishes it
+// ---------------------------------------------------------------------
+
+/// Finished by any division, the result is bit-identical to a one-call load
+/// of the same save at the same moment — state, journal, and report.
+/// @spec SAVE-019
+#[test]
+fn the_last_advance_finishes_bit_identical_to_a_one_call_load() {
+    for (seed, away, owed) in [(19_001u64, 600u64, 0u64), (19_002, 150, 40), (19_003, 20, 0)] {
+        let s = famine_state(seed);
+        let json = save_string_owing(&s, 80_000, owed);
+        let one_call = load_string(&json, 80_000 + away).unwrap();
+        for d in [&[u64::MAX][..], &[1], &[97, 3]] {
+            let g = drive(begin_load(&json, 80_000 + away).unwrap(), d);
+            assert_eq!(
+                save_string(&g.state, 80_000 + away),
+                save_string(&one_call.state, 80_000 + away),
+                "away {away}s owing {owed}, division {d:?}: state and journal"
+            );
+            assert_eq!(g.report, one_call.report, "away {away}s, division {d:?}: report");
+        }
+    }
+}
+
+/// Finishing records the completed report in the journal under the minimum
+/// interval rule, exactly once — and never before the last tick.
+/// @spec SAVE-019
+#[test]
+fn finishing_records_the_report_and_only_finishing_does() {
+    let s = lived_state(19_004);
+    let json = save_string(&s, 90_000);
+    let away = MIN_REPORTABLE_ABSENCE_SECONDS + 240;
+    let mut c = begin_load(&json, 90_000 + away).unwrap();
+    let before = away_entries(&s.journal).len();
+    loop {
+        match c.advance(97) {
+            Advance::Pending(next) => {
+                c = next;
+                let peek = begin_load(&json, 90_000 + away).unwrap();
+                let at = c.total_ticks() - c.remaining_ticks();
+                let sd = advance_to(peek, at, u64::MAX).set_down();
+                assert_eq!(away_entries(&sd.state.journal).len(), before, "nothing recorded mid-way");
+            }
+            Advance::Finished(g) => {
+                let recorded = away_entries(&g.state.journal);
+                assert_eq!(recorded.len(), before + 1, "one absence, one entry");
+                assert_eq!(recorded.last().unwrap().1, g.report, "the entry is the finished report");
+                break;
+            }
+        }
+    }
+
+    let brief = save_string(&s, 95_000);
+    let g = drive(begin_load(&brief, 95_000 + MIN_REPORTABLE_ABSENCE_SECONDS - 1).unwrap(), &[50]);
+    assert_eq!(away_entries(&g.state.journal).len(), before, "below the minimum, nothing");
+}
+
+/// A catch-up owing nothing — no time away, or a clock that ran backwards —
+/// finishes on its first advance, as the one-call load would.
+/// @spec SAVE-019
+#[test]
+fn a_catch_up_owing_nothing_finishes_on_its_first_advance() {
+    let s = played_state(19_005);
+    let json = save_string(&s, 100_000);
+    for now in [100_000u64, 40_000] {
+        let c = begin_load(&json, now).unwrap();
+        assert_eq!(c.total_ticks(), 0);
+        for n in [0u64, 1, 5_000] {
+            let g = finished(begin_load(&json, now).unwrap().advance(n));
+            let one_call = load_string(&json, now).unwrap();
+            assert_eq!(state_bytes(&g.state), state_bytes(&one_call.state), "now {now}, advance {n}");
+            assert_eq!(g.report, one_call.report);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------
+// SAVE-020 — setting a catch-up down early
+// ---------------------------------------------------------------------
+
+/// Set down after some of its ticks: the state is the meadow those ticks
+/// reached, the owed count is the rest, the report so far wears the
+/// catch-up's own span and flag over contents folded from the ticks replayed,
+/// and the journal is untouched.
+/// @spec SAVE-020
+#[test]
+fn a_set_down_returns_the_state_so_far_the_rest_owed_and_the_report_so_far() {
+    let s = famine_state(20_001);
+    let json = save_string(&s, 110_000);
+    let away = 150u64; // 600 ticks
+    for k in [0u64, 1, 240, 599] {
+        let c = begin_load(&json, 110_000 + away).unwrap();
+        let sd = advance_to(c, k, 61).set_down();
+
+        // The meadow after exactly k replayed ticks, folded the same way: a
+        // load owing k ticks over no interval at all.
+        let reference = load_string(&save_string_owing(&s, 110_000, k), 110_000).unwrap();
+        assert_eq!(state_bytes(&sd.state), state_bytes(&reference.state), "after {k}: state so far");
+        assert_eq!(sd.owed_ticks, 600 - k, "after {k}: the rest is owed");
+        assert_eq!(sd.report_so_far.elapsed_seconds, away, "after {k}: the catch-up's own span");
+        assert!(!sd.report_so_far.truncated);
+        let mut contents = sd.report_so_far.clone();
+        contents.elapsed_seconds = 0;
+        assert_eq!(contents, reference.report, "after {k}: contents folded from the ticks replayed");
+        assert_eq!(sd.state.journal, s.journal, "after {k}: nothing recorded in the journal");
+    }
+}
+
+/// The truncated flag a set-down reports is the catch-up's own, even when the
+/// ticks replayed so far are nowhere near the cap.
+/// @spec SAVE-020
+#[test]
+fn a_set_down_carries_the_catch_ups_truncation() {
+    let s = played_state(20_002);
+    let json = save_string(&s, 1_000);
+    let c = begin_load(&json, 1_000 + 2 * CATCHUP_CAP_SECONDS).unwrap();
+    let sd = pending(c.advance(10)).set_down();
+    assert!(sd.report_so_far.truncated, "a capped absence is flagged from the start");
+    assert_eq!(sd.report_so_far.elapsed_seconds, CATCHUP_CAP_SECONDS);
+    assert_eq!(sd.owed_ticks, CATCHUP_CAP_SECONDS * 4 - 10);
+}
+
+/// A set-down of a catch-up whose save carried a report so far folds that
+/// report in too, so setting down twice loses nothing of the first.
+/// @spec SAVE-020
+#[test]
+fn a_set_down_folds_in_any_report_the_save_carried() {
+    let s = famine_state(20_003);
+    let carried = carried_report(4_000, false);
+    let json = save_string_carrying(&s, 120_000, 0, Some(&carried));
+    let sd = advance_to(begin_load(&json, 120_000 + 150).unwrap(), 300, 300).set_down();
+
+    let fresh = advance_to(begin_load(&save_string(&s, 120_000), 120_000 + 150).unwrap(), 300, 300)
+        .set_down()
+        .report_so_far;
+    let r = &sd.report_so_far;
+    assert_eq!(r.elapsed_seconds, 4_000 + 150);
+    for res in ResourceId::ALL {
+        assert_eq!(
+            r.resource_deltas[res.ix()],
+            carried.resource_deltas[res.ix()] + fresh.resource_deltas[res.ix()],
+            "{res:?}"
+        );
+    }
+    for name in ["Pemberly", "Quillon"] {
+        assert_eq!(count_of(&r.arrived, name), count_of(&carried.arrived, name) + count_of(&fresh.arrived, name));
+        assert_eq!(count_of(&r.returned, name), count_of(&carried.returned, name) + count_of(&fresh.returned, name));
+    }
+    assert_eq!(r.seasons_passed, carried.seasons_passed + fresh.seasons_passed);
+    assert_eq!(sd.state.journal, s.journal, "nothing recorded");
+}
+
+/// The point of a set-down: a save carrying its count and report, loaded
+/// again, replays the rest and tells the absence once — the same tale, the
+/// same meadow, and one journal entry, wherever the wake was interrupted.
+/// @spec SAVE-020, SAVE-022
+#[test]
+fn an_interrupted_catch_up_saved_and_reloaded_tells_the_absence_once() {
+    let s = famine_state(20_004);
+    let json = save_string(&s, 130_000);
+    let now = 130_000 + 600; // 2400 ticks
+    let whole = load_string(&json, now).unwrap();
+    assert!(!whole.report.wandered.is_empty(), "fixture: a tale worth keeping whole");
+
+    for k in [1u64, 300, 1_200, 2_399] {
+        let sd = advance_to(begin_load(&json, now).unwrap(), k, 500).set_down();
+        let resaved = save_string_carrying(&sd.state, now, sd.owed_ticks, Some(&sd.report_so_far));
+        let again = load_string(&resaved, now).unwrap();
+
+        assert_same_tale(&again.report, &whole.report, &format!("interrupted after {k}"));
+        let mut a = again.state.clone();
+        let mut w = whole.state.clone();
+        a.journal = Journal::default();
+        w.journal = Journal::default();
+        assert_eq!(state_bytes(&a), state_bytes(&w), "after {k}: not one owed tick lost or doubled");
+        assert_eq!(occurrences(&again.state.journal), occurrences(&whole.state.journal));
+        let entries = away_entries(&again.state.journal);
+        assert_eq!(entries.len(), away_entries(&whole.state.journal).len(), "after {k}: told once");
+        assert_eq!(entries.last().unwrap().1, again.report, "and the entry is the whole tale");
+    }
+}
+
+// ---------------------------------------------------------------------
+// SAVE-021 — the report so far is canonical state in a newer format
+// ---------------------------------------------------------------------
+
+const V4_FIXTURE_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/save_v4.json");
+
+fn v4_fixture() -> String {
+    fs::read_to_string(V4_FIXTURE_PATH).unwrap_or_else(|e| {
+        panic!("SAVE-013 requires a committed v4 fixture at {V4_FIXTURE_PATH}: {e}")
+    })
+}
+
+/// A save carries its report so far, or none, beside its owed count.
+/// @spec SAVE-021
+#[test]
+fn a_save_carries_its_report_so_far_or_none() {
+    let s = played_state(21_001);
+    let r = carried_report(9_000, true);
+
+    let with: serde_json::Value =
+        serde_json::from_str(&save_string_carrying(&s, 5_000, 77, Some(&r))).unwrap();
+    assert_eq!(with["save_version"], SAVE_VERSION);
+    assert_eq!(with["owed_ticks"], 77);
+    assert_eq!(with["report_so_far"], serde_json::to_value(&r).unwrap(), "the report, whole");
+
+    let without: serde_json::Value =
+        serde_json::from_str(&save_string_carrying(&s, 5_000, 77, None)).unwrap();
+    assert!(without["report_so_far"].is_null(), "none is written as none");
+    assert!(
+        without.as_object().unwrap().contains_key("report_so_far"),
+        "the field is part of the format"
+    );
+    let plain: serde_json::Value = serde_json::from_str(&save_string(&s, 5_000)).unwrap();
+    assert!(plain["report_so_far"].is_null(), "an ordinary save carries none");
+
+    let dir = scratch_dir("carrying");
+    let path = dir.join("save.json");
+    write_save_carrying(&path, &s, 5_000, 77, Some(&r)).unwrap();
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        save_string_carrying(&s, 5_000, 77, Some(&r)),
+        "the atomic write writes the same save"
+    );
+}
+
+/// Canonical: a save carrying a report so far, loaded and set down again with
+/// nothing replayed and no time passed, writes back byte for byte.
+/// @spec SAVE-021
+#[test]
+fn a_carried_report_round_trips_byte_for_byte() {
+    let s = played_state(21_002);
+    let r = carried_report(9_000, false);
+    let first = save_string_carrying(&s, 6_000, 55, Some(&r));
+    let sd = begin_load(&first, 6_000).unwrap().set_down();
+    assert_eq!(sd.report_so_far, r, "the report comes back as it was written");
+    assert_eq!(sd.owed_ticks, 55);
+    let second = save_string_carrying(&sd.state, 6_000, sd.owed_ticks, Some(&sd.report_so_far));
+    assert_eq!(first, second, "save → load → save is byte-stable with a report carried");
+}
+
+/// The report so far arrives under a version newer than any save written
+/// without it, so a build that predates it refuses such a save as too new.
+/// @spec SAVE-021
+#[test]
+fn the_report_so_far_arrives_under_a_newer_save_version() {
+    let v4: serde_json::Value = serde_json::from_str(&v4_fixture()).unwrap();
+    let last_without = v4["save_version"].as_u64().unwrap() as u32;
+    assert!(
+        SAVE_VERSION > last_without,
+        "SAVE_VERSION {SAVE_VERSION} must be newer than {last_without}, the last written without it"
+    );
+    let s = played_state(21_003);
+    let v: serde_json::Value =
+        serde_json::from_str(&save_string_carrying(&s, 1, 0, Some(&carried_report(100, false))))
+            .unwrap();
+    assert_eq!(v["save_version"], SAVE_VERSION);
+}
+
+/// @spec SAVE-013, SAVE-021
+#[test]
+fn the_v4_fixture_is_committed_and_predates_the_report_so_far() {
+    let v: serde_json::Value = serde_json::from_str(&v4_fixture()).expect("the v4 fixture is JSON");
+    assert_eq!(v["save_version"], 4, "a v4 save, frozen as a historical artifact");
+    assert!(v.get("report_so_far").is_none(), "it predates the report so far entirely");
+    assert!(
+        v["owed_ticks"].as_u64().is_some_and(|n| n > 0),
+        "and it is v4, not a relabelled v3: it carries a nonzero owed count"
+    );
+    let state = v["state"].as_object().expect("a save carries a state object");
+    assert!(state.contains_key("journal"));
+    assert!(
+        state["ticks"].as_u64().is_some_and(|t| t > 0)
+            && !state["kittens"].as_array().unwrap().is_empty(),
+        "a played meadow, not a fresh game"
+    );
+}
+
+/// A v4 save migrates carrying no report so far: its load begins a tale of
+/// its own, with its meadow and owed count exactly as written.
+/// @spec SAVE-013, SAVE-021
+#[test]
+fn a_v4_save_migrates_carrying_no_report_so_far() {
+    let fixture = v4_fixture();
+    let before: serde_json::Value = serde_json::from_str(&fixture).unwrap();
+    let saved_at = before["saved_at_unix"].as_u64().unwrap();
+    let owed = before["owed_ticks"].as_u64().unwrap();
+
+    let c = begin_load(&fixture, saved_at).expect("a v4 save loads");
+    assert_eq!(c.total_ticks(), owed, "the owed count survives migration");
+    let sd = c.set_down();
+    assert_eq!(sd.report_so_far, OfflineReport::default(), "no report so far was carried");
+
+    let resaved: serde_json::Value =
+        serde_json::from_str(&save_string_carrying(&sd.state, saved_at, sd.owed_ticks, None)).unwrap();
+    assert_eq!(resaved["save_version"], SAVE_VERSION);
+    for (key, was) in before["state"].as_object().unwrap() {
+        let now = &resaved["state"][key];
+        assert!(json_eq(was, now), "migrating a v4 save changed `{key}`: {was} became {now}");
+    }
+
+    let g = finished(begin_load(&fixture, saved_at + 30).unwrap().advance(u64::MAX));
+    assert_eq!(g.report.elapsed_seconds, 30, "the tale is this load's alone");
+    assert_eq!(g.report.seasons_passed, load_string(&fixture, saved_at + 30).unwrap().report.seasons_passed);
+}
+
+// ---------------------------------------------------------------------
+// SAVE-022 — a carried report is continued, not begun again
+// ---------------------------------------------------------------------
+
+/// Every field of the continued report: span summed, truncation either's,
+/// deltas the carried plus the replay's against the state as loaded, names
+/// merged with counts summed, seasons summed.
+/// @spec SAVE-022
+#[test]
+fn a_carried_report_is_continued_field_by_field() {
+    let s = famine_state(22_001);
+    let away = 150u64;
+    let fresh = load_string(&save_string(&s, 140_000), 140_000 + away).unwrap();
+    let wanderer = fresh.report.wandered.first().expect("fixture: someone wanders").0.clone();
+
+    let mut carried = carried_report(5_000, false);
+    carried.wandered.push((wanderer.clone(), 4));
+    let json = save_string_carrying(&s, 140_000, 0, Some(&carried));
+    let g = finished(begin_load(&json, 140_000 + away).unwrap().advance(u64::MAX));
+    let r = &g.report;
+
+    assert_eq!(r.elapsed_seconds, 5_000 + away, "span: the carried span plus this interval");
+    assert!(!r.truncated, "neither was truncated");
+    for res in ResourceId::ALL {
+        assert_eq!(
+            r.resource_deltas[res.ix()],
+            carried.resource_deltas[res.ix()] + fresh.report.resource_deltas[res.ix()],
+            "{res:?}: the carried delta plus the replay's against the state as loaded"
+        );
+    }
+    for (list, c, f) in [
+        (&r.arrived, &carried.arrived, &fresh.report.arrived),
+        (&r.wandered, &carried.wandered, &fresh.report.wandered),
+        (&r.returned, &carried.returned, &fresh.report.returned),
+    ] {
+        let mut names: Vec<&String> = c.iter().chain(f.iter()).map(|(n, _)| n).collect();
+        names.sort();
+        names.dedup();
+        for name in names {
+            assert_eq!(count_of(list, name), count_of(c, name) + count_of(f, name), "{name}");
+            assert_eq!(list.iter().filter(|(n, _)| n == name).count(), 1, "{name} listed once");
+        }
+        assert_eq!(list.len(), {
+            let mut all: Vec<&String> = c.iter().chain(f.iter()).map(|(n, _)| n).collect();
+            all.sort();
+            all.dedup();
+            all.len()
+        });
+    }
+    assert!(count_of(&r.wandered, &wanderer) > 4, "a name in both lists has its counts summed");
+    assert_eq!(r.seasons_passed, carried.seasons_passed + fresh.report.seasons_passed);
+    assert_eq!(away_entries(&g.state.journal).last().unwrap().1, *r, "the continued report is recorded");
+}
+
+/// Truncated where either was: a capped year interrupted mid-wake still reads
+/// as more than its span after the interruption.
+/// @spec SAVE-022
+#[test]
+fn a_continued_report_is_truncated_where_either_part_was() {
+    let s = played_state(22_002);
+
+    let json = save_string_carrying(&s, 150_000, 0, Some(&carried_report(CATCHUP_CAP_SECONDS, true)));
+    let g = finished(begin_load(&json, 150_000 + 30).unwrap().advance(u64::MAX));
+    assert!(g.report.truncated, "the carried report was truncated");
+    assert_eq!(g.report.elapsed_seconds, CATCHUP_CAP_SECONDS + 30);
+
+    let json = save_string_carrying(&s, 1_000, 0, Some(&carried_report(600, false)));
+    let sd = pending(begin_load(&json, 1_000 + 2 * CATCHUP_CAP_SECONDS).unwrap().advance(4)).set_down();
+    assert!(sd.report_so_far.truncated, "this load's interval was truncated");
+    assert_eq!(sd.report_so_far.elapsed_seconds, 600 + CATCHUP_CAP_SECONDS);
+
+    let json = save_string_carrying(&s, 160_000, 0, Some(&carried_report(600, false)));
+    let g = finished(begin_load(&json, 160_000 + 30).unwrap().advance(u64::MAX));
+    assert!(!g.report.truncated, "neither was");
+}
+
+/// The minimum-interval rule judges the continued report by its whole span:
+/// a relaunch soon after a quit mid-wake still retains the absence.
+/// @spec SAVE-022
+#[test]
+fn retention_judges_a_continued_report_by_its_whole_span() {
+    let s = lived_state(22_003);
+    let before = away_entries(&s.journal).len();
+    let min = MIN_REPORTABLE_ABSENCE_SECONDS;
+    for (carried_span, interval, kept) in [
+        (min + 3_600, 5, true),     // a long absence, relaunched seconds later
+        (min - 10, 20, true),       // neither part alone, together enough
+        (10, 5, false),             // together still too short
+        (min + 3_600, 0, true),     // relaunched at the very same second
+    ] {
+        let json = save_string_carrying(&s, 170_000, 0, Some(&carried_report(carried_span, false)));
+        let g = finished(begin_load(&json, 170_000 + interval).unwrap().advance(u64::MAX));
+        assert_eq!(g.report.elapsed_seconds, carried_span + interval);
+        let entries = away_entries(&g.state.journal);
+        if kept {
+            assert_eq!(entries.len(), before + 1, "carried {carried_span}s + {interval}s: retained");
+            assert_eq!(entries.last().unwrap().1, g.report);
+        } else {
+            assert_eq!(entries.len(), before, "carried {carried_span}s + {interval}s: too short");
+        }
+    }
+}
+
+/// Relaunching later than the quit: the finished report is the uninterrupted
+/// one extended by the time between the quit and the load that finishes it.
+/// @spec SAVE-022
+#[test]
+fn a_later_relaunch_extends_the_tale_by_the_time_between() {
+    let s = famine_state(22_004);
+    let json = save_string(&s, 180_000);
+    let quit_at = 180_000 + 600;
+    let sd = advance_to(begin_load(&json, quit_at).unwrap(), 900, 900).set_down();
+    let resaved = save_string_carrying(&sd.state, quit_at, sd.owed_ticks, Some(&sd.report_so_far));
+    let g = finished(begin_load(&resaved, quit_at + 45).unwrap().advance(u64::MAX));
+    assert_eq!(g.report.elapsed_seconds, 600 + 45);
+    assert_eq!(g.state.ticks, s.ticks + 2_400 + 180, "every owed tick, plus the new interval's");
+    assert_eq!(away_entries(&g.state.journal).len(), away_entries(&s.journal).len() + 1);
+}

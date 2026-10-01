@@ -1,0 +1,540 @@
+{
+  "save_version": 4,
+  "saved_at_unix": 1758000000,
+  "owed_ticks": 123,
+  "state": {
+    "ticks": 1220,
+    "rng": {
+      "state": 9222323339146228233,
+      "inc": 2885390081777926815
+    },
+    "resources": [
+      200.0,
+      0.0,
+      0.0,
+      6.099999999999892,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "structures": [
+      4,
+      2,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "kittens": [
+      {
+        "name": "Ziggy",
+        "job": null,
+        "location": "Home",
+        "arrived_day": 1,
+        "job_seq": null,
+        "away_seq": null,
+        "skills": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 0.0,
+        "rank": 0,
+        "trait_id": "Charming",
+        "tinkering": null
+      },
+      {
+        "name": "Pancake",
+        "job": null,
+        "location": "Home",
+        "arrived_day": 2,
+        "job_seq": null,
+        "away_seq": null,
+        "skills": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 0.0,
+        "rank": 0,
+        "trait_id": "Charming",
+        "tinkering": null
+      }
+    ],
+    "ideas": [],
+    "pity": 0,
+    "famine_days": 0,
+    "recovery_days": 122,
+    "grumpy": false,
+    "next_seq": 0,
+    "zoomies_until": 1291,
+    "speed": 1.0,
+    "roster_high_water": 2,
+    "revealed": [
+      {
+        "Structure": "CatnipPatch"
+      },
+      {
+        "Idea": "PantryOrganization"
+      },
+      {
+        "Idea": "ScratchingArts"
+      }
+    ],
+    "journal": {
+      "recent": [
+        {
+          "tick": 1,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Structure": "CatnipPatch"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 1,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Idea": "PantryOrganization"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 1,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Idea": "ScratchingArts"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 10,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Ziggy"
+              }
+            }
+          }
+        },
+        {
+          "tick": 20,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Pancake"
+              }
+            }
+          }
+        },
+        {
+          "tick": 30,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 5,
+                "kitten": "Pancake"
+              }
+            }
+          }
+        },
+        {
+          "tick": 170,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 4,
+                "kitten": "Pancake"
+              }
+            }
+          }
+        },
+        {
+          "tick": 210,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 2,
+                "kitten": "Ziggy"
+              }
+            }
+          }
+        },
+        {
+          "tick": 230,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 9,
+                "kitten": null
+              }
+            }
+          }
+        },
+        {
+          "tick": 240,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 1,
+                "kitten": "Pancake"
+              }
+            }
+          }
+        },
+        {
+          "tick": 250,
+          "item": {
+            "Happened": {
+              "SeasonChanged": {
+                "season": "Summer"
+              }
+            }
+          }
+        },
+        {
+          "tick": 290,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 8,
+                "kitten": null
+              }
+            }
+          }
+        },
+        {
+          "tick": 330,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 7,
+                "kitten": null
+              }
+            }
+          }
+        },
+        {
+          "tick": 400,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 6,
+                "kitten": null
+              }
+            }
+          }
+        },
+        {
+          "tick": 420,
+          "item": {
+            "Happened": {
+              "ZoomiesStarted": {
+                "until_tick": 541
+              }
+            }
+          }
+        },
+        {
+          "tick": 430,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 4,
+                "kitten": "Ziggy"
+              }
+            }
+          }
+        },
+        {
+          "tick": 470,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 7,
+                "kitten": null
+              }
+            }
+          }
+        },
+        {
+          "tick": 500,
+          "item": {
+            "Happened": {
+              "SeasonChanged": {
+                "season": "Autumn"
+              }
+            }
+          }
+        },
+        {
+          "tick": 541,
+          "item": {
+            "Happened": "ZoomiesEnded"
+          }
+        },
+        {
+          "tick": 740,
+          "item": {
+            "Happened": {
+              "ZoomiesStarted": {
+                "until_tick": 861
+              }
+            }
+          }
+        },
+        {
+          "tick": 750,
+          "item": {
+            "Happened": {
+              "SeasonChanged": {
+                "season": "Winter"
+              }
+            }
+          }
+        },
+        {
+          "tick": 861,
+          "item": {
+            "Happened": "ZoomiesEnded"
+          }
+        },
+        {
+          "tick": 1000,
+          "item": {
+            "Happened": {
+              "SeasonChanged": {
+                "season": "Spring"
+              }
+            }
+          }
+        },
+        {
+          "tick": 1000,
+          "item": {
+            "Happened": {
+              "NewYear": {
+                "year": 1
+              }
+            }
+          }
+        },
+        {
+          "tick": 1010,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 1,
+                "kitten": "Pancake"
+              }
+            }
+          }
+        },
+        {
+          "tick": 1020,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 8,
+                "kitten": null
+              }
+            }
+          }
+        },
+        {
+          "tick": 1170,
+          "item": {
+            "Happened": {
+              "ZoomiesStarted": {
+                "until_tick": 1291
+              }
+            }
+          }
+        }
+      ],
+      "kept": []
+    },
+    "kites_high_water": 0.0,
+    "mess": 0.0,
+    "pending_sky": null,
+    "elder": null,
+    "jamboree_until": 0,
+    "refinements": [],
+    "rules": [],
+    "devotion": 0.0,
+    "serenity": 0.0,
+    "peak_devotion": 0.0,
+    "enlightenment_tier": 0,
+    "rites": [],
+    "rite_counts": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "arches_bought": [],
+    "dream_drift": 0.0,
+    "promises": [],
+    "penpal": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "discovered": [],
+    "elder_wisdom": 0.0,
+    "warm_memories": 0.0,
+    "passed_down_wisdom": 0.0,
+    "generation": 0,
+    "traditions": [],
+    "family_album": [],
+    "armed_adventure": null,
+    "active_adventure": null,
+    "adventure_completions": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "adventure_rewards": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "adventure_done": false,
+    "tidy_progress": 0,
+    "sites_reached": [],
+    "dream_looms": [],
+    "stirred_dreams": 0.0,
+    "distant_dawn": false,
+    "whale_visit_years": 0,
+    "whale_contentment": 0,
+    "deja_vu_until": 0
+  }
+}

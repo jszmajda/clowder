@@ -18,9 +18,15 @@ Two properties drive nearly every decision here. **The game lives in a tmux pane
 ```
 startup
   resolve save path
-  load save (or start a new game)          ← before raw mode, so failures print normally
+  load save (or start a new game)          ← before raw mode, so failures print normally;
+                                             the absence it owes is not yet replayed
   enter raw mode + alternate screen
   install panic hook, drop guard, signal handlers
+
+wake (a load that owes catch-up)
+  replay one bounded count of the catch-up per frame, drawing the waking screen,
+  until it finishes — or skip the screen when the first count finishes it
+  take the opening, queue the load's report
 
 loop
   1. poll for input with a frame-budget timeout
@@ -61,11 +67,25 @@ Each frame compares the two. When wall-clock elapsed exceeds monotonic elapsed b
 
 **One absence rule.** `load_string` caps catch-up at 365 days and sets `truncated` on the report. An in-process gap uses the same cap and the same flag, so a two-year suspend and a two-year closed save behave identically. There is one rule for absence; whether the process happened to be running across it is not something the player should be able to feel.
 
-**Catch-up is paced, never dropped.** A long gap can owe millions of ticks, and running them all in one frame is indistinguishable from a hang. Each frame spends a bounded slice of wall time running ticks and banks the rest, so a big catch-up drains over several frames while the UI stays alive and can say so. The tick count is exact; only its spreading over frames is approximate. Ticks owed are counted in integers, never floats, so a large backlog cannot lose precision.
+**Catch-up is paced, never dropped.** A long gap can owe millions of ticks, and running them all in one frame is indistinguishable from a hang. Each frame runs at most a bounded count of owed ticks and banks the rest, so a big catch-up drains over several frames while the UI stays alive. The bound is a count, not a slice of wall time: a time budget would read a clock inside the drain and buy more ticks on a fast machine than a slow one, making how far the meadow advances a property of the hardware. Ticks owed are counted in integers, never floats, so a large backlog cannot lose precision.
 
 **A save carries its banked ticks as a count.** Because ticks can be banked, the state in memory may be behind real time — mid-catch-up, deliberately. The timestamp is simply the present, and the ticks earned but not yet run are written beside it.
 
 The tempting alternative is to back-date the timestamp so the interval re-derives them, and it is wrong in a way that takes a while to see: the reload reconstructs ticks by multiplying an interval by whatever speed is persisted, so a backlog earned at one speed and saved at another is re-priced by the ratio between them. Earn fast, save slow, and most of it evaporates; the other way round, it multiplies. What the player earned is theirs, so it is stored as what it is.
+
+## Waking Up
+
+A load's catch-up is the largest backlog the game ever owes — a closed laptop's week, a year at the cap — and it is replayed after the terminal is taken, not before. Load parses, migrates, and normalizes the save before raw mode, so every load failure still prints on an ordinary terminal; what it hands back is the state with its catch-up pending (persistence: Paced Catch-up). The shell then enters the terminal and wakes the meadow: each frame advances the catch-up by at most a bounded count of ticks and draws the waking screen (navigation leaf), until the catch-up finishes and the game opens. A player returning from a long absence sees the meadow waking, with its progress, rather than a terminal that has not yet appeared.
+
+The game is **awake** from the moment it opens (navigation leaf: the opening): at once for a new game, which owes no catch-up, and for a load whose first bound finishes its catch-up; when the wake finishes, for any other load. Everything the loop does as play — its frame-budget wait, live ticks, autosave — belongs to the awake game; until then the shell is waking.
+
+- **Short absences show nothing.** Before the first frame the shell advances one bound. Where that finishes the catch-up — a short absence, a backwards clock, no absence at all — the game opens directly and no waking screen is ever drawn; a screen that would flash for one frame tells the player nothing. Otherwise the first frame is the waking screen, drawn having replayed no more than one bound.
+- **The bound is a count.** As with the live drain (Time, above), a count rather than a time budget, for the same reasons. It is its own count, larger than live play's: the waking screen has only its progress and the quit key to keep responsive, so a bound can take most of a frame's worth of a release build's time. Its value is a tuning constant (Deferred).
+- **No waiting while waking.** The poll for input does not wait out the frame budget while waking — it checks for a key and moves on — so the replay runs at the machine's pace and frames are its only pauses. Waiting out the budget between bounds would stretch a wake far beyond the replay's own cost.
+- **The replay comes first.** No live tick runs while waking. Real time keeps passing, and the ordinary accumulator observes it at the save's speed, suspend excess and the absence cap included, banking it as it would any interval; those ticks run as live ticks from the first frame of play, after every replayed tick. The ticks therefore run in the order they were earned — the absence, then the time spent waking — and the wait costs the player no game time.
+- **The frame that finishes opens the game.** When an advance finishes the catch-up, that frame runs no live tick; the shell takes the opening (navigation leaf) and queues the load's retained report against the caught-up state, and the first frame of play follows. The opening is taken against exactly the state a one-call replay of the same save at the same moment would have produced, bit for bit; the first frame of play then runs the live ticks banked while waking, as any frame runs its banked ticks, before it draws.
+- **No autosave while waking.** The save on disk still owes everything the wake has not finished, so a crash or a kill mid-wake loses nothing — the next load replays from that save, its interval reaching to the new moment. An autosave mid-wake would write a meadow halfway through its replay, protecting nothing the untouched save does not already protect. The cadence keeps counting from startup, so a wake longer than the interval autosaves on the first frame of play, securing the caught-up meadow promptly.
+- **Quitting mid-wake.** Input while waking answers quitting alone (navigation leaf). A quit key or a termination signal sets the catch-up down and saves promptly, the save's owed count carrying the catch-up's remaining ticks together with any live ticks banked while waking, and the save carrying the core's report so far beside it (persistence: Paced Catch-up). The next load wakes through the rest and continues that report, so the player who comes back is told the whole absence once, retained and bannered by its whole span however soon they return. Shutdown never waits for a wake to finish, any more than it waits for a live backlog.
 
 ## Terminal Lifecycle
 
@@ -83,9 +103,9 @@ Ctrl-C is not a signal here. In raw mode the terminal delivers it as an ordinary
 
 ## Saving
 
-**Cadence.** Autosave runs on a wall-clock interval and on every clean shutdown. The write itself is the core's atomic temp-file-plus-rename, so a save interrupted mid-write never corrupts the previous one.
+**Cadence.** Autosave runs on a wall-clock interval once the game is awake (Waking Up), and on every clean shutdown, one taken while waking included; it does not run while waking (Waking Up), the save on disk already owing everything the wake has not finished. The write itself is the core's atomic temp-file-plus-rename, so a save interrupted mid-write never corrupts the previous one.
 
-**Shutdown does not wait for the sim to catch up.** A quit or a signal arriving mid-backlog saves and exits promptly rather than draining first — a player pressing `q` should not watch the game refuse to close while it works through a week of absence. Back-dating makes this free: the unrun interval is carried in the timestamp and simply runs at the next load. Shutdown is the same operation whether the sim is current or a month behind.
+**Shutdown does not wait for the sim to catch up.** A quit or a signal arriving mid-backlog or mid-wake saves and exits promptly rather than draining first — a player pressing `q` should not watch the game refuse to close while it works through a week of absence. The banked ticks are carried in the save as a count, a wake's unreplayed ticks among them, and simply run at the next load. Shutdown is the same operation whether the sim is current or a month behind.
 
 **Failure is not fatal.** A failed autosave (full disk, revoked permissions, a data directory that vanished) reports itself once and the game keeps running — the player keeps playing, and the next cadence retries. Killing a healthy session because a disk was briefly full would destroy more progress than the failed write did.
 
@@ -117,16 +137,20 @@ The `Corrupt` policy is the one that earns its keep. Saves are human-readable JS
 
 ## Core API Dependencies (a cascade into `clowder-core`)
 
-One read-only addition, for the same reason the navigation leaf needs its own: the rule belongs core-side, and duplicating it shell-side is how the two drift.
+Two additions, for the same reason the navigation leaf needs its own: the rule belongs core-side, and duplicating it shell-side is how the two drift.
 
 1. **The catch-up cap** — `CATCHUP_CAP_SECONDS` is private to the persistence module, but TUI-RUN-024 requires an in-process gap to be capped at exactly the same limit the load path applies. A shell-side copy of the number is a second source of truth for the one rule that must be identical on both paths; export it instead.
+2. **The paced catch-up** — a load that returns its catch-up pending, advanced by counts the shell chooses, reporting its total and remaining ticks, and finished or set down by the core (SAVE-018, SAVE-019, SAVE-020); and a save write that carries a set-down catch-up's report so far beside its owed count (SAVE-021), which the next load continues (SAVE-022). Waking needs the replay to stay the core's: the shell drives the pace and reads the progress, and never runs replay ticks or folds a report itself.
 
 ## Decisions & Alternatives
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |---|---|---|---|
 | Clock source | Monotonic for accumulation, wall-clock checkpoint for suspend detection | Wall clock alone; monotonic alone | Wall-alone lets NTP and DST inject or rewind game time; monotonic-alone silently loses a suspended laptop's hours, breaking tenet 2 |
-| Long catch-up | Time-budgeted ticks per frame, remainder banked | Run every owed tick in one frame; cap and discard the excess | A multi-minute frozen frame reads as a hang; discarding punishes absence |
+| Long catch-up | A bounded count of ticks per frame, remainder banked | Run every owed tick in one frame; a wall-time budget per frame; cap and discard the excess | A multi-minute frozen frame reads as a hang; a time budget makes how far the meadow advances depend on the machine; discarding punishes absence |
+| A load's catch-up | Replayed after the terminal is taken, a bounded count per frame behind a waking screen | Replay it all before the first frame; replay it on a background thread; draw the game's frame live as the replay advances | Replaying first holds a blank terminal for up to the whole absence; a thread costs the single-threaded determinism story; a live game frame shows tabs and numbers racing through states the player cannot act on, and the opening would have to judge tabs it watched arrive |
+| Time spent waking | Banked at the save's speed and run as live ticks after the replay | Not counted; counted into the replay | Not counting it costs the player game time for the wait; folding it into the replay would change the replayed ticks and break bit-identity with a one-call load |
+| Autosave while waking | None; the save on disk still owes the unfinished wake | Autosave on cadence mid-wake | An autosave mid-wake writes a meadow halfway through its replay, protecting nothing the untouched save does not already protect, and costs a set-down and a save on frames the wake would rather spend replaying |
 | In-process gap cap | The same 365-day cap and `truncated` flag as the load path | No cap while running | One absence rule; the player should not be able to feel whether the process was running |
 | Tick accounting | Integer ticks owed, fractional remainder banked separately | Floating-point tick counter | A large backlog in `f64` loses whole ticks to precision |
 | Banked ticks across a save | Carried as an explicit count beside a present timestamp | Back-date the timestamp so the interval re-derives them | Re-deriving re-prices the backlog at whatever speed is persisted, losing or conjuring ticks by the ratio between the speed they were earned at and the speed they were saved at |
@@ -140,7 +164,7 @@ One read-only addition, for the same reason the navigation leaf needs its own: t
 | Corrupt save | Move aside, never overwrite | Overwrite with a new game; refuse to start | Human-readable saves exist to be hand-rescued; destroying one is the worst available outcome |
 | Autosave failure | Report once, keep playing, retry next cadence | Abort the session; retry in a tight loop | A transient disk problem should not end a session or spam the log |
 | Concurrency | Single thread; synchronous save | Background save thread; async runtime | The save is small; a thread costs the determinism story for milliseconds |
-| Load ordering | Load before entering raw mode | Enter raw mode first | A load failure must be able to print to an ordinary terminal |
+| Load ordering | Parse, migrate, and normalize before entering raw mode; replay after | Enter raw mode first; replay before raw mode too | A load failure must be able to print to an ordinary terminal; the replay cannot fail, and run before the terminal is taken it is a blank wait |
 
 ## Open Questions & Future Decisions
 
@@ -150,12 +174,12 @@ One read-only addition, for the same reason the navigation leaf needs its own: t
 
 ### Deferred
 1. Frame cadence — a fixed rate versus redrawing only on change. The shell sub-HLD defers this to measurement on a real pane; the loop shape above accommodates either, since the poll timeout is the only knob.
-2. The exact autosave interval and the per-frame catch-up budget. Both are single constants; they want tuning against a real long game rather than a guess now.
+2. The exact autosave interval and the two per-frame tick bounds — live play's backlog drain and waking's. Each is a single constant; they want tuning against a real long game rather than a guess now.
 3. Whether the suspend-detection tolerance needs to adapt to platforms whose monotonic clock *does* include suspended time — a platform where the two clocks agree needs no correction, and the comparison is already a no-op there.
 
 ## References
 
 - Parent: `../tui-design.md` (loop shape, the shell-owns-wall-clock decision)
-- Consumes: `clowder_core::{GameState::tick, load_string, read_save, write_save, default_save_path, LoadError, LoadedGame, OfflineReport}` and `content::TICKS_PER_SECOND`
-- Siblings: `navigation/` delivers key meaning and owns the offline-report presentation (TUI-NAV-027); `render/` owns drawing within the frame this loop schedules
+- Consumes: `clowder_core::{GameState::tick, load_string, read_save, write_save, default_save_path, LoadError, LoadedGame, OfflineReport, CATCHUP_CAP_SECONDS}` and `content::TICKS_PER_SECOND`; and the paced catch-up the load hands back — advance by a count, total and remaining ticks, finish, set down — with the save write that carries a report so far (Core API Dependencies 2; SAVE-018 to SAVE-022)
+- Siblings: `navigation/` delivers key meaning and owns the offline-report presentation (TUI-NAV-027) and the waking screen (TUI-NAV-102); `render/` owns drawing within the frame this loop schedules
 - Persistence intent (the catch-up cap, atomic write, and version policy this leaf drives): `../../persistence/persistence-design.md`

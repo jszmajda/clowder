@@ -7,6 +7,7 @@ pub mod clock;
 pub mod lock;
 pub mod persist;
 pub mod term;
+pub mod wake;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -20,6 +21,16 @@ use crate::render::Layout;
 pub use clock::TickAccumulator;
 pub use lock::SessionLock;
 pub use term::TerminalGuard;
+pub use wake::{Wake, Waking, WAKE_TICKS_PER_FRAME};
+
+/// The one place a save's timestamp is derived from the real clock, shared by
+/// a live session's save and a shutdown taken mid-wake. @spec TUI-RUN-027
+pub(crate) fn now_unix() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
 
 /// Everything one session owns. The loop is a method on this rather than a
 /// free function: a step needs the game, the view, banked time, the previous
@@ -94,24 +105,19 @@ pub fn run() -> ExitCode {
         }
     };
 
-    let now_unix = std::time::SystemTime::now()
+    let load_now_unix = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
 
-    // Carried past the match so start-up can queue whatever report the load
-    // retained (TUI-NAV-027) once `view` exists — a load never runs through a
-    // command, so this is the one seam that reaches for it directly.
-    let mut loaded_game: Option<clowder_core::LoadedGame> = None;
-    let state = match contents {
+    // A load never runs through a command, so whatever it found — a fresh
+    // game, or a catch-up pending (SAVE-018) — is carried past the match to
+    // where the terminal exists to replay it behind. @spec TUI-RUN-033
+    let startup = match contents {
         // TUI-RUN-010: an ordinary first run, not an error.
-        None => GameState::new(now_unix),
-        Some(c) => match clowder_core::load_string(&c, now_unix) {
-            Ok(loaded) => {
-                let state = loaded.state.clone();
-                loaded_game = Some(loaded);
-                state
-            }
+        None => Startup::NewGame(GameState::new(load_now_unix)),
+        Some(c) => match clowder_core::begin_load(&c, load_now_unix) {
+            Ok(catch_up) => Startup::Loaded(Box::new(catch_up)),
             // TUI-RUN-011: never guess forward over a save that is currently fine.
             Err(clowder_core::LoadError::TooNew { found }) => {
                 eprintln!(
@@ -135,7 +141,7 @@ pub fn run() -> ExitCode {
                              Starting a new meadow.",
                             moved.display()
                         );
-                        GameState::new(now_unix)
+                        Startup::NewGame(GameState::new(load_now_unix))
                     }
                     Err(e) => {
                         eprintln!(
@@ -147,7 +153,7 @@ pub fn run() -> ExitCode {
                     }
                 }
             }
-            Err(clowder_core::LoadError::NotFound) => GameState::new(now_unix),
+            Err(clowder_core::LoadError::NotFound) => Startup::NewGame(GameState::new(load_now_unix)),
         },
     };
 
@@ -179,30 +185,6 @@ pub fn run() -> ExitCode {
         return ExitCode::FAILURE;
     }
 
-    let mut view = ViewState::default();
-    // TUI-NAV-024: the cold open is one section with one focused row, and
-    // whatever the load already found showing counts as known rather than
-    // freshly arrived. Without this the first thing a player presses does
-    // nothing, and the hint bar's "Enter do" is a promise the game does not
-    // keep.
-    crate::nav::opening(&mut view, &state);
-    // TUI-NAV-027: exactly where the core kept a catch-up report, never from
-    // a span the shell judges on its own.
-    if let Some(loaded) = &loaded_game {
-        crate::nav::queue_load_report(&mut view, loaded);
-    }
-
-    let mut app = App {
-        state,
-        view,
-        clock: TickAccumulator::default(),
-        save_path,
-        last_save: Instant::now(),
-        prev_layout: None,
-        quitting: false,
-        save_failed: false,
-    };
-
     // Anything said from in here would be printed onto the alternate screen and
     // then wiped out by the restore that follows. Collect instead, and speak
     // once the player's own terminal is back.
@@ -210,79 +192,213 @@ pub fn run() -> ExitCode {
     {
         let _guard = _guard;
         let backend = ratatui::backend::CrosstermBackend::new(std::io::stdout());
-        let mut terminal = match ratatui::Terminal::new(backend) {
-            Ok(t) => Some(t),
-            Err(e) => {
-                parting.push(format!("clowder could not start drawing: {e}"));
-                app.quitting = true;
-                None
-            }
-        };
+        match ratatui::Terminal::new(backend) {
+            Ok(mut terminal) => {
+                // TUI-RUN-033/034: a load's catch-up replays behind the waking
+                // screen, after the terminal is taken — never before.
+                let opened = match startup {
+                    Startup::NewGame(state) => {
+                        let mut view = ViewState::default();
+                        // TUI-NAV-024: the cold open is one section with one
+                        // focused row, and whatever the load already found
+                        // showing counts as known rather than freshly arrived.
+                        crate::nav::opening(&mut view, &state);
+                        Some(Box::new(App {
+                            state,
+                            view,
+                            clock: TickAccumulator::default(),
+                            save_path: save_path.clone(),
+                            last_save: Instant::now(),
+                            prev_layout: None,
+                            quitting: false,
+                            save_failed: false,
+                        }))
+                    }
+                    Startup::Loaded(catch_up) => {
+                        match run_wake(*catch_up, save_path.clone(), &mut terminal) {
+                            Ok(WakeOutcome::Opened(app)) => Some(app),
+                            Ok(WakeOutcome::ShutDown(Ok(()))) => None,
+                            Ok(WakeOutcome::ShutDown(Err(e))) => {
+                                parting.push(format!("clowder could not save on the way out: {e}"));
+                                None
+                            }
+                            Err(e) => {
+                                parting.push(format!("clowder stopped while waking: {e}"));
+                                None
+                            }
+                        }
+                    }
+                };
 
-        // The only place real clocks are read. Both are sampled together so
-        // their difference is meaningful: the wall clock outrunning the
-        // monotonic one is the machine having been suspended.
-        // @spec TUI-RUN-021, TUI-RUN-022
-        let mut last_mono = Instant::now();
-        let mut last_wall = std::time::SystemTime::now();
+                if let Some(mut app) = opened {
+                    // The only place real clocks are read. Both are sampled
+                    // together so their difference is meaningful: the wall
+                    // clock outrunning the monotonic one is the machine
+                    // having been suspended.
+                    // @spec TUI-RUN-021, TUI-RUN-022
+                    let mut last_mono = Instant::now();
+                    let mut last_wall = std::time::SystemTime::now();
 
-        while !app.quitting && !term::termination_requested() {
-            let now_mono = Instant::now();
-            let now_wall = std::time::SystemTime::now();
-            let reading = clock::Reading {
-                monotonic: now_mono.duration_since(last_mono),
-                // A backwards correction reads as zero elapsed here; the
-                // accumulator keeps the monotonic figure. @spec TUI-RUN-023
-                wall: now_wall.duration_since(last_wall).unwrap_or_default(),
-            };
-            last_mono = now_mono;
-            last_wall = now_wall;
+                    while !app.quitting && !term::termination_requested() {
+                        let now_mono = Instant::now();
+                        let now_wall = std::time::SystemTime::now();
+                        let reading = clock::Reading {
+                            monotonic: now_mono.duration_since(last_mono),
+                            // A backwards correction reads as zero elapsed
+                            // here; the accumulator keeps the monotonic
+                            // figure. @spec TUI-RUN-023
+                            wall: now_wall.duration_since(last_wall).unwrap_or_default(),
+                        };
+                        last_mono = now_mono;
+                        last_wall = now_wall;
 
-            // The poll timeout IS the frame cadence; nothing to do means we
-            // wait here. Bounded so a flood cannot starve the frame.
-            let mut input = Vec::new();
-            let mut waited = false;
-            while input.len() < App::MAX_INPUT_EVENTS_PER_FRAME {
-                let timeout =
-                    if waited { std::time::Duration::ZERO } else { App::FRAME_BUDGET };
-                waited = true;
-                match crossterm::event::poll(timeout) {
-                    Ok(true) => match crossterm::event::read() {
-                        Ok(ev) => input.push(ev),
-                        Err(e) => {
-                            parting.push(format!("clowder lost its input: {e}"));
+                        // The poll timeout IS the frame cadence; nothing to do
+                        // means we wait here. Bounded so a flood cannot starve
+                        // the frame.
+                        let mut input = Vec::new();
+                        let mut waited = false;
+                        while input.len() < App::MAX_INPUT_EVENTS_PER_FRAME {
+                            let timeout =
+                                if waited { std::time::Duration::ZERO } else { app.poll_timeout() };
+                            waited = true;
+                            match crossterm::event::poll(timeout) {
+                                Ok(true) => match crossterm::event::read() {
+                                    Ok(ev) => input.push(ev),
+                                    Err(e) => {
+                                        parting.push(format!("clowder lost its input: {e}"));
+                                        break;
+                                    }
+                                },
+                                Ok(false) => break,
+                                Err(e) => {
+                                    parting.push(format!("clowder lost its input: {e}"));
+                                    break;
+                                }
+                            }
+                        }
+
+                        if let Err(e) = app.step(&mut terminal, reading, &input) {
+                            parting.push(format!("clowder stopped: {e}"));
                             break;
                         }
-                    },
-                    Ok(false) => break,
-                    Err(e) => {
-                        parting.push(format!("clowder lost its input: {e}"));
-                        break;
+                    }
+                    // Every clean shutdown saves, and does not drain the
+                    // backlog first: the banked count goes into the save and
+                    // the next load runs it, so quitting mid-catch-up costs
+                    // nothing and waits for nothing. A failure does not
+                    // change the exit code — the session is ending either
+                    // way, and the player is better served by being told than
+                    // by a status nobody reads. @spec TUI-RUN-026, TUI-RUN-031
+                    if let Err(e) = app.save() {
+                        parting.push(format!("clowder could not save on the way out: {e}"));
                     }
                 }
             }
-
-            let Some(t) = terminal.as_mut() else { break };
-            if let Err(e) = app.step(t, reading, &input) {
-                parting.push(format!("clowder stopped: {e}"));
-                break;
+            Err(e) => {
+                parting.push(format!("clowder could not start drawing: {e}"));
+                // Still a clean shutdown: save whatever was there to save,
+                // exactly as if play had opened and quit at once.
+                let result = match startup {
+                    Startup::NewGame(state) => {
+                        clowder_core::write_save_owing(&save_path, &state, now_unix(), 0)
+                    }
+                    Startup::Loaded(catch_up) => {
+                        let sd = catch_up.set_down();
+                        clowder_core::write_save_carrying(
+                            &save_path,
+                            &sd.state,
+                            now_unix(),
+                            sd.owed_ticks,
+                            Some(&sd.report_so_far),
+                        )
+                    }
+                };
+                if let Err(e) = result {
+                    parting.push(format!("clowder could not save on the way out: {e}"));
+                }
             }
-        }
-        // Every clean shutdown saves, and does not drain the backlog first: the
-        // banked count goes into the save and the next load runs it, so
-        // quitting mid-catch-up costs nothing and waits for nothing.
-        // A failure does not change the
-        // exit code — the session is ending either way, and the player is better
-        // served by being told than by a status nobody reads.
-        // @spec TUI-RUN-026, TUI-RUN-031
-        if let Err(e) = app.save() {
-            parting.push(format!("clowder could not save on the way out: {e}"));
         }
     }
     for line in parting {
         eprintln!("{line}");
     }
     ExitCode::SUCCESS
+}
+
+/// What startup found: a fresh game, or a load whose catch-up (SAVE-018) is
+/// still pending — carried past the terminal's creation so it can be replayed
+/// behind the waking screen rather than before the terminal is taken.
+/// @spec TUI-RUN-033
+///
+/// `GameState` is simply a large value; boxing it here would trade a bigger
+/// local for an allocation this one-shot, single-value match never needed.
+#[allow(clippy::large_enum_variant)]
+enum Startup {
+    NewGame(GameState),
+    Loaded(Box<clowder_core::CatchUp>),
+}
+
+/// What waking through a load's catch-up ended in: the game opened, or a quit
+/// key / termination signal that set the catch-up down and saved.
+/// @spec TUI-RUN-038, TUI-RUN-039
+enum WakeOutcome {
+    Opened(Box<App>),
+    ShutDown(std::io::Result<()>),
+}
+
+/// Drive a load's catch-up to completion behind the waking screen — polling
+/// without waiting out the frame budget (TUI-RUN-035), observing real time at
+/// the save's speed (TUI-RUN-036), taking no autosave (TUI-RUN-037) — until
+/// it finishes and the game opens, or a quit key or termination signal cuts
+/// it short. @spec TUI-RUN-033, TUI-RUN-034, TUI-RUN-038, TUI-RUN-039
+fn run_wake<B: ratatui::backend::Backend>(
+    catch_up: clowder_core::CatchUp,
+    save_path: std::path::PathBuf,
+    terminal: &mut ratatui::Terminal<B>,
+) -> std::io::Result<WakeOutcome> {
+    let mut wake = Wake::begin(catch_up, save_path, terminal)?;
+    let mut last_mono = Instant::now();
+    let mut last_wall = std::time::SystemTime::now();
+    loop {
+        let w = match wake {
+            Wake::Awake(app) => return Ok(WakeOutcome::Opened(Box::new(app))),
+            Wake::Waking(w) => w,
+        };
+        // A termination signal mid-wake answers exactly as a quit key does:
+        // set the catch-up down and save promptly. @spec TUI-RUN-039
+        if term::termination_requested() {
+            return Ok(WakeOutcome::ShutDown(w.shut_down()));
+        }
+
+        let now_mono = Instant::now();
+        let now_wall = std::time::SystemTime::now();
+        let reading = clock::Reading {
+            monotonic: now_mono.duration_since(last_mono),
+            wall: now_wall.duration_since(last_wall).unwrap_or_default(),
+        };
+        last_mono = now_mono;
+        last_wall = now_wall;
+
+        // TUI-RUN-035: no waiting while waking — poll once, without the
+        // frame budget's timeout, and move on.
+        let mut input = Vec::new();
+        while input.len() < App::MAX_INPUT_EVENTS_PER_FRAME {
+            match crossterm::event::poll(w.poll_timeout()) {
+                Ok(true) => match crossterm::event::read() {
+                    Ok(ev) => input.push(ev),
+                    Err(_) => break,
+                },
+                _ => break,
+            }
+        }
+
+        match w.step(terminal, reading, &input)? {
+            Wake::Waking(next) if next.quitting => {
+                return Ok(WakeOutcome::ShutDown(next.shut_down()));
+            }
+            next => wake = next,
+        }
+    }
 }
 
 impl App {
@@ -494,10 +610,11 @@ impl App {
         // earned slow and saved fast were conjured, by the ratio between the
         // two speeds. What the player earned is theirs, so it is stored as
         // what it is. @spec TUI-RUN-027, SAVE-017
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        clowder_core::write_save_owing(&self.save_path, &self.state, now, self.clock.backlog())
+        clowder_core::write_save_owing(&self.save_path, &self.state, now_unix(), self.clock.backlog())
+    }
+
+    /// How long the awake game waits out its frame budget. @spec TUI-RUN-035
+    pub fn poll_timeout(&self) -> std::time::Duration {
+        Self::FRAME_BUDGET
     }
 }

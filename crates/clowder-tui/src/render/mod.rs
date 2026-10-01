@@ -717,6 +717,47 @@ fn draw_dividers(f: &mut Frame, columns: &[u16], top: u16, height: u16, season: 
     }
 }
 
+/// The waking screen: three lines in place of the whole frame, drawn from the
+/// catch-up's total and remaining counts and the terminal's size alone —
+/// nothing about the absence itself. Below the floor, the too-small card
+/// stands in, as it does for the game's own frame, and the replay carries on
+/// beneath it regardless of which is drawn.
+/// @spec TUI-NAV-102
+pub fn waking(f: &mut Frame, total_ticks: u64, remaining_ticks: u64) {
+    let area = f.area();
+    if let Body::TooSmall(rect) = layout::compute(area, None, false).body {
+        widgets::overlays::too_small(f, rect);
+        return;
+    }
+
+    // Both round down, so neither reads full until waking ends.
+    let replayed = total_ticks.saturating_sub(remaining_ticks);
+    let total = total_ticks.max(1);
+    let filled = (40 * replayed / total) as usize;
+    let percent = 100 * replayed / total;
+    let bar: String =
+        "\u{2588}".repeat(filled) + &"\u{2591}".repeat(40 - filled);
+
+    let calm = "the clowder is stretching awake\u{2026}";
+    let bar_line = format!("{bar}   {percent}%");
+    let hint = "q save & quit \u{b7} the meadow finishes waking next time";
+    let lines = [(calm, Role::Dim), (bar_line.as_str(), Role::Inherited), (hint, Role::Dim)];
+
+    // Centred in the pane, one blank row between each. @spec TUI-NAV-102
+    let block_h = 5u16;
+    let top = area.y + area.height.saturating_sub(block_h) / 2;
+    for (i, (text, role)) in lines.iter().enumerate() {
+        let y = top + i as u16 * 2;
+        if y >= area.y + area.height {
+            continue;
+        }
+        let w = (text.chars().count() as u16).min(area.width);
+        let x = area.x + (area.width.saturating_sub(w)) / 2;
+        let rect = Rect::new(x, y, w, 1);
+        f.render_widget(Paragraph::new(Line::styled(text.to_string(), style_for(*role))), rect);
+    }
+}
+
 /// Draw one frame, returning the layout it used.
 ///
 /// The layout must escape: the breakpoints' dead-band is a function of the

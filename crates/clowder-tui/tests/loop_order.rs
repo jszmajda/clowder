@@ -469,3 +469,93 @@ fn a_save_that_cannot_be_read_is_never_moved_aside() {
          read, so nothing is known to be corrupt.\n{run}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-033 — a load's catch-up is replayed after the terminal is taken
+// ---------------------------------------------------------------------------
+
+/// Run the real binary against a scratch home, ending it at the deadline with
+/// a termination signal rather than a kill, so a child that has taken a
+/// terminal takes its ordinary shutdown path and restores it (TUI-RUN-004).
+#[cfg(unix)]
+fn run_clowder_until_deadline(home: &Path, budget: Duration) -> Run {
+    let mut child = Command::new(CLOWDER)
+        .env_clear()
+        .env("HOME", home)
+        .env("XDG_DATA_HOME", home.join(".local/share"))
+        .env("PATH", "/usr/bin:/bin")
+        .env("TERM", "xterm-256color")
+        .current_dir(home)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|e| panic!("spawning {CLOWDER}: {e}"));
+
+    let deadline = Instant::now() + budget;
+    let mut timed_out = false;
+    loop {
+        match child.try_wait().expect("polling the child") {
+            Some(_) => break,
+            None if Instant::now() >= deadline => {
+                timed_out = true;
+                let _ = Command::new("kill").arg("-TERM").arg(child.id().to_string()).status();
+                let grace = Instant::now() + Duration::from_secs(5);
+                while child.try_wait().expect("polling the child").is_none() {
+                    if Instant::now() >= grace {
+                        let _ = child.kill();
+                        break;
+                    }
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                break;
+            }
+            None => std::thread::sleep(Duration::from_millis(20)),
+        }
+    }
+
+    let output = child.wait_with_output().expect("collecting the child's output");
+    Run {
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        status: output.status,
+        timed_out,
+    }
+}
+
+/// A save away for longer than the catch-up cap owes a year of ticks — far
+/// more than any machine replays inside the deadline, and far more than a
+/// debug build replays in many minutes. A shell that replayed the absence
+/// before taking the terminal would still be replaying at the deadline,
+/// having reached neither the alternate screen nor its attempt to prepare
+/// one. A shell that takes the terminal first gets there at once: with a
+/// terminal to take it enters the alternate screen, and without one it says
+/// it could not prepare the terminal. Either is proof the absence was not
+/// replayed first.
+///
+/// @spec TUI-RUN-033
+#[cfg(unix)]
+#[test]
+fn a_long_absence_is_replayed_after_the_terminal_is_taken_not_before() {
+    let home = TempDir::new("year-away");
+    let save = child_save_path(home.path());
+    fs::create_dir_all(save.parent().unwrap()).unwrap();
+    let meadow = clowder_core::GameState::new(33_033);
+    // Stamped at the epoch's first second: today is far past the cap.
+    fs::write(&save, clowder_core::save_string(&meadow, 1)).expect("writing the fixture save");
+
+    let run = run_clowder_until_deadline(home.path(), CHILD_BUDGET);
+
+    let took_the_terminal = run.stdout.contains(ALTERNATE_SCREEN[0].0)
+        || run.combined().contains("could not prepare the terminal");
+    assert!(
+        took_the_terminal,
+        "the shell neither entered the alternate screen nor tried to prepare a terminal \
+         within {CHILD_BUDGET:?} of starting on a save a year away — it was replaying the \
+         absence before taking the terminal, which the player sees as a hang.\n{run}"
+    );
+    assert!(
+        !run.stderr.contains("panicked at"),
+        "the shell panicked on a long absence.\n{run}"
+    );
+}

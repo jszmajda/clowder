@@ -25,7 +25,7 @@
 
 ## The Event Loop
 
-- [x] **TUI-RUN-014**: Each iteration the system shall poll for input with a frame-budget timeout, apply any resulting commands, advance the simulation, autosave if due, and render one frame, in that order.
+- [ ] **TUI-RUN-014**: Once the game is awake — from the start of a new game, from before the first frame for a load whose first bound finishes its catch-up (TUI-RUN-034), and otherwise from the end of its waking (TUI-RUN-038) — each iteration the system shall poll for input with a frame-budget timeout, apply any resulting commands, advance the simulation, autosave if due, and render one frame, in that order.
 - [x] **TUI-RUN-015**: The system shall apply a frame's commands before running that frame's ticks, so a key pressed during the preceding wait takes effect at the time it was pressed rather than after the elapsed interval.
 - [x] **TUI-RUN-016**: The system shall consume at most a bounded number of input events per frame and shall coalesce queued resize events to the most recent, so a flood of input cannot starve the simulation or the renderer.
 - [x] **TUI-RUN-017**: The system shall advance the simulation regardless of render state — including a terminal too small to draw and a frame with nothing to redraw — so time never depends on what is on screen.
@@ -46,6 +46,16 @@
 
 ## Saving
 
-- [x] **TUI-RUN-026**: The system shall autosave on a wall-clock interval and on every clean shutdown, using the core's atomic write.
+- [ ] **TUI-RUN-026**: The system shall autosave on a wall-clock interval once the game is awake (TUI-RUN-014), never while waking (TUI-RUN-037), and shall save on every clean shutdown, one taken while waking included, using the core's atomic write.
 - [x] **TUI-RUN-027**: The system shall record a save's banked-but-unrun ticks as an explicit count beside the present timestamp, so a save taken mid-catch-up owes exactly the ticks it banked — neither lost nor counted twice, and never re-priced by a speed set after they were earned.
 - [x] **TUI-RUN-028**: When a save fails to write, the system shall report it once, continue playing, and retry at the next cadence, rather than ending the session or retrying continuously.
+
+## Waking Up
+
+- [x] **TUI-RUN-033**: When a load owes catch-up, the system shall replay it after entering raw mode and the alternate screen rather than before, advancing the core's catch-up (SAVE-018) by at most a bounded count of ticks per frame — a count rather than a slice of wall time, for the reasons TUI-RUN-025 gives, and its own count rather than live play's — and shall draw its first frame having replayed at most one such bound, so a long absence shows itself waking rather than holding a terminal that has not yet appeared.
+- [x] **TUI-RUN-034**: Where the first bound of a load's catch-up finishes it — a short absence, a backwards clock, or none — the system shall open the game directly, drawing no waking screen; otherwise it shall draw the waking screen (TUI-NAV-102) on every frame until the catch-up finishes.
+- [x] **TUI-RUN-035**: While waking, the system shall poll for input without waiting out the frame budget, so the replay runs at the machine's pace with frames as its only pauses.
+- [x] **TUI-RUN-036**: While waking, the system shall run no live tick, and shall observe the real time passing through the ordinary accumulator at the save's speed — suspend excess and the absence cap included — banking it to run as live ticks from the first frame of play, after every replayed tick, so the ticks run in the order they were earned and the wait costs no game time.
+- [x] **TUI-RUN-037**: While waking, the system shall take no autosave, leaving the save on disk owing everything the wake has not finished, so a crash or kill mid-wake loses nothing and the next load replays from that save.
+- [x] **TUI-RUN-038**: When an advance finishes a load's catch-up, the system shall run no live tick in that frame, and shall take the opening (TUI-NAV-024) and queue the load's retained report (TUI-NAV-027) against the caught-up state before the first frame of play, so the opening is taken against the state a one-call load of the same save at the same now_unix produces, bit for bit, and the live ticks banked while waking run only after it (TUI-RUN-036).
+- [x] **TUI-RUN-039**: When shutdown begins while waking — a quit key or a termination signal — the system shall set the catch-up down (SAVE-020) and save promptly rather than finishing the wake, the save's owed count carrying the catch-up's remaining ticks together with any live ticks banked while waking, and the save carrying the report so far the set-down returns (SAVE-021), so a later load wakes through the rest and tells the absence once (SAVE-022).
