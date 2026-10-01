@@ -495,8 +495,10 @@ fn draw_list(
 /// cannot tell the colours apart. Focus is the cursor glyph plus reverse
 /// video, never a palette colour: the row's colour already says what its
 /// state is, and a second colour would be saying something else at the same
-/// time. @spec TUI-NAV-009, TUI-NAV-021, TUI-NAV-022, TUI-THEME-006,
-/// TUI-THEME-014, TUI-RENDER-020, TUI-RENDER-021
+/// time. A kitten's row carries neither heading field; the place they would
+/// take instead names the kitten's one state (TUI-RENDER-024).
+/// @spec TUI-NAV-009, TUI-NAV-021, TUI-NAV-022, TUI-THEME-006,
+/// TUI-THEME-014, TUI-RENDER-020, TUI-RENDER-021, TUI-RENDER-024
 fn row_line(
     state: &GameState,
     row: &Row,
@@ -530,9 +532,6 @@ fn row_line(
         return Line::from(Span::styled(fmt::fit(&text, width), style));
     }
 
-    let count_text = count_field_text(stated_count(state, row));
-    let cost_text = cost_field_text(stated_cost(state, row).as_deref(), c);
-
     let mut fixed = cursor.chars().count() + 2;
     if counted {
         fixed += 1 + 7;
@@ -542,14 +541,26 @@ fn row_line(
     }
     let name_w = width.saturating_sub(fixed).max(4);
 
+    // A kitten's row states neither heading; the place its count and cost
+    // fields would take instead names the kitten's one state
+    // (TUI-NAV-101, TUI-RENDER-024).
     let mut suffix = String::new();
-    if counted {
+    if let RowKey::Kitten(ix, _) = row.key {
+        let total = fixed - (cursor.chars().count() + 2);
+        let place = total.saturating_sub(1);
         suffix.push(' ');
-        suffix.push_str(&count_text);
-    }
-    if costed {
-        suffix.push(' ');
-        suffix.push_str(&cost_text);
+        suffix.push_str(&format!("{:<place$}", kitten_state_word(state, ix)));
+    } else {
+        let count_text = count_field_text(stated_count(state, row));
+        let cost_text = cost_field_text(stated_cost(state, row).as_deref(), c);
+        if counted {
+            suffix.push(' ');
+            suffix.push_str(&count_text);
+        }
+        if costed {
+            suffix.push(' ');
+            suffix.push_str(&cost_text);
+        }
     }
 
     // A kitten's row carries no label (TUI-NAV-093), but where the name's
@@ -600,6 +611,28 @@ fn kitten_elder_hint(state: &GameState, row: &Row) -> Option<&'static str> {
 /// The row-bound hint a kitten's row carries after its name, whole or not at
 /// all. @spec TUI-NAV-095
 const ELDER_HINT: &str = "(n: Elder)";
+
+/// The word a kitten away from home reads, whatever job it holds.
+const AWAY_WORD: &str = "visiting";
+/// The word a kitten at home with no job reads.
+const IDLE_WORD: &str = "idle";
+
+/// The one state a listed kitten's row names, read from the kitten's location
+/// and job as the core holds them and no rule of the shell's own: away from
+/// home wherever it is anywhere but home, whatever job it holds; at home with
+/// a job, that job's name as its definition spells it; at home with none, the
+/// idle word. Says nothing of the Elder, whose own hint (TUI-NAV-095) stands
+/// in the name's column, not here. @spec TUI-NAV-101
+fn kitten_state_word(state: &GameState, ix: usize) -> String {
+    let kitten = &state.kittens[ix];
+    if kitten.location != Location::Home {
+        AWAY_WORD.to_string()
+    } else if let Some(j) = kitten.job {
+        content::job_def(j).name.to_string()
+    } else {
+        IDLE_WORD.to_string()
+    }
+}
 
 /// A row's fixed-width fields (TUI-RENDER-020): the pane's width, whether its
 /// section gives an owned-count field, and the cost field's width — the

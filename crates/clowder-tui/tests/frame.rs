@@ -1673,6 +1673,15 @@ fn every_list_row_draws_its_count_and_cost_in_fixed_fields_at_its_right() {
                         if counted || costed {
                             assert_eq!(line[4 + name_w], " ", "{at}: a blank column before the first field.\n{drawn:?}");
                         }
+                        if matches!(row.key, RowKey::Kitten(..)) {
+                            // A kitten's row states neither heading; its
+                            // fields' place carries the kitten's state
+                            // instead, swept over every state, width, and
+                            // cursor by
+                            // `every_kitten_row_names_its_one_state_whole_in_its_fields_place`
+                            // (TUI-RENDER-024).
+                            continue;
+                        }
                         if counted {
                             let count = stated_count(state, row);
                             if count == Some(0) {
@@ -1830,14 +1839,13 @@ fn every_kitten_row_whose_gate_is_open_carries_the_whole_elder_hint_where_it_fit
                 let column = cells_text(line, 4, 4 + name_w);
                 let fields = cells_text(line, 4 + name_w, width);
 
-                // Never in the count or cost field: those draw what the
-                // inspector states, and nothing of the hint.
-                let (cost_text, _) = cost_field(stated_cost(&state, row).as_deref(), &store, c);
-                assert_eq!(
-                    fields,
-                    format!(" {} {cost_text}", count_field(stated_count(&state, row))),
-                    "{at}: the count and cost fields draw what the inspector states there, and \
-                     the hint never stands in either"
+                // Never in the count or cost field's place: that place carries
+                // the kitten's state, whose exact drawing is swept by
+                // `every_kitten_row_names_its_one_state_whole_in_its_fields_place`
+                // (TUI-RENDER-024); here only that no part of the hint is there.
+                assert!(
+                    fields.starts_with(' ') && !fields.contains(ELDER_HINT) && !fields.contains("(n:"),
+                    "{at}: the hint never stands in the count or cost field's place"
                 );
 
                 // The name first, never cost a character; after it, blanks and
@@ -1893,4 +1901,389 @@ fn every_kitten_row_whose_gate_is_open_carries_the_whole_elder_hint_where_it_fit
     assert!(drawn_with > 0, "fixture: no row was wide enough to require the hint");
     assert!(focused_with > 0, "fixture: the cursor's own row never required the hint");
     assert!(drawn_without > 0, "fixture: no row was too narrow to hold the hint");
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-101 / TUI-RENDER-024 — what a kitten's row says it is doing
+// ---------------------------------------------------------------------------
+
+use clowder_core::content::job_def;
+
+/// The word a kitten away from home reads, whatever job it holds.
+const AWAY_WORD: &str = "visiting";
+/// The word a kitten at home with no job reads — the idle chip's own word.
+const IDLE_WORD: &str = "idle";
+
+/// Every location that is not home. The match is exhaustive, so a location
+/// added to the core lands here or fails to compile, and the sweeps below
+/// stay quantified over every place a kitten can be away at.
+fn away_locations() -> Vec<Location> {
+    [Location::Home, Location::NeighborsYard]
+        .into_iter()
+        .filter(|l| match l {
+            Location::Home => false,
+            Location::NeighborsYard => true,
+        })
+        .collect()
+}
+
+/// The one state TUI-NAV-101 names for a kitten, read straight from its
+/// location and job: away reads the away word whatever the job; at home with
+/// a job, the job's name as its definition spells it; at home with none, the
+/// idle word.
+fn expected_state_word(k: &Kitten) -> String {
+    if k.location != Location::Home {
+        AWAY_WORD.to_string()
+    } else if let Some(j) = k.job {
+        job_def(j).name.to_string()
+    } else {
+        IDLE_WORD.to_string()
+    }
+}
+
+/// A roster that holds every state a kitten's row can name, each reached
+/// every way the rule distinguishes: every job at home and every job away at
+/// every away location, no job at home and away, a tinkerer bound to a recipe
+/// and one bound to none, at home and away, and the Elder among them — so the
+/// word is checked for every job in the vocabulary, for both words, and on
+/// the Elder's own row. `long` names are added at the front to push the name
+/// column against the `(n: Elder)` hint's fit.
+fn every_state_roster(long: &[String]) -> GameState {
+    let mut s = rich_meadow();
+    let mut roster: Vec<Kitten> = long.iter().map(|n| kitten_named(n, None)).collect();
+    for j in JobId::ALL {
+        roster.push(kitten_named(&format!("Home{j:?}"), Some(j)));
+        for (li, loc) in away_locations().into_iter().enumerate() {
+            let mut k = kitten_named(&format!("Away{li}{j:?}"), Some(j));
+            k.location = loc;
+            k.away_seq = Some(1);
+            roster.push(k);
+        }
+    }
+    roster.push(kitten_named("Lazybones", None));
+    for (li, loc) in away_locations().into_iter().enumerate() {
+        let mut k = kitten_named(&format!("Wanderer{li}"), None);
+        k.location = loc;
+        k.away_seq = Some(1);
+        roster.push(k);
+    }
+    let mut bound = kitten_named("Boundtink", Some(JobId::Tinkerer));
+    bound.tinkering = Some(CraftId::ALL[0]);
+    roster.push(bound.clone());
+    for (li, loc) in away_locations().into_iter().enumerate() {
+        let mut k = bound.clone();
+        k.name = format!("Boundaway{li}");
+        k.location = loc;
+        k.away_seq = Some(1);
+        roster.push(k);
+    }
+    s.roster_high_water = s.roster_high_water.max(roster.len());
+    s.kittens = roster;
+    s
+}
+
+/// The name's column a row draws, exactly as TUI-RENDER-020 and TUI-NAV-095
+/// draw it with no state word in the picture: the whole name, a blank, and
+/// the whole hint where the column holds all three and the gate is open;
+/// otherwise the name as any name is drawn.
+fn expected_name_column(state: &GameState, k: usize, name_w: usize) -> String {
+    let name = &state.kittens[k].name;
+    let name_len = name.chars().count();
+    let gate = state.command_gate_open(&clowder_core::Command::AppointElder(k));
+    if gate && name_len + 1 + ELDER_HINT.chars().count() <= name_w {
+        let trailing = name_w - name_len - 1 - ELDER_HINT.chars().count();
+        format!("{name} {ELDER_HINT}{}", " ".repeat(trailing))
+    } else {
+        format!("{:<name_w$}", fmt::fit(name, name_w))
+    }
+}
+
+/// Every listed kitten row names exactly one state in its count and cost
+/// fields' place, read from the kitten's location and job as the core holds
+/// them: the away word wherever it is anywhere but home, job or none; at home
+/// with a job, that job's name as its definition spells it — the spelling its
+/// count row in the jobs group draws — a tinkerer's included, bound to a
+/// recipe or not; at home with no job, the idle word; and nothing of the
+/// Elder. The word begins at the count field's left edge, one blank column
+/// after the name's column, left-aligned so every kitten's word starts at one
+/// column; it is drawn whole, never cut, in the row's own style (the cursor's
+/// reverse included), with blanks after it to the cost field's end; and the
+/// name's column keeps the width the fields leave, drawing the name and the
+/// `(n: Elder)` hint exactly as it would with no word there. The place is
+/// fixed by the resource vocabulary and is wider than every job name and both
+/// words. Quantified over every job, every away location, both words, the
+/// Elder's row, with the cursor on each kitten row in turn and on no kitten,
+/// at the floor, narrow, at the pane breakpoint, three-pane, and wide — with
+/// names built at each width to sit just inside, on, and just past where the
+/// hint fits.
+///
+/// @spec TUI-NAV-101, TUI-RENDER-024
+#[test]
+fn every_kitten_row_names_its_one_state_whole_in_its_fields_place() {
+    let store = store_names();
+    let c = cost_field_width(&store);
+    let place = 7 + 1 + c;
+    let hint_w = ELDER_HINT.chars().count();
+    assert!(
+        gives_count_field(Section::Clowder) && gives_cost_field(Section::Clowder),
+        "fixture: the Clowder list gives both fields, so a kitten's row has their place"
+    );
+    for word in JobId::ALL.iter().map(|j| job_def(*j).name).chain([AWAY_WORD, IDLE_WORD]) {
+        assert!(
+            word.chars().count() < place,
+            "the fields' place ({place} columns) is wider than every job name and both words; \
+             {word:?} is not narrower (TUI-RENDER-024)"
+        );
+    }
+
+    let (mut checked, mut focused_checked, mut elder_checked) = (0u32, 0u32, 0u32);
+    let mut words_seen: BTreeSet<String> = BTreeSet::new();
+    let mut job_rows_checked: BTreeSet<String> = BTreeSet::new();
+    for (w, h) in [(FLOOR_W, 70u16), (90, 70), (99, 70), (100, 70), (130, 70), (200, 70)] {
+        let probe = every_state_roster(&[]);
+        let space = list_space(&cold(&probe, &ViewState { section: Some(Section::Clowder), ..Default::default() }, w, h).layout);
+        let width = space.width as usize;
+        let name_w = width - 4 - 8 - (c + 1);
+        let count_at = 4 + name_w + 1;
+        assert_eq!(count_at + place, width, "fixture: the fields' place runs to the row's right edge");
+
+        let mut long: Vec<String> = vec![name_of_len('W', name_w + 7)];
+        for (head, len) in [
+            ('C', name_w.checked_sub(hint_w + 1)),
+            ('D', name_w.checked_sub(hint_w).map(|n| n + 1)),
+            ('X', Some(name_w)),
+            ('Q', name_w.checked_sub(hint_w)),
+        ] {
+            if let Some(len) = len.filter(|l| *l >= 2) {
+                long.push(name_of_len(head, len));
+            }
+        }
+        let mut state = every_state_roster(&long);
+        // The Elder is a kitten at home with a job, so its word is the job's
+        // and says nothing of the appointment.
+        let elder = state.kittens.iter().position(|k| k.location == Location::Home && k.job.is_some()).expect("fixture");
+        state.elder = Some(elder);
+
+        let all = rows(&state, Section::Clowder);
+        let kitten_ix: Vec<usize> = (0..all.len()).filter(|i| matches!(all[*i].key, RowKey::Kitten(..))).collect();
+        assert_eq!(kitten_ix.len(), state.kittens.len(), "fixture: every kitten is listed at {w}x{h}");
+
+        let mut cursors: Vec<Option<RowKey>> = kitten_ix.iter().map(|i| Some(all[*i].key.clone())).collect();
+        cursors.push(all.iter().find(|r| r.selectable() && !matches!(r.key, RowKey::Kitten(..))).map(|r| r.key.clone()));
+
+        for cursor_key in cursors {
+            let mut view = ViewState { section: Some(Section::Clowder), ..Default::default() };
+            view.focus[Section::Clowder.index()] = cursor_key.clone();
+            let d = cold(&state, &view, w, h);
+            let space = list_space(&d.layout);
+            assert_eq!(space.width as usize, width, "fixture: the list's width is the probe's at {w}x{h}");
+            let lines = cell_lines(&d.buffer, space);
+            let cursor = cursor_key.as_ref().and_then(|k| all.iter().position(|r| &r.key == k)).unwrap_or(0);
+            let cy = lines
+                .iter()
+                .position(|l| l[0] == "▸")
+                .unwrap_or_else(|| panic!("fixture: the cursor is drawn in the Clowder list at {w}x{h}"));
+            let line_of_row = |ri: usize| (cy + ri).checked_sub(cursor).expect("fixture: the list is drawn unscrolled");
+
+            // The job's name as its count row in the jobs group draws it.
+            for (ri, row) in all.iter().enumerate() {
+                if let (RowKey::Content(ContentId::Job(j), _), RowKind::Count { .. }) = (&row.key, &row.kind) {
+                    let col = cells_text(&lines[line_of_row(ri)], 4, 4 + name_w);
+                    let def = job_def(*j).name;
+                    if def.chars().count() <= name_w {
+                        assert_eq!(col.trim_end(), def, "fixture: the job's count row draws its definition's name");
+                        job_rows_checked.insert(def.to_string());
+                    }
+                }
+            }
+
+            for &ri in &kitten_ix {
+                let row = &all[ri];
+                let RowKey::Kitten(k, _) = row.key else { unreachable!() };
+                let y = line_of_row(ri);
+                let line = &lines[y];
+                let kitten = &state.kittens[k];
+                let word = expected_state_word(kitten);
+                let focused = cursor_key.as_ref() == Some(&row.key);
+                let at = format!(
+                    "at {w}x{h}, kitten {k} ({:?} at {:?}{}, {}) reads {:?}",
+                    kitten.job,
+                    kitten.location,
+                    if Some(k) == state.elder { ", the Elder" } else { "" },
+                    if focused { "the cursor's row" } else { "not the cursor's row" },
+                    line.concat()
+                );
+
+                // The name's column keeps the width the fields leave and draws
+                // exactly what it would with no word: the word shortens no
+                // name and moves no hint.
+                assert_eq!(
+                    cells_text(line, 4, 4 + name_w),
+                    expected_name_column(&state, k, name_w),
+                    "{at}: the name's column keeps its {name_w} columns and draws the name and the \
+                     hint exactly as without the word (TUI-RENDER-024, TUI-NAV-095)"
+                );
+                assert_eq!(line[4 + name_w], " ", "{at}: one blank column after the name's column");
+
+                // Exactly the one word, begun at the count field's left edge,
+                // left-aligned, whole, blank after it to the cost field's end.
+                assert_eq!(
+                    cells_text(line, count_at, width),
+                    format!("{word:<place$}"),
+                    "{at}: the fields' place names exactly the one state {word:?}, begun at the \
+                     count field's left edge, left-aligned and whole, blank after it to the cost \
+                     field's end (TUI-NAV-101, TUI-RENDER-024)"
+                );
+
+                // In the row's own style: every cell of the place wears what
+                // the row's marker wears, the cursor's reverse included.
+                let marker_cell = d.buffer.cell((space.x + 2, space.y + y as u16)).expect("in the buffer").clone();
+                for x in count_at..count_at + word.chars().count() {
+                    let cell = d.buffer.cell((space.x + x as u16, space.y + y as u16)).expect("in the buffer");
+                    assert_eq!(
+                        (cell.fg, cell.bg, cell.modifier),
+                        (marker_cell.fg, marker_cell.bg, marker_cell.modifier),
+                        "{at}: the word's cell {} is not drawn in the row's own style (TUI-RENDER-024)",
+                        x - count_at
+                    );
+                }
+
+                checked += 1;
+                words_seen.insert(word);
+                if focused {
+                    focused_checked += 1;
+                }
+                if Some(k) == state.elder {
+                    elder_checked += 1;
+                }
+            }
+        }
+    }
+    assert!(checked > 0, "fixture: kitten rows were checked");
+    assert!(focused_checked > 0, "fixture: the cursor's own row was checked");
+    assert!(elder_checked > 0, "fixture: the Elder's row was checked");
+    for word in JobId::ALL.iter().map(|j| job_def(*j).name.to_string()).chain([AWAY_WORD.into(), IDLE_WORD.into()]) {
+        assert!(words_seen.contains(&word), "fixture: some kitten's row named {word:?}");
+    }
+    assert!(!job_rows_checked.is_empty(), "fixture: some job's count row was read for its spelling");
+}
+
+/// The word belongs to the row, not to the kitten's name: while every kitten's
+/// row names its state, the palette's result for each kitten carries the
+/// kitten's name alone — a query for any state word finds no kitten whose
+/// name does not hold it — and the inspector names each kitten as before.
+///
+/// @spec TUI-NAV-101
+#[test]
+fn a_kittens_state_word_is_drawn_on_its_row_and_is_no_part_of_its_name() {
+    use clowder_tui::nav::palette::results;
+
+    let store = store_names();
+    let c = cost_field_width(&store);
+    let place = 7 + 1 + c;
+    let state = every_state_roster(&[]);
+    let (w, h) = (130u16, 70u16);
+    let view = ViewState { section: Some(Section::Clowder), ..Default::default() };
+    let d = cold(&state, &view, w, h);
+    let space = list_space(&d.layout);
+    let width = space.width as usize;
+    let lines = cell_lines(&d.buffer, space);
+
+    for (k, kitten) in state.kittens.iter().enumerate() {
+        let word = expected_state_word(kitten);
+        let line = lines
+            .iter()
+            .find(|l| cells_text(l, 4, width).starts_with(&format!("{} ", kitten.name)))
+            .unwrap_or_else(|| panic!("fixture: kitten {k}'s row is drawn"));
+        assert_eq!(
+            cells_text(line, width - place, width),
+            format!("{word:<place$}"),
+            "kitten {k}'s row names its state {word:?} in its fields' place (TUI-NAV-101): {:?}",
+            line.concat()
+        );
+
+        let named: Vec<_> = results(&state, "")
+            .into_iter()
+            .filter(|r| matches!(r.key, RowKey::Kitten(ix, _) if ix == k))
+            .collect();
+        assert_eq!(named.len(), 1, "fixture: kitten {k} is one palette result");
+        assert_eq!(named[0].name, kitten.name, "kitten {k}'s palette result carries its name alone (TUI-NAV-101)");
+
+        assert_eq!(
+            inspector_name(&state, Section::Clowder, &RowKey::Kitten(k, "")),
+            kitten.name,
+            "the inspector names kitten {k} by its name alone (TUI-NAV-101)"
+        );
+    }
+    for word in JobId::ALL.iter().map(|j| job_def(*j).name.to_string()).chain([AWAY_WORD.into(), IDLE_WORD.into()]) {
+        for r in results(&state, &word) {
+            if let RowKey::Kitten(ix, _) = r.key {
+                assert!(
+                    state.kittens[ix].name.to_lowercase().contains(&word.to_lowercase()),
+                    "a palette query for {word:?} found kitten {ix} by a word its name does not \
+                     hold (TUI-NAV-101)"
+                );
+            }
+        }
+    }
+}
+
+/// The word is re-derived on every frame: an assignment, a change of job, a
+/// wandering away, a homecoming, and an unassignment each show on the very
+/// next frame drawn into the same terminal, with the previous layout carried
+/// as the loop carries it.
+///
+/// @spec TUI-NAV-101
+#[test]
+fn a_kittens_state_word_follows_the_core_on_the_next_frame() {
+    let store = store_names();
+    let c = cost_field_width(&store);
+    let place = 7 + 1 + c;
+    let mut state = clowder_named(&["Biscuit".to_string(), "Marmalade".to_string()]);
+    let view = ViewState { section: Some(Section::Clowder), ..Default::default() };
+    let (w, h) = (130u16, 60u16);
+    let mut term = terminal(w, h);
+    let mut prev: Option<Layout> = None;
+
+    let away = away_locations();
+    type KittenStep<'a> = (&'a str, Box<dyn Fn(&mut Kitten)>);
+    let mut steps: Vec<KittenStep> = vec![
+        ("idle at home", Box::new(|_k: &mut Kitten| {})),
+        ("assigned", Box::new(|k: &mut Kitten| k.job = Some(JobId::ALL[0]))),
+        ("reassigned", Box::new(|k: &mut Kitten| k.job = Some(JobId::Tinkerer))),
+    ];
+    for loc in away {
+        steps.push(("wandered away", Box::new(move |k: &mut Kitten| k.location = loc)));
+        steps.push(("came home", Box::new(|k: &mut Kitten| k.location = Location::Home)));
+        steps.push(("wandered away jobless", Box::new(move |k: &mut Kitten| {
+            k.job = None;
+            k.location = loc;
+        })));
+        steps.push(("came home jobless", Box::new(|k: &mut Kitten| k.location = Location::Home)));
+    }
+    steps.push(("assigned again", Box::new(|k: &mut Kitten| k.job = Some(JobId::ALL[1]))));
+    steps.push(("unassigned", Box::new(|k: &mut Kitten| k.job = None)));
+
+    for (what, step) in steps {
+        step(&mut state.kittens[0]);
+        let d = draw(&mut term, &state, &view, prev.as_ref());
+        let space = list_space(&d.layout);
+        prev = Some(d.layout);
+        let width = space.width as usize;
+        let lines = cell_lines(&d.buffer, space);
+        for (k, kitten) in state.kittens.iter().enumerate() {
+            let word = expected_state_word(kitten);
+            let line = lines
+                .iter()
+                .find(|l| cells_text(l, 4, width).starts_with(&format!("{} ", kitten.name)))
+                .unwrap_or_else(|| panic!("fixture: kitten {k}'s row is drawn after {what}"));
+            assert_eq!(
+                cells_text(line, width - place, width),
+                format!("{word:<place$}"),
+                "after kitten 0 {what}, kitten {k}'s row names {word:?} on the next frame \
+                 (TUI-NAV-101): {:?}",
+                line.concat()
+            );
+        }
+    }
 }
