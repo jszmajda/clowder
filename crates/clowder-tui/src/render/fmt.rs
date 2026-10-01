@@ -188,6 +188,28 @@ fn char_width(c: char) -> usize {
     Span::raw(c.to_string()).width()
 }
 
+/// A group header's line: two `─`, a space, the header's words, a space, and
+/// `─` repeated to fill the rest of `width` — one line spanning the list's
+/// whole width, carrying no cursor glyph, marker, count, or cost. Where
+/// `width` cannot hold the leading rule, the words, and the trailing space,
+/// the words are cut as `fit` cuts a name, and the result still fills `width`
+/// exactly, so every one of its cells draws (TUI-RENDER-023).
+pub fn group_header_line(words: &str, width: usize) -> String {
+    const PREFIX: &str = "\u{2500}\u{2500} "; // "── "
+    if width < PREFIX.chars().count() {
+        return "\u{2500}".repeat(width);
+    }
+    let budget = width.saturating_sub(PREFIX.chars().count() + 1);
+    let shown = fit(words, budget);
+    let used = PREFIX.chars().count() + Span::raw(&shown).width();
+    if used >= width {
+        return format!("{PREFIX}{shown}");
+    }
+    let after_words = width - used;
+    let dashes = after_words.saturating_sub(1);
+    format!("{PREFIX}{shown} {}", "\u{2500}".repeat(dashes))
+}
+
 /// Shorten a name to fit, with an explicit ellipsis so the player can see that
 /// text was cut. The full name stays available in the inspector.
 /// @spec TUI-RENDER-014

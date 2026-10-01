@@ -3454,8 +3454,13 @@ fn a_first_visit_lands_on_the_first_actionable_row() {
     state.revealed.insert(ContentId::Idea(IdeaId::ALL[0]));
 
     let list = rows(&state, Section::Ideas);
+    // The first row the cursor can land on: a group header above it is a
+    // signpost, not a row (TUI-NAV-099).
     assert!(
-        matches!(list.first().map(|r| &r.key), Some(RowKey::Content(id, "")) if state.availability(*id) == Availability::Teased),
+        matches!(
+            list.iter().find(|r| r.selectable()).map(|r| &r.key),
+            Some(RowKey::Content(id, "")) if state.availability(*id) == Availability::Teased
+        ),
         "fixture: the first row must be a teased one, or the landing rule is not under test"
     );
     let first_available = list
@@ -3485,11 +3490,13 @@ fn a_first_visit_lands_on_the_first_actionable_row() {
 #[test]
 fn a_section_with_nothing_actionable_lands_on_its_first_row() {
     let state = fresh();
+    // The first row is the first one the cursor can land on: a group header
+    // above it is a signpost, not a row (TUI-NAV-099).
     let first = rows(&state, Section::Meadow)
-        .first()
+        .into_iter()
+        .find(|r| r.selectable())
         .expect("fixture: a new meadow has rows")
-        .key
-        .clone();
+        .key;
 
     let mut view = ViewState::default();
     update(Action::SectionJump(Section::Meadow), &mut view, &state);
@@ -3565,6 +3572,66 @@ fn the_cursor_never_lands_on_an_unselectable_row() {
             );
         }
     }
+}
+
+/// Where a section's list opens with a group header, the row TUI-NAV-032 calls
+/// the section's first is the first row beneath that header: the header is a
+/// line the cursor never lands on. Quantified over every several-group section
+/// that lists anything in a new meadow and in a maximal one — each must open
+/// with its first group's header, and a first visit must land beneath it, on
+/// the first row the player can act on or, failing that, the first row.
+///
+/// @spec TUI-NAV-099
+#[test]
+fn a_first_visit_lands_beneath_the_header_that_opens_a_sections_list() {
+    let mut checked = 0;
+    for (label, state) in [("a new meadow", fresh()), ("a maximal meadow", rich())] {
+        for section in Section::ALL {
+            if section == Section::Crafts {
+                continue; // one group by design: no header to land beneath
+            }
+            let list = rows(&state, section);
+            if !list.iter().any(|r| r.selectable()) {
+                continue;
+            }
+            assert!(
+                matches!(list[0].kind, RowKind::Group),
+                "in {label}, {}'s list opens with {:?} rather than its first group's header",
+                section.title(),
+                list[0].key
+            );
+
+            let mut view = ViewState::default();
+            update(Action::SectionJump(section), &mut view, &state);
+            let landed = view.focus[section.index()]
+                .clone()
+                .unwrap_or_else(|| panic!("in {label}, entering {} left no cursor", section.title()));
+            let at = list
+                .iter()
+                .position(|r| r.key == landed)
+                .unwrap_or_else(|| panic!("in {label}, entering {} focused {landed:?}, not a row of it", section.title()));
+            assert!(
+                at >= 1 && list[at].selectable(),
+                "in {label}, entering {} landed on the header line itself",
+                section.title()
+            );
+            checked += 1;
+        }
+    }
+
+    // The fallback: a new meadow's home lists nothing but its verbs, so its
+    // first row — the one a visit lands on — is the line directly beneath the
+    // header that opens it.
+    let state = fresh();
+    let list = rows(&state, Section::Meadow);
+    let mut view = ViewState::default();
+    update(Action::SectionJump(Section::Meadow), &mut view, &state);
+    assert_eq!(
+        view.focus[Section::Meadow.index()].as_ref(),
+        list.get(1).map(|r| &r.key),
+        "a first visit to a new meadow's home must land on the row directly beneath its header"
+    );
+    assert!(checked >= 2, "fixture: too few sections listed anything to check");
 }
 
 // ---------------------------------------------------------------------------

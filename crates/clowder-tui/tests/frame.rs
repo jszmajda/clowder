@@ -247,7 +247,12 @@ fn region_lines(buf: &Buffer, rect: Rect) -> Vec<String> {
 /// about rows is not a test about whether the pane has a border.
 fn content_lines(buf: &Buffer, rect: Rect) -> Vec<String> {
     let mut lines = region_lines(buf, rect);
-    let bordered = |l: &String| l.chars().next().is_some_and(is_box);
+    // A border line is box glyphs (and blanks) only; a group header's rule
+    // carries its words (TUI-RENDER-023), so it is a line of the list, not a
+    // frame around it.
+    let bordered = |l: &String| {
+        l.chars().next().is_some_and(is_box) && !l.chars().any(|c| c.is_alphanumeric())
+    };
     if lines.first().is_some_and(bordered) {
         lines.remove(0);
     }
@@ -748,6 +753,267 @@ fn no_line_of_the_list_survives_a_scroll_in_place() {
             rows.len()
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-100, TUI-RENDER-023 — a group header's words, and its line
+//
+// A header is found without guessing its text: the cursor is put on the row
+// directly beneath it in the row list (the first row of the group it heads,
+// TUI-NAV-099), and the header is the pane line directly above the cursor's.
+// The pane is read raw — `region_lines`, not `content_lines` — so nothing about
+// a rule-shaped line is normalised away.
+// ---------------------------------------------------------------------------
+
+/// Every group of every section listed at once: every structure and idea, every
+/// resource held, a roster, every rite the ceremonies depend on, the arch that
+/// opens the jar and the promise, every colony, a visiting whale, and a meadow
+/// that has Moved once.
+fn every_group_listed() -> GameState {
+    use clowder_core::content::MEADOW_MOVE_MIN_KITTENS;
+    use clowder_core::{ArchId, ColonyId, CraftId, IdeaId, JobId, RiteId};
+
+    let mut s = GameState::new(7);
+    for r in ResourceId::ALL {
+        s.resources[r.ix()] = 1.0e12;
+    }
+    for b in StructureId::ALL {
+        s.structures[b.ix()] = 5;
+    }
+    s.ideas = IdeaId::ALL.iter().copied().collect::<BTreeSet<_>>();
+    s.revealed = StructureId::ALL
+        .iter()
+        .map(|b| ContentId::Structure(*b))
+        .chain(IdeaId::ALL.iter().map(|i| ContentId::Idea(*i)))
+        .collect::<BTreeSet<_>>();
+    let mut kittens = roster(MEADOW_MOVE_MIN_KITTENS + 2);
+    for (i, k) in kittens.iter_mut().enumerate() {
+        k.name = format!("kitten-{i}");
+    }
+    kittens[0].job = Some(JobId::Tinkerer);
+    kittens[0].tinkering = Some(CraftId::ALL[0]);
+    s.kittens = kittens;
+    s.elder = Some(0);
+    s.peak_devotion = 1.0e12;
+    s.devotion = 1.0e6;
+    s.serenity = 1.0e12;
+    s.rites = [RiteId::TheReverie, RiteId::Enlightenment].into_iter().collect::<BTreeSet<_>>();
+    s.arches_bought = [ArchId::EverdreamArch].into_iter().collect::<BTreeSet<_>>();
+    s.discovered = ColonyId::ALL.iter().copied().collect::<BTreeSet<_>>();
+    s.sites_reached = BTreeSet::new();
+    s.whale_visit_years = 5;
+    s.whale_contentment = 1;
+    s.generation = 1;
+    s.elder_wisdom = 1.0e9;
+    s.warm_memories = 1.0e3;
+    s
+}
+
+/// The words the design gives the header of the group `row` stands in: the
+/// plain plural of what the row is about, `stores` for resources, and
+/// `things to do` for a section's own verbs.
+fn header_words_for(row: &Row) -> &'static str {
+    match &row.key {
+        RowKey::Fixed(_) => "things to do",
+        RowKey::Content(ContentId::Structure(_), _) => "structures",
+        RowKey::Content(ContentId::Job(_), _) => "jobs",
+        RowKey::Content(ContentId::Idea(_), _) => "ideas",
+        RowKey::Content(ContentId::Refinement(_), _) => "refinements",
+        RowKey::Content(ContentId::Rule(_), _) => "rules",
+        RowKey::Content(ContentId::Rite(_), _) => "rites",
+        RowKey::Content(ContentId::Arch(_), _) => "arches",
+        RowKey::Content(ContentId::Tradition(_), _) => "traditions",
+        RowKey::Content(ContentId::DreamLoom(_), _) => "loom upgrades",
+        RowKey::Content(ContentId::Craft(_), _) => panic!("the one-group section's rows wear no header"),
+        RowKey::Resource(_) => "stores",
+        RowKey::Kitten(..) => "kittens",
+        RowKey::Colony(..) => "colonies",
+        RowKey::Site(_) => "sites",
+        RowKey::Adventure(_) => "adventures",
+    }
+}
+
+/// Every (section, header words) the design gives a several-group section.
+fn designed_headers() -> BTreeSet<(usize, &'static str)> {
+    let table: [(Section, &[&str]); 9] = [
+        (Section::Meadow, &["things to do", "structures", "stores"]),
+        (Section::Clowder, &["jobs", "kittens", "things to do"]),
+        (Section::Ideas, &["ideas", "refinements", "rules"]),
+        (Section::Sunbeams, &["things to do", "rites"]),
+        (Section::Wonders, &["things to do", "arches"]),
+        (Section::Friends, &["colonies", "things to do"]),
+        (Section::Sky, &["sites", "things to do"]),
+        (Section::Dreams, &["things to do", "loom upgrades"]),
+        (Section::Legacy, &["things to do", "traditions", "adventures"]),
+    ];
+    table
+        .iter()
+        .flat_map(|(s, ws)| ws.iter().map(move |w| (s.index(), *w)))
+        .collect()
+}
+
+/// One drawn group header: the pane line, cell by cell, with the width of the
+/// list it was drawn in.
+struct HeaderLine {
+    text: String,
+    cells: Vec<ratatui::buffer::Cell>,
+}
+
+/// Draw `section` with the cursor on `beneath` and return the pane line
+/// directly above the cursor's — the header of the group `beneath` opens.
+fn header_above(state: &GameState, section: Section, beneath: &RowKey, w: u16, h: u16) -> HeaderLine {
+    let mut view = ViewState { section: Some(section), ..Default::default() };
+    view.focus[section.index()] = Some(beneath.clone());
+    let d = cold(state, &view, w, h);
+    let rect = list_rect(&d.layout);
+    let lines = region_lines(&d.buffer, rect);
+    let at = lines
+        .iter()
+        .position(|l| l.starts_with('\u{25B8}'))
+        .unwrap_or_else(|| panic!("the cursor's row is not drawn in {}'s pane:\n{}", section.title(), lines.join("\n")));
+    assert!(at > 0, "the cursor's row is the pane's first line; no header can stand above it");
+    let y = rect.y + (at - 1) as u16;
+    let cells = (rect.x..rect.right())
+        .map(|x| d.buffer.cell((x, y)).expect("inside the buffer").clone())
+        .collect();
+    HeaderLine { text: lines[at - 1].clone(), cells }
+}
+
+/// Every header the row list carries for `state`, as (section, the row
+/// directly beneath it).
+fn headers_of(state: &GameState) -> Vec<(Section, Row)> {
+    let mut out = Vec::new();
+    for section in Section::ALL {
+        let list = rows(state, section);
+        for (i, row) in list.iter().enumerate() {
+            if matches!(row.kind, RowKind::Group) {
+                let next = list
+                    .get(i + 1)
+                    .unwrap_or_else(|| panic!("{}'s header at line {i} stands above nothing", section.title()));
+                out.push((section, next.clone()));
+            }
+        }
+    }
+    out
+}
+
+/// The words a drawn header line carries: what stands between its leading
+/// `── ` and the blank before its closing rule.
+fn words_of(line: &str) -> String {
+    line.strip_prefix("\u{2500}\u{2500} ")
+        .unwrap_or(line)
+        .trim_end()
+        .trim_end_matches('\u{2500}')
+        .trim_end()
+        .to_string()
+}
+
+/// Each header is worded as the design names its group's kind: `things to do`
+/// over a section's own verbs in every section that has them, `stores` over
+/// resources, and the plain plural for every other kind — lowercase, carrying
+/// no figure. Quantified over every header of every several-group section, in
+/// a meadow that lists every group the design names, which the test checks.
+///
+/// @spec TUI-NAV-100
+#[test]
+fn every_group_header_is_worded_as_the_plain_plural_of_its_kind() {
+    let state = every_group_listed();
+    let mut seen: BTreeSet<(usize, &'static str)> = BTreeSet::new();
+
+    for (section, beneath) in headers_of(&state) {
+        let expected = header_words_for(&beneath);
+        let line = header_above(&state, section, &beneath.key, WIDE, TALL);
+        let words = words_of(&line.text);
+        assert_eq!(
+            words, expected,
+            "{}'s header over {:?} reads {:?}; the design words it {expected:?}. Line: {:?}",
+            section.title(),
+            beneath.key,
+            words,
+            line.text
+        );
+        assert!(
+            !words.chars().any(|c| c.is_ascii_digit() || c.is_uppercase()),
+            "{}'s header {words:?} carries a figure or a capital",
+            section.title()
+        );
+        seen.insert((section.index(), expected));
+    }
+
+    let missing: Vec<String> = designed_headers()
+        .difference(&seen)
+        .map(|(ix, w)| format!("{} — {w}", Section::ALL[*ix].title()))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "with every group listed, these designed headers are not drawn:\n  {}",
+        missing.join("\n  ")
+    );
+}
+
+/// A header is one line across the list's whole width — from its left edge
+/// two `─`, a blank, the words, a blank, and `─` to its right edge — with no
+/// cursor glyph, marker, count or cost, and every cell of it, the words
+/// included, in `dim`. Quantified over every header of every section, at
+/// widths spanning both the narrow and the wide layout and both sides of the
+/// list's cap. At every width the frame can draw a list at, the list holds the
+/// leading rule, the longest header's words, and a blank (checked below), so
+/// the words are drawn whole at each of them; the cut TUI-RENDER-014 gives a
+/// narrower list is not reachable through a frame.
+///
+/// @spec TUI-RENDER-023
+#[test]
+fn a_group_header_is_a_dim_labelled_rule_spanning_the_list() {
+    let state = every_group_listed();
+    let headers = headers_of(&state);
+    let dim = clowder_tui::theme::Role::Dim.color();
+    let longest = designed_headers().iter().map(|(_, w)| w.chars().count()).max().unwrap_or(0);
+
+    for w in [FLOOR_W, 85, 99, 100, 104, 119, 120, 121, WIDE, 160, 200] {
+        for (section, beneath) in &headers {
+            let line = header_above(&state, *section, &beneath.key, w, TALL);
+            let width = line.cells.len();
+            assert!(
+                width > 3 + longest,
+                "fixture: at {w} columns the list is {width} wide, too narrow to hold every header whole"
+            );
+            let words = words_of(&line.text);
+            assert!(!words.is_empty(), "{}'s header at {w} columns carries no words: {:?}", section.title(), line.text);
+            let n = words.chars().count();
+            let expected = format!(
+                "\u{2500}\u{2500} {words} {}",
+                "\u{2500}".repeat(width.saturating_sub(3 + n + 1))
+            );
+            assert_eq!(
+                line.text, expected,
+                "{}'s header over {:?} at {w} columns ({width}-column list) is not a rule spanning \
+                 the list with its words set after two rule glyphs",
+                section.title(),
+                beneath.key
+            );
+            for (x, cell) in line.cells.iter().enumerate() {
+                assert_eq!(
+                    cell.fg,
+                    dim.expect("dim is a colour"),
+                    "{}'s header at {w} columns: cell {x} ({:?}) is not drawn in dim",
+                    section.title(),
+                    cell.symbol()
+                );
+                assert!(
+                    !cell.modifier.contains(ratatui::style::Modifier::REVERSED),
+                    "{}'s header at {w} columns: cell {x} is reversed, as a focused row is",
+                    section.title()
+                );
+            }
+        }
+    }
+    assert!(
+        headers.len() >= designed_headers().len(),
+        "fixture: with every group listed, only {} header line(s) are listed; the design names {}, \
+         so the claim is not quantified over every header",
+        headers.len(),
+        designed_headers().len()
+    );
 }
 
 // ---------------------------------------------------------------------------

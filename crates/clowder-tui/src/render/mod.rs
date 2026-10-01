@@ -435,9 +435,10 @@ fn draw_list(
     armed: Option<&ArmedRow>,
 ) {
     let all = rows(state, section);
-    let cursor = cursor_key
-        .and_then(|k| all.iter().position(|r| &r.key == k))
-        .unwrap_or(0);
+    // The list never highlights a header: where the remembered row has left
+    // the list, it falls back to the first selectable row, never index 0
+    // outright. @spec TUI-NAV-032, TUI-NAV-099
+    let cursor = crate::nav::rows::cursor_index(&all, cursor_key).unwrap_or(0);
     let prompt_key = prompt.and_then(|p| p.row.as_ref());
     let armed = armed.filter(|a| armed_is_live(a));
 
@@ -506,10 +507,8 @@ fn row_line(
 ) -> Line<'static> {
     let label = row_label(state, row);
     if matches!(row.kind, RowKind::Group) {
-        return Line::from(Span::styled(
-            fmt::fit(&format!("── {label} ──"), width),
-            style_for(Role::Dim),
-        ));
+        // @spec TUI-RENDER-023
+        return Line::from(Span::styled(fmt::group_header_line(&label, width), style_for(Role::Dim)));
     }
 
     let (marker, role) = marker_for(state, row).unwrap_or((" ", Role::Inherited));

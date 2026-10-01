@@ -1996,3 +1996,465 @@ fn the_complete_resource_table_lives_in_home_and_nowhere_else() {
     let unique: HashSet<ResourceId> = listed.iter().copied().collect();
     assert_eq!(listed.len(), unique.len(), "home lists a resource twice");
 }
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-097, TUI-NAV-098, TUI-NAV-099 — groups within a section
+//
+// A row's kind is read off its identity alone: a fixed row (one about no
+// content item) is the section's own verb, and every other row is about a
+// structure, a job, a kitten, a resource, a colony, a site, an adventure, or a
+// content item of some other kind. A group header is the one row with no kind.
+// The design's table is restated here as data — which kinds each section
+// lists, in what order, and the order of its verbs — and every assertion below
+// is a comparison between a built list and that table.
+// ---------------------------------------------------------------------------
+
+/// The kind of thing a row is about. A group of a section's list holds the
+/// rows of exactly one of these.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+enum GroupKind {
+    ThingsToDo,
+    Structures,
+    Stores,
+    Jobs,
+    Kittens,
+    Ideas,
+    Refinements,
+    Rules,
+    Crafts,
+    Rites,
+    Arches,
+    Colonies,
+    Sites,
+    LoomUpgrades,
+    Traditions,
+    Adventures,
+}
+
+/// The kind of thing `row` is about, or `None` for a group header.
+fn group_kind(row: &Row) -> Option<GroupKind> {
+    if matches!(row.kind, RowKind::Group) {
+        return None;
+    }
+    Some(match &row.key {
+        RowKey::Fixed(_) => GroupKind::ThingsToDo,
+        RowKey::Content(ContentId::Structure(_), _) => GroupKind::Structures,
+        RowKey::Content(ContentId::Job(_), _) => GroupKind::Jobs,
+        RowKey::Content(ContentId::Idea(_), _) => GroupKind::Ideas,
+        RowKey::Content(ContentId::Refinement(_), _) => GroupKind::Refinements,
+        RowKey::Content(ContentId::Rule(_), _) => GroupKind::Rules,
+        RowKey::Content(ContentId::Craft(_), _) => GroupKind::Crafts,
+        RowKey::Content(ContentId::Rite(_), _) => GroupKind::Rites,
+        RowKey::Content(ContentId::Arch(_), _) => GroupKind::Arches,
+        RowKey::Content(ContentId::Tradition(_), _) => GroupKind::Traditions,
+        RowKey::Content(ContentId::DreamLoom(_), _) => GroupKind::LoomUpgrades,
+        RowKey::Resource(_) => GroupKind::Stores,
+        RowKey::Kitten(..) => GroupKind::Kittens,
+        RowKey::Colony(..) => GroupKind::Colonies,
+        RowKey::Site(_) => GroupKind::Sites,
+        RowKey::Adventure(_) => GroupKind::Adventures,
+    })
+}
+
+/// The design's groups for `section`, in the order they stand (TUI-NAV-098).
+fn design_groups(section: Section) -> Vec<GroupKind> {
+    use GroupKind::*;
+    match section {
+        Section::Meadow => vec![ThingsToDo, Structures, Stores],
+        Section::Clowder => vec![Jobs, Kittens, ThingsToDo],
+        Section::Ideas => vec![Ideas, Refinements, Rules],
+        Section::Crafts => vec![Crafts],
+        Section::Sunbeams => vec![ThingsToDo, Rites],
+        Section::Wonders => vec![ThingsToDo, Arches],
+        Section::Friends => vec![Colonies, ThingsToDo],
+        Section::Sky => vec![Sites, ThingsToDo],
+        Section::Dreams => vec![ThingsToDo, LoomUpgrades],
+        Section::Legacy => vec![ThingsToDo, Traditions, Adventures],
+    }
+}
+
+/// The section's own verbs, by the command each fires, in the order its
+/// "things to do" group stands them (TUI-NAV-098).
+fn design_verbs(section: Section) -> Vec<&'static str> {
+    match section {
+        Section::Meadow => vec!["GatherCatnip", "Forage", "Rummage"],
+        Section::Clowder => vec!["HostJamboree", "Pounce"],
+        Section::Ideas | Section::Crafts => vec![],
+        Section::Sunbeams => vec!["Bask", "Reverie", "Enlighten"],
+        Section::Wonders => vec!["HoldParade", "RefineStarshard", "RefineEcho", "CondenseJar", "MakePromise"],
+        Section::Friends => vec!["ScoutPicnic"],
+        Section::Sky => vec!["SummonStarWhale", "FeedWhale"],
+        Section::Dreams => vec!["DeepNap"],
+        Section::Legacy => vec!["GreatMeadowMove", "PassItDown"],
+    }
+}
+
+fn position_in<T: PartialEq>(all: &[T], x: &T) -> usize {
+    all.iter().position(|y| y == x).expect("every id is in its kind's ALL table")
+}
+
+/// Where the core lists a content item among its kind.
+fn core_position(id: ContentId) -> usize {
+    match id {
+        ContentId::Structure(x) => position_in(&StructureId::ALL, &x),
+        ContentId::Idea(x) => position_in(&IdeaId::ALL, &x),
+        ContentId::Craft(x) => position_in(&CraftId::ALL, &x),
+        ContentId::Job(x) => position_in(&JobId::ALL, &x),
+        ContentId::Rite(x) => position_in(&RiteId::ALL, &x),
+        ContentId::Arch(x) => position_in(&ArchId::ALL, &x),
+        ContentId::Refinement(x) => position_in(&RefinementId::ALL, &x),
+        ContentId::Rule(x) => position_in(&RuleId::ALL, &x),
+        ContentId::Tradition(x) => position_in(&TraditionId::ALL, &x),
+        ContentId::DreamLoom(x) => position_in(&DreamLoomId::ALL, &x),
+    }
+}
+
+/// Where a row's item stands within its group, as the spec orders it: a verb
+/// by the design's order, the no-adventure row before every adventure, a kitten
+/// by roster position, and everything else by the order the core lists it. An
+/// item's several rows share one position, so a non-decreasing run is one in
+/// which they stand adjacent. `None` for a verb the design does not name for
+/// this section.
+fn place_in_group(section: Section, row: &Row) -> Option<usize> {
+    match &row.key {
+        RowKey::Fixed(_) => {
+            let fired = commands_of(row);
+            let name = variant(fired.first()?);
+            design_verbs(section).iter().position(|v| *v == name)
+        }
+        RowKey::Content(id, _) => Some(core_position(*id)),
+        RowKey::Resource(r) => Some(position_in(&ResourceId::ALL, r)),
+        RowKey::Kitten(ix, _) => Some(*ix),
+        RowKey::Colony(c, _) => Some(position_in(&ColonyId::ALL, c)),
+        RowKey::Site(s) => Some(position_in(&SiteId::ALL, s)),
+        RowKey::Adventure(None) => Some(0),
+        RowKey::Adventure(Some(a)) => Some(1 + position_in(&clowder_core::AdventureId::ALL, a)),
+    }
+}
+
+/// A meadow holding a little catnip and nothing else: home lists its verbs and
+/// its stores, and no structure has been revealed.
+fn verbs_and_stores_only() -> GameState {
+    let mut s = GameState::new(19);
+    s.resources[ResourceId::Catnip.ix()] = 10.0;
+    s
+}
+
+/// The open meadow with no whale visiting and no colony found: a section's
+/// verbs listed with its content group empty, and a verb whose row is absent.
+fn maximal_no_whale_no_friends() -> GameState {
+    let mut s = maximal();
+    s.whale_visit_years = 0;
+    s.discovered = BTreeSet::new();
+    s
+}
+
+/// The open meadow whose two Clowder verbs are both held back by the gates the
+/// core reports for them, while the jobs and the roster stay listed: the verbs'
+/// group has rows the builder offers and lists none of them.
+fn maximal_clowder_verbs_shut() -> GameState {
+    let mut s = maximal();
+    s.ideas.remove(&IdeaId::TeaCeremonies);
+    s.ideas.remove(&IdeaId::PouncingPractice);
+    assert!(
+        !s.command_gate_open(&Command::HostJamboree) && !s.command_gate_open(&Command::Pounce(1)),
+        "fixture: both Clowder verbs must be gated shut"
+    );
+    s
+}
+
+/// The spread every group claim is quantified over: between them these lay out
+/// every group of every section, every verb, sections with only some of their
+/// groups, a group whose only row is teased, and groups whose rows are all held
+/// back by a gate the core reports.
+fn grouping_spread() -> Vec<(&'static str, GameState)> {
+    vec![
+        ("a new meadow", GameState::new(7)),
+        ("a new meadow with unlimited stock", rich_but_locked()),
+        ("a meadow with only verbs and stores", verbs_and_stores_only()),
+        ("a meadow with one teased structure", teased_and_half_covered()),
+        ("the maximal meadow", maximal()),
+        ("the maximal meadow, poor", poor_but_unlocked()),
+        ("the maximal meadow, no roster", maximal_without_a_roster()),
+        ("the maximal meadow, first generation", maximal_first_generation()),
+        ("the maximal meadow, every hand busy", maximal_all_hands_busy()),
+        ("the maximal meadow, a small named roster", every_multi_row_item_listed()),
+        ("the maximal meadow, no whale and no friends", maximal_no_whale_no_friends()),
+        ("the maximal meadow, its Clowder verbs gated shut", maximal_clowder_verbs_shut()),
+    ]
+}
+
+fn describe_list(list: &[Row]) -> String {
+    list.iter()
+        .map(|r| match group_kind(r) {
+            None => format!("  [header {:?}]", r.key),
+            Some(k) => format!("  {k:?}: {:?}", r.key),
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Every row of a kind stands in its kind's one group — contiguous, never split
+/// by a header or by a row of another kind — and every row a section lists is
+/// of a kind its design gives it. Within a group, verbs stand in the order
+/// TUI-NAV-098 names them, the no-adventure row first, kittens by roster
+/// position, and every other kind in the order the core lists it; an item's
+/// several rows (a craft's two, a colony's two) stand adjacent. Quantified
+/// over every section of every meadow in the spread, which between them list
+/// every kind and every verb the design names — checked below.
+///
+/// @spec TUI-NAV-097
+#[test]
+fn every_row_of_a_kind_stands_contiguous_in_its_kinds_one_group_in_the_specs_order() {
+    let mut kinds_seen: HashSet<(Section, GroupKind)> = HashSet::new();
+    let mut verbs_seen: HashSet<(Section, &'static str)> = HashSet::new();
+
+    for (label, state) in grouping_spread() {
+        for section in Section::ALL {
+            let list = rows(&state, section);
+            let design = design_groups(section);
+
+            let mut positions: HashMap<GroupKind, Vec<usize>> = HashMap::new();
+            for (i, row) in list.iter().enumerate() {
+                let Some(kind) = group_kind(row) else { continue };
+                assert!(
+                    design.contains(&kind),
+                    "in {label}, {} lists {:?}, a row of kind {kind:?}, which is not one of its \
+                     groups {design:?}. List:\n{}",
+                    section.title(),
+                    row.key,
+                    describe_list(&list)
+                );
+                positions.entry(kind).or_default().push(i);
+                kinds_seen.insert((section, kind));
+                if kind == GroupKind::ThingsToDo {
+                    if let Some(c) = commands_of(row).first() {
+                        verbs_seen.insert((section, variant(c)));
+                    }
+                }
+            }
+
+            for (kind, at) in &positions {
+                let (first, last) = (at[0], *at.last().expect("non-empty"));
+                assert_eq!(
+                    last - first + 1,
+                    at.len(),
+                    "in {label}, {}'s {kind:?} rows are split — something stands between \
+                     them (rows {first}..={last}), so the kind is not one group. List:\n{}",
+                    section.title(),
+                    describe_list(&list)
+                );
+
+                let mut previous: Option<usize> = None;
+                for i in at {
+                    let row = &list[*i];
+                    let place = place_in_group(section, row).unwrap_or_else(|| {
+                        panic!(
+                            "in {label}, {} lists the verb row {:?}, which its things-to-do \
+                             group does not name",
+                            section.title(),
+                            row.key
+                        )
+                    });
+                    if let Some(p) = previous {
+                        assert!(
+                            place >= p,
+                            "in {label}, {}'s {kind:?} group stands {:?} after a row the spec \
+                             orders behind it (verbs in their named order, the no-adventure row \
+                             first, kittens by roster, everything else in the core's order, an \
+                             item's rows adjacent). List:\n{}",
+                            section.title(),
+                            row.key,
+                            describe_list(&list)
+                        );
+                    }
+                    previous = Some(place);
+                }
+            }
+        }
+    }
+
+    for section in Section::ALL {
+        for kind in design_groups(section) {
+            assert!(
+                kinds_seen.contains(&(section, kind)),
+                "fixture: no meadow in the spread lists {}'s {kind:?} group, so the claim is \
+                 not quantified over it",
+                section.title()
+            );
+        }
+        for verb in design_verbs(section) {
+            assert!(
+                verbs_seen.contains(&(section, verb)),
+                "fixture: no meadow in the spread lists {}'s {verb} row",
+                section.title()
+            );
+        }
+    }
+}
+
+/// A section's groups stand in the design's fixed order, whichever of them are
+/// listed now: the kinds a list holds, read top to bottom, are exactly the
+/// design's groups for that section with the absent ones left out — so no
+/// group moves as another comes or goes. Quantified over every section of
+/// every meadow in the spread, which lists some sections whole and others with
+/// only some of their groups.
+///
+/// @spec TUI-NAV-098
+#[test]
+fn a_sections_groups_stand_in_the_designs_fixed_order_whichever_are_listed() {
+    let mut partial_seen = false;
+    for (label, state) in grouping_spread() {
+        for section in Section::ALL {
+            let list = rows(&state, section);
+            let mut order: Vec<GroupKind> = Vec::new();
+            for kind in list.iter().filter_map(group_kind) {
+                if order.last() != Some(&kind) {
+                    order.push(kind);
+                }
+            }
+            let expected: Vec<GroupKind> = design_groups(section)
+                .into_iter()
+                .filter(|k| order.contains(k))
+                .collect();
+            assert_eq!(
+                order,
+                expected,
+                "in {label}, {}'s groups stand out of the design's order. List:\n{}",
+                section.title(),
+                describe_list(&list)
+            );
+            if !order.is_empty() && order.len() < design_groups(section).len() {
+                partial_seen = true;
+            }
+        }
+    }
+    assert!(partial_seen, "fixture: the spread never lists a section with only some of its groups");
+}
+
+/// Each group a several-group section lists — judged on the rows it lists
+/// after every gate the core reports, a teased row counting — is headed by
+/// exactly one header directly above its first row, the first group included;
+/// no header stands above an empty group, so none stands alone, at the list's
+/// end, or above another header; and the one-group section (Crafts) lists no
+/// header at all. A section that lists no row the cursor can land on lists
+/// nothing. Quantified over every section of every meadow in the spread — which
+/// reaches a group listing only a teased row and a group whose rows are all
+/// held back by a gate, both checked below.
+///
+/// @spec TUI-NAV-099
+#[test]
+fn every_listed_group_of_a_several_group_section_and_no_other_wears_one_header_directly_above_it() {
+    let mut teased_only_group_seen = false;
+    let mut gated_group_seen = false;
+
+    for (label, state) in grouping_spread() {
+        for section in Section::ALL {
+            let list = rows(&state, section);
+            let headers: Vec<usize> = list
+                .iter()
+                .enumerate()
+                .filter(|(_, r)| group_kind(r).is_none())
+                .map(|(i, _)| i)
+                .collect();
+
+            if !list.iter().any(|r| r.selectable()) {
+                assert!(
+                    list.is_empty(),
+                    "in {label}, {} lists no selectable row but still lists {} line(s) — a \
+                     header alone. List:\n{}",
+                    section.title(),
+                    list.len(),
+                    describe_list(&list)
+                );
+                continue;
+            }
+
+            if design_groups(section).len() == 1 {
+                assert!(
+                    headers.is_empty(),
+                    "in {label}, {} has one group by design and must list no header, but lists \
+                     {}. List:\n{}",
+                    section.title(),
+                    headers.len(),
+                    describe_list(&list)
+                );
+                continue;
+            }
+
+            // Each listed group's first row, and the kinds listed.
+            let mut firsts: Vec<(GroupKind, usize)> = Vec::new();
+            for (i, row) in list.iter().enumerate() {
+                if let Some(kind) = group_kind(row) {
+                    if !firsts.iter().any(|(k, _)| *k == kind) {
+                        firsts.push((kind, i));
+                    }
+                }
+            }
+
+            for (kind, first) in &firsts {
+                assert!(
+                    *first > 0 && group_kind(&list[first - 1]).is_none(),
+                    "in {label}, {}'s {kind:?} group is listed with no header directly above its \
+                     first row. List:\n{}",
+                    section.title(),
+                    describe_list(&list)
+                );
+                assert!(
+                    *first < 2 || group_kind(&list[first - 2]).is_some(),
+                    "in {label}, {}'s {kind:?} group has two headers above it. List:\n{}",
+                    section.title(),
+                    describe_list(&list)
+                );
+            }
+            assert_eq!(
+                headers.len(),
+                firsts.len(),
+                "in {label}, {} lists {} group(s) but {} header(s): every listed group wears \
+                 exactly one, and an empty group none. List:\n{}",
+                section.title(),
+                firsts.len(),
+                headers.len(),
+                describe_list(&list)
+            );
+            for h in &headers {
+                assert!(
+                    list.get(h + 1).is_some_and(|r| group_kind(r).is_some()),
+                    "in {label}, {}'s header at line {h} stands above nothing — at the list's \
+                     end or above another header. List:\n{}",
+                    section.title(),
+                    describe_list(&list)
+                );
+            }
+
+            // Reach: a group whose only rows are teased content.
+            for (kind, first) in &firsts {
+                let members: Vec<&Row> = list[*first..]
+                    .iter()
+                    .take_while(|r| group_kind(r) == Some(*kind))
+                    .collect();
+                if members.iter().all(|r| match r.key {
+                    RowKey::Content(id, _) => state.availability(id) == Availability::Teased,
+                    _ => false,
+                }) {
+                    teased_only_group_seen = true;
+                }
+            }
+            // Reach: a design group with rows the builder offers, every one
+            // of them held back by a gate the core reports — here, a verb the
+            // design names that the core reports closed while its section
+            // lists other groups.
+            if design_groups(section).contains(&GroupKind::ThingsToDo)
+                && !firsts.iter().any(|(k, _)| *k == GroupKind::ThingsToDo)
+            {
+                gated_group_seen = true;
+            }
+        }
+    }
+
+    assert!(teased_only_group_seen, "fixture: the spread never lists a group whose only rows are teased");
+    assert!(
+        gated_group_seen,
+        "fixture: the spread never lists a several-group section with its verbs all held back by a gate"
+    );
+}

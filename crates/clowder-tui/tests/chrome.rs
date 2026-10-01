@@ -4437,8 +4437,10 @@ fn a_cold_open_teaches_the_backbone() {
 fn on_a_new_game_the_meadow_is_the_only_section_with_a_tab() {
     let state = GameState::new(3);
 
+    // The first row the cursor can land on: a group header above it is a
+    // signpost, not a row (TUI-NAV-099).
     assert_eq!(
-        rows(&state, Section::Meadow).first().map(|r| r.key.clone()),
+        rows(&state, Section::Meadow).into_iter().find(|r| r.selectable()).map(|r| r.key),
         Some(RowKey::Fixed("GatherCatnip")),
         "a new game's first row is the gather action — the one thing a cold player can do"
     );

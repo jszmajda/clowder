@@ -62,6 +62,8 @@ Lists outgrow the body — 59 ideas will not fit 20 rows — so the list scrolls
 
 A group header scrolls like any other line. Pinning the current group to the top was considered and dropped: it costs a row of the body permanently, and `[` / `]` already move by group, which is the affordance a player reaches for when they want to know where they are.
 
+**A group header's line.** A group header (navigation leaf: Groups within a section) is one line of the list, drawn as a labelled rule across the list's whole width: from the list's left edge, two `─`, a space, the header's words, a space, and `─` repeated to the list's right edge — `── kittens ─────────────`. It takes the cursor's column like the rest of the line and carries no cursor glyph, marker, count, or cost, so it never reads as a row: a row begins with its cursor column and its marker, a header with the rule. Every cell of it wears `dim`, the words included, whatever the rows beneath it wear (theme leaf: `dim` carries a list's group-header rules), so it says where a kind begins and nothing about any row's state. The words are drawn whole wherever the list holds the leading rule, the words, and a space; a list narrower than that cuts the words as a name is cut (TUI-RENDER-014).
+
 When the list is longer than the viewport, the frame says so — a position indicator rather than a scrollbar, since a single column of scrollbar is both harder to read and more expensive in a narrow pane than a short "n more below".
 
 ## Numbers and Names
@@ -121,6 +123,7 @@ Whether frames run at a fixed cadence or only when something changed is deferred
 | Wide layout | Cap the list, give surplus to the inspector | Let the list grow; add a fourth column | A row stretched across 150 columns separates name from cost by a saccade; the inspector has more to say |
 | Scroll position | Derived from the cursor each frame | Stored scroll offset | Stored offset can disagree with the cursor after a reveal or a resize; deriving it cannot |
 | Group headers | Scroll with the list | Pin the current group | Pinning costs a permanent body row for what `[` / `]` already provides |
+| A group header's line | A `dim` rule spanning the list with the header's words set in it near its left end | The words alone between short dashes; the words in bold or a palette colour; a blank line above | A rule that spans the list marks the break across every column the rows use, so the eye sees where a kind ends without reading the words; a colour or weight would say something about state that a header does not carry; a blank line costs a body row per group |
 | Overflow indicator | A short "more below" note | A scrollbar column | A column is expensive in a narrow pane and harder to read at a glance |
 | Number precision | Compact when glanced, exact in the inspector; precision follows magnitude | Fixed decimal places everywhere; exact everywhere | Fixed places make small values look falsely precise and eat the columns alignment needs; exact everywhere does not fit |
 | Reach of the contract | The sidebar and list rows, each abbreviation with its exact form in the inspector | Every figure on screen held to having an exact form in the inspector | A report or a refusal has no row whose inspector could hold an exact form, so a figure in a banner, the Journal, a footer, or the hint bar cannot be held to one |

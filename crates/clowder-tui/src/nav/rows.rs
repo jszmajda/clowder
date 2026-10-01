@@ -115,6 +115,23 @@ fn gated(state: &GameState, row: Row) -> Option<Row> {
     }
 }
 
+/// One group of a section's list: `rows` gated and, where any survive, headed
+/// by `title` directly above the first — a header never standing above an
+/// empty group. The gate has to run here, before a group's emptiness is
+/// judged, since a group all of whose rows the core gates shut is itself
+/// empty and so wears no header.
+/// @spec TUI-NAV-097, TUI-NAV-098, TUI-NAV-099, TUI-NAV-100
+fn headed_group(state: &GameState, title: &'static str, rows: Vec<Row>) -> Vec<Row> {
+    let listed: Vec<Row> = rows.into_iter().filter_map(|r| gated(state, r)).collect();
+    if listed.is_empty() {
+        return Vec::new();
+    }
+    let mut out = Vec::with_capacity(listed.len() + 1);
+    out.push(Row { key: RowKey::Fixed(title), kind: RowKind::Group, heavy: false });
+    out.extend(listed);
+    out
+}
+
 pub fn rows(state: &GameState, section: Section) -> Vec<Row> {
     rows_ungated(state, section).into_iter().filter_map(|r| gated(state, r)).collect()
 }
@@ -135,91 +152,109 @@ fn rows_ungated(state: &GameState, section: Section) -> Vec<Row> {
 }
 
 fn meadow_rows(state: &GameState) -> Vec<Row> {
-    let mut out = vec![
+    let mut verbs = vec![
         Row { key: RowKey::Fixed("GatherCatnip"), kind: act(Command::GatherCatnip, CountSemantics::Single), heavy: false },
         Row { key: RowKey::Fixed("Forage"), kind: act(Command::Forage, CountSemantics::Single), heavy: false },
     ];
     if revealed(state, ContentId::Idea(IdeaId::CouchSpelunking)) || state.ideas.contains(&IdeaId::CouchSpelunking) {
-        out.push(Row { key: RowKey::Fixed("Rummage"), kind: act(Command::Rummage, CountSemantics::Single), heavy: false });
+        verbs.push(Row { key: RowKey::Fixed("Rummage"), kind: act(Command::Rummage, CountSemantics::Single), heavy: false });
     }
+    let mut out = headed_group(state, "things to do", verbs);
+
+    let mut structures = Vec::new();
     for s in StructureId::ALL {
         let id = ContentId::Structure(s);
         if revealed(state, id) {
-            out.push(Row {
+            structures.push(Row {
                 key: RowKey::Content(id, ""),
                 kind: act(Command::Build(s), CountSemantics::RepeatN),
                 heavy: false,
             });
         }
     }
+    out.extend(headed_group(state, "structures", structures));
 
     // The stores group: every revealed resource as an inspectable row.
     // @spec TUI-NAV-049
-    let held: Vec<ResourceId> = ResourceId::ALL
+    let stores: Vec<Row> = ResourceId::ALL
         .into_iter()
         .filter(|r| state.stock(*r) > 0.0)
+        .map(|r| Row { key: RowKey::Resource(r), kind: RowKind::Display, heavy: false })
         .collect();
-    if !held.is_empty() {
-        out.push(Row { key: RowKey::Fixed("stores"), kind: RowKind::Group, heavy: false });
-        for r in held {
-            out.push(Row { key: RowKey::Resource(r), kind: RowKind::Display, heavy: false });
-        }
-    }
+    out.extend(headed_group(state, "stores", stores));
     out
 }
 
 fn clowder_rows(state: &GameState) -> Vec<Row> {
-    let mut out = Vec::new();
+    let mut jobs = Vec::new();
     for j in JobId::ALL {
         let id = ContentId::Job(j);
         if revealed(state, id) {
-            out.push(Row {
+            jobs.push(Row {
                 key: RowKey::Content(id, ""),
                 kind: RowKind::Count { increment: Command::AssignJob(j), decrement: Command::UnassignJob(j) },
                 heavy: false,
             });
         }
     }
+    let mut out = headed_group(state, "jobs", jobs);
+
     // Each kitten is exactly one row, drawn with its name and no label; its
     // Enter promotes it. AppointElder is never a row of its own — it is taken
     // only by this row's own row-bound `n` key (TUI-NAV-094).
     // @spec TUI-NAV-093
+    let mut kittens = Vec::new();
     for (ix, _k) in state.kittens.iter().enumerate() {
-        out.push(Row {
+        kittens.push(Row {
             key: RowKey::Kitten(ix, ""),
             kind: act(Command::Promote(ix), CountSemantics::Single),
             heavy: false,
         });
     }
-    out.push(Row { key: RowKey::Fixed("HostJamboree"), kind: act(Command::HostJamboree, CountSemantics::Single), heavy: false });
-    out.push(Row {
-        key: RowKey::Fixed("Pounce"),
-        kind: act(Command::Pounce(1), CountSemantics::CountTaking),
-        heavy: false,
-    });
+    out.extend(headed_group(state, "kittens", kittens));
+
+    out.extend(headed_group(
+        state,
+        "things to do",
+        vec![
+            Row { key: RowKey::Fixed("HostJamboree"), kind: act(Command::HostJamboree, CountSemantics::Single), heavy: false },
+            Row {
+                key: RowKey::Fixed("Pounce"),
+                kind: act(Command::Pounce(1), CountSemantics::CountTaking),
+                heavy: false,
+            },
+        ],
+    ));
     out
 }
 
 fn ideas_rows(state: &GameState) -> Vec<Row> {
-    let mut out = Vec::new();
+    let mut ideas = Vec::new();
     for i in IdeaId::ALL {
         let id = ContentId::Idea(i);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::ResearchIdea(i), CountSemantics::Single), heavy: false });
+            ideas.push(Row { key: RowKey::Content(id, ""), kind: act(Command::ResearchIdea(i), CountSemantics::Single), heavy: false });
         }
     }
+    let mut out = headed_group(state, "ideas", ideas);
+
+    let mut refinements = Vec::new();
     for r in RefinementId::ALL {
         let id = ContentId::Refinement(r);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyRefinement(r), CountSemantics::RepeatN), heavy: false });
+            refinements.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyRefinement(r), CountSemantics::RepeatN), heavy: false });
         }
     }
+    out.extend(headed_group(state, "refinements", refinements));
+
+    let mut rules = Vec::new();
     for r in RuleId::ALL {
         let id = ContentId::Rule(r);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::AdoptRule(r), CountSemantics::Single), heavy: true });
+            rules.push(Row { key: RowKey::Content(id, ""), kind: act(Command::AdoptRule(r), CountSemantics::Single), heavy: true });
         }
     }
+    out.extend(headed_group(state, "rules", rules));
     out
 }
 
@@ -240,112 +275,157 @@ fn crafts_rows(state: &GameState) -> Vec<Row> {
 }
 
 fn sunbeams_rows(state: &GameState) -> Vec<Row> {
-    let mut out = vec![
-        Row { key: RowKey::Fixed("Bask"), kind: act(Command::Bask, CountSemantics::Single), heavy: false },
-        Row { key: RowKey::Fixed("Reverie"), kind: act(Command::Reverie, CountSemantics::Single), heavy: false },
-    ];
+    let mut out = headed_group(
+        state,
+        "things to do",
+        vec![
+            Row { key: RowKey::Fixed("Bask"), kind: act(Command::Bask, CountSemantics::Single), heavy: false },
+            Row { key: RowKey::Fixed("Reverie"), kind: act(Command::Reverie, CountSemantics::Single), heavy: false },
+            Row { key: RowKey::Fixed("Enlighten"), kind: act(Command::Enlighten, CountSemantics::Single), heavy: false },
+        ],
+    );
+
+    let mut rites = Vec::new();
     for r in RiteId::ALL {
         let id = ContentId::Rite(r);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyRite(r), CountSemantics::RepeatN), heavy: false });
+            rites.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyRite(r), CountSemantics::RepeatN), heavy: false });
         }
     }
-    out.push(Row { key: RowKey::Fixed("Enlighten"), kind: act(Command::Enlighten, CountSemantics::Single), heavy: false });
+    out.extend(headed_group(state, "rites", rites));
     out
 }
 
 fn wonders_rows(state: &GameState) -> Vec<Row> {
-    let mut out = vec![Row { key: RowKey::Fixed("HoldParade"), kind: act(Command::HoldParade, CountSemantics::Single), heavy: false }];
+    let mut out = headed_group(
+        state,
+        "things to do",
+        vec![
+            Row { key: RowKey::Fixed("HoldParade"), kind: act(Command::HoldParade, CountSemantics::Single), heavy: false },
+            Row { key: RowKey::Fixed("RefineStarshard"), kind: act(Command::RefineStarshard, CountSemantics::Single), heavy: false },
+            Row { key: RowKey::Fixed("RefineEcho"), kind: act(Command::RefineEcho, CountSemantics::Single), heavy: false },
+            Row { key: RowKey::Fixed("CondenseJar"), kind: act(Command::CondenseJar, CountSemantics::Single), heavy: false },
+            Row { key: RowKey::Fixed("MakePromise"), kind: act(Command::MakePromise, CountSemantics::Single), heavy: false },
+        ],
+    );
+
+    let mut arches = Vec::new();
     for a in ArchId::ALL {
         let id = ContentId::Arch(a);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyArch(a), CountSemantics::RepeatN), heavy: false });
+            arches.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyArch(a), CountSemantics::RepeatN), heavy: false });
         }
     }
-    out.push(Row { key: RowKey::Fixed("RefineStarshard"), kind: act(Command::RefineStarshard, CountSemantics::Single), heavy: false });
-    out.push(Row { key: RowKey::Fixed("RefineEcho"), kind: act(Command::RefineEcho, CountSemantics::Single), heavy: false });
-    out.push(Row { key: RowKey::Fixed("CondenseJar"), kind: act(Command::CondenseJar, CountSemantics::Single), heavy: false });
-    out.push(Row { key: RowKey::Fixed("MakePromise"), kind: act(Command::MakePromise, CountSemantics::Single), heavy: false });
+    out.extend(headed_group(state, "arches", arches));
     out
 }
 
 fn friends_rows(state: &GameState) -> Vec<Row> {
-    let mut out = Vec::new();
+    let mut colonies = Vec::new();
     for c in ColonyId::ALL {
         if c == ColonyId::StarWhales || !state.discovered.contains(&c) {
             continue;
         }
-        out.push(Row {
+        colonies.push(Row {
             key: RowKey::Colony(c, "trade"),
             kind: act(Command::Trade(c, 1), CountSemantics::CountTaking),
             heavy: false,
         });
-        out.push(Row { key: RowKey::Colony(c, "penpal"), kind: act(Command::SendPenPal(c), CountSemantics::Single), heavy: false });
+        colonies.push(Row { key: RowKey::Colony(c, "penpal"), kind: act(Command::SendPenPal(c), CountSemantics::Single), heavy: false });
     }
-    out.push(Row { key: RowKey::Fixed("ScoutPicnic"), kind: act(Command::ScoutPicnic, CountSemantics::Single), heavy: false });
+    let mut out = headed_group(state, "colonies", colonies);
+
+    out.extend(headed_group(
+        state,
+        "things to do",
+        vec![Row { key: RowKey::Fixed("ScoutPicnic"), kind: act(Command::ScoutPicnic, CountSemantics::Single), heavy: false }],
+    ));
     out
 }
 
 fn sky_rows(state: &GameState) -> Vec<Row> {
-    let mut out = Vec::new();
+    let mut sites = Vec::new();
     for site in SiteId::ALL {
         if state.site_reachable(site) {
-            out.push(Row { key: RowKey::Site(site), kind: act(Command::LaunchExpedition(site), CountSemantics::Single), heavy: false });
+            sites.push(Row { key: RowKey::Site(site), kind: act(Command::LaunchExpedition(site), CountSemantics::Single), heavy: false });
         }
     }
-    out.push(Row { key: RowKey::Fixed("SummonStarWhale"), kind: act(Command::SummonStarWhale, CountSemantics::Single), heavy: false });
+    let mut out = headed_group(state, "sites", sites);
+
+    let mut verbs = vec![Row {
+        key: RowKey::Fixed("SummonStarWhale"),
+        kind: act(Command::SummonStarWhale, CountSemantics::Single),
+        heavy: false,
+    }];
     if state.whale_visit_years > 0 {
-        out.push(Row { key: RowKey::Fixed("FeedWhale"), kind: act(Command::FeedWhale, CountSemantics::Single), heavy: false });
+        verbs.push(Row { key: RowKey::Fixed("FeedWhale"), kind: act(Command::FeedWhale, CountSemantics::Single), heavy: false });
     }
+    out.extend(headed_group(state, "things to do", verbs));
     out
 }
 
 fn dreams_rows(state: &GameState) -> Vec<Row> {
-    let mut out = vec![Row {
-        key: RowKey::Fixed("DeepNap"),
-        kind: act(Command::DeepNap(1), CountSemantics::CountTaking),
-        // TUI-NAV-015 names four heavy actions and this is one: it skips whole
-        // years. `heavy` is the arming contract — false here means a held Enter
-        // would commit it outright.
-        heavy: true,
-    }];
+    let mut out = headed_group(
+        state,
+        "things to do",
+        vec![Row {
+            key: RowKey::Fixed("DeepNap"),
+            kind: act(Command::DeepNap(1), CountSemantics::CountTaking),
+            // TUI-NAV-015 names four heavy actions and this is one: it skips
+            // whole years. `heavy` is the arming contract — false here would
+            // mean a held Enter would commit it outright.
+            heavy: true,
+        }],
+    );
+
+    let mut looms = Vec::new();
     for id in DreamLoomId::ALL {
         let cid = ContentId::DreamLoom(id);
         if revealed(state, cid) {
-            out.push(Row { key: RowKey::Content(cid, ""), kind: act(Command::BuyDreamLoom(id), CountSemantics::RepeatN), heavy: false });
+            looms.push(Row { key: RowKey::Content(cid, ""), kind: act(Command::BuyDreamLoom(id), CountSemantics::RepeatN), heavy: false });
         }
     }
+    out.extend(headed_group(state, "loom upgrades", looms));
     out
 }
 
 fn legacy_rows(state: &GameState) -> Vec<Row> {
-    let mut out = vec![
-        Row { key: RowKey::Fixed("GreatMeadowMove"), kind: act(Command::GreatMeadowMove, CountSemantics::Single), heavy: true },
-        Row { key: RowKey::Fixed("PassItDown"), kind: act(Command::PassItDown, CountSemantics::Single), heavy: true },
-    ];
+    let mut out = headed_group(
+        state,
+        "things to do",
+        vec![
+            Row { key: RowKey::Fixed("GreatMeadowMove"), kind: act(Command::GreatMeadowMove, CountSemantics::Single), heavy: true },
+            Row { key: RowKey::Fixed("PassItDown"), kind: act(Command::PassItDown, CountSemantics::Single), heavy: true },
+        ],
+    );
+
+    let mut traditions = Vec::new();
     for t in TraditionId::ALL {
         let id = ContentId::Tradition(t);
         if revealed(state, id) {
-            out.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyTradition(t), CountSemantics::RepeatN), heavy: false });
+            traditions.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyTradition(t), CountSemantics::RepeatN), heavy: false });
         }
     }
+    out.extend(headed_group(state, "traditions", traditions));
 
     let adventures_open = state.traditions.contains(&clowder_core::TraditionId::AdventurousSpirit)
         || state.ideas.contains(&IdeaId::AdventurousSpirit);
+    let mut adventures = Vec::new();
     if adventures_open {
-        out.push(Row {
+        adventures.push(Row {
             key: RowKey::Adventure(None),
             kind: act(Command::DeclareAdventure(None), CountSemantics::Single),
             heavy: false,
         });
         for a in AdventureId::ALL {
-            out.push(Row {
+            adventures.push(Row {
                 key: RowKey::Adventure(Some(a)),
                 kind: act(Command::DeclareAdventure(Some(a)), CountSemantics::Single),
                 heavy: false,
             });
         }
     }
+    out.extend(headed_group(state, "adventures", adventures));
     out
 }
 
@@ -376,6 +456,16 @@ pub fn has_tab(state: &GameState, focus: Option<Section>, section: Section) -> b
 /// TUI-NAV-085
 pub fn tab_sections(state: &GameState, focus: Option<Section>) -> Vec<Section> {
     Section::ALL.into_iter().filter(|s| has_tab(state, focus, *s)).collect()
+}
+
+/// The list index the cursor sits at: the remembered row's position where it
+/// is still listed, or else the list's first selectable row — never index 0
+/// outright, since a group header may stand there and the cursor never lands
+/// on one (TUI-NAV-032, TUI-NAV-099). `None` where nothing in the list is
+/// selectable.
+pub fn cursor_index(list: &[Row], key: Option<&RowKey>) -> Option<usize> {
+    key.and_then(|k| list.iter().position(|r| &r.key == k && r.selectable()))
+        .or_else(|| list.iter().position(|r| r.selectable()))
 }
 
 /// Whether `key` names a row still listed anywhere — every section, not only

@@ -1632,11 +1632,12 @@ fn the_inspector_describes_the_row_the_list_falls_back_to_when_the_focused_row_l
         !rows(&state, Section::Meadow).iter().any(|r| r.key == key),
         "fixture: {gone:?} is not listed in a meadow that has revealed nothing"
     );
+    // The row the list highlights: the first the cursor can rest on, a group
+    // header above it being a signpost, not a row (TUI-NAV-099).
     let first = rows(&state, Section::Meadow)
         .into_iter()
-        .next()
-        .expect("fixture: a fresh meadow lists something");
-    assert!(first.selectable(), "fixture: the list's first row is one the cursor can rest on");
+        .find(|r| r.selectable())
+        .expect("fixture: a fresh meadow lists something selectable");
 
     let fallen = pane_text(&state, &looking_at(Section::Meadow, key), WIDE, TALL);
     let on_first = pane_text(&state, &looking_at(Section::Meadow, first.key.clone()), WIDE, TALL);

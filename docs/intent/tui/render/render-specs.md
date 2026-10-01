@@ -19,6 +19,7 @@
 
 - [x] **TUI-RENDER-009**: The system shall derive the list's scroll position each frame from the cursor's position, keeping the cursor visible with a margin above and below, rather than storing a scroll offset.
 - [x] **TUI-RENDER-010**: The system shall scroll group headers with the list rather than pinning them.
+- [x] **TUI-RENDER-023**: The system shall draw a group header as one line spanning the list's whole width, every cell in `dim`: from the list's left edge two `─`, a space, the header's words, a space, and `─` repeated to the list's right edge, with no cursor glyph, marker, count, or cost; where the list cannot hold the leading rule, the words, and a space, the words shall be cut as TUI-RENDER-014 cuts a name.
 - [x] **TUI-RENDER-011**: When a list is longer than its viewport, the system shall indicate that more rows exist beyond the visible range without spending a column on a scrollbar.
 
 ## Numbers and Names

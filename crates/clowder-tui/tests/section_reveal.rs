@@ -112,7 +112,11 @@ fn sky_site_only() -> GameState {
     let mut s = sky_base();
     s.sites_reached = BTreeSet::new();
     let keys: Vec<RowKey> = rows(&s, Section::Sky).into_iter().map(|r| r.key).collect();
-    assert_eq!(keys, vec![RowKey::Site(SiteId::ALL[0])], "fixture: the sky lists the first site alone");
+    assert_eq!(
+        keys,
+        vec![RowKey::Fixed("sites"), RowKey::Site(SiteId::ALL[0])],
+        "fixture: the sky lists the first site alone, beneath its group header"
+    );
     s
 }
 
@@ -121,7 +125,11 @@ fn sky_whale_only() -> GameState {
     let mut s = sky_base();
     s.structures[StructureId::SkyDock.ix()] = 1;
     let keys: Vec<RowKey> = rows(&s, Section::Sky).into_iter().map(|r| r.key).collect();
-    assert_eq!(keys, vec![whale_key()], "fixture: the sky lists the summoning row alone");
+    assert_eq!(
+        keys,
+        vec![RowKey::Fixed("things to do"), whale_key()],
+        "fixture: the sky lists the summoning row alone, beneath its group header"
+    );
     s
 }
 
@@ -133,7 +141,7 @@ fn sky_both() -> GameState {
     let keys: Vec<RowKey> = rows(&s, Section::Sky).into_iter().map(|r| r.key).collect();
     assert_eq!(
         keys,
-        vec![RowKey::Site(SiteId::ALL[0]), whale_key()],
+        vec![RowKey::Fixed("sites"), RowKey::Site(SiteId::ALL[0]), RowKey::Fixed("things to do"), whale_key()],
         "fixture: the site's row sits above the summoning row"
     );
     s

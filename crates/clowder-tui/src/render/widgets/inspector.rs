@@ -539,10 +539,11 @@ pub fn draw(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     // back to its first row, and the inspector must follow it there rather
     // than describe a row that no longer exists. @spec TUI-NAV-018,
     // TUI-NAV-032
-    let cursor = view.focus[section.index()]
-        .as_ref()
-        .and_then(|k| all.iter().position(|r| &r.key == k))
-        .unwrap_or(0);
+    // Never a header: where the remembered key has left the list, the list
+    // falls back to its first selectable row. @spec TUI-NAV-032, TUI-NAV-099
+    let Some(cursor) = crate::nav::rows::cursor_index(&all, view.focus[section.index()].as_ref()) else {
+        return;
+    };
     let Some(row) = all.get(cursor) else {
         return;
     };
