@@ -489,7 +489,19 @@ impl App {
                             // that runs through a command rather than a load.
                             // @spec TUI-NAV-027, TUI-NAV-050
                             Ok(events) => {
-                                crate::nav::queue_command_reports(&mut self.view, &self.state, &events)
+                                crate::nav::queue_command_reports(&mut self.view, &self.state, &events);
+                                // An accepted appointment is answered on the
+                                // footer line, naming the Elder the core then
+                                // holds by its whole name; no other accepted
+                                // command leaves a note. @spec TUI-NAV-107
+                                if matches!(cmd, clowder_core::Command::AppointElder(_)) {
+                                    if let Some(k) = self.state.elder.and_then(|e| self.state.kittens.get(e)) {
+                                        self.view.footer = Some((
+                                            format!("{} is the Elder now", k.name),
+                                            Instant::now() + std::time::Duration::from_secs(4),
+                                        ));
+                                    }
+                                }
                             }
                             Err(e) => {
                                 self.view.footer = Some((

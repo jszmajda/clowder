@@ -10,7 +10,7 @@
 //! three-column split are breakpoints, and live in `render::layout` beside the
 //! render specs that state them a second time.
 //! @spec TUI-NAV-017, TUI-NAV-018, TUI-NAV-029, TUI-NAV-078, TUI-NAV-079,
-//!       TUI-NAV-080
+//!       TUI-NAV-080, TUI-NAV-108
 
 use clowder_core::content::{self, TICKS_PER_SECOND};
 use clowder_core::{ContentId, GameState, LockReason, ResourceId};
@@ -470,6 +470,12 @@ fn draw_body(
     let on_this_row = prompt.filter(|p| p.row.as_ref() == Some(key));
 
     let mut lines: Vec<String> = vec![full_name(state, key)];
+
+    // The Elder's row states the mark whole beneath the name, whether or not
+    // the list's row had room to draw it. @spec TUI-NAV-108
+    if matches!(key, RowKey::Kitten(ix, _) if state.elder == Some(*ix)) {
+        lines.push(crate::render::ELDER_MARK.to_string());
+    }
 
     // A later row of a multi-row item states its own label whole, beneath the
     // item's name — never the item's name a second time. @spec TUI-NAV-091

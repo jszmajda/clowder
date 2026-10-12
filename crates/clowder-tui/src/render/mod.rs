@@ -571,6 +571,20 @@ fn row_line(
     let hint = kitten_elder_hint(state, row)
         .filter(|hint| name_len + 1 + hint.chars().count() <= name_w);
 
+    // The Elder's own row draws the mark in the row's own style instead,
+    // stepping down to the glyph alone, then to nothing, by what the name's
+    // column holds beside the whole name. @spec TUI-NAV-104, TUI-NAV-105, TUI-NAV-106
+    if let Some(mark) = elder_mark(state, row)
+        .into_iter()
+        .find(|mark| name_len + 1 + mark.chars().count() <= name_w)
+    {
+        let trailing = name_w - name_len - 1 - mark.chars().count();
+        let mut text = format!("{cursor}{marker} {label} {mark}");
+        text.push_str(&" ".repeat(trailing));
+        text.push_str(&suffix);
+        return Line::from(Span::styled(fmt::fit(&text, width), style));
+    }
+
     let Some(hint) = hint else {
         let name = fmt::fit(&label, name_w);
         let mut text = format!("{cursor}{marker} {name:<name_w$}");
@@ -605,8 +619,26 @@ fn row_line(
 /// @spec TUI-NAV-095
 fn kitten_elder_hint(state: &GameState, row: &Row) -> Option<&'static str> {
     let RowKey::Kitten(ix, _) = row.key else { return None };
+    if state.elder == Some(ix) {
+        return None;
+    }
     state.command_gate_open(&Command::AppointElder(ix)).then_some(ELDER_HINT)
 }
+
+/// The forms of the Elder's mark the row of the kitten the core holds as the
+/// Elder may draw, fullest first; empty on every other row.
+/// @spec TUI-NAV-104, TUI-NAV-106
+fn elder_mark(state: &GameState, row: &Row) -> Vec<&'static str> {
+    match row.key {
+        RowKey::Kitten(ix, _) if state.elder == Some(ix) => vec![ELDER_MARK, ELDER_GLYPH],
+        _ => Vec::new(),
+    }
+}
+
+/// The Elder's mark: glyph, one blank column, word. @spec TUI-NAV-105
+pub(crate) const ELDER_MARK: &str = "◆ Elder";
+/// The mark's glyph alone, its narrower form. @spec TUI-NAV-106
+const ELDER_GLYPH: &str = "◆";
 
 /// The row-bound hint a kitten's row carries after its name, whole or not at
 /// all. @spec TUI-NAV-095

@@ -1822,8 +1822,10 @@ fn each_kitten_is_exactly_one_clowder_row_whose_enter_promotes_it() {
 }
 
 /// A kitten's row is drawn with the kitten's name — the whole of it, followed
-/// at most by the row-bound key's own `(n: Elder)` hint — and with no label in
-/// the name's place, and no list shows one kitten's name on two rows.
+/// at most by the row-bound key's own `(n: Elder)` hint or, on the row of the
+/// kitten the core holds as the Elder, by the Elder's mark, whole or as its
+/// glyph alone (TUI-NAV-104) — and with no label in the name's place, and no
+/// list shows one kitten's name on two rows.
 /// Quantified over every kitten of a short, distinctly named roster, over
 /// every section's list, in both the wide and the narrow layout.
 ///
@@ -1841,7 +1843,10 @@ fn a_kittens_row_is_drawn_with_its_name_and_no_list_shows_a_kitten_twice() {
                 if !row.selectable() {
                     continue;
                 }
-                let bare = field.strip_suffix("(n: Elder)").map(str::trim_end).unwrap_or(&field);
+                // What a kitten's row may carry after its name: the hint, or
+                // the Elder's mark as far as its column holds it.
+                let asides = ["(n: Elder)", "\u{25c6} Elder", "\u{25c6}"];
+                let bare = asides.iter().find_map(|a| field.strip_suffix(a)).map(str::trim_end).unwrap_or(&field);
                 for name in &names {
                     if reads_as(bare, name) {
                         shown.entry(name.clone()).or_default().push(format!("{} {:?}", section.title(), row.key));
@@ -1856,10 +1861,14 @@ fn a_kittens_row_is_drawn_with_its_name_and_no_list_shows_a_kitten_twice() {
                          with the kitten's name {name:?} and no label"
                     )
                 });
+                let is_elder = state.elder == Some(ix);
                 assert!(
-                    rest.trim().is_empty() || rest.trim() == "(n: Elder)",
+                    rest.trim().is_empty()
+                        || (!is_elder && rest.trim() == asides[0])
+                        || (is_elder && asides[1..].contains(&rest.trim())),
                     "{whr} draws {field:?}: after the kitten's name it carries {rest:?}, but a \
-                     kitten's row carries no label — only, where it is drawn, the `(n: Elder)` hint"
+                     kitten's row carries no label — only, where it is drawn, the `(n: Elder)` \
+                     hint, or on the Elder's own row the Elder's mark"
                 );
             }
         }

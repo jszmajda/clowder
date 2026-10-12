@@ -577,7 +577,7 @@ fn add_appoint_elder(items: &mut Vec<String>, state: &GameState, view: &ViewStat
     let Some(RowKey::Kitten(ix, _)) = &view.focus[Section::Clowder.index()] else {
         return;
     };
-    if !state.command_gate_open(&Command::AppointElder(*ix)) {
+    if state.elder == Some(*ix) || !state.command_gate_open(&Command::AppointElder(*ix)) {
         return;
     }
 

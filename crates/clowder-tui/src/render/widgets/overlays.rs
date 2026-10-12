@@ -359,7 +359,7 @@ pub fn help(f: &mut Frame, area: Rect) {
     // full: a mnemonic is live only on its own screen, so it never earns a
     // permanent line in the hint bar, and the help overlay is the only place
     // every one of them is named at once, whatever screen the player is on.
-    // @spec TUI-NAV-025, TUI-NAV-046
+    // @spec TUI-NAV-025, TUI-NAV-046, TUI-NAV-109
     // A focused-item mnemonic's act is worded by its row's label (TUI-NAV-089)
     // followed by the item it acts on, in parentheses (TUI-NAV-090) — the same
     // wording the hint bar gives it.
@@ -378,6 +378,7 @@ pub fn help(f: &mut Frame, area: Rect) {
         ("\u{b7}", "flavor event"),
         ("\u{25aa}", "mechanical event"),
         ("\u{25e6}", "idle kitten"),
+        ("\u{25c6}", "the Elder"),
         ("~", "unread offline report"),
         ("!", "open sky-event window"),
     ];

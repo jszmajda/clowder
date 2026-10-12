@@ -1638,28 +1638,24 @@ fn every_list_row_draws_its_count_and_cost_in_fixed_fields_at_its_right() {
                         let at = format!("{section:?} row {key_text} at {w}x{h}");
                         let drawn = line.concat();
 
-                        // A kitten's row may carry the whole `(n: Elder)` hint
-                        // after its name where the column has room, drawn there
-                        // and nowhere else (TUI-NAV-095) — the dedicated sweep
-                        // over every width and gate state is
-                        // `every_kitten_row_whose_gate_is_open_carries_the_whole_elder_hint_where_it_fits`;
-                        // here it is only accounted for so this generic field
-                        // check still holds over the name column it shares.
-                        let hint = match row.key {
-                            RowKey::Kitten(kix, _)
-                                if state.command_gate_open(&clowder_core::Command::AppointElder(kix)) =>
-                            {
-                                Some("(n: Elder)")
+                        // A kitten's row may carry, after its name where the
+                        // column has room, the whole `(n: Elder)` hint
+                        // (TUI-NAV-095) or, on the Elder's own row, the
+                        // Elder's mark as far as the column holds it
+                        // (TUI-NAV-104, TUI-NAV-106) — the dedicated sweeps
+                        // over every width, gate state, and Elder are
+                        // `every_kitten_row_but_the_elders_carries_the_whole_elder_hint_where_it_fits`
+                        // and
+                        // `the_elders_row_keeps_its_name_and_draws_the_first_step_of_the_mark_its_column_holds`;
+                        // here they are only accounted for so this generic
+                        // field check still holds over the name column they
+                        // share.
+                        let expected_column = match row.key {
+                            RowKey::Kitten(kix, _) => {
+                                assert_eq!(full, state.kittens[kix].name, "fixture: {at} is named by its kitten");
+                                expected_name_column(state, kix, name_w)
                             }
-                            _ => None,
-                        };
-                        let name_len = full.chars().count();
-                        let expected_column = match hint.filter(|h| name_len + 1 + h.chars().count() <= name_w) {
-                            Some(h) => {
-                                let trailing = name_w - name_len - 1 - h.chars().count();
-                                format!("{full} {h}{}", " ".repeat(trailing))
-                            }
-                            None => {
+                            _ => {
                                 let name = fmt::fit(&full, name_w);
                                 format!("{name:<name_w$}")
                             }
@@ -1753,26 +1749,30 @@ fn name_of_len(head: char, len: usize) -> String {
 }
 
 /// Wherever the core reports the gate of AppointElder open for a listed
-/// kitten, that kitten's row — the cursor's and every other alike — carries
-/// `(n: Elder)` after the name, within the name's column, in the dim role, of
-/// single-width characters, and never in the count or cost field. The hint is
-/// drawn whole or not at all and never costs the name a character: where the
-/// name's column holds the whole name, a blank, and the whole hint, the hint
-/// is there; where it cannot hold the whole name and the whole hint even set
-/// hard against each other, the row carries no part of the hint and draws its
-/// name as any name is drawn (TUI-RENDER-014); and in every case the name
-/// comes first, whole or shortened as any name is, followed by nothing but
-/// blanks and at most the whole hint. A row whose kitten's gate the core
-/// reports shut carries none (no reachable meadow lists one: the gate opens
-/// with the first kitten). Quantified over every kitten row, with the cursor
-/// on each kitten row in turn and on no kitten at all, at the floor, narrow,
-/// at the pane breakpoint, three-pane, and wide — with names built at each
-/// width to sit just inside, on, and just past where the hint fits, and names
-/// longer than the column.
+/// kitten who is not the one the core holds as the Elder, that kitten's row —
+/// the cursor's and every other alike — carries `(n: Elder)` after the name,
+/// within the name's column, in the dim role, of single-width characters, and
+/// never in the count or cost field. The hint is drawn whole or not at all and
+/// never costs the name a character: where the name's column holds the whole
+/// name, a blank, and the whole hint, the hint is there; where it cannot hold
+/// the whole name and the whole hint even set hard against each other, the row
+/// carries no part of the hint and draws its name as any name is drawn
+/// (TUI-RENDER-014); and in every case the name comes first, whole or
+/// shortened as any name is, followed by nothing but blanks and at most the
+/// whole hint. The row of the kitten the core holds as the Elder carries no
+/// part of the hint, in its name's column or anywhere else on the row, however
+/// much room its name leaves; what stands there instead is TUI-NAV-104's. A
+/// row whose kitten's gate the core reports shut carries none (no reachable
+/// meadow lists one: the gate opens with the first kitten). Quantified over
+/// every kitten row, with nobody the Elder and with each kitten the Elder in
+/// turn, with the cursor on each kitten row in turn and on no kitten at all,
+/// at the floor, narrow, at the pane breakpoint, three-pane, and wide — with
+/// names built at each width to sit just inside, on, and just past where the
+/// hint fits, and names longer than the column.
 ///
 /// @spec TUI-NAV-095
 #[test]
-fn every_kitten_row_whose_gate_is_open_carries_the_whole_elder_hint_where_it_fits() {
+fn every_kitten_row_but_the_elders_carries_the_whole_elder_hint_where_it_fits() {
     let dim = clowder_tui::theme::Role::Dim.color().expect("the dim role is a colour");
     let store = store_names();
     let c = cost_field_width(&store);
@@ -1784,6 +1784,7 @@ fn every_kitten_row_whose_gate_is_open_carries_the_whole_elder_hint_where_it_fit
     assert!(ELDER_HINT.is_ascii(), "fixture: the hint as the spec words it is single-width");
 
     let (mut drawn_with, mut drawn_without, mut focused_with) = (0u32, 0u32, 0u32);
+    let (mut elder_rows, mut elder_rows_with_room, mut beside_an_elder) = (0u32, 0u32, 0u32);
     for (w, h) in [(FLOOR_W, 60u16), (90, 60), (99, 60), (100, 60), (130, 60), (200, 60)] {
         // The name column's width, taken from the frame's own list space.
         let probe = clowder_named(&["Biscuit".to_string()]);
@@ -1802,98 +1803,127 @@ fn every_kitten_row_whose_gate_is_open_carries_the_whole_elder_hint_where_it_fit
                 names.push(name_of_len(head, len));
             }
         }
-        let state = clowder_named(&names);
-        let all = rows(&state, Section::Clowder);
-        let kitten_ix: Vec<usize> = (0..all.len()).filter(|i| matches!(all[*i].key, RowKey::Kitten(..))).collect();
-        assert!(!kitten_ix.is_empty(), "fixture: kitten rows are listed at {w}x{h}");
+        // Nobody the Elder, then each kitten in turn.
+        let elders: Vec<Option<usize>> = std::iter::once(None).chain((0..names.len()).map(Some)).collect();
+        for elder in elders {
+            let mut state = clowder_named(&names);
+            state.elder = elder;
+            let all = rows(&state, Section::Clowder);
+            let kitten_ix: Vec<usize> = (0..all.len()).filter(|i| matches!(all[*i].key, RowKey::Kitten(..))).collect();
+            assert!(!kitten_ix.is_empty(), "fixture: kitten rows are listed at {w}x{h}");
 
-        let mut cursors: Vec<Option<RowKey>> = kitten_ix.iter().map(|i| Some(all[*i].key.clone())).collect();
-        cursors.push(all.iter().find(|r| r.selectable() && !matches!(r.key, RowKey::Kitten(..))).map(|r| r.key.clone()));
+            let mut cursors: Vec<Option<RowKey>> = kitten_ix.iter().map(|i| Some(all[*i].key.clone())).collect();
+            cursors.push(all.iter().find(|r| r.selectable() && !matches!(r.key, RowKey::Kitten(..))).map(|r| r.key.clone()));
 
-        for cursor_key in cursors {
-            let mut view = ViewState { section: Some(Section::Clowder), ..Default::default() };
-            view.focus[Section::Clowder.index()] = cursor_key.clone();
-            let d = cold(&state, &view, w, h);
-            let space = list_space(&d.layout);
-            let lines = cell_lines(&d.buffer, space);
-            let cursor = cursor_key.as_ref().and_then(|k| all.iter().position(|r| &r.key == k)).unwrap_or(0);
-            let cy = lines
-                .iter()
-                .position(|l| l[0] == "▸")
-                .unwrap_or_else(|| panic!("fixture: the cursor is drawn in the Clowder list at {w}x{h}"));
+            for cursor_key in cursors {
+                let mut view = ViewState { section: Some(Section::Clowder), ..Default::default() };
+                view.focus[Section::Clowder.index()] = cursor_key.clone();
+                let d = cold(&state, &view, w, h);
+                let space = list_space(&d.layout);
+                let lines = cell_lines(&d.buffer, space);
+                let cursor = cursor_key.as_ref().and_then(|k| all.iter().position(|r| &r.key == k)).unwrap_or(0);
+                let cy = lines
+                    .iter()
+                    .position(|l| l[0] == "▸")
+                    .unwrap_or_else(|| panic!("fixture: the cursor is drawn in the Clowder list at {w}x{h}"));
 
-            for &ri in &kitten_ix {
-                let row = &all[ri];
-                let RowKey::Kitten(k, _) = row.key else { unreachable!() };
-                let y = (cy + ri).checked_sub(cursor).expect("fixture: the list is drawn unscrolled");
-                let line = &lines[y];
-                let name = &state.kittens[k].name;
-                let name_len = name.chars().count();
-                let focused = cursor_key.as_ref() == Some(&row.key);
-                let at = format!(
-                    "at {w}x{h}, kitten {k}'s row (a {name_len}-letter name in a {name_w}-column name \
-                     column, {}) reads {:?}",
-                    if focused { "the cursor's" } else { "not the cursor's" },
-                    line.concat()
-                );
-                let column = cells_text(line, 4, 4 + name_w);
-                let fields = cells_text(line, 4 + name_w, width);
-
-                // Never in the count or cost field's place: that place carries
-                // the kitten's state, whose exact drawing is swept by
-                // `every_kitten_row_names_its_one_state_whole_in_its_fields_place`
-                // (TUI-RENDER-024); here only that no part of the hint is there.
-                assert!(
-                    fields.starts_with(' ') && !fields.contains(ELDER_HINT) && !fields.contains("(n:"),
-                    "{at}: the hint never stands in the count or cost field's place"
-                );
-
-                // The name first, never cost a character; after it, blanks and
-                // at most the whole hint.
-                if name_len > name_w || !column.contains(ELDER_HINT) {
-                    assert_eq!(
-                        column,
-                        format!("{:<name_w$}", fmt::fit(name, name_w)),
-                        "{at}: without the whole hint, the name's column carries the name as any \
-                         name is drawn and no part of the hint"
+                for &ri in &kitten_ix {
+                    let row = &all[ri];
+                    let RowKey::Kitten(k, _) = row.key else { unreachable!() };
+                    let y = (cy + ri).checked_sub(cursor).expect("fixture: the list is drawn unscrolled");
+                    let line = &lines[y];
+                    let name = &state.kittens[k].name;
+                    let name_len = name.chars().count();
+                    let focused = cursor_key.as_ref() == Some(&row.key);
+                    let at = format!(
+                        "at {w}x{h} with {}, kitten {k}'s row (a {name_len}-letter name in a \
+                         {name_w}-column name column, {}) reads {:?}",
+                        match elder {
+                            Some(e) => format!("kitten {e} the Elder"),
+                            None => "nobody the Elder".to_string(),
+                        },
+                        if focused { "the cursor's" } else { "not the cursor's" },
+                        line.concat()
                     );
-                }
-                let hint_at = column.find(ELDER_HINT);
-                if let Some(off) = hint_at {
-                    let head: String = column.chars().take(name_len).collect();
-                    assert_eq!(&head, name, "{at}: the hint cost the name a character");
-                    let between = &column[name.len()..off];
-                    assert!(between.chars().all(|ch| ch == ' '), "{at}: something other than blanks between the name and the hint");
-                    let after = &column[off + ELDER_HINT.len()..];
-                    assert!(after.chars().all(|ch| ch == ' '), "{at}: something other than blanks after the hint");
-                    let cell0 = 4 + column[..off].chars().count();
-                    for (i, sym) in line[cell0..cell0 + hint_w].iter().enumerate() {
-                        assert_eq!(sym.chars().count(), 1, "{at}: the hint's cell {i} is not one single-width character");
-                        let fg = d.buffer.cell((space.x + (cell0 + i) as u16, space.y + y as u16)).expect("in the buffer").fg;
-                        assert_eq!(fg, dim, "{at}: the hint's cell {i} ({sym:?}) is not drawn in the dim role");
-                    }
-                }
+                    let column = cells_text(line, 4, 4 + name_w);
+                    let fields = cells_text(line, 4 + name_w, width);
 
-                let gate = state.command_gate_open(&clowder_core::Command::AppointElder(k));
-                if !gate {
-                    assert!(hint_at.is_none(), "{at}: the core reports this kitten's gate shut, so the row carries no hint");
-                } else if name_len + 1 + hint_w <= name_w {
+                    // Never in the count or cost field's place: that place carries
+                    // the kitten's state, whose exact drawing is swept by
+                    // `every_kitten_row_names_its_one_state_whole_in_its_fields_place`
+                    // (TUI-RENDER-024); here only that no part of the hint is there.
                     assert!(
-                        hint_at.is_some(),
-                        "{at}: the gate is open and the name's column holds the whole name, a \
-                         blank, and the whole `{ELDER_HINT}`, so the row carries the hint"
+                        fields.starts_with(' ') && !fields.contains(ELDER_HINT) && !fields.contains("(n:"),
+                        "{at}: the hint never stands in the count or cost field's place"
                     );
-                    drawn_with += 1;
-                    if focused {
-                        focused_with += 1;
+
+                    // The Elder's own row carries no hint, whole or in part,
+                    // whatever room its name leaves. What it carries in the
+                    // hint's place is swept by the TUI-NAV-104–106 tests.
+                    if elder == Some(k) {
+                        assert!(
+                            !column.contains(ELDER_HINT) && !column.contains("(n") && !column.contains("n:"),
+                            "{at}: the row of the kitten the core holds as the Elder carries no \
+                             hint — the hint would offer what is already true"
+                        );
+                        elder_rows += 1;
+                        if name_len + 1 + hint_w <= name_w {
+                            elder_rows_with_room += 1;
+                        }
+                        continue;
                     }
-                } else if name_len + hint_w > name_w {
-                    assert!(
-                        hint_at.is_none(),
-                        "{at}: the name's column cannot hold the whole name and the whole hint, \
-                         so the row carries no part of it"
-                    );
-                    drawn_without += 1;
+                    if elder.is_some() {
+                        beside_an_elder += 1;
+                    }
+
+                    // The name first, never cost a character; after it, blanks and
+                    // at most the whole hint.
+                    if name_len > name_w || !column.contains(ELDER_HINT) {
+                        assert_eq!(
+                            column,
+                            format!("{:<name_w$}", fmt::fit(name, name_w)),
+                            "{at}: without the whole hint, the name's column carries the name as any \
+                             name is drawn and no part of the hint"
+                        );
+                    }
+                    let hint_at = column.find(ELDER_HINT);
+                    if let Some(off) = hint_at {
+                        let head: String = column.chars().take(name_len).collect();
+                        assert_eq!(&head, name, "{at}: the hint cost the name a character");
+                        let between = &column[name.len()..off];
+                        assert!(between.chars().all(|ch| ch == ' '), "{at}: something other than blanks between the name and the hint");
+                        let after = &column[off + ELDER_HINT.len()..];
+                        assert!(after.chars().all(|ch| ch == ' '), "{at}: something other than blanks after the hint");
+                        let cell0 = 4 + column[..off].chars().count();
+                        for (i, sym) in line[cell0..cell0 + hint_w].iter().enumerate() {
+                            assert_eq!(sym.chars().count(), 1, "{at}: the hint's cell {i} is not one single-width character");
+                            let fg = d.buffer.cell((space.x + (cell0 + i) as u16, space.y + y as u16)).expect("in the buffer").fg;
+                            assert_eq!(fg, dim, "{at}: the hint's cell {i} ({sym:?}) is not drawn in the dim role");
+                        }
+                    }
+
+                    let gate = state.command_gate_open(&clowder_core::Command::AppointElder(k));
+                    if !gate {
+                        assert!(hint_at.is_none(), "{at}: the core reports this kitten's gate shut, so the row carries no hint");
+                    } else if name_len + 1 + hint_w <= name_w {
+                        assert!(
+                            hint_at.is_some(),
+                            "{at}: the gate is open, the kitten is not the Elder, and the name's \
+                             column holds the whole name, a blank, and the whole `{ELDER_HINT}`, so \
+                             the row carries the hint"
+                        );
+                        drawn_with += 1;
+                        if focused {
+                            focused_with += 1;
+                        }
+                    } else if name_len + hint_w > name_w {
+                        assert!(
+                            hint_at.is_none(),
+                            "{at}: the name's column cannot hold the whole name and the whole hint, \
+                             so the row carries no part of it"
+                        );
+                        drawn_without += 1;
+                    }
                 }
             }
         }
@@ -1901,6 +1931,600 @@ fn every_kitten_row_whose_gate_is_open_carries_the_whole_elder_hint_where_it_fit
     assert!(drawn_with > 0, "fixture: no row was wide enough to require the hint");
     assert!(focused_with > 0, "fixture: the cursor's own row never required the hint");
     assert!(drawn_without > 0, "fixture: no row was too narrow to hold the hint");
+    assert!(beside_an_elder > 0, "fixture: no other kitten's row was read while an Elder stood");
+    assert!(elder_rows > 0, "fixture: the Elder's own row was never read");
+    assert!(
+        elder_rows_with_room > 0,
+        "fixture: the Elder's own row never had room for the hint it must not carry"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-104 / TUI-NAV-105 / TUI-NAV-106 — who the Elder is, on the roster
+// ---------------------------------------------------------------------------
+
+/// The Elder's mark, whole: the glyph, one blank column, and the word.
+const ELDER_MARK: &str = "◆ Elder";
+/// The mark's glyph alone — what stands where the word has no room.
+const ELDER_GLYPH: &str = "◆";
+
+/// The Clowder list as one frame drew it, unscrolled: the list's space, its
+/// cells line by line, the width of the name's column the fields leave
+/// (TUI-RENDER-020), and for each kitten's row its roster position and the
+/// line of the list's space it is drawn on.
+struct ClowderList {
+    d: Drawn,
+    space: Rect,
+    lines: Vec<Vec<String>>,
+    name_w: usize,
+    kitten_lines: Vec<(usize, usize)>,
+}
+
+impl ClowderList {
+    /// The line a kitten's row is drawn on.
+    fn line_of_kitten(&self, k: usize) -> usize {
+        self.kitten_lines
+            .iter()
+            .find(|(ix, _)| *ix == k)
+            .map(|(_, y)| *y)
+            .unwrap_or_else(|| panic!("fixture: kitten {k}'s row is listed"))
+    }
+
+    /// Every line of the list's space that draws the mark's glyph anywhere.
+    fn lines_with_the_glyph(&self) -> Vec<usize> {
+        (0..self.lines.len()).filter(|y| self.lines[*y].iter().any(|sym| sym == ELDER_GLYPH)).collect()
+    }
+}
+
+/// Read the Clowder list out of a drawn frame whose cursor stands on
+/// `cursor_key`, or where the list puts it when none is remembered. `c` is the
+/// cost field's width.
+fn clowder_list_in(d: Drawn, state: &GameState, cursor_key: Option<&RowKey>, c: usize) -> ClowderList {
+    let space = list_space(&d.layout);
+    let lines = cell_lines(&d.buffer, space);
+    let all = rows(state, Section::Clowder);
+    assert!(
+        all.len() <= space.height as usize,
+        "fixture: the Clowder list ({} rows) fits its {}-line pane unscrolled",
+        all.len(),
+        space.height
+    );
+    let cursor = cursor_key
+        .and_then(|k| all.iter().position(|r| &r.key == k))
+        .or_else(|| all.iter().position(|r| r.selectable()))
+        .expect("fixture: the Clowder list has a row the cursor can stand on");
+    let cy = lines.iter().position(|l| l[0] == "▸").expect("fixture: the cursor is drawn in the Clowder list");
+    let kitten_lines = all
+        .iter()
+        .enumerate()
+        .filter_map(|(ri, r)| match r.key {
+            RowKey::Kitten(k, _) => Some((k, (cy + ri).checked_sub(cursor).expect("fixture: the list is drawn unscrolled"))),
+            _ => None,
+        })
+        .collect();
+    let name_w = space.width as usize - 4 - 8 - (c + 1);
+    ClowderList { d, space, lines, name_w, kitten_lines }
+}
+
+/// The Clowder list drawn into a terminal that has never drawn anything.
+fn clowder_list(state: &GameState, cursor_key: Option<&RowKey>, w: u16, h: u16, c: usize) -> ClowderList {
+    let mut view = ViewState { section: Some(Section::Clowder), ..Default::default() };
+    view.focus[Section::Clowder.index()] = cursor_key.cloned();
+    clowder_list_in(cold(state, &view, w, h), state, cursor_key, c)
+}
+
+/// While the core holds a kitten as the Elder, the Elder's mark stands on that
+/// kitten's row — the row for the roster position the core holds — and on no
+/// other row of the roster, of the Clowder list, or of any other section's
+/// list, whatever the kitten is doing: every job at home, every job away at
+/// every away location, no job at home and away, a tinkerer bound and unbound.
+/// Every other kitten's row is drawn as any kitten's row is. While the core
+/// holds no Elder, no row carries the mark. The gate of AppointElder has no
+/// say: no reachable meadow lists a kitten's row with that gate shut (the
+/// gate opens with the first kitten), so the mark is read here under the only
+/// answer the core gives a listed kitten. Quantified over nobody and every
+/// kitten of a roster holding every state in turn as the Elder, at the floor,
+/// narrow, at the pane breakpoint, three-pane, and wide.
+///
+/// @spec TUI-NAV-104
+#[test]
+fn the_elders_mark_stands_on_the_elders_row_and_on_no_other_whoever_the_elder_is() {
+    let c = cost_field_width(&store_names());
+    let base = every_state_roster(&[]);
+    let everyone: BTreeSet<usize> = (0..base.kittens.len()).collect();
+    let mut marked_whole: BTreeSet<usize> = BTreeSet::new();
+    let (mut elder_rows, mut other_rows, mut elderless_frames) = (0u32, 0u32, 0u32);
+
+    for (w, h) in [(FLOOR_W, 70u16), (90, 70), (99, 70), (100, 70), (130, 70), (200, 70)] {
+        let elders: Vec<Option<usize>> = std::iter::once(None).chain(everyone.iter().copied().map(Some)).collect();
+        for elder in elders {
+            let mut state = base.clone();
+            state.elder = elder;
+            let list = clowder_list(&state, None, w, h, c);
+            assert_eq!(list.kitten_lines.len(), state.kittens.len(), "fixture: every kitten is listed at {w}x{h}");
+            let whose = match elder {
+                Some(e) => format!("kitten {e} ({:?} at {:?}) the Elder", state.kittens[e].job, state.kittens[e].location),
+                None => "the core holding no Elder".to_string(),
+            };
+
+            for &(k, y) in &list.kitten_lines {
+                let line = &list.lines[y];
+                assert_eq!(
+                    cells_text(line, 4, 4 + list.name_w),
+                    expected_name_column(&state, k, list.name_w),
+                    "at {w}x{h} with {whose}, kitten {k}'s row reads {:?}: the Elder's mark stands \
+                     after the name on the Elder's own row, as far as its column holds it, and no \
+                     other kitten's row carries it (TUI-NAV-104)",
+                    line.concat()
+                );
+                if elder == Some(k) {
+                    elder_rows += 1;
+                    if kitten_aside(&state, k, list.name_w) == Some(ELDER_MARK) {
+                        marked_whole.insert(k);
+                    }
+                } else {
+                    other_rows += 1;
+                }
+            }
+
+            // On no other row: nowhere in the list's space but the Elder's own line.
+            let allowed: Vec<usize> = elder
+                .filter(|e| kitten_aside(&state, *e, list.name_w).is_some())
+                .map(|e| vec![list.line_of_kitten(e)])
+                .unwrap_or_default();
+            assert_eq!(
+                list.lines_with_the_glyph(),
+                allowed,
+                "at {w}x{h} with {whose}, the lines of the Clowder list drawing `{ELDER_GLYPH}` are \
+                 not exactly the Elder's own row (TUI-NAV-104)"
+            );
+            if elder.is_none() {
+                elderless_frames += 1;
+            }
+        }
+    }
+    assert!(elder_rows > 0 && other_rows > 0 && elderless_frames > 0, "fixture: rows were read with and without an Elder");
+    assert_eq!(
+        marked_whole, everyone,
+        "fixture: every kitten of the roster, whatever it is doing, wore the whole mark as the \
+         Elder at some width"
+    );
+
+    // No other section's list carries the mark on any row.
+    let mut state = base.clone();
+    state.elder = Some(0);
+    for section in Section::ALL.into_iter().filter(|s| *s != Section::Clowder) {
+        for (w, h) in [(FLOOR_W, 70u16), (130, 70)] {
+            let d = cold(&state, &ViewState { section: Some(section), ..Default::default() }, w, h);
+            let lines = cell_lines(&d.buffer, list_space(&d.layout));
+            assert!(
+                !lines.iter().any(|l| l.iter().any(|sym| sym == ELDER_GLYPH)),
+                "at {w}x{h}, a row of the {section:?} list draws `{ELDER_GLYPH}`; the mark stands \
+                 on the Elder's own row and on no other (TUI-NAV-104)"
+            );
+        }
+    }
+}
+
+/// The mark is re-derived on every frame from the roster position the core
+/// holds: on the very next frame drawn into the same terminal after an
+/// appointment lands, the new Elder's row carries the mark and no other row
+/// does — the row it left is drawn as any other kitten's row is, its hint
+/// back — and it is the roster position that is marked, never a name: a later
+/// namesake's appointment marks the namesake's row alone. The mark stays on
+/// the Elder's row when the Elder wanders away or takes a job, and no row
+/// carries it once the core holds no Elder.
+///
+/// @spec TUI-NAV-104
+#[test]
+fn the_elders_mark_follows_the_cores_elder_on_the_frame_an_appointment_lands() {
+    use clowder_core::Command;
+
+    let c = cost_field_width(&store_names());
+    let names: Vec<String> = ["Biscuit", "Clover", "Biscuit", "Dumpling"].iter().map(|n| n.to_string()).collect();
+    let mut state = clowder_named(&names);
+    let view = ViewState { section: Some(Section::Clowder), ..Default::default() };
+    let (w, h) = (130u16, 60u16);
+    let mut term = terminal(w, h);
+    let mut prev: Option<Layout> = None;
+
+    let away = away_locations()[0];
+    type MeadowStep<'a> = (&'a str, Box<dyn Fn(&mut GameState)>);
+    let appoint = |k: usize| -> Box<dyn Fn(&mut GameState)> {
+        Box::new(move |s: &mut GameState| {
+            s.apply(Command::AppointElder(k)).expect("fixture: the core accepts the appointment");
+        })
+    };
+    let steps: Vec<MeadowStep> = vec![
+        ("nobody was yet the Elder", Box::new(|_s: &mut GameState| {})),
+        ("kitten 0 was appointed", appoint(0)),
+        ("kitten 0's later namesake, kitten 2, was appointed", appoint(2)),
+        ("kitten 2 was appointed again", appoint(2)),
+        ("the Elder wandered away", Box::new(move |s: &mut GameState| {
+            s.kittens[2].location = away;
+            s.kittens[2].away_seq = Some(1);
+        })),
+        ("the Elder took a job", Box::new(|s: &mut GameState| s.kittens[2].job = Some(JobId::ALL[0]))),
+        ("kitten 1 was appointed", appoint(1)),
+        ("kitten 3 was appointed", appoint(3)),
+        ("the core held no Elder again", Box::new(|s: &mut GameState| s.elder = None)),
+    ];
+
+    let (mut marked, mut left) = (0u32, 0u32);
+    let mut before: Option<usize> = None;
+    for (what, step) in steps {
+        step(&mut state);
+        let d = draw(&mut term, &state, &view, prev.as_ref());
+        prev = Some(d.layout);
+        let list = clowder_list_in(d, &state, None, c);
+        for &(k, y) in &list.kitten_lines {
+            let line = &list.lines[y];
+            let column = cells_text(line, 4, 4 + list.name_w);
+            let name = &state.kittens[k].name;
+            let name_w = list.name_w;
+            let (aside, why) = if state.elder == Some(k) {
+                marked += 1;
+                (ELDER_MARK, "is the kitten the core now holds as the Elder, so its row carries the mark")
+            } else {
+                if before == Some(k) {
+                    left += 1;
+                }
+                (ELDER_HINT, "is not the Elder, so its row is drawn as any other kitten's, its hint in place")
+            };
+            assert_eq!(
+                column,
+                format!("{:<name_w$}", format!("{name} {aside}")),
+                "on the frame after {what}, kitten {k} {why} (TUI-NAV-104): {:?}",
+                line.concat()
+            );
+        }
+        let allowed: Vec<usize> = state.elder.map(|e| vec![list.line_of_kitten(e)]).unwrap_or_default();
+        assert_eq!(
+            list.lines_with_the_glyph(),
+            allowed,
+            "on the frame after {what}, the lines drawing `{ELDER_GLYPH}` are not exactly the row \
+             of the Elder the core holds ({:?}) (TUI-NAV-104)",
+            state.elder
+        );
+        before = state.elder;
+    }
+    assert!(marked > 0, "fixture: some frame was drawn with an Elder");
+    assert!(left > 0, "fixture: some frame was drawn just after the mark left a row");
+}
+
+/// The mark is `◆ Elder` — the glyph, one blank column, and the word, each
+/// cell one single-width character — drawn after the kitten's name within the
+/// name's column, one blank column on, exactly where the hint begins on every
+/// other kitten's row. It wears the row's own style, cell for cell what the
+/// name wears — the cursor's reverse with it under the cursor — and no colour
+/// of its own. No part of it stands in the count and cost fields' place, where
+/// the kitten's state is drawn as on every kitten's row. Quantified over an
+/// Elder in each state a row names — idle, at work, away, a tinkerer — with
+/// the cursor on each kitten's row in turn and on no kitten, at the floor,
+/// narrow, at the pane breakpoint, three-pane, and wide.
+///
+/// @spec TUI-NAV-105
+#[test]
+fn the_elders_mark_is_its_glyph_a_blank_and_its_word_after_the_name_in_the_rows_own_style() {
+    use ratatui::style::Modifier;
+
+    let c = cost_field_width(&store_names());
+    let place = 7 + 1 + c;
+    let mark: Vec<String> = ELDER_MARK.chars().map(|ch| ch.to_string()).collect();
+    assert_eq!(mark.len(), 7, "fixture: the mark as the spec words it is the glyph, a blank, and a five-letter word");
+    assert_eq!((mark[0].as_str(), mark[1].as_str()), (ELDER_GLYPH, " "), "fixture: the glyph, then one blank column");
+
+    let names: Vec<String> = ["Bo", "Fig", "Mo", "Zu"].iter().map(|n| n.to_string()).collect();
+    let mut base = clowder_named(&names);
+    base.kittens[1].job = Some(JobId::ALL[0]);
+    base.kittens[1].job_seq = Some(1);
+    base.kittens[2].location = away_locations()[0];
+    base.kittens[2].away_seq = Some(1);
+    base.kittens[3].job = Some(JobId::Tinkerer);
+    base.kittens[3].job_seq = Some(2);
+    base.kittens[3].tinkering = Some(CraftId::ALL[0]);
+
+    let (mut whole, mut under_the_cursor, mut beside_a_hint) = (0u32, 0u32, 0u32);
+    for (w, h) in [(FLOOR_W, 60u16), (90, 60), (99, 60), (100, 60), (130, 60), (200, 60)] {
+        let mut whole_here = 0u32;
+        for elder in 0..base.kittens.len() {
+            let mut state = base.clone();
+            state.elder = Some(elder);
+            let all = rows(&state, Section::Clowder);
+            let mut cursors: Vec<Option<RowKey>> =
+                all.iter().filter(|r| matches!(r.key, RowKey::Kitten(..))).map(|r| Some(r.key.clone())).collect();
+            cursors.push(all.iter().find(|r| r.selectable() && !matches!(r.key, RowKey::Kitten(..))).map(|r| r.key.clone()));
+
+            for cursor_key in cursors {
+                let list = clowder_list(&state, cursor_key.as_ref(), w, h, c);
+                let (name_w, width) = (list.name_w, list.space.width as usize);
+                let y = list.line_of_kitten(elder);
+                let line = &list.lines[y];
+                let kitten = &state.kittens[elder];
+                let name_len = kitten.name.chars().count();
+                let focused = matches!(cursor_key, Some(RowKey::Kitten(k, _)) if k == elder);
+                let at = format!(
+                    "at {w}x{h}, the row of the Elder, kitten {elder} ({:?} at {:?}, {}), reads {:?}",
+                    kitten.job,
+                    kitten.location,
+                    if focused { "the cursor's row" } else { "not the cursor's row" },
+                    line.concat()
+                );
+                if name_len + 1 + mark.len() > name_w {
+                    continue; // no room for the whole mark: TUI-NAV-106's steps
+                }
+                whole += 1;
+                whole_here += 1;
+
+                // The glyph, one blank column, and the word, after the name
+                // and one blank column, and nothing else in the name's column.
+                assert_eq!(
+                    cells_text(line, 4, 4 + name_w),
+                    format!("{:<name_w$}", format!("{} {ELDER_MARK}", kitten.name)),
+                    "{at}: the name's column carries the name, one blank column, and the whole \
+                     mark `{ELDER_MARK}` (TUI-NAV-105)"
+                );
+                let cell0 = 4 + name_len + 1;
+                let cell_at = |x: usize| list.d.buffer.cell((list.space.x + x as u16, list.space.y + y as u16)).expect("in the buffer");
+                let name_cell = cell_at(4);
+                assert_eq!(
+                    name_cell.modifier.contains(Modifier::REVERSED),
+                    focused,
+                    "fixture: {at}: the name is reversed exactly under the cursor"
+                );
+                for (i, expected) in mark.iter().enumerate() {
+                    let sym = &line[cell0 + i];
+                    assert_eq!(sym, expected, "{at}: the mark's cell {i} (TUI-NAV-105)");
+                    assert_eq!(sym.chars().count(), 1, "{at}: the mark's cell {i} is not one single-width character");
+                    let cell = cell_at(cell0 + i);
+                    assert_eq!(
+                        (cell.fg, cell.bg, cell.modifier),
+                        (name_cell.fg, name_cell.bg, name_cell.modifier),
+                        "{at}: the mark's cell {i} ({sym:?}) is not drawn in the row's own style, as \
+                         the name is — it takes no colour of its own, and the cursor's reverse with \
+                         the row (TUI-NAV-105)"
+                    );
+                }
+                if focused {
+                    under_the_cursor += 1;
+                }
+
+                // Placed as the hint is placed on every other kitten's row.
+                for &(k, ky) in &list.kitten_lines {
+                    if k == elder {
+                        continue;
+                    }
+                    let other = cells_text(&list.lines[ky], 4, 4 + name_w);
+                    if let Some(off) = other.find(ELDER_HINT) {
+                        assert_eq!(
+                            off - state.kittens[k].name.len(),
+                            cell0 - 4 - name_len,
+                            "{at}: the mark begins as far after its name as the hint does after \
+                             kitten {k}'s — one blank column (TUI-NAV-105)"
+                        );
+                        beside_a_hint += 1;
+                    }
+                }
+
+                // No part of it in the fields' place: the kitten's state
+                // stands there as on every kitten's row (TUI-RENDER-024).
+                assert_eq!(
+                    cells_text(line, 4 + name_w, width),
+                    format!(" {:<place$}", expected_state_word(kitten)),
+                    "{at}: the count and cost fields' place carries the kitten's one state and no \
+                     part of the mark (TUI-NAV-105, TUI-NAV-101)"
+                );
+            }
+        }
+        assert!(whole_here > 0, "fixture: at {w}x{h} no Elder's row had room for the whole mark");
+    }
+    assert!(whole > 0 && under_the_cursor > 0, "fixture: the whole mark was read, under the cursor too");
+    assert!(beside_a_hint > 0, "fixture: no frame drew the mark and another row's hint together");
+}
+
+/// The mark is its row's own and no part of the kitten's name: while the
+/// Elder's row carries it, the palette's result for the Elder — and for every
+/// other kitten — shows the kitten's name alone, a query for the mark, its
+/// glyph, or its word finds no kitten whose name does not hold it, and the
+/// palette draws no mark beside the Elder's name. Quantified over each kitten
+/// of a roster as the Elder.
+///
+/// @spec TUI-NAV-105
+#[test]
+fn the_elders_mark_is_its_rows_own_and_no_part_of_the_kittens_name() {
+    use clowder_tui::nav::palette::results;
+    use clowder_tui::nav::Overlay;
+
+    let c = cost_field_width(&store_names());
+    let names: Vec<String> = ["Biscuit", "Clover", "Dumpling"].iter().map(|n| n.to_string()).collect();
+    let (w, h) = (130u16, 60u16);
+    for elder in 0..names.len() {
+        let mut state = clowder_named(&names);
+        state.elder = Some(elder);
+        let elder_name = state.kittens[elder].name.clone();
+
+        // The row carries the mark...
+        let list = clowder_list(&state, None, w, h, c);
+        let name_w = list.name_w;
+        let line = &list.lines[list.line_of_kitten(elder)];
+        assert_eq!(
+            cells_text(line, 4, 4 + name_w),
+            format!("{:<name_w$}", format!("{elder_name} {ELDER_MARK}")),
+            "the row of the Elder, kitten {elder}, carries the mark after its name (TUI-NAV-105): {:?}",
+            line.concat()
+        );
+
+        // ...and the palette's result for the kitten shows the name alone.
+        for (k, kitten) in state.kittens.iter().enumerate() {
+            let named: Vec<_> = results(&state, "")
+                .into_iter()
+                .filter(|r| matches!(r.key, RowKey::Kitten(ix, _) if ix == k))
+                .collect();
+            assert_eq!(named.len(), 1, "fixture: kitten {k} is one palette result");
+            assert_eq!(
+                named[0].name, kitten.name,
+                "with kitten {elder} the Elder, kitten {k}'s palette result carries its name alone (TUI-NAV-105)"
+            );
+        }
+        for query in [ELDER_MARK, ELDER_GLYPH, "Elder", "elder"] {
+            for r in results(&state, query) {
+                if let RowKey::Kitten(ix, _) = r.key {
+                    assert!(
+                        state.kittens[ix].name.to_lowercase().contains(&query.to_lowercase()),
+                        "a palette query for {query:?} found kitten {ix} by a mark its name does \
+                         not hold (TUI-NAV-105)"
+                    );
+                }
+            }
+        }
+        let view = ViewState {
+            section: Some(Section::Clowder),
+            overlay: Some(Overlay::Palette { query: elder_name.clone(), selected: 0 }),
+            ..Default::default()
+        };
+        let d = cold(&state, &view, w, h);
+        let drawn = region_lines(&d.buffer, d.buffer.area);
+        assert!(
+            drawn.iter().any(|l| l.trim_end().ends_with(&format!(" {elder_name}"))),
+            "the palette shows the Elder, kitten {elder}, by its name alone, with nothing after it \
+             (TUI-NAV-105):\n{}",
+            drawn.join("\n")
+        );
+        assert!(
+            !drawn.iter().any(|l| l.contains(ELDER_GLYPH)),
+            "the palette draws the Elder's mark; the mark is its row's own and no part of the \
+             kitten's name (TUI-NAV-105):\n{}",
+            drawn.join("\n")
+        );
+    }
+}
+
+/// On the Elder's row the name is drawn exactly as on any kitten's row — whole
+/// where its column holds it, shortened as any name is where it does not — and
+/// after it stands the first of these that the column holds together with the
+/// whole name and one blank column: the whole mark `◆ Elder`; the glyph `◆`
+/// alone; no mark. The mark never costs the name a character, the word is
+/// never drawn in part, and the row carries no mark only where its column
+/// cannot hold the whole name, the blank, and the glyph. The steps are the
+/// same at every width: what the row carries follows only from how long the
+/// name is and how wide its column. Quantified over every width the list's
+/// space takes from the floor up, narrow and three-pane alike, with names
+/// built at each to sit just inside, on, and just past where the whole mark
+/// fits and where the glyph fits, to fill the column, and to overrun it — with
+/// the cursor on the Elder's row and off it.
+///
+/// @spec TUI-NAV-106
+#[test]
+fn the_elders_row_keeps_its_name_and_draws_the_first_step_of_the_mark_its_column_holds() {
+    let c = cost_field_width(&store_names());
+    let place = 7 + 1 + c;
+    let mark_w = ELDER_MARK.chars().count();
+    let glyph_w = ELDER_GLYPH.chars().count();
+    let h = 60u16;
+
+    // One terminal width for each distinct space the list takes.
+    let mut sizes: Vec<u16> = Vec::new();
+    let mut spaces: BTreeSet<(u16, bool)> = BTreeSet::new();
+    for w in FLOOR_W..=240 {
+        let layout = compute(area(w, h), None, false);
+        let wide = matches!(layout.body, Body::Wide { .. });
+        if spaces.insert((list_space(&layout).width, wide)) {
+            sizes.push(w);
+        }
+    }
+    assert!(sizes.len() > 6, "fixture: the list takes many widths between the floor and its cap");
+
+    let (mut step_whole, mut step_glyph, mut step_none, mut name_cut) = (0u32, 0u32, 0u32, 0u32);
+    for w in sizes {
+        let width = list_space(&compute(area(w, h), None, false)).width as usize;
+        let name_w = width - 4 - 8 - (c + 1);
+
+        // Name lengths either side of each step's edge.
+        let lens: BTreeSet<usize> = [
+            Some(1),
+            Some(2),
+            name_w.checked_sub(mark_w + 2),
+            name_w.checked_sub(mark_w + 1), // the whole mark fits exactly
+            name_w.checked_sub(mark_w),     // the whole mark is one column short
+            name_w.checked_sub(glyph_w + 2),
+            name_w.checked_sub(glyph_w + 1), // the glyph fits exactly
+            name_w.checked_sub(glyph_w),     // the glyph is one column short
+            Some(name_w),                    // the name fills its column
+            Some(name_w + 1),                // the name is one column too long
+            Some(name_w + 7),
+        ]
+        .into_iter()
+        .flatten()
+        .filter(|l| *l >= 1)
+        .collect();
+        let heads = ['B', 'C', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N'];
+        let names: Vec<String> = lens.iter().zip(heads).map(|(len, head)| name_of_len(head, *len)).collect();
+        assert_eq!(names.len(), lens.len(), "fixture: a head for every name");
+        let (mut whole_here, mut glyph_here, mut none_here) = (0u32, 0u32, 0u32);
+
+        for elder in 0..names.len() {
+            let mut state = clowder_named(&names);
+            state.elder = Some(elder);
+            let all = rows(&state, Section::Clowder);
+            let on_the_elder = all
+                .iter()
+                .find(|r| matches!(r.key, RowKey::Kitten(k, _) if k == elder))
+                .map(|r| r.key.clone())
+                .expect("fixture: the Elder's row is listed");
+            let off_the_roster = all
+                .iter()
+                .find(|r| r.selectable() && !matches!(r.key, RowKey::Kitten(..)))
+                .map(|r| r.key.clone())
+                .expect("fixture: a row that is no kitten's is listed");
+
+            for (cursor_key, whose) in [(on_the_elder, "the cursor's row"), (off_the_roster, "not the cursor's row")] {
+                let list = clowder_list(&state, Some(&cursor_key), w, h, c);
+                assert_eq!(list.name_w, name_w, "fixture: the list's space at {w}x{h} is the layout's");
+                let line = &list.lines[list.line_of_kitten(elder)];
+                let name = &state.kittens[elder].name;
+                let len = name.chars().count();
+                let at = format!(
+                    "at {w}x{h}, the Elder's row ({whose}; a {len}-letter name in a {name_w}-column \
+                     name column) reads {:?}",
+                    line.concat()
+                );
+
+                let (expected, step) = if len + 1 + mark_w <= name_w {
+                    whole_here += 1;
+                    (format!("{name} {ELDER_MARK}"), "the whole name, a blank column, and the whole mark all fit, so the row carries the whole mark")
+                } else if len + 1 + glyph_w <= name_w {
+                    glyph_here += 1;
+                    (format!("{name} {ELDER_GLYPH}"), "the whole mark does not fit beside the whole name but its glyph does, so the row carries the glyph alone and no part of the word")
+                } else {
+                    none_here += 1;
+                    if len > name_w {
+                        name_cut += 1;
+                    }
+                    (fmt::fit(name, name_w), "the column cannot hold the whole name, a blank column, and the glyph, so the row carries no mark and draws its name as any name is drawn")
+                };
+                assert_eq!(
+                    cells_text(line, 4, 4 + name_w),
+                    format!("{expected:<name_w$}"),
+                    "{at}: {step} (TUI-NAV-106)"
+                );
+                // The name's column is all the room the mark has.
+                assert_eq!(
+                    cells_text(line, 4 + name_w, width),
+                    format!(" {:<place$}", IDLE_WORD),
+                    "{at}: nothing of the mark stands past the name's column (TUI-NAV-106)"
+                );
+            }
+        }
+        assert!(
+            glyph_here > 0 && none_here > 0,
+            "fixture: at {w}x{h} the glyph-alone and no-mark steps were both drawn"
+        );
+        step_whole += whole_here;
+        step_glyph += glyph_here;
+        step_none += none_here;
+    }
+    assert!(step_whole > 0 && step_glyph > 0 && step_none > 0, "fixture: every step was drawn");
+    assert!(name_cut > 0, "fixture: some Elder's name was too long for its column");
 }
 
 // ---------------------------------------------------------------------------
@@ -1982,19 +2606,35 @@ fn every_state_roster(long: &[String]) -> GameState {
     s
 }
 
-/// The name's column a row draws, exactly as TUI-RENDER-020 and TUI-NAV-095
-/// draw it with no state word in the picture: the whole name, a blank, and
-/// the whole hint where the column holds all three and the gate is open;
-/// otherwise the name as any name is drawn.
+/// What a kitten's row carries after its name, one blank column on, in a
+/// name's column `name_w` wide. On the row of the kitten the core holds as
+/// the Elder: the first step of the Elder's mark the column holds together
+/// with the whole name and that blank — the whole mark, else its glyph alone,
+/// else nothing (TUI-NAV-104, TUI-NAV-106) — and never the hint. On any other
+/// kitten's row: the whole hint, while the core reports the gate open and the
+/// column holds it (TUI-NAV-095). Otherwise nothing.
+fn kitten_aside(state: &GameState, k: usize, name_w: usize) -> Option<&'static str> {
+    let name_len = state.kittens[k].name.chars().count();
+    let fits = |aside: &str| name_len + 1 + aside.chars().count() <= name_w;
+    if state.elder == Some(k) {
+        [ELDER_MARK, ELDER_GLYPH].into_iter().find(|step| fits(step))
+    } else if state.command_gate_open(&clowder_core::Command::AppointElder(k)) {
+        Some(ELDER_HINT).filter(|hint| fits(hint))
+    } else {
+        None
+    }
+}
+
+/// The name's column a kitten's row draws, exactly as TUI-RENDER-020,
+/// TUI-NAV-095, and TUI-NAV-104–106 draw it with no state word in the
+/// picture: the whole name, a blank, and what the row carries after its name
+/// (`kitten_aside`) where it carries anything; otherwise the name as any name
+/// is drawn.
 fn expected_name_column(state: &GameState, k: usize, name_w: usize) -> String {
     let name = &state.kittens[k].name;
-    let name_len = name.chars().count();
-    let gate = state.command_gate_open(&clowder_core::Command::AppointElder(k));
-    if gate && name_len + 1 + ELDER_HINT.chars().count() <= name_w {
-        let trailing = name_w - name_len - 1 - ELDER_HINT.chars().count();
-        format!("{name} {ELDER_HINT}{}", " ".repeat(trailing))
-    } else {
-        format!("{:<name_w$}", fmt::fit(name, name_w))
+    match kitten_aside(state, k, name_w) {
+        Some(aside) => format!("{:<name_w$}", format!("{name} {aside}")),
+        None => format!("{:<name_w$}", fmt::fit(name, name_w)),
     }
 }
 
@@ -2120,8 +2760,9 @@ fn every_kitten_row_names_its_one_state_whole_in_its_fields_place() {
                 assert_eq!(
                     cells_text(line, 4, 4 + name_w),
                     expected_name_column(&state, k, name_w),
-                    "{at}: the name's column keeps its {name_w} columns and draws the name and the \
-                     hint exactly as without the word (TUI-RENDER-024, TUI-NAV-095)"
+                    "{at}: the name's column keeps its {name_w} columns and draws the name and \
+                     the hint — or, on the Elder's row, the Elder's mark — exactly as without \
+                     the word (TUI-RENDER-024, TUI-NAV-095, TUI-NAV-104)"
                 );
                 assert_eq!(line[4 + name_w], " ", "{at}: one blank column after the name's column");
 

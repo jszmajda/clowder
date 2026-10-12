@@ -855,6 +855,165 @@ fn the_inspector_states_a_later_rows_label_beneath_the_name_at_every_width() {
     }
 }
 
+/// The Elder's mark, whole, as the roster's row draws it where it has room
+/// (TUI-NAV-105).
+const ELDER_MARK: &str = "◆ Elder";
+
+/// One frame drawn at `w` columns with the player having called for the
+/// inspector: the list's lines where the list is on screen — the three-pane
+/// layout — or none where the narrow-mode swap has it off screen, and the
+/// inspector's non-blank lines, trimmed.
+fn list_and_inspector_in_frame(
+    state: &GameState,
+    view: &ViewState,
+    w: u16,
+    h: u16,
+) -> (Option<Vec<String>>, Vec<String>) {
+    let view = ViewState { inspector_wanted: true, ..view.clone() };
+    let mut term = terminal(w, h);
+    let mut layout = None;
+    term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, &view, None)))
+        .expect("TestBackend is infallible");
+    let (list, rect) = match layout.expect("frame returns its layout").body {
+        Body::Wide { list, inspector, .. } => (Some(list), inspector),
+        Body::Narrow { main, .. } => (None, Rect::new(main.x + 1, main.y, main.width.saturating_sub(1), main.height)),
+        other => panic!("fixture: {w}x{h} lays out an inspector, not {other:?}"),
+    };
+    let buf = term.backend().buffer();
+    let inspector =
+        region_lines(buf, rect).into_iter().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect();
+    (list.map(|r| region_lines(buf, r)), inspector)
+}
+
+/// While the cursor is on the row of the kitten the core holds as the Elder,
+/// the inspector states that the kitten is the Elder as one line directly
+/// beneath the kitten's name — the whole mark, `◆ Elder` — and nothing more:
+/// no word of what being the Elder does. It states it at every width, the
+/// persistent pane and the narrow-mode swap alike, and whether or not the
+/// Elder's row in the list has room for the mark: a name too long for any
+/// name's column, whose row carries no mark at all, is stated the Elder here
+/// all the same. On every other kitten's row, while another kitten is the
+/// Elder and while the core holds none, it states no such line, and no other
+/// row of any section states one. Quantified over every kitten of a roster —
+/// short names, a name that wraps by its words, a name no column holds — as
+/// the Elder, as not the Elder, and with no Elder, at widths from the floor
+/// through the pane breakpoint to the widest; and over every selectable row of
+/// every section with an Elder standing.
+///
+/// @spec TUI-NAV-108
+#[test]
+fn the_inspector_states_the_elders_mark_beneath_the_name_on_the_elders_row_alone_at_every_width() {
+    let mut base = world(true);
+    base.kittens[1].name = format!("Marmalad{}", "e".repeat(72));
+    base.kittens[2].name = "Clementine of the Seven Long Whiskers and the Very Soft Paws".to_string();
+    base.elder = None;
+    let kittens: Vec<(usize, RowKey)> = rows(&base, Section::Clowder)
+        .into_iter()
+        .filter_map(|r| match r.key {
+            RowKey::Kitten(ix, _) => Some((ix, r.key)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(kittens.len(), base.kittens.len(), "fixture: every kitten's row is listed");
+
+    let (mut stated, mut stated_in_the_swap, mut stated_with_no_room, mut stated_beside_the_row) = (0u32, 0u32, 0u32, 0u32);
+    for w in [FLOOR_W, 90, PANE_BREAKPOINT - 1, PANE_BREAKPOINT, CAP_BREAKPOINT, WIDE, WIDEST] {
+        for (k, key) in &kittens {
+            let k = *k;
+            let name = &base.kittens[k].name;
+            let view = looking_at(Section::Clowder, key.clone());
+            let whr = format!("at {w} columns, on kitten {k}'s row");
+
+            // With no Elder: the name, and nothing else. A kitten's row has
+            // no definition, no count, and no cost to state.
+            let (_, plain) = list_and_inspector_in_frame(&base, &view, w, TALL);
+            assert!(
+                plain.join(" ") == *name || plain.concat() == *name,
+                "fixture: {whr} with the core holding no Elder, the inspector states the kitten's \
+                 name and nothing else. It read:\n{}",
+                plain.join("\n")
+            );
+            assert!(
+                !plain.iter().any(|l| l.contains('◆') || l.contains("Elder")),
+                "{whr}: the core holds no Elder, but the inspector states one (TUI-NAV-108). It read:\n{}",
+                plain.join("\n")
+            );
+
+            // Another kitten the Elder: still no such line.
+            let other = (k + 1) % base.kittens.len();
+            let mut elsewhere = base.clone();
+            elsewhere.elder = Some(other);
+            let (_, shown) = list_and_inspector_in_frame(&elsewhere, &view, w, TALL);
+            assert_eq!(
+                shown, plain,
+                "{whr} with kitten {other} the Elder: this kitten is not the Elder, so the \
+                 inspector states what it states with no Elder at all — no line for the Elder \
+                 (TUI-NAV-108)"
+            );
+
+            // This kitten the Elder: one line more, the whole mark, beneath the name.
+            let mut own = base.clone();
+            own.elder = Some(k);
+            let (list, shown) = list_and_inspector_in_frame(&own, &view, w, TALL);
+            let mut expected = plain.clone();
+            expected.push(ELDER_MARK.to_string());
+            assert_eq!(
+                shown, expected,
+                "{whr}, the kitten the core holds as the Elder: the inspector states the kitten's \
+                 name, then the whole mark `{ELDER_MARK}` as one line beneath it, and nothing of \
+                 what being the Elder does (TUI-NAV-108)"
+            );
+            stated += 1;
+            match list {
+                None => stated_in_the_swap += 1,
+                Some(lines) => {
+                    let row = lines
+                        .iter()
+                        .find(|l| l.contains(&name.chars().take(8).collect::<String>()))
+                        .unwrap_or_else(|| panic!("fixture: {whr}, the kitten's row is drawn in the list beside the pane"));
+                    if row.contains('◆') {
+                        stated_beside_the_row += 1;
+                    } else {
+                        stated_with_no_room += 1;
+                    }
+                }
+            }
+        }
+    }
+    assert!(stated > 0, "fixture: the Elder's row was inspected");
+    assert!(stated_in_the_swap > 0, "fixture: the Elder's row was inspected with the list off screen");
+    assert!(stated_beside_the_row > 0, "fixture: the Elder's row was inspected beside a row carrying the mark");
+    assert!(
+        stated_with_no_room > 0,
+        "fixture: the Elder's row was inspected beside a row whose name left the mark no room"
+    );
+
+    // No row but the Elder's states the line, in any section.
+    let mut state = base.clone();
+    let elder = 0usize;
+    state.elder = Some(elder);
+    let mut others = 0u32;
+    for w in [FLOOR_W, PANE_BREAKPOINT, WIDEST] {
+        for (section, row) in every_row(&state) {
+            if matches!(row.key, RowKey::Kitten(ix, _) if ix == elder) {
+                continue;
+            }
+            let view = looking_at(section, row.key.clone());
+            let shown = inspector_lines_in_frame(&state, &view, w, TALL);
+            assert!(
+                !shown.iter().any(|l| l.contains('◆')),
+                "at {w} columns, on {:?} in {}: this is not the Elder's row, but the inspector \
+                 states the Elder's mark (TUI-NAV-108). It read:\n{}",
+                row.key,
+                section.title(),
+                shown.join("\n")
+            );
+            others += 1;
+        }
+    }
+    assert!(others > 0, "fixture: rows other than the Elder's were inspected");
+}
+
 /// The exact next cost, component by component, with what the player has beside
 /// what the item needs. Exact, because this is the number a decision turns on
 /// and the compact form on the row has already rounded it (TUI-RENDER-012); per

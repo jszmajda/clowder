@@ -496,7 +496,8 @@ fn roster_kitten(name: &str) -> clowder_core::Kitten {
 /// At the narrow layout with the inspector swapped in for the list, `n` on a
 /// kitten's row — every kitten's in turn — reaches the core as AppointElder
 /// for that kitten, which the core accepts, and the swap, the cursor, the
-/// focused section, and the report banner all stand as they did.
+/// focused section, and the report banner all stand as they did; the footer
+/// carries the appointment's own note (TUI-NAV-107) and no refusal's.
 ///
 /// @spec TUI-NAV-094
 #[test]
@@ -543,7 +544,14 @@ fn n_through_the_loop_appoints_each_kitten_and_leaves_the_narrow_swap_standing()
             "{whr}, `n` did not appoint kitten {ix} Elder; it issues AppointElder for the kitten \
              the row is about"
         );
-        assert_eq!(a.view.footer, None, "{whr}, an accepted appointment left a footer note");
+        // The one accepted act the footer confirms (TUI-NAV-107) — swept on
+        // its own below; here only that the note is the appointment's, never
+        // a refusal's.
+        assert!(
+            a.view.footer.as_ref().is_some_and(|(note, _)| note.contains(a.state.kittens[ix].name.as_str())),
+            "{whr}, the accepted appointment did not leave its footer note naming the Elder: {:?}",
+            a.view.footer
+        );
         assert_eq!(a.view.section, before.section, "{whr}, `n` changed the focused section");
         assert_eq!(a.view.focus, before.focus, "{whr}, `n` moved the cursor");
         assert_eq!(a.view.reports, before.reports, "{whr}, `n` dismissed the report banner");
@@ -553,4 +561,487 @@ fn n_through_the_loop_appoints_each_kitten_and_leaves_the_narrow_swap_standing()
             "{whr}, `n` changed the layout"
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-107 — how an appointment is answered
+//
+// Whether the core accepted the command a press issued is known only where
+// the command is applied, which is the loop; so is which line of the frame a
+// footer note is drawn on. All of it is asserted through `step`.
+//
+// One clause has no reachable case: a press of `n` the core refuses. The key
+// is live only on a listed kitten's row, a row is listed only for a kitten in
+// the roster, and the core accepts AppointElder for every kitten in the
+// roster — the press and its command meet the same state within one step —
+// so no meadow makes the core refuse one. What a refusal leaves is asserted
+// on the refusal the same row does reach, its `Enter`, which is where "the
+// footer line that carries TUI-NAV-014's refusals" and "lasting as such a
+// note does" are read from.
+// ---------------------------------------------------------------------------
+
+/// The text of one row of the terminal, as the last frame drew it.
+fn screen_row(term: &Terminal<TestBackend>, rect: ratatui::layout::Rect) -> String {
+    let buf = term.backend().buffer();
+    (rect.x..rect.right()).map(|x| buf.cell((x, rect.y)).map(|c| c.symbol()).unwrap_or(" ")).collect()
+}
+
+/// The whole screen, as the last frame drew it.
+fn screen(term: &Terminal<TestBackend>) -> String {
+    let buf = term.backend().buffer();
+    let area = buf.area;
+    (area.y..area.bottom())
+        .map(|y| (area.x..area.right()).map(|x| buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" ")).collect::<String>())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// How many journal entries record an appointment of a kitten of this name.
+fn appointments_journalled(state: &GameState, name: &str) -> usize {
+    use clowder_core::{Event, JournalItem};
+    state
+        .journal
+        .recent
+        .iter()
+        .chain(state.journal.kept.iter())
+        .filter(|e| matches!(&e.item, JournalItem::Happened(Event::ElderAppointed { name: n }) if n == name))
+        .count()
+}
+
+/// A long name the roster's row must shorten in a narrow list, among short
+/// ones; no name here is part of another.
+const ROSTER_NAMES: [&str; 4] = ["Biscuit", "Clover", "Marmalade-of-the-Long-Whiskers", "Dumpling"];
+
+fn small_roster() -> GameState {
+    let mut state = GameState::new(4242);
+    state.kittens = ROSTER_NAMES.iter().map(|n| roster_kitten(n)).collect();
+    state.roster_high_water = state.kittens.len();
+    state.elder = None;
+    state
+}
+
+fn kitten_row_keys(state: &GameState) -> Vec<(usize, clowder_tui::nav::RowKey)> {
+    use clowder_tui::nav::rows::rows;
+    use clowder_tui::nav::{RowKey, Section};
+    rows(state, Section::Clowder)
+        .into_iter()
+        .filter_map(|r| match r.key {
+            RowKey::Kitten(ix, _) => Some((ix, r.key)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A press of `n` on a kitten's row that the core accepts leaves one footer
+/// note, on the line of the frame a refusal's note is drawn on and lasting as
+/// long as one does, saying in plain words that the kitten the core then holds
+/// as the Elder is the Elder — by that kitten's whole name as the core holds
+/// it, never the form its row shortened — whether nobody, another kitten, or
+/// that very kitten was the Elder before the press. The event's ticker line
+/// and its Journal entry stand beside the note on the same frame. Quantified
+/// over every kitten's row, over each of those three standings, in the narrow
+/// list, the narrow-mode inspector swap, and the three-pane layout.
+///
+/// @spec TUI-NAV-107
+#[test]
+fn an_accepted_n_leaves_one_footer_note_naming_the_elder_the_core_holds_by_its_whole_name() {
+    use clowder_tui::nav::Section;
+    use crossterm::event::KeyCode;
+
+    let base = small_roster();
+    let kittens = kitten_row_keys(&base);
+    assert_eq!(kittens.len(), ROSTER_NAMES.len(), "fixture: every kitten's row is listed");
+    let long = ROSTER_NAMES.iter().max_by_key(|n| n.len()).copied().unwrap();
+
+    let layouts: [(&str, u16, u16, bool); 3] = [
+        ("the narrow list", 80, 30, false),
+        ("the narrow-mode inspector swap", 80, 30, true),
+        ("the three-pane layout", 130, 40, false),
+    ];
+    let (mut checked, mut shortened_on_its_row) = (0u32, 0u32);
+    for (layout_name, w, h, swap) in layouts {
+        for (ix, row_key) in &kittens {
+            let ix = *ix;
+            let name = base.kittens[ix].name.clone();
+            let other = (ix + 1) % base.kittens.len();
+            for (standing, elder_before) in
+                [("nobody the Elder", None), ("another kitten the Elder", Some(other)), ("that kitten already the Elder", Some(ix))]
+            {
+                let whr = format!("in {layout_name}, with `n` pressed on kitten {ix}'s row and {standing} before the press");
+                let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
+                let mut a = app(scratch(&format!("appoint-note-{w}-{swap}-{ix}-{}", elder_before.map_or(99, |e| e))));
+                a.state = base.clone();
+                a.state.elder = elder_before;
+                a.view.section = Some(Section::Clowder);
+                a.view.focus[Section::Clowder.index()] = Some(row_key.clone());
+                a.view.inspector_wanted = swap;
+                a.step(&mut term, elapsed(0.0), &[]).expect("a first frame draws");
+
+                // The control: this row's `Enter` is refused, and its note is
+                // a refusal's — where it is drawn and how long it lasts.
+                a.step(&mut term, elapsed(0.0), &[key(KeyCode::Enter)]).expect("a step with Enter does not fail");
+                let asked = Instant::now();
+                let (refusal, refusal_until) =
+                    a.view.footer.clone().unwrap_or_else(|| panic!("fixture: {whr}, the row's Enter was not refused with a note"));
+                let refusal_lasts = refusal_until.duration_since(asked);
+                let hints = a.prev_layout.expect("a frame was drawn").hints;
+                assert_eq!(
+                    screen_row(&term, hints).trim_end(),
+                    refusal,
+                    "fixture: {whr}, a refusal's note is drawn on the frame's footer line"
+                );
+                assert_eq!(appointments_journalled(&a.state, &name), 0, "fixture: nothing appointed yet");
+                if !swap && w < 100 && name == long {
+                    assert!(
+                        !screen(&term).contains(&name),
+                        "fixture: {whr}, the roster's row shortens the long name {name:?}"
+                    );
+                    shortened_on_its_row += 1;
+                }
+                // The control leaves nothing behind: no note, and no repeat
+                // gate still closed on the press under test.
+                a.view.footer = None;
+                a.view.last_repeat = None;
+
+                a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))]).expect("a step with `n` does not fail");
+                let pressed = Instant::now();
+
+                assert_eq!(a.state.elder, Some(ix), "fixture: {whr}, the core accepted the appointment");
+                let (note, until) = a.view.footer.clone().unwrap_or_else(|| {
+                    panic!(
+                        "{whr}, the core accepted the appointment and the footer carries no note; an \
+                         accepted appointment is answered where the player is looking (TUI-NAV-107)"
+                    )
+                });
+                assert_ne!(note, refusal, "{whr}, the footer still carries the refusal's note");
+                assert!(
+                    note.contains(&name),
+                    "{whr}, the note {note:?} does not name the Elder the core holds by its whole \
+                     name {name:?} (TUI-NAV-107)"
+                );
+                assert!(
+                    note.contains("Elder"),
+                    "{whr}, the note {note:?} does not say in plain words that {name:?} is the Elder (TUI-NAV-107)"
+                );
+                assert!(!note.contains('\u{2026}'), "{whr}, the note {note:?} names the Elder by a shortened form");
+                for (k, kitten) in a.state.kittens.iter().enumerate() {
+                    if k != ix {
+                        assert!(
+                            !note.contains(kitten.name.as_str()),
+                            "{whr}, the note {note:?} names kitten {k}, who is not the Elder the core holds"
+                        );
+                    }
+                }
+
+                // Lasting as a refusal's note does.
+                let lasts = until.duration_since(pressed);
+                let apart = lasts.abs_diff(refusal_lasts);
+                assert!(
+                    apart < Duration::from_millis(500),
+                    "{whr}, the note lasts {lasts:?} where a refusal's lasts {refusal_lasts:?}; it \
+                     lasts as such a note does (TUI-NAV-107)"
+                );
+
+                // On the footer line, with the ticker's line beside it and
+                // the Journal's entry kept.
+                let layout = a.prev_layout.expect("a frame was drawn");
+                assert_eq!(layout.hints, hints, "fixture: {whr}, the footer line stands where it stood");
+                let footer_line = screen_row(&term, layout.hints);
+                if note.chars().count() <= layout.hints.width as usize {
+                    assert_eq!(
+                        footer_line.trim_end(),
+                        note,
+                        "{whr}, the note is not drawn on the footer line that carries a refusal's \
+                         note (TUI-NAV-107)"
+                    );
+                } else {
+                    let head: String = note.chars().take(layout.hints.width as usize / 2).collect();
+                    assert!(footer_line.starts_with(&head), "{whr}, the note is not drawn on the footer line: {footer_line:?}");
+                }
+                let name_head: String = name.chars().take(12).collect();
+                let ticker_line = screen_row(&term, layout.ticker);
+                assert!(
+                    ticker_line.contains(&name_head),
+                    "{whr}, the ticker does not carry the appointment's line beside the footer's \
+                     note (TUI-NAV-107, TUI-NAV-026): {ticker_line:?}"
+                );
+                assert_eq!(
+                    appointments_journalled(&a.state, &name),
+                    1,
+                    "{whr}, the Journal does not keep the appointment's one entry beside the \
+                     footer's note (TUI-NAV-107, TUI-NAV-026)"
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked > 0, "fixture: appointments were checked");
+    assert!(shortened_on_its_row > 0, "fixture: no kitten's name was shortened on its row");
+}
+
+/// Each further press of `n` the core accepts leaves the note anew — a held
+/// key's presses included, each as the repeat gate lets it through, and a
+/// press on the Elder's own row as much as any — always naming the Elder the
+/// core then holds: the same kitten while the cursor stays, the new one once
+/// it has moved to another kitten's row. A press the repeat gate swallows is
+/// issued to nobody and answers nothing.
+///
+/// @spec TUI-NAV-107
+#[test]
+fn each_further_accepted_n_leaves_the_note_anew_naming_the_elder_the_core_then_holds() {
+    use clowder_tui::nav::Section;
+    use crossterm::event::KeyCode;
+
+    let base = small_roster();
+    let kittens = kitten_row_keys(&base);
+    let (first, first_key) = kittens[0].clone();
+    let (second, second_key) = kittens[1].clone();
+    let name_of = |k: usize| base.kittens[k].name.clone();
+
+    let mut term = Terminal::new(TestBackend::new(100, 30)).unwrap();
+    let mut a = app(scratch("appoint-note-anew"));
+    a.state = base.clone();
+    a.view.section = Some(Section::Clowder);
+    a.view.focus[Section::Clowder.index()] = Some(first_key);
+    a.step(&mut term, elapsed(0.0), &[]).expect("a first frame draws");
+
+    // A key held: press after press on one row, the second onward on the
+    // Elder's own row, each let through by the repeat gate.
+    let mut last_until: Option<Instant> = None;
+    for press in 1..=4usize {
+        std::thread::sleep(Duration::from_millis(120));
+        a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))]).expect("a step with `n` does not fail");
+        assert_eq!(a.state.elder, Some(first), "fixture: press {press} appointed kitten {first}");
+        assert_eq!(
+            appointments_journalled(&a.state, &name_of(first)),
+            press,
+            "fixture: the core accepted press {press} of `n` on kitten {first}'s row"
+        );
+        let (note, until) = a.view.footer.clone().unwrap_or_else(|| {
+            panic!("press {press} of `n` on kitten {first}'s row was accepted and left no footer note (TUI-NAV-107)")
+        });
+        assert!(
+            note.contains(&name_of(first)) && !note.contains(&name_of(second)),
+            "press {press} of `n` on kitten {first}'s row left the note {note:?}; it names the Elder \
+             the core then holds, {:?} (TUI-NAV-107)",
+            name_of(first)
+        );
+        if let Some(earlier) = last_until {
+            assert!(
+                until > earlier,
+                "press {press} of `n`, accepted on the Elder's own row, did not leave the note \
+                 anew: it still expires when the press before it set it to (TUI-NAV-107)"
+            );
+        }
+        last_until = Some(until);
+    }
+
+    // Two presses inside the repeat gate: one is issued, one swallowed.
+    std::thread::sleep(Duration::from_millis(120));
+    let before = appointments_journalled(&a.state, &name_of(first));
+    a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n')), key(KeyCode::Char('n'))]).unwrap();
+    assert_eq!(
+        appointments_journalled(&a.state, &name_of(first)),
+        before + 1,
+        "fixture: of two presses inside the repeat gate, one is issued"
+    );
+
+    // The note gone — expired, or cleared — a further accepted press leaves it again.
+    a.view.footer = None;
+    std::thread::sleep(Duration::from_millis(120));
+    a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))]).unwrap();
+    assert!(
+        a.view.footer.as_ref().is_some_and(|(note, _)| note.contains(&name_of(first))),
+        "with the earlier note gone, a further accepted press on the Elder's own row left no note \
+         naming the Elder (TUI-NAV-107): {:?}",
+        a.view.footer
+    );
+
+    // The cursor moved to another kitten's row: the note names the new Elder.
+    a.view.focus[Section::Clowder.index()] = Some(second_key);
+    std::thread::sleep(Duration::from_millis(120));
+    a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))]).unwrap();
+    assert_eq!(a.state.elder, Some(second), "fixture: the core accepted the appointment of kitten {second}");
+    let (note, _) = a.view.footer.clone().expect("the appointment of another kitten left no footer note (TUI-NAV-107)");
+    assert!(
+        note.contains(&name_of(second)) && !note.contains(&name_of(first)),
+        "after kitten {second} was appointed, the note {note:?} does not name the Elder the core \
+         then holds, {:?}, alone (TUI-NAV-107)",
+        name_of(second)
+    );
+}
+
+/// Every section's surfaces open, everything affordable, a long roster with
+/// kittens at work and at rest: a meadow where the core accepts a command
+/// from rows of every section.
+fn everything_open() -> GameState {
+    use clowder_core::{ArchId, ColonyId, ContentId, CraftId, IdeaId, JobId, ResourceId, RiteId, StructureId};
+
+    let mut s = GameState::new(7);
+    for r in ResourceId::ALL {
+        s.resources[r.ix()] = 1.0e12;
+    }
+    for b in StructureId::ALL {
+        s.structures[b.ix()] = 5;
+    }
+    s.ideas = IdeaId::ALL.iter().copied().collect();
+    s.revealed = StructureId::ALL
+        .iter()
+        .map(|b| ContentId::Structure(*b))
+        .chain(IdeaId::ALL.iter().map(|i| ContentId::Idea(*i)))
+        .collect();
+    let size = clowder_core::content::MEADOW_MOVE_MIN_KITTENS + 9;
+    s.roster_high_water = size;
+    let mut roster: Vec<clowder_core::Kitten> = (0..size)
+        .map(|i| {
+            let mut k = roster_kitten(&format!("kitten-{i}"));
+            k.exp = 1.0e6;
+            k
+        })
+        .collect();
+    for k in roster.iter_mut().take(4) {
+        k.job = Some(JobId::Tinkerer);
+        k.job_seq = Some(1);
+    }
+    roster[0].tinkering = Some(CraftId::ALL[0]);
+    s.kittens = roster;
+    s.elder = Some(0);
+    s.peak_devotion = 1.0e12;
+    s.devotion = 1.0e6;
+    s.serenity = 1.0e12;
+    s.rites = [RiteId::TheReverie, RiteId::Enlightenment].into_iter().collect();
+    s.arches_bought = [ArchId::EverdreamArch].into_iter().collect();
+    s.discovered = ColonyId::ALL.iter().copied().collect();
+    s.whale_visit_years = 5;
+    s.whale_contentment = 1;
+    s.generation = 1;
+    s.elder_wisdom = 1.0e9;
+    s.warm_memories = 1.0e3;
+    s
+}
+
+/// An appointment is the one accepted act the footer confirms: no other
+/// command the core accepts leaves a footer note. Every selectable row of
+/// every section is pressed with each key that acts on a row — Enter, `+`,
+/// `-`, and each mnemonic letter — and a heavy row with the distinct second
+/// Enter that commits it, each press in a session of its own; wherever the
+/// core accepts the command the press issues and that command is not
+/// AppointElder, the footer stands empty after the step. In the same meadow,
+/// `n` on a kitten's row does leave its note.
+///
+/// @spec TUI-NAV-107
+#[test]
+fn no_accepted_command_but_an_appointment_leaves_a_footer_note() {
+    use clowder_core::Command;
+    use clowder_tui::nav::rows::rows;
+    use clowder_tui::nav::{keys, update, Outcome, RowKey, Section};
+    use crossterm::event::{KeyCode, KeyEvent};
+
+    let base = everything_open();
+    let presses = [
+        KeyCode::Enter,
+        KeyCode::Char('+'),
+        KeyCode::Char('-'),
+        KeyCode::Char('g'),
+        KeyCode::Char('f'),
+        KeyCode::Char('r'),
+        KeyCode::Char('p'),
+    ];
+
+    // What a press would issue, asked of a copy of the view so the session's
+    // own press still meets the view as it stood.
+    let would_issue = |view: &ViewState, state: &GameState, code: KeyCode| -> Option<Command> {
+        let mut shadow = view.clone();
+        let action = keys::resolve(KeyEvent::from(code), &shadow);
+        match update(action, &mut shadow, state) {
+            Outcome::Apply(cmd) => Some(cmd),
+            _ => None,
+        }
+    };
+
+    let mut accepted_kinds: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut sections_accepting: std::collections::BTreeSet<usize> = std::collections::BTreeSet::new();
+    let (mut accepted, mut heavy_accepted, mut session) = (0u32, 0u32, 0u32);
+    for section in Section::ALL {
+        for row in rows(&base, section).into_iter().filter(|r| r.selectable()) {
+            for code in presses {
+                let mut view = ViewState { section: Some(section), ..ViewState::default() };
+                view.focus[section.index()] = Some(row.key.clone());
+                let mut issued = would_issue(&view, &base, code);
+                // A heavy row's first Enter arms; a distinct second commits.
+                let arms_first = issued.is_none() && row.heavy && code == KeyCode::Enter;
+                if issued.is_none() && !arms_first {
+                    continue;
+                }
+
+                session += 1;
+                let mut term = Terminal::new(TestBackend::new(100, 30)).unwrap();
+                let mut a = app(scratch(&format!("no-other-note-{session}")));
+                a.state = base.clone();
+                a.view = view;
+                if arms_first {
+                    a.step(&mut term, elapsed(0.0), &[key(code)]).unwrap();
+                    if a.view.armed.is_none() {
+                        continue;
+                    }
+                    a.view.footer = None;
+                    std::thread::sleep(Duration::from_millis(120));
+                    issued = would_issue(&a.view, &a.state, code);
+                }
+                let Some(cmd) = issued else { continue };
+                if matches!(cmd, Command::AppointElder(_)) || a.state.clone().apply(cmd).is_err() {
+                    continue;
+                }
+
+                a.step(&mut term, elapsed(0.0), &[key(code)]).expect("a step with a press does not fail");
+
+                assert_eq!(
+                    a.view.footer, None,
+                    "in {}, {code:?} on the row {:?} issued {cmd:?}, which the core accepted, and \
+                     the footer carries a note; an appointment is the one accepted act the footer \
+                     confirms (TUI-NAV-107)",
+                    section.title(),
+                    row.key
+                );
+                accepted += 1;
+                if row.heavy {
+                    heavy_accepted += 1;
+                }
+                let kind = format!("{cmd:?}");
+                accepted_kinds.insert(kind.split(['(', ' ', '{']).next().unwrap_or("").to_string());
+                sections_accepting.insert(section.index());
+            }
+        }
+    }
+    assert!(accepted > 0, "fixture: the core accepted commands");
+    assert!(heavy_accepted > 0, "fixture: the core accepted a heavy row's commit");
+    assert!(
+        accepted_kinds.len() >= 12 && sections_accepting.len() >= 6,
+        "fixture: the core accepted commands of many kinds ({accepted_kinds:?}) from rows of many \
+         sections ({} of them)",
+        sections_accepting.len()
+    );
+
+    // The one that does: `n` on a kitten's row, in this very meadow.
+    let (ix, row_key) = rows(&base, Section::Clowder)
+        .into_iter()
+        .find_map(|r| match r.key {
+            RowKey::Kitten(ix, _) if base.elder != Some(ix) => Some((ix, r.key)),
+            _ => None,
+        })
+        .expect("fixture: a kitten's row is listed");
+    let mut term = Terminal::new(TestBackend::new(100, 30)).unwrap();
+    let mut a = app(scratch("no-other-note-appointment"));
+    a.state = base.clone();
+    a.view.section = Some(Section::Clowder);
+    a.view.focus[Section::Clowder.index()] = Some(row_key);
+    a.step(&mut term, elapsed(0.0), &[]).expect("a first frame draws");
+    a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))]).expect("a step with `n` does not fail");
+    assert_eq!(a.state.elder, Some(ix), "fixture: the core accepted the appointment");
+    assert!(
+        a.view.footer.as_ref().is_some_and(|(note, _)| note.contains(a.state.kittens[ix].name.as_str())),
+        "in the meadow where no other accepted command left a footer note, an accepted appointment \
+         left none either ({:?}); it is the one accepted act the footer confirms (TUI-NAV-107)",
+        a.view.footer
+    );
 }
