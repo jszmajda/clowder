@@ -73,7 +73,10 @@ use ratatui::Terminal;
 const SAVED_AT: u64 = 1_000_000;
 
 fn scratch(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("clowder-waking-{}-{name}", std::process::id()));
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir =
+        std::env::temp_dir().join(format!("clowder-waking-{}-{name}-{n}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir.join("save.json")
@@ -545,7 +548,7 @@ fn no_autosave_is_taken_while_waking() {
 /// The finishing frame runs no live tick and opens the game against exactly
 /// the state a one-call load of the same save at the same moment produces:
 /// the opening taken and the report queued as for a load that never woke.
-/// @spec TUI-RUN-038
+/// @spec TUI-RUN-038, TUI-NAV-024
 #[test]
 fn the_frame_that_finishes_opens_the_game_against_the_one_call_state() {
     let json = save_of(&meadow(38_001, 1.0));
@@ -582,7 +585,7 @@ fn the_frame_that_finishes_opens_the_game_against_the_one_call_state() {
 /// A quit key or a termination signal mid-wake saves promptly: the state so
 /// far, owing the catch-up's remaining ticks plus the live ticks banked while
 /// waking, with the core's report so far beside them.
-/// @spec TUI-RUN-039
+/// @spec TUI-RUN-039, TUI-RUN-026
 #[test]
 fn shutdown_while_waking_saves_the_set_down_catch_up_and_the_banked_time() {
     let json = save_of(&meadow(39_001, 1.0));

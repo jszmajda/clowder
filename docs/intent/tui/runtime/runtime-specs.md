@@ -25,7 +25,7 @@
 
 ## The Event Loop
 
-- [ ] **TUI-RUN-014**: Once the game is awake — from the start of a new game, from before the first frame for a load whose first bound finishes its catch-up (TUI-RUN-034), and otherwise from the end of its waking (TUI-RUN-038) — each iteration the system shall poll for input with a frame-budget timeout, apply any resulting commands, advance the simulation, autosave if due, and render one frame, in that order.
+- [x] **TUI-RUN-014**: Once the game is awake — from the start of a new game, from before the first frame for a load whose first bound finishes its catch-up (TUI-RUN-034), and otherwise from the end of its waking (TUI-RUN-038) — each iteration the system shall poll for input with a frame-budget timeout, apply any resulting commands, advance the simulation, autosave if due, and render one frame, in that order.
 - [x] **TUI-RUN-015**: The system shall apply a frame's commands before running that frame's ticks, so a key pressed during the preceding wait takes effect at the time it was pressed rather than after the elapsed interval.
 - [x] **TUI-RUN-016**: The system shall consume at most a bounded number of input events per frame and shall coalesce queued resize events to the most recent, so a flood of input cannot starve the simulation or the renderer.
 - [x] **TUI-RUN-017**: The system shall advance the simulation regardless of render state — including a terminal too small to draw and a frame with nothing to redraw — so time never depends on what is on screen.
@@ -46,7 +46,7 @@
 
 ## Saving
 
-- [ ] **TUI-RUN-026**: The system shall autosave on a wall-clock interval once the game is awake (TUI-RUN-014), never while waking (TUI-RUN-037), and shall save on every clean shutdown, one taken while waking included, using the core's atomic write.
+- [x] **TUI-RUN-026**: The system shall autosave on a wall-clock interval once the game is awake (TUI-RUN-014), never while waking (TUI-RUN-037), and shall save on every clean shutdown, one taken while waking included, using the core's atomic write.
 - [x] **TUI-RUN-027**: The system shall record a save's banked-but-unrun ticks as an explicit count beside the present timestamp, so a save taken mid-catch-up owes exactly the ticks it banked — neither lost nor counted twice, and never re-priced by a speed set after they were earned.
 - [x] **TUI-RUN-028**: When a save fails to write, the system shall report it once, continue playing, and retry at the next cadence, rather than ending the session or retrying continuously.
 

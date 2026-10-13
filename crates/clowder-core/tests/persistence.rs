@@ -907,7 +907,7 @@ fn count_of(list: &[(String, u32)], name: &str) -> u32 {
 
 /// The total is the interval's ticks at the save's own speed plus the ticks
 /// the save carried as owed, and load replays none of them before it returns.
-/// @spec SAVE-018
+/// @spec SAVE-006, SAVE-018
 #[test]
 fn a_paced_load_owes_the_intervals_ticks_plus_the_carried_count_and_has_replayed_none() {
     for (speed, owed) in [(1.0, 0u64), (1.0, 37), (2.0, 37), (0.25, 5)] {
