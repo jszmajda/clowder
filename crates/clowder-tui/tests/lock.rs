@@ -145,7 +145,7 @@ fn map_number_tokens(text: &str, f: impl Fn(&str) -> Option<String>) -> (String,
 
 fn records_pid(text: &str, pid: u32) -> bool {
     let wanted = pid.to_string();
-    number_tokens(text).iter().any(|t| *t == wanted)
+    number_tokens(text).contains(&wanted)
 }
 
 /// Larger than any process id either target platform can issue (Darwin caps
@@ -552,13 +552,56 @@ fn simultaneous_launches_cannot_both_pass_the_check() {
     let dir = scratch_dir("simultaneous");
     let save = save_path(&dir);
 
-    const LAUNCHES: usize = 8;
-    let start_together = std::sync::Barrier::new(LAUNCHES);
+    // The window a losing implementation leaves open is a few instructions
+    // wide, so one contest rarely lands in it. Many contests do.
+    for round in 0..CONTESTS {
+        assert_eq!(
+            winners_of_a_contest(&save),
+            1,
+            "contest {round}: exactly one of {LAUNCHES} simultaneous launches may hold the save"
+        );
+        assert!(
+            beside_the_save(&dir, &save).is_empty(),
+            "contest {round}: the winner's release should leave nothing beside the save"
+        );
+    }
+}
 
+/// The same contest, against a lock a crashed session left behind. Every launch
+/// finds it stale and every launch moves to clear it; a launch that clears on
+/// what it read a moment ago, rather than on what is there now, removes the
+/// lock the first of them has just taken and takes the save a second time.
+///
+/// @spec TUI-RUN-008, TUI-RUN-029
+#[test]
+fn simultaneous_launches_past_a_stale_lock_cannot_both_pass_the_check() {
+    let dir = scratch_dir("simultaneous-stale");
+    let save = save_path(&dir);
+    let (path, text) = genuine_lock(&dir, &save);
+    let stale = attributed_to_a_dead_process(&text, std::process::id());
+
+    for round in 0..CONTESTS {
+        fs::write(&path, &stale).unwrap();
+        assert_eq!(
+            winners_of_a_contest(&save),
+            1,
+            "contest {round}: exactly one of {LAUNCHES} simultaneous launches may clear a stale \
+             lock and hold the save"
+        );
+    }
+}
+
+const LAUNCHES: usize = 8;
+const CONTESTS: usize = 40;
+
+/// Start `LAUNCHES` launches at the same moment and count how many came away
+/// holding the save. Every outcome is collected before any is dropped, so the
+/// winners are all still holding their locks when they are counted.
+fn winners_of_a_contest(save: &Path) -> usize {
+    let start_together = std::sync::Barrier::new(LAUNCHES);
     std::thread::scope(|scope| {
         let handles: Vec<_> = (0..LAUNCHES)
             .map(|_| {
-                let save = &save;
                 let start_together = &start_together;
                 scope.spawn(move || {
                     start_together.wait();
@@ -566,18 +609,10 @@ fn simultaneous_launches_cannot_both_pass_the_check() {
                 })
             })
             .collect();
-
-        // Every outcome is collected before any is dropped, so the winners are
-        // all still holding their locks when they are counted.
         let outcomes: Vec<_> = handles
             .into_iter()
             .map(|h| h.join().expect("an acquiring launch should not panic"))
             .collect();
-
-        let winners = outcomes.iter().filter(|o| o.is_ok()).count();
-        assert_eq!(
-            winners, 1,
-            "exactly one of {LAUNCHES} simultaneous launches may hold the save; {winners} did"
-        );
-    });
+        outcomes.iter().filter(|o| o.is_ok()).count()
+    })
 }

@@ -151,6 +151,25 @@ fn try_create_exclusive(path: &Path, contents: &str) -> io::Result<bool> {
     }
 }
 
+/// Held while a launch decides whether the save is free. Reading a lock,
+/// judging it stale, clearing it and writing a new one are several steps, and
+/// two launches interleaving them each clear what the other has just written
+/// and both come away holding the save. An advisory lock on the save's
+/// directory makes the decision one step: the kernel grants it to one launch
+/// at a time and lets it go when that launch returns or dies, so it cannot
+/// itself go stale. It is taken on the directory, not on a file of its own, so
+/// that nothing but the session lock ever sits beside the save.
+///
+/// Best effort: on a filesystem that cannot grant it, launches decide
+/// unguarded, which is no worse than having no guard and better than refusing
+/// a player their own game.
+fn launch_guard(lock_path: &Path) -> Option<fs::File> {
+    let dir = lock_path.parent().filter(|p| !p.as_os_str().is_empty());
+    let dir = fs::File::open(dir.unwrap_or_else(|| Path::new("."))).ok()?;
+    dir.lock().ok()?;
+    Some(dir)
+}
+
 impl SessionLock {
     /// Take the lock beside the save, recording this process's id and start
     /// time. A stale lock — one whose process is gone, or whose id now belongs
@@ -181,6 +200,11 @@ impl SessionLock {
             )));
         };
         let contents = render_lock(my_pid, my_start);
+
+        // One launch at a time from here to the return, so no launch reads a
+        // lock another is halfway through writing or clears one another has
+        // just taken.
+        let _deciding = launch_guard(&path);
 
         loop {
             match try_create_exclusive(&path, &contents) {
