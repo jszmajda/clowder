@@ -3226,3 +3226,222 @@ fn an_open_done_row_is_drawn_under_the_cursor_and_described_by_the_inspector() {
         assert!(pane.contains(&head), "the inspector does not describe the open done row {key:?}:\n{pane}");
     }
 }
+
+// ---------------------------------------------------------------------------
+// Coats on list rows — TUI-THEME-019, TUI-THEME-020
+// ---------------------------------------------------------------------------
+
+fn fg_at(buf: &Buffer, x: u16, y: u16) -> ratatui::style::Color {
+    buf.cell((x, y)).map(|c| c.fg).unwrap_or_default()
+}
+
+/// A resource's name as a cost field spells it — its stores-row name, the
+/// variant spaced at each capital.
+fn resource_name(r: ResourceId) -> String {
+    let tag = format!("{r:?}");
+    let mut out = String::new();
+    for (i, c) in tag.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            out.push(' ');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// An ungated structure priced in two or more resources, so its row can be
+/// partly covered and its cost field holds more than one name — and a second
+/// ungated structure for the cursor to rest on.
+fn two_priced_structures() -> (StructureId, StructureId) {
+    let ungated = |s: &StructureId| matches!(structure_def(*s).gate, clowder_core::StructureGate::Always);
+    let a = StructureId::ALL
+        .into_iter()
+        .find(|s| ungated(s) && structure_def(*s).base_costs.len() >= 2)
+        .expect("fixture: an ungated structure priced in two resources");
+    let b = StructureId::ALL
+        .into_iter()
+        .find(|s| *s != a && ungated(s))
+        .expect("fixture: a second ungated structure");
+    (a, b)
+}
+
+/// A meadow with just `revealed` on its list and nothing in stock.
+fn bare_meadow(revealed: &[StructureId]) -> GameState {
+    let mut s = GameState::new(11);
+    s.revealed = revealed.iter().map(|b| ContentId::Structure(*b)).collect();
+    s
+}
+
+/// The Meadow drawn wide, `focus` under the cursor: the buffer and the list.
+fn meadow_list(state: &GameState, focus: RowKey) -> (Buffer, Rect) {
+    let mut view = ViewState { section: Some(Section::Meadow), ..Default::default() };
+    view.focus[Section::Meadow.index()] = Some(focus);
+    let drawn = cold(state, &view, 150, 60);
+    let list = match drawn.layout.body {
+        Body::Wide { list, .. } => list,
+        other => panic!("fixture: 150x60 lays out a list pane, not {other:?}"),
+    };
+    (drawn.buffer, list)
+}
+
+/// The list line whose name column — five cells in, after the divider the
+/// list's space carries on its edge, the cursor column, and the marker —
+/// begins with `name`: its y, and its text.
+fn line_named(buf: &Buffer, list: Rect, name: &str) -> (u16, String) {
+    let lines = region_lines(buf, list);
+    lines
+        .iter()
+        .enumerate()
+        .find(|(_, l)| {
+            let column: String = l.chars().skip(5).collect();
+            // The name's column pads the name with blanks, so two blanks after
+            // it tell `Catnip` from `Catnip Patch`.
+            column.starts_with(&format!("{name}  "))
+        })
+        .map(|(i, l)| (list.y + i as u16, l.clone()))
+        .unwrap_or_else(|| panic!("fixture: no list line is named {name:?}:\n{}", lines.join("\n")))
+}
+
+/// The cell column at which `needle` last occurs in `line`.
+fn last_at(line: &str, needle: &str) -> usize {
+    let at = line.rfind(needle).unwrap_or_else(|| panic!("{needle:?} is not on the line {line:?}"));
+    line[..at].chars().count()
+}
+
+/// A priced structure's row wears its coats on the names in its cost field
+/// while its line is `ready` — the figures and the separators keep the row's
+/// colour — and wears none at all while its line is `dim`, which recedes
+/// whole: a structure short of its price is Teased and dim whether it wears
+/// `○` or, half covered, `◐`. (A `partial`-coloured row belongs to a kind
+/// with no reveal ladder; the row tests cover its coats.)
+///
+/// @spec TUI-THEME-019, TUI-THEME-020
+#[test]
+fn a_priced_row_wears_coats_on_its_cost_names_while_its_state_lets_it() {
+    use clowder_tui::theme::{coat, coat_colours, Role};
+    use ratatui::style::Modifier;
+
+    let (a, other) = two_priced_structures();
+    let a_name = structure_def(a).name;
+    let a_id = ContentId::Structure(a);
+    let cost = bare_meadow(&[a, other]).cost_of_next(a_id, 1);
+    assert!(cost.len() >= 2, "fixture: {a_name} is priced in two or more resources");
+
+    let mut ready = bare_meadow(&[a, other]);
+    for (r, need) in &cost {
+        ready.resources[r.ix()] = need * 2.0;
+    }
+    let mut partial = bare_meadow(&[a, other]);
+    for (r, need) in &cost {
+        partial.resources[r.ix()] = need * 0.5;
+    }
+    let dim = bare_meadow(&[a, other]);
+
+    for (what, state, glyph, role) in [
+        ("ready", &ready, "●", Role::Ready),
+        ("teased, half covered", &partial, "◐", Role::Dim),
+        ("not covered", &dim, "○", Role::Dim),
+    ] {
+        let (buf, list) = meadow_list(state, RowKey::Content(ContentId::Structure(other), ""));
+        let (y, line) = line_named(&buf, list, a_name);
+        let marker_x = list.x + 3;
+        let marker = buf.cell((marker_x, y)).expect("a cell").symbol().to_string();
+        assert_eq!(marker, glyph, "fixture: the {what} row wears {glyph}: {line:?}");
+        let role_colour = role.color().expect("a state colour");
+        assert_eq!(fg_at(&buf, marker_x, y), role_colour, "fixture: the {what} marker wears its colour");
+        assert!(
+            !buf.cell((marker_x, y)).expect("a cell").modifier.contains(Modifier::REVERSED),
+            "fixture: {a_name} is not the focused row"
+        );
+
+        for (r, _) in &cost {
+            let name = resource_name(*r);
+            let cx = last_at(&line, &format!(" {name}")) + 1;
+            let expected = coat_colours(coat(*r), name.chars().count());
+            for (k, want) in expected.iter().enumerate() {
+                let got = fg_at(&buf, list.x + (cx + k) as u16, y);
+                if role == Role::Dim {
+                    assert_eq!(
+                        got, role_colour,
+                        "the {what} row's cost name {name}, character {k}, wears {got:?}; a dim row \
+                         recedes whole: {line:?}"
+                    );
+                } else {
+                    assert_eq!(
+                        &got, want,
+                        "the {what} row's cost name {name}, character {k}, wears {got:?}, not its \
+                         coat's {want:?}: {line:?}"
+                    );
+                }
+            }
+            // The figure before the name, and the blank between, wear the row's colour.
+            for x in [cx - 2, cx - 1] {
+                let got = fg_at(&buf, list.x + x as u16, y);
+                assert_eq!(
+                    got, role_colour,
+                    "on the {what} row, cell {x} before {name} wears {got:?}, not the row's colour: \
+                     {line:?}"
+                );
+            }
+        }
+    }
+}
+
+/// The focused row reverses whole and wears no coat: focus is the terminal's
+/// own pair, and a coat under a reversal is a block of colour the design never
+/// chose.
+///
+/// @spec TUI-THEME-020
+#[test]
+fn the_focused_row_reverses_whole_and_wears_no_coat() {
+    use clowder_tui::theme::Hue;
+    use ratatui::style::Modifier;
+
+    let (a, other) = two_priced_structures();
+    let a_name = structure_def(a).name;
+    let mut state = bare_meadow(&[a, other]);
+    for (r, need) in state.cost_of_next(ContentId::Structure(a), 1) {
+        state.resources[r.ix()] = need * 2.0;
+    }
+    let (buf, list) = meadow_list(&state, RowKey::Content(ContentId::Structure(a), ""));
+    let (y, line) = line_named(&buf, list, a_name);
+    assert_eq!(buf.cell((list.x + 1, y)).expect("a cell").symbol(), "▸", "fixture: {a_name} is focused");
+    assert!(
+        buf.cell((list.x + 3, y)).expect("a cell").modifier.contains(Modifier::REVERSED),
+        "fixture: the focused row is reversed"
+    );
+    let ring: Vec<ratatui::style::Color> = Hue::RING.iter().map(|h| h.color()).collect();
+    for x in list.x..list.right() {
+        let got = fg_at(&buf, x, y);
+        assert!(
+            !ring.contains(&got),
+            "the focused row wears a coat colour {got:?} at cell {} under its reversal: {line:?}",
+            x - list.x
+        );
+    }
+}
+
+/// A stores row wears its coat on its own name, which is the name the sidebar
+/// and every cost field spell.
+///
+/// @spec TUI-THEME-019
+#[test]
+fn a_stores_row_wears_its_coat_on_its_name() {
+    use clowder_tui::theme::{coat, coat_colours};
+
+    let (a, other) = two_priced_structures();
+    let mut state = bare_meadow(&[a, other]);
+    let (r, _) = state.cost_of_next(ContentId::Structure(a), 1)[0];
+    state.resources[r.ix()] = 5.0;
+    let (buf, list) = meadow_list(&state, RowKey::Content(ContentId::Structure(other), ""));
+    let name = resource_name(r);
+    let (y, line) = line_named(&buf, list, &name);
+    let expected = coat_colours(coat(r), name.chars().count());
+    for (k, want) in expected.iter().enumerate() {
+        let got = fg_at(&buf, list.x + 5 + k as u16, y);
+        assert_eq!(
+            &got, want,
+            "the stores row for {name}, character {k}, wears {got:?}, not its coat's {want:?}: {line:?}"
+        );
+    }
+}

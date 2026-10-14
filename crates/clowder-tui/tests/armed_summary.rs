@@ -27,7 +27,8 @@
 //! AdoptRule rows — last in a long list — are checked on a terminal tall
 //! enough that nothing scrolls.
 //!
-//! @spec TUI-NAV-015, TUI-NAV-075, TUI-NAV-077, TUI-THEME-011, TUI-THEME-015
+//! @spec TUI-NAV-015, TUI-NAV-075, TUI-NAV-077, TUI-THEME-011, TUI-THEME-015,
+//! TUI-THEME-020
 
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
@@ -1021,9 +1022,10 @@ fn rule_short(rule: RuleId, share: f64) -> GameState {
 /// row, whatever marker it wears (armed while affordable, and still armed once
 /// its price is only partly or not at all in hand), at every supported size;
 /// and while the narrow-mode swap shows the inspector in the list's place, the
-/// summary the inspector carries wears attention there instead.
+/// summary the inspector carries wears attention there instead. Every cell
+/// of the expansion wears attention, so no name inside it wears its coat.
 ///
-/// @spec TUI-THEME-011
+/// @spec TUI-THEME-011, TUI-THEME-020
 #[test]
 fn an_armed_row_wears_attention_on_its_expansion_and_nowhere_on_its_own_line() {
     let rich = meadow();

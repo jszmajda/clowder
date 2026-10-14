@@ -3,7 +3,8 @@
 //! @spec TUI-THEME-001, TUI-THEME-002, TUI-THEME-003, TUI-THEME-004,
 //! TUI-THEME-005, TUI-THEME-006, TUI-THEME-007, TUI-THEME-008, TUI-THEME-009,
 //! TUI-THEME-010, TUI-THEME-011, TUI-THEME-012, TUI-THEME-013, TUI-THEME-014,
-//! TUI-THEME-015
+//! TUI-THEME-015, TUI-THEME-016, TUI-THEME-017, TUI-THEME-018, TUI-THEME-019,
+//! TUI-THEME-020, TUI-THEME-021
 //!
 //! **How this test reaches the code.** `clowder-tui` is a binary crate with no
 //! library target, so an integration test cannot `use clowder_tui::…`.
@@ -50,17 +51,17 @@
 
 use clowder_tui::theme;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::sync::Mutex;
 
-use clowder_core::Season;
+use clowder_core::{ResourceId, Season};
 use ratatui::backend::TestBackend;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::Paragraph;
 use ratatui::Terminal;
 
-use theme::{seasonal_accent, truecolor_advertised, Role};
+use theme::{blend, coat, coat_colours, seasonal_accent, truecolor_advertised, Coat, Dressing, Hue, Role};
 
 // ---------------------------------------------------------------------------
 // The roles, and a compile-time guard on there being six of them
@@ -530,17 +531,17 @@ fn the_colour_vocabulary_is_five_states_and_does_not_grow_with_the_content() {
     }
 }
 
-/// The guard against the palette quietly acquiring a hue per item. There are
-/// far more resources, structures and ideas than a player could ever learn
-/// colours for, and the theme is the one place that temptation would land.
+/// The guard against the palette quietly acquiring a hue per item. A resource
+/// reaches the theme for its coat and for nothing else; no other identity —
+/// a structure, an idea, a job, a kitten — belongs in a colour decision at
+/// all, and a coat is a function of which resource and of nothing else.
 ///
 /// @spec TUI-THEME-003
 #[test]
-fn the_theme_names_no_item_so_nothing_can_have_a_colour_of_its_own() {
-    /// Every identity type the core exports. None of them belongs in a colour
-    /// decision.
-    const IDENTITY_TYPES: [&str; 15] = [
-        "ResourceId",
+fn only_a_resource_reaches_the_theme_and_only_for_its_coat() {
+    /// Every identity type the core exports but the one the coats are keyed
+    /// by. None of them belongs in a colour decision.
+    const IDENTITY_TYPES: [&str; 14] = [
         "StructureId",
         "SiteId",
         "DreamLoomId",
@@ -564,15 +565,26 @@ fn the_theme_names_no_item_so_nothing_can_have_a_colour_of_its_own() {
     for identity in IDENTITY_TYPES {
         assert!(
             !source.contains(identity),
-            "{} mentions `{identity}`. Colour encodes state, never identity: the moment a \
-             colour can be reached from *which item this is*, the palette has to grow with the \
-             content and stops meaning anything.",
+            "{} mentions `{identity}`. Only a resource wears a coat: the moment a colour can be \
+             reached from which structure, idea, job, or kitten this is, the palette has to grow \
+             with the content and stops meaning anything.",
             path.display()
         );
     }
 
+    // A coat is a function of which resource, and of nothing else — the same
+    // answer on two calls, with no stock, cap, rate, or season in sight.
+    for r in ResourceId::ALL {
+        assert_eq!(
+            coat(r),
+            coat(r),
+            "{r:?} answered differently on two calls — a coat must be a function of the resource \
+             and of nothing else"
+        );
+    }
+
     // The season is the one thing outside the state vocabulary that reaches the
-    // theme, and it reaches only the chrome.
+    // theme for a state colour, and it reaches only the chrome.
     assert_eq!(
         PALETTE_ROLES.iter().map(|r| rgb(*r)).collect::<HashSet<_>>().len(),
         5,
@@ -585,12 +597,12 @@ fn the_theme_names_no_item_so_nothing_can_have_a_colour_of_its_own() {
 // ---------------------------------------------------------------------------
 
 /// Everything the theme can put on screen, counted. Five states, four seasons,
-/// and the terminal's own foreground: every colour beyond that dilutes the
-/// signal that colour *is* meaning.
+/// seven hues of the ring, and the terminal's own foreground; beyond those,
+/// only the colours a blended coat passes through between two of its stops.
 ///
 /// @spec TUI-THEME-004
 #[test]
-fn the_theme_can_produce_nine_colours_and_no_others() {
+fn the_theme_can_produce_sixteen_colours_and_the_paths_between_stops_and_no_others() {
     // The compile-time half: `role_name` matches on `Role` with no wildcard, so
     // a seventh role stops this file building.
     for role in ROLES {
@@ -604,20 +616,61 @@ fn the_theme_can_produce_nine_colours_and_no_others() {
     for season in Season::ALL {
         all.insert(accent(season));
     }
+    for hue in Hue::RING {
+        all.insert(hue_rgb(hue));
+    }
 
     assert_eq!(
         all.len(),
-        9,
-        "the theme should reach exactly nine values — five states and four seasonal accents — \
-         and it reached {}. Each of the nine is a thing the player has to learn.",
+        16,
+        "the theme should reach exactly sixteen values — five states, four seasonal accents, and \
+         seven ring hues — and it reached {}. Each of the sixteen is a thing the player has to learn.",
         all.len()
     );
 
     assert_eq!(
         Role::Inherited.color(),
         None,
-        "the sixth role is the absence of a colour, not a tenth value"
+        "the sixth role is the absence of a colour, not a seventeenth value"
     );
+
+    // Every colour a solid or patched coat puts on a character is a stop, and
+    // every colour a blended coat puts on one lies on the path between two
+    // consecutive stops — nothing a coat draws is a colour of its own.
+    let ring: HashSet<(u8, u8, u8)> = Hue::RING.iter().map(|h| hue_rgb(*h)).collect();
+    for r in ResourceId::ALL {
+        let c = coat(r);
+        for n in 1..=16 {
+            let colours = coat_colours(c, n);
+            assert_eq!(colours.len(), n, "{r:?}: one colour per character");
+            match c.dressing {
+                Dressing::Solid | Dressing::Patched => {
+                    for (i, colour) in colours.iter().enumerate() {
+                        let value = rgb_of(*colour, &format!("{r:?}'s coat, character {i}"));
+                        assert!(
+                            ring.contains(&value),
+                            "{r:?}'s {:?} coat puts #{:02X}{:02X}{:02X} on character {i} of {n}, which is \
+                             not a hue of the ring",
+                            c.dressing,
+                            value.0,
+                            value.1,
+                            value.2
+                        );
+                    }
+                }
+                Dressing::Blended => {
+                    for (i, colour) in colours.iter().enumerate() {
+                        let expected = expected_blend_colour(c.stops, i, n);
+                        assert_eq!(
+                            rgb_of(*colour, "a blended coat"),
+                            rgb_of(expected, "the path"),
+                            "{r:?}'s blended coat, character {i} of {n}, is off the path between its stops"
+                        );
+                    }
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1726,4 +1779,426 @@ fn everything_that_wants_notice_wears_the_same_one_colour() {
         vec!["attention"],
         "more than one role is carrying \"this wants you\""
     );
+}
+
+// ---------------------------------------------------------------------------
+// Coats — reading the ring, and the colour arithmetic a blend is held to
+// ---------------------------------------------------------------------------
+
+/// The 24-bit value behind a hue of the ring.
+fn hue_rgb(hue: Hue) -> (u8, u8, u8) {
+    rgb_of(hue.color(), &format!("the {} hue", hue.name()))
+}
+
+/// OKLab, the space a blend's path is straight in. Björn Ottosson's
+/// published matrices, applied to linear RGB.
+fn oklab((r, g, b): (u8, u8, u8)) -> (f64, f64, f64) {
+    let (lr, lg, lb) = (to_linear(r), to_linear(g), to_linear(b));
+    let l = (0.412_221_470_8 * lr + 0.536_332_536_3 * lg + 0.051_445_992_9 * lb).cbrt();
+    let m = (0.211_903_498_2 * lr + 0.680_699_545_1 * lg + 0.107_396_956_6 * lb).cbrt();
+    let s = (0.088_302_461_9 * lr + 0.281_718_837_6 * lg + 0.629_978_700_5 * lb).cbrt();
+    (
+        0.210_454_255_3 * l + 0.793_617_785_0 * m - 0.004_072_046_8 * s,
+        1.977_998_495_1 * l - 2.428_592_205_0 * m + 0.450_593_709_9 * s,
+        0.025_904_037_1 * l + 0.782_771_766_2 * m - 0.808_675_766_0 * s,
+    )
+}
+
+fn from_oklab((l, a, b): (f64, f64, f64)) -> (u8, u8, u8) {
+    let l_ = l + 0.396_337_777_4 * a + 0.215_803_757_3 * b;
+    let m_ = l - 0.105_561_345_8 * a - 0.063_854_172_8 * b;
+    let s_ = l - 0.089_484_177_5 * a - 1.291_485_548_0 * b;
+    let (l3, m3, s3) = (l_.powi(3), m_.powi(3), s_.powi(3));
+    let r = 4.076_741_662_1 * l3 - 3.307_711_591_3 * m3 + 0.230_969_929_2 * s3;
+    let g = -1.268_438_004_6 * l3 + 2.609_757_401_1 * m3 - 0.341_319_396_5 * s3;
+    let bb = -0.004_196_086_3 * l3 - 0.703_418_614_7 * m3 + 1.707_614_701_0 * s3;
+    (from_linear(r.clamp(0.0, 1.0)), from_linear(g.clamp(0.0, 1.0)), from_linear(bb.clamp(0.0, 1.0)))
+}
+
+/// The colour at character `i` of `n` on the piecewise-linear OKLab path
+/// through `stops`, each segment an equal share of the span — the design's
+/// own statement of a blended coat, computed here independently of the
+/// module's `coat_colours` so the two can disagree.
+fn expected_blend_colour(stops: &[Hue], i: usize, n: usize) -> Color {
+    if n == 1 || stops.len() == 1 {
+        return stops[0].color();
+    }
+    let t = i as f64 / (n - 1) as f64;
+    let segments = (stops.len() - 1) as f64;
+    let along = t * segments;
+    let k = (along.floor() as usize).min(stops.len() - 2);
+    let u = along - k as f64;
+    blend(stops[k].color(), stops[k + 1].color(), u)
+}
+
+/// The clearance floor: the CIE76 difference every colour a coat can put on
+/// a character keeps from every state colour, `dim` included. Twenty is
+/// unmistakably two colours; eighteen leaves the ring room to be lively
+/// without a name ever reading as a marker's colour.
+const CLEARANCE_FLOOR: f64 = 18.0;
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-002 — the coats hold the band and the floor too
+// ---------------------------------------------------------------------------
+
+/// Every colour a coat can put on a character — each hue of the ring and
+/// every colour along a blended coat's path — reads on a near-black and a
+/// near-white ground alike, and sits in the same mid band as the states.
+///
+/// @spec TUI-THEME-002
+#[test]
+fn every_coat_colour_clears_the_contrast_floor_against_both_grounds_and_keeps_the_band() {
+    let mut values: Vec<(String, (u8, u8, u8))> =
+        Hue::RING.iter().map(|h| (format!("the {} hue", h.name()), hue_rgb(*h))).collect();
+    for r in ResourceId::ALL {
+        let c = coat(r);
+        if c.dressing != Dressing::Blended {
+            continue;
+        }
+        for n in [2usize, 3, 5, 8, 13, 32] {
+            for (i, colour) in coat_colours(c, n).into_iter().enumerate() {
+                values.push((
+                    format!("{r:?}'s blended coat, character {i} of {n}"),
+                    rgb_of(colour, "a blended coat"),
+                ));
+            }
+        }
+    }
+
+    for (name, value) in values {
+        let on_black = contrast(value, NEAR_BLACK);
+        assert!(
+            on_black >= CONTRAST_FLOOR,
+            "{name} (#{:02X}{:02X}{:02X}) is {on_black:.2}:1 against a near-black ground, below \
+             the {CONTRAST_FLOOR}:1 floor.",
+            value.0,
+            value.1,
+            value.2
+        );
+        let on_white = contrast(value, NEAR_WHITE);
+        assert!(
+            on_white >= CONTRAST_FLOOR,
+            "{name} (#{:02X}{:02X}{:02X}) is {on_white:.2}:1 against a near-white ground, below \
+             the {CONTRAST_FLOOR}:1 floor — a coat tuned for the dark ground alone.",
+            value.0,
+            value.1,
+            value.2
+        );
+        let l = luminance(value);
+        assert!(
+            l > MID_BAND.0 && l < MID_BAND.1,
+            "{name} has luminance {l:.3}, outside the mid band ({}, {})",
+            MID_BAND.0,
+            MID_BAND.1
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-009 — no coat is a season
+// ---------------------------------------------------------------------------
+
+/// The accent belongs to the chrome and a coat to a store; neither may be the
+/// other, or a store would look like the year.
+///
+/// @spec TUI-THEME-009
+#[test]
+fn no_coat_colour_is_a_seasonal_accent() {
+    for hue in Hue::RING {
+        for season in Season::ALL {
+            assert_ne!(
+                hue_rgb(hue),
+                accent(season),
+                "the {} hue is the {season:?} accent; a store would wear the season",
+                hue.name()
+            );
+        }
+    }
+    for r in ResourceId::ALL {
+        let c = coat(r);
+        for (i, colour) in coat_colours(c, 32).into_iter().enumerate() {
+            let value = rgb_of(colour, "a coat");
+            for season in Season::ALL {
+                assert_ne!(
+                    value,
+                    accent(season),
+                    "{r:?}'s coat, character {i} of 32, is the {season:?} accent"
+                );
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-016 — every resource wears a coat of its own
+// ---------------------------------------------------------------------------
+
+/// Every resource has a coat; a solid one has one stop and a patched or
+/// blended one two to four; no two consecutive stops match; no two resources
+/// share a coat; and the clowder is diverse — each dressing is worn somewhere.
+///
+/// @spec TUI-THEME-016
+#[test]
+fn every_resource_wears_a_coat_of_its_own() {
+    let mut worn: HashMap<Coat, ResourceId> = HashMap::new();
+    let mut dressings = HashSet::new();
+    for r in ResourceId::ALL {
+        let c = coat(r);
+        let n = c.stops.len();
+        match c.dressing {
+            Dressing::Solid => assert_eq!(
+                n,
+                1,
+                "{r:?} wears a solid coat of {n} stops; a solid coat has exactly one"
+            ),
+            Dressing::Patched | Dressing::Blended => assert!(
+                (2..=4).contains(&n),
+                "{r:?} wears a {:?} coat of {n} stops; a patched or blended coat has two to four",
+                c.dressing
+            ),
+        }
+        for pair in c.stops.windows(2) {
+            assert_ne!(
+                pair[0],
+                pair[1],
+                "{r:?}'s coat repeats {} on consecutive stops — a solid coat in disguise",
+                pair[0].name()
+            );
+        }
+        if let Some(other) = worn.insert(c, r) {
+            panic!("{r:?} and {other:?} wear the same coat, {c:?}; one coat is one resource");
+        }
+        dressings.insert(c.dressing);
+    }
+    for d in [Dressing::Solid, Dressing::Patched, Dressing::Blended] {
+        assert!(dressings.contains(&d), "no resource wears a {d:?} coat; the clowder is diverse");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-017 — how a coat lies across the letters
+// ---------------------------------------------------------------------------
+
+/// A solid coat is its one stop on every character.
+///
+/// @spec TUI-THEME-017
+#[test]
+fn a_solid_coat_is_its_one_stop_on_every_character() {
+    for hue in Hue::RING {
+        let stops: &'static [Hue] = Box::leak(Box::new([hue]));
+        let c = Coat { stops, dressing: Dressing::Solid };
+        for n in 1..=13 {
+            for (i, colour) in coat_colours(c, n).into_iter().enumerate() {
+                assert_eq!(
+                    rgb_of(colour, "a solid coat"),
+                    hue_rgb(hue),
+                    "a solid {} coat on {n} characters wears something else on character {i}",
+                    hue.name()
+                );
+            }
+        }
+    }
+}
+
+/// A patched coat divides the name into one run per stop, in order, every run
+/// the quotient long and the first `remainder` runs one longer; a name shorter
+/// than its stops wears the first stops, one character each.
+///
+/// @spec TUI-THEME-017
+#[test]
+fn a_patched_coat_lies_in_near_equal_runs_the_first_ones_a_character_longer() {
+    const STOPS: [&[Hue]; 4] = [
+        &[Hue::Poppy, Hue::Sky],
+        &[Hue::Pond, Hue::Blush, Hue::Clover],
+        &[Hue::Sky, Hue::Bluebell, Hue::Orchid, Hue::Blush],
+        &[Hue::Pond, Hue::Blush, Hue::Pond, Hue::Blush],
+    ];
+    for stops in STOPS {
+        let c = Coat { stops, dressing: Dressing::Patched };
+        let k = stops.len();
+        for n in 1..=20 {
+            let drawn: Vec<(u8, u8, u8)> =
+                coat_colours(c, n).into_iter().map(|col| rgb_of(col, "a patched coat")).collect();
+            let expected: Vec<(u8, u8, u8)> = if n < k {
+                stops[..n].iter().map(|h| hue_rgb(*h)).collect()
+            } else {
+                let (q, rem) = (n / k, n % k);
+                stops
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(i, h)| std::iter::repeat_n(hue_rgb(*h), q + usize::from(i < rem)))
+                    .collect()
+            };
+            assert_eq!(
+                drawn,
+                expected,
+                "a {k}-stop patched coat on {n} characters: runs should be near-equal, the first \
+                 {} one longer, in the coat's order",
+                n % k
+            );
+        }
+    }
+}
+
+/// A blend is a straight path in OKLab: its ends are the two stops, and its
+/// midpoint is the OKLab midpoint, computed here independently.
+///
+/// @spec TUI-THEME-017
+#[test]
+fn a_blend_is_a_straight_path_in_oklab_between_its_two_colours() {
+    for (i, a) in Hue::RING.iter().enumerate() {
+        for b in Hue::RING.iter().skip(i + 1) {
+            let (ca, cb) = (a.color(), b.color());
+            assert_eq!(rgb_of(blend(ca, cb, 0.0), "a blend"), hue_rgb(*a), "a blend at 0 is its first colour");
+            assert_eq!(rgb_of(blend(ca, cb, 1.0), "a blend"), hue_rgb(*b), "a blend at 1 is its second colour");
+            let (la, lb) = (oklab(hue_rgb(*a)), oklab(hue_rgb(*b)));
+            let mid = from_oklab(((la.0 + lb.0) / 2.0, (la.1 + lb.1) / 2.0, (la.2 + lb.2) / 2.0));
+            let got = rgb_of(blend(ca, cb, 0.5), "a blend");
+            let off = |x: u8, y: u8| (i16::from(x) - i16::from(y)).unsigned_abs();
+            assert!(
+                off(got.0, mid.0) <= 1 && off(got.1, mid.1) <= 1 && off(got.2, mid.2) <= 1,
+                "the midpoint of {} and {} is #{:02X}{:02X}{:02X}, not the OKLab midpoint #{:02X}{:02X}{:02X}",
+                a.name(),
+                b.name(),
+                got.0,
+                got.1,
+                got.2,
+                mid.0,
+                mid.1,
+                mid.2
+            );
+        }
+    }
+}
+
+/// A blended coat runs from its first stop on the first character to its last
+/// on the last, positions evenly spaced, each segment an equal share — so a
+/// five-character name on three stops lands its middle character exactly on
+/// the middle stop, and a two-character name never wears it at all.
+///
+/// @spec TUI-THEME-017
+#[test]
+fn a_blended_coat_runs_from_first_stop_to_last_with_each_segment_an_equal_share() {
+    const THREE: &[Hue] = &[Hue::Sky, Hue::Bluebell, Hue::Orchid];
+    const TWO: &[Hue] = &[Hue::Poppy, Hue::Sky];
+    let three = Coat { stops: THREE, dressing: Dressing::Blended };
+    let two = Coat { stops: TWO, dressing: Dressing::Blended };
+    let value = |c: Color| rgb_of(c, "a blended coat");
+
+    let one = coat_colours(three, 1);
+    assert_eq!(value(one[0]), hue_rgb(Hue::Sky), "a one-character name wears the first stop");
+
+    let pair = coat_colours(three, 2);
+    assert_eq!(value(pair[0]), hue_rgb(Hue::Sky));
+    assert_eq!(value(pair[1]), hue_rgb(Hue::Orchid), "a two-character name ends on the last stop");
+
+    let five = coat_colours(three, 5);
+    assert_eq!(value(five[0]), hue_rgb(Hue::Sky));
+    assert_eq!(value(five[2]), hue_rgb(Hue::Bluebell), "the middle character lands on the middle stop");
+    assert_eq!(value(five[4]), hue_rgb(Hue::Orchid));
+    assert_eq!(value(five[1]), value(blend(Hue::Sky.color(), Hue::Bluebell.color(), 0.5)));
+    assert_eq!(value(five[3]), value(blend(Hue::Bluebell.color(), Hue::Orchid.color(), 0.5)));
+
+    let nine = coat_colours(two, 9);
+    for (i, colour) in nine.iter().enumerate() {
+        assert_eq!(
+            value(*colour),
+            value(blend(Hue::Poppy.color(), Hue::Sky.color(), i as f64 / 8.0)),
+            "character {i} of 9 on a two-stop blend sits at {}/8 of the path",
+            i
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-018 — the ring keeps its distance from the states
+// ---------------------------------------------------------------------------
+
+/// Every hue of the ring, and every colour along every blended coat's path
+/// that a name of up to thirty-two characters can land on, keeps the
+/// clearance floor from each of the five state colours.
+///
+/// @spec TUI-THEME-018
+#[test]
+fn every_coat_colour_keeps_the_clearance_floor_from_every_state_colour() {
+    let states: Vec<(&str, (u8, u8, u8))> =
+        PALETTE_ROLES.iter().map(|r| (role_name(*r), rgb(*r))).collect();
+    let check = |what: &str, value: (u8, u8, u8)| {
+        for (name, state) in &states {
+            let d = delta_e(value, *state);
+            assert!(
+                d >= CLEARANCE_FLOOR,
+                "{what} (#{:02X}{:02X}{:02X}) is ΔE {d:.1} from `{name}`, under the \
+                 {CLEARANCE_FLOOR} clearance floor: a name could read as that state's colour",
+                value.0,
+                value.1,
+                value.2
+            );
+        }
+    };
+    for hue in Hue::RING {
+        check(&format!("the {} hue", hue.name()), hue_rgb(hue));
+    }
+    for r in ResourceId::ALL {
+        let c = coat(r);
+        if c.dressing != Dressing::Blended {
+            continue;
+        }
+        for n in 2..=32 {
+            for (i, colour) in coat_colours(c, n).into_iter().enumerate() {
+                check(&format!("{r:?}'s blended coat, character {i} of {n}"), rgb_of(colour, "a blend"));
+            }
+        }
+    }
+}
+
+/// Which pairs of stops a blend may run between, derived by measuring every
+/// pair's path, and every blended coat in the table held to the pairs that
+/// pass — the test that names the blendable pairs.
+///
+/// @spec TUI-THEME-018
+#[test]
+fn a_blend_runs_only_between_stops_whose_path_keeps_the_clearance() {
+    let mut allowed: Vec<(Hue, Hue)> = Vec::new();
+    let mut forbidden: Vec<(Hue, Hue)> = Vec::new();
+    for (i, a) in Hue::RING.iter().enumerate() {
+        for b in Hue::RING.iter().skip(i + 1) {
+            let clear = (0..=64).all(|k| {
+                let colour = rgb_of(blend(a.color(), b.color(), f64::from(k) / 64.0), "a blend");
+                PALETTE_ROLES.iter().all(|role| delta_e(colour, rgb(*role)) >= CLEARANCE_FLOOR)
+            });
+            if clear {
+                allowed.push((*a, *b));
+            } else {
+                forbidden.push((*a, *b));
+            }
+        }
+    }
+    assert!(
+        !allowed.is_empty() && !forbidden.is_empty(),
+        "fixture: the ring should have both blendable and unblendable pairs; allowed {allowed:?}, \
+         forbidden {forbidden:?}"
+    );
+    let names = |pairs: &[(Hue, Hue)]| -> Vec<String> {
+        pairs.iter().map(|(a, b)| format!("{}–{}", a.name(), b.name())).collect()
+    };
+    for r in ResourceId::ALL {
+        let c = coat(r);
+        if c.dressing != Dressing::Blended {
+            continue;
+        }
+        for pair in c.stops.windows(2) {
+            let ok = allowed
+                .iter()
+                .any(|(a, b)| (*a, *b) == (pair[0], pair[1]) || (*a, *b) == (pair[1], pair[0]));
+            assert!(
+                ok,
+                "{r:?} blends {} to {}, whose path passes within the clearance floor of a state \
+                 colour. The blendable pairs are {:?}",
+                pair[0].name(),
+                pair[1].name(),
+                names(&allowed)
+            );
+        }
+    }
 }

@@ -3,7 +3,8 @@
 //!
 //! @spec TUI-NAV-019, TUI-NAV-020, TUI-NAV-021, TUI-NAV-022, TUI-NAV-023,
 //! TUI-NAV-024, TUI-NAV-025, TUI-NAV-034, TUI-NAV-044, TUI-NAV-045, TUI-NAV-054,
-//! TUI-NAV-086, TUI-NAV-092, TUI-THEME-011, TUI-THEME-015, TUI-RENDER-016
+//! TUI-NAV-086, TUI-NAV-092, TUI-THEME-011, TUI-THEME-015, TUI-THEME-019,
+//! TUI-THEME-020, TUI-THEME-021, TUI-RENDER-016
 //!
 //! **The contract these tests are made of.** The chrome's job is to be quiet.
 //! An empty attention cluster means nothing needs you, and that only works if
@@ -5596,4 +5597,120 @@ fn the_help_overlay_lists_d_show_or_fold_done_among_the_ideas_keys_alone() {
             );
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Coats in the sidebar — TUI-THEME-019, TUI-THEME-020, TUI-THEME-021
+// ---------------------------------------------------------------------------
+
+/// The colours a resource's coat puts on each character of `drawn`, read by
+/// position in the whole name: a kept character wears its own position's
+/// colour, and an ellipsis the colour of the character it stands in place of.
+fn coat_on(r: ResourceId, full: &str, drawn: &str) -> Vec<ratatui::style::Color> {
+    let colours = clowder_tui::theme::coat_colours(clowder_tui::theme::coat(r), full.chars().count());
+    drawn.chars().enumerate().map(|(i, _)| colours[i]).collect()
+}
+
+fn fg_at(buf: &Buffer, x: u16, y: u16) -> ratatui::style::Color {
+    buf.cell((x, y)).map(|c| c.fg).unwrap_or_default()
+}
+
+/// Every store the sidebar draws wears its coat on its name — every character,
+/// a space included — and on nothing else: its stock, `/`, cap, bar, rate, and
+/// blanks wear no colour, and the `full` tag alone wears attention.
+///
+/// @spec TUI-THEME-019, TUI-THEME-020
+#[test]
+fn every_store_in_the_sidebar_wears_its_coat_on_its_name_and_nowhere_else() {
+    use ratatui::style::Color;
+    let state = every_store_held(0);
+    let listed = listed_stores(&state);
+    assert_eq!(listed.len(), ResourceId::ALL.len(), "fixture: every store held, every store listed");
+    let w = 40u16;
+    let h = 2 * listed.len() as u16;
+    let (lines, buf) = sidebar_in(&state, w, h);
+    let name_col = w as usize - 14;
+
+    for (i, r) in listed.iter().enumerate() {
+        let full = stores_row_name(&state, *r);
+        assert!(full.chars().count() <= name_col, "fixture: {full:?} fits the name column whole");
+        let y = (2 * i) as u16;
+        let line = &lines[2 * i];
+        assert!(line.starts_with(&full), "line {y} should begin with {full:?}: {line:?}");
+
+        let expected = coat_on(*r, &full, &full);
+        for (x, want) in expected.iter().enumerate() {
+            let got = fg_at(&buf, x as u16, y);
+            assert_ne!(got, Color::Reset, "{full:?}: character {x} wears no colour at all");
+            assert_eq!(&got, want, "{full:?}: character {x} wears {got:?}, not its coat's {want:?}");
+        }
+        for x in expected.len()..w as usize {
+            let got = fg_at(&buf, x as u16, y);
+            assert_eq!(
+                got,
+                Color::Reset,
+                "{full:?}: cell {x} of its name line — a figure, the `/`, or a blank — wears \
+                 {got:?}; only the name wears the coat"
+            );
+        }
+
+        let bar = &lines[2 * i + 1];
+        let tag = bar.find("full").map(|at| {
+            let start = bar[..at].chars().count();
+            start..start + 4
+        });
+        for x in 0..w as usize {
+            let got = fg_at(&buf, x as u16, y + 1);
+            if tag.as_ref().is_some_and(|t| t.contains(&x)) {
+                assert_eq!(got, attention_colour(), "{full:?}: its `full` tag wears attention");
+            } else {
+                assert_eq!(
+                    got,
+                    Color::Reset,
+                    "{full:?}: cell {x} of its bar line wears {got:?}; the bar line has no name to coat"
+                );
+            }
+        }
+    }
+}
+
+/// A store cut to the name column keeps, on every character drawn, the colour
+/// that character has in the whole name, and its ellipsis wears the colour of
+/// the character it stands in place of — so a store looks like itself whether
+/// or not it was cut.
+///
+/// @spec TUI-THEME-021
+#[test]
+fn a_store_cut_short_keeps_its_colours_by_position_and_the_ellipsis_wears_its_own() {
+    let state = every_store_held(0);
+    let listed = listed_stores(&state);
+    let w = 18u16;
+    let h = 2 * listed.len() as u16;
+    let name_col = w as usize - 14;
+    let (lines, buf) = sidebar_in(&state, w, h);
+
+    let mut cut = 0;
+    for (i, r) in listed.iter().enumerate() {
+        let full = stores_row_name(&state, *r);
+        let drawn = fmt::fit(&full, name_col);
+        if drawn == full {
+            continue;
+        }
+        cut += 1;
+        assert!(drawn.ends_with('…'), "fixture: a cut name ends in the ellipsis: {drawn:?}");
+        let y = (2 * i) as u16;
+        let line = &lines[2 * i];
+        assert!(line.starts_with(&drawn), "line {y} should begin with {drawn:?}: {line:?}");
+        let expected = coat_on(*r, &full, &drawn);
+        for (x, want) in expected.iter().enumerate() {
+            let got = fg_at(&buf, x as u16, y);
+            assert_eq!(
+                &got,
+                want,
+                "{full:?} cut to {drawn:?}: cell {x} wears {got:?}, not the colour character {x} \
+                 of the whole name wears"
+            );
+        }
+    }
+    assert!(cut > 0, "fixture: some name is longer than {name_col} characters");
 }

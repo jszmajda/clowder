@@ -184,7 +184,7 @@ pub fn rate(per_second: f64) -> String {
 
 /// Display width of a single character, measured the way the renderer
 /// measures it.
-fn char_width(c: char) -> usize {
+pub(crate) fn char_width(c: char) -> usize {
     Span::raw(c.to_string()).width()
 }
 

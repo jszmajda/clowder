@@ -1952,3 +1952,51 @@ fn no_departure_reads_as_a_loss_a_decrease_or_a_net_total() {
          departures:\n{entry}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Coats stay out of sentences — TUI-THEME-019
+// ---------------------------------------------------------------------------
+
+/// A resource named in a sentence — the report banner, the Journal, the ticker
+/// — wears the sentence's colour: every cell of those surfaces is the inherited
+/// foreground, a state colour, or the chrome's accent, and never a coat.
+///
+/// @spec TUI-THEME-019
+#[test]
+fn a_resource_named_in_a_sentence_wears_the_sentences_colour_and_no_coat() {
+    use clowder_tui::theme::{seasonal_accent, Role};
+    use ratatui::style::Color;
+
+    let state = away(&[(10_000, full_report())]);
+    let view = unread(&state);
+    let mut allowed: Vec<Color> = vec![Color::Reset];
+    for role in [Role::Dim, Role::Ready, Role::Partial, Role::Attention, Role::Milestone] {
+        allowed.push(role.color().expect("a state colour"));
+    }
+    for season in Season::ALL {
+        allowed.push(seasonal_accent(season));
+    }
+
+    let surfaces: [(&str, Buffer, Rect); 3] = [
+        ("the report banner", banner(&state, &view), banner_rect()),
+        ("the Journal", journal(&state, 0), overlay_rect()),
+        ("the ticker", ticker(&state), ticker_rect()),
+    ];
+    let named = ["Twigs", "Feathers", "Catnip"];
+    let mut mentioned = false;
+    for (what, buf, rect) in &surfaces {
+        let text = text_of(buf, *rect);
+        mentioned |= named.iter().any(|n| mentions(&text, n));
+        for y in rect.y..rect.bottom() {
+            for x in rect.x..rect.right() {
+                let fg = buf.cell((x, y)).map(|c| c.fg).unwrap_or_default();
+                assert!(
+                    allowed.contains(&fg),
+                    "{what} wears {fg:?} at ({x}, {y}), a colour outside the state palette — a \
+                     coat in a sentence:\n{text}"
+                );
+            }
+        }
+    }
+    assert!(mentioned, "fixture: some surface names a resource");
+}

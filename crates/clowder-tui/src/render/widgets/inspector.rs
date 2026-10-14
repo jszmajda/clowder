@@ -23,7 +23,7 @@ use ratatui::{
 
 use crate::nav::rows::{rows, Row, RowKey, RowKind};
 use crate::nav::{CountPrompt, Section, ViewState};
-use crate::render::fmt;
+use crate::render::{fmt, line_from_pieces, pieces_text, Piece};
 use crate::theme::Role;
 
 /// The section a frame draws when the view state has not chosen one yet —
@@ -41,6 +41,27 @@ fn humanize(tag: &str) -> String {
         out.push(c);
     }
     out
+}
+
+/// A line of the inspector: its pieces, each a run of plain text or a
+/// resource's name wearing its coat.
+type Pieces = Vec<Piece>;
+
+fn plain(text: String) -> Pieces {
+    vec![Piece::plain(text)]
+}
+
+/// The description's first line — the row's name in full, a stores row's
+/// name in its coat. @spec TUI-NAV-018, TUI-THEME-019
+fn name_line(state: &GameState, key: &RowKey) -> Pieces {
+    let name = full_name(state, key);
+    match key {
+        RowKey::Resource(r) => {
+            let chars = name.chars().count();
+            vec![Piece::name(*r, name, chars)]
+        }
+        _ => plain(name),
+    }
 }
 
 /// A row's flavour name, in full — never shortened, unlike the list's column.
@@ -293,10 +314,11 @@ fn wait_text(seconds: f64) -> String {
 /// by the amount a shortfall names, covered where a shortfall leaves it out or
 /// the core reports no reason, unmarked where another reason holds the item
 /// back. @spec TUI-NAV-078
-fn component_line(state: &GameState, r: ResourceId, need: f64, reason: &Option<LockReason>) -> String {
+fn component_line(state: &GameState, r: ResourceId, need: f64, reason: &Option<LockReason>) -> Pieces {
     let have = state.stock(r);
-    let mut line =
-        format!("{}: need {}, have {}", resource_label(r), fmt::exact(need), fmt::exact(have));
+    let name = resource_label(r);
+    let chars = name.chars().count();
+    let mut line = format!(": need {}, have {}", fmt::exact(need), fmt::exact(have));
 
     let short_amount = match reason {
         Some(LockReason::ShortBy { missing }) => {
@@ -328,13 +350,15 @@ fn component_line(state: &GameState, r: ResourceId, need: f64, reason: &Option<L
         // reports no reason at all or a shortfall that leaves it out.
         line.push_str(", covered");
     }
-    line
+    // The name heads the line in its coat, short or covered alike; the line
+    // is the inherited foreground whatever the shortfall. @spec TUI-THEME-019
+    vec![Piece::name(r, name, chars), Piece::plain(line)]
 }
 
 /// The next cost lines for a content item that takes one: the core's price for
 /// one more, per component with need and have, marked by the core's lock
 /// reason. @spec TUI-NAV-078
-fn cost_lines(state: &GameState, id: ContentId, reason: &Option<LockReason>) -> Vec<String> {
+fn cost_lines(state: &GameState, id: ContentId, reason: &Option<LockReason>) -> Vec<Pieces> {
     let cost = state.cost_of_next(id, 1);
     cost.iter().map(|(r, need)| component_line(state, *r, *need, reason)).collect()
 }
@@ -343,15 +367,15 @@ fn cost_lines(state: &GameState, id: ContentId, reason: &Option<LockReason>) -> 
 /// reports, per component. The core reports no lock reason for these rows, so
 /// need and have stand unmarked and no wait is stated beside them.
 /// @spec TUI-NAV-073
-fn unit_cost_lines(state: &GameState, unit: &[(ResourceId, f64)]) -> Vec<String> {
+fn unit_cost_lines(state: &GameState, unit: &[(ResourceId, f64)]) -> Vec<Pieces> {
     unit.iter()
         .map(|(r, need)| {
-            format!(
-                "{}: need {}, have {}",
-                resource_label(*r),
-                fmt::exact(*need),
-                fmt::exact(state.stock(*r))
-            )
+            let name = resource_label(*r);
+            let chars = name.chars().count();
+            vec![
+                Piece::name(*r, name, chars),
+                Piece::plain(format!(": need {}, have {}", fmt::exact(*need), fmt::exact(state.stock(*r)))),
+            ]
         })
         .collect()
 }
@@ -366,30 +390,30 @@ fn unit_cost_lines(state: &GameState, unit: &[(ResourceId, f64)]) -> Vec<String>
 /// substitution the list makes in its own cost slot, leaving the lock reason
 /// stated beside it exactly where the core reports one, prompt or none.
 /// @spec TUI-NAV-018, TUI-NAV-078, TUI-NAV-079, TUI-NAV-035
-fn content_lines(state: &GameState, row: &Row, id: ContentId, tag: &str, prompt: Option<&CountPrompt>) -> Vec<String> {
-    let mut out = Vec::new();
+fn content_lines(state: &GameState, row: &Row, id: ContentId, tag: &str, prompt: Option<&CountPrompt>) -> Vec<Pieces> {
+    let mut out: Vec<Pieces> = Vec::new();
 
     let stmt = statement(id);
     if !stmt.trim().is_empty() {
-        out.push(stmt);
+        out.push(plain(stmt));
     }
 
     match id {
-        ContentId::Structure(s) => out.push(format!("Owned: {}.", state.structures[s.ix()])),
-        ContentId::Rite(r) => out.push(format!("Held: {}.", state.rite_counts[r.ix()])),
+        ContentId::Structure(s) => out.push(plain(format!("Owned: {}.", state.structures[s.ix()]))),
+        ContentId::Rite(r) => out.push(plain(format!("Held: {}.", state.rite_counts[r.ix()]))),
         _ => {}
     }
 
     if let ContentId::Job(j) = id {
-        out.push(format!("Workers in the meadow: {}.", state.effective_workers(j)));
+        out.push(plain(format!("Workers in the meadow: {}.", state.effective_workers(j))));
     }
 
     if tag == "tinker" {
         if let ContentId::Craft(c) = id {
-            out.push(format!("Tinkerers in the meadow: {}.", bound_tinkerers(state, c)));
+            out.push(plain(format!("Tinkerers in the meadow: {}.", bound_tinkerers(state, c))));
         }
         if let Some(p) = prompt {
-            out.push(crate::render::count_prompt_preview(state, row, &p.digits));
+            out.push(crate::render::count_prompt_preview_pieces(state, row, &p.digits));
         }
         // A tinkerer count row binds rather than makes: no next cost, no
         // reason — the core reports neither for it.
@@ -403,12 +427,12 @@ fn content_lines(state: &GameState, row: &Row, id: ContentId, tag: &str, prompt:
     // lock reason beside it (TUI-NAV-079) is read whether or not a prompt is
     // held to this row.
     if let Some(p) = prompt {
-        out.push(crate::render::count_prompt_preview(state, row, &p.digits));
+        out.push(crate::render::count_prompt_preview_pieces(state, row, &p.digits));
     } else if reason != Some(LockReason::AlreadyYours) {
         out.extend(cost_lines(state, id, &reason));
     }
     if let Some(r) = &reason {
-        out.push(lock_reason_text(r));
+        out.push(plain(lock_reason_text(r)));
     }
 
     out
@@ -431,7 +455,7 @@ fn bound_tinkerers(state: &GameState, c: clowder_core::CraftId) -> usize {
 /// form of its size behind `+` where it is above zero and `-` where it is
 /// below, with no sign where it stands still. @spec TUI-NAV-080,
 /// TUI-RENDER-012
-fn store_lines(state: &GameState, r: ResourceId) -> Vec<String> {
+fn store_lines(state: &GameState, r: ResourceId) -> Vec<Pieces> {
     let cap = state.cap(r);
     let cap_text = if cap.is_finite() { fmt::exact(cap) } else { "none".to_string() };
     let rate = state.net_rate(r);
@@ -443,10 +467,10 @@ fn store_lines(state: &GameState, r: ResourceId) -> Vec<String> {
     } else {
         format!("-{size}")
     };
-    vec![format!(
+    vec![plain(format!(
         "Stock: {}. Cap: {cap_text}. Net rate: {rate_text} per game second.",
         fmt::exact(state.stock(r)),
-    )]
+    ))]
 }
 
 /// The whole of the inspector's content for one row. While an open count
@@ -469,18 +493,18 @@ fn draw_body(
     };
     let on_this_row = prompt.filter(|p| p.row.as_ref() == Some(key));
 
-    let mut lines: Vec<String> = vec![full_name(state, key)];
+    let mut lines: Vec<Pieces> = vec![name_line(state, key)];
 
     // The Elder's row states the mark whole beneath the name, whether or not
     // the list's row had room to draw it. @spec TUI-NAV-108
     if matches!(key, RowKey::Kitten(ix, _) if state.elder == Some(*ix)) {
-        lines.push(crate::render::ELDER_MARK.to_string());
+        lines.push(plain(crate::render::ELDER_MARK.to_string()));
     }
 
     // A later row of a multi-row item states its own label whole, beneath the
     // item's name — never the item's name a second time. @spec TUI-NAV-091
     if let Some(label) = crate::nav::rows::later_row_label(key) {
-        lines.push(label.to_string());
+        lines.push(plain(label.to_string()));
     }
 
     // The swapped-in inspector carries the same consequence summary the list
@@ -490,39 +514,44 @@ fn draw_body(
     let mut attention_rows: Option<std::ops::Range<usize>> = None;
     if let Some(armed) = armed.filter(|a| a.key == *key && crate::render::armed_is_live(a)) {
         let start = lines.len();
-        lines.push(String::new());
-        lines.extend(crate::render::consequence_summary(state, armed));
+        lines.push(Vec::new());
+        lines.extend(crate::render::consequence_summary(state, armed).into_iter().map(plain));
         attention_rows = Some(start..lines.len());
     }
 
     match key {
         RowKey::Content(id, tag) => {
-            lines.push(String::new());
+            lines.push(Vec::new());
             lines.extend(content_lines(state, &row, *id, tag, on_this_row));
         }
         RowKey::Resource(r) => {
-            lines.push(String::new());
+            lines.push(Vec::new());
             lines.extend(store_lines(state, *r));
         }
         _ => {
             if let Some(p) = on_this_row {
-                lines.push(String::new());
-                lines.push(crate::render::count_prompt_preview(state, &row, &p.digits));
+                lines.push(Vec::new());
+                lines.push(crate::render::count_prompt_preview_pieces(state, &row, &p.digits));
             } else if let RowKind::Act { command, .. } = &row.kind {
                 if let Some(unit) = state.unit_price(command) {
-                    lines.push(String::new());
+                    lines.push(Vec::new());
                     lines.extend(unit_cost_lines(state, &unit));
                 }
             }
         }
     }
 
+    // An attention line wears attention whole, every name in it included
+    // (TUI-THEME-020); every other line is the inherited foreground with each
+    // resource's name in its coat (TUI-THEME-019).
     let out: Vec<Line<'static>> = lines
         .into_iter()
         .enumerate()
         .map(|(i, l)| match &attention_rows {
-            Some(r) if r.contains(&i) => Line::styled(l, crate::render::style_for(Role::Attention)),
-            _ => Line::from(l),
+            Some(r) if r.contains(&i) => {
+                Line::styled(pieces_text(&l), crate::render::style_for(Role::Attention))
+            }
+            _ => line_from_pieces(&l, ratatui::style::Style::default(), true, usize::MAX),
         })
         .collect();
     let para = Paragraph::new(out).wrap(Wrap { trim: true });

@@ -36,6 +36,115 @@ pub(crate) fn style_for(role: Role) -> Style {
     }
 }
 
+/// A run of text on a line: plain, or a resource's name, which wears its coat
+/// where the line lets it. A name piece carries the whole name's character
+/// count, so a name cut short (TUI-RENDER-014) keeps each character's colour
+/// by its position in the whole name.
+#[derive(Debug, Clone)]
+pub(crate) struct Piece {
+    text: String,
+    coat: Option<(ResourceId, usize)>,
+}
+
+impl Piece {
+    pub(crate) fn plain(text: impl Into<String>) -> Self {
+        Piece { text: text.into(), coat: None }
+    }
+
+    /// A resource's name as drawn — whole, or cut with its ellipsis — and the
+    /// character count of the whole name.
+    pub(crate) fn name(r: ResourceId, drawn: impl Into<String>, full_chars: usize) -> Self {
+        Piece { text: drawn.into(), coat: Some((r, full_chars)) }
+    }
+}
+
+/// The pieces' text, run together.
+pub(crate) fn pieces_text(pieces: &[Piece]) -> String {
+    pieces.iter().map(|p| p.text.as_str()).collect()
+}
+
+/// One line from its pieces, fitted to `width` exactly as `fmt::fit` fits a
+/// string, every character in `base` — and, where `coats` is on, each
+/// character of a resource's name in its coat's colour by its position in the
+/// whole name, the figures, separators, and blanks beside it keeping `base`.
+/// An ellipsis that cuts a name wears the colour of the character at its
+/// position. A line whose colour says one thing whole — dim, attention, a
+/// reversal — passes `coats` off, and every character keeps `base`.
+/// @spec TUI-THEME-019, TUI-THEME-020, TUI-THEME-021
+pub(crate) fn line_from_pieces(pieces: &[Piece], base: Style, coats: bool, width: usize) -> Line<'static> {
+    let mut cells: Vec<(char, Style)> = Vec::new();
+    for piece in pieces {
+        match piece.coat {
+            Some((r, full)) if coats => {
+                let colours = crate::theme::coat_colours(crate::theme::coat(r), full);
+                for (i, c) in piece.text.chars().enumerate() {
+                    let style = colours.get(i).map_or(base, |colour| base.fg(*colour));
+                    cells.push((c, style));
+                }
+            }
+            _ => cells.extend(piece.text.chars().map(|c| (c, base))),
+        }
+    }
+
+    let total: usize = cells.iter().map(|(c, _)| fmt::char_width(*c)).sum();
+    if total > width {
+        let ellipsis = '\u{2026}';
+        let ellipsis_width = fmt::char_width(ellipsis);
+        let budget = width.saturating_sub(ellipsis_width);
+        let (mut kept, mut used) = (0usize, 0usize);
+        for (c, _) in &cells {
+            let cw = fmt::char_width(*c);
+            if used + cw > budget {
+                break;
+            }
+            kept += 1;
+            used += cw;
+        }
+        if kept > 0 && used + ellipsis_width <= width {
+            let replaced = cells[kept].1;
+            cells.truncate(kept);
+            cells.push((ellipsis, replaced));
+        } else {
+            let (mut kept, mut used) = (0usize, 0usize);
+            for (c, _) in &cells {
+                let cw = fmt::char_width(*c);
+                if used + cw > width {
+                    break;
+                }
+                kept += 1;
+                used += cw;
+            }
+            cells.truncate(kept);
+        }
+    }
+
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut run = String::new();
+    let mut run_style: Option<Style> = None;
+    for (c, style) in cells {
+        if run_style != Some(style) {
+            if let Some(s) = run_style {
+                spans.push(Span::styled(std::mem::take(&mut run), s));
+            }
+            run_style = Some(style);
+        }
+        run.push(c);
+    }
+    if let Some(s) = run_style {
+        spans.push(Span::styled(run, s));
+    }
+    Line::from(spans)
+}
+
+/// A row's name as a piece: a stores row's name wears its coat, any other
+/// row's name is plain. @spec TUI-THEME-019
+fn name_piece(row: &Row, drawn: &str, full: &str) -> Piece {
+    match row.key {
+        RowKey::Resource(r) => Piece::name(r, drawn, full.chars().count()),
+        _ => Piece::plain(drawn),
+    }
+}
+
 /// The glyph-and-role a row wears, taken from the core's answers rather than
 /// worked out here — never from a price or a threshold of the shell's own.
 /// `None` is a display-only row: an empty marker slot. Glyph first: the
@@ -170,35 +279,56 @@ fn count_field_text(count: Option<u64>) -> String {
     }
 }
 
-/// The cost field as TUI-RENDER-020 draws it, `width` columns wide: each
-/// component a compact figure, a space, and its stores-row name, apart by
-/// `, ` — the first figure right-aligned in the field's first six columns —
-/// and the longest leading run of whole components that fits, `, …` after it
-/// where any is left out. @spec TUI-RENDER-020, TUI-RENDER-012
-fn cost_field_text(cost: Option<&[(ResourceId, f64)]>, width: usize) -> String {
-    let Some(cost) = cost else { return " ".repeat(width) };
-    let parts: Vec<String> = cost
+/// The cost field's pieces: the price's components in the core's order, each
+/// a compact figure, a space, and the resource's stores-row name — the name
+/// a piece of its own so it can wear its coat — apart by `, `, the first
+/// figure right-aligned in six columns; the longest leading run of components
+/// that fits the field, with `, …` after it where any is left out; blank to
+/// the field's width. @spec TUI-RENDER-020, TUI-THEME-019
+fn cost_field_pieces(cost: Option<&[(ResourceId, f64)]>, width: usize) -> Vec<Piece> {
+    let Some(cost) = cost else { return vec![Piece::plain(" ".repeat(width))] };
+    let components: Vec<[Piece; 2]> = cost
         .iter()
         .enumerate()
         .map(|(i, (r, a))| {
-            if i == 0 {
-                format!("{:>6} {}", fmt::compact(*a), resource_label(*r))
+            let figure = if i == 0 {
+                format!("{:>6} ", fmt::compact(*a))
             } else {
-                format!("{} {}", fmt::compact(*a), resource_label(*r))
-            }
+                format!("{} ", fmt::compact(*a))
+            };
+            let name = resource_label(*r);
+            let chars = name.chars().count();
+            [Piece::plain(figure), Piece::name(*r, name, chars)]
         })
         .collect();
-    let mut text = String::new();
-    for k in (1..=parts.len()).rev() {
-        let run = parts[..k].join(", ");
-        let tail = if k < parts.len() { ", …" } else { "" };
-        if run.chars().count() + tail.chars().count() <= width {
-            text = format!("{run}{tail}");
+    let run_len = |k: usize| -> usize {
+        components[..k].iter().map(|c| c[0].text.chars().count() + c[1].text.chars().count()).sum::<usize>()
+            + 2 * k.saturating_sub(1)
+    };
+    let mut out: Vec<Piece> = Vec::new();
+    for k in (1..=components.len()).rev() {
+        let tail = if k < components.len() { ", …" } else { "" };
+        if run_len(k) + tail.chars().count() <= width {
+            for (i, component) in components.iter().take(k).enumerate() {
+                if i > 0 {
+                    out.push(Piece::plain(", "));
+                }
+                out.push(component[0].clone());
+                out.push(component[1].clone());
+            }
+            if !tail.is_empty() {
+                out.push(Piece::plain(tail));
+            }
             break;
         }
     }
-    format!("{text:<width$}")
+    let used: usize = out.iter().map(|p| p.text.chars().count()).sum();
+    if used < width {
+        out.push(Piece::plain(" ".repeat(width - used)));
+    }
+    out
 }
+
 
 /// The components an open count prompt's preview (TUI-NAV-067) prices for
 /// `digits`: the core's per-component total for taking the count (a
@@ -226,49 +356,69 @@ fn prompt_preview_components(state: &GameState, row: &Row, digits: &str) -> Vec<
     }
 }
 
-/// A priced component of an open prompt's preview, in the exact form: what
-/// TUI-RENDER-021 requires wherever the prompt's text is drawn.
-fn prompt_preview_parts(comps: &[(ResourceId, f64)]) -> Vec<String> {
-    comps.iter().map(|(r, a)| format!("{} {}", fmt::exact(*a), resource_label(*r))).collect()
+/// The components a preview prices, each as its figure in the exact form and
+/// the resource it names. @spec TUI-NAV-067
+fn prompt_preview_parts(comps: &[(ResourceId, f64)]) -> Vec<(String, ResourceId)> {
+    comps.iter().map(|(r, a)| (fmt::exact(*a), *r)).collect()
 }
 
-/// `×` joined to the digits exactly as typed, then — where the preview prices
-/// components — two blank columns and those components, apart by `, `.
-/// @spec TUI-NAV-067, TUI-RENDER-021
-fn prompt_text(parts: &[String], digits: &str) -> String {
+/// The prompt's pieces: `×` joined to the digits exactly as typed; then,
+/// where the preview prices components, two blank columns and the first
+/// `keep` of them (all, with `None`), each its figure, a space, and the
+/// resource's name as a piece of its own, apart by `, `, with `, …` after
+/// them where any is left out — or `…` alone after the blank columns where
+/// none is kept. @spec TUI-NAV-067, TUI-RENDER-021, TUI-THEME-019
+fn prompt_pieces(parts: &[(String, ResourceId)], digits: &str, keep: Option<usize>) -> Vec<Piece> {
+    let mut out = vec![Piece::plain(format!("×{digits}"))];
     if parts.is_empty() {
-        format!("×{digits}")
-    } else {
-        format!("×{digits}  {}", parts.join(", "))
+        return out;
     }
+    let k = keep.unwrap_or(parts.len());
+    out.push(Piece::plain("  "));
+    for (i, (figure, r)) in parts.iter().take(k).enumerate() {
+        if i > 0 {
+            out.push(Piece::plain(", "));
+        }
+        out.push(Piece::plain(format!("{figure} ")));
+        let name = resource_label(*r);
+        let chars = name.chars().count();
+        out.push(Piece::name(*r, name, chars));
+    }
+    if k < parts.len() {
+        out.push(Piece::plain(if k == 0 { "…" } else { ", …" }));
+    }
+    out
 }
 
-/// The prompt's text cut to fit `place` columns: whole where it fits; else
+/// The prompt's whole text, as `prompt_pieces` lays it out.
+fn prompt_text(parts: &[(String, ResourceId)], digits: &str) -> String {
+    pieces_text(&prompt_pieces(parts, digits, None))
+}
+
+/// The prompt's pieces cut to fit `place` columns: whole where it fits; else
 /// the count whole and the longest leading run of components that fits,
 /// `, …` after it; else the count, two blank columns, and `…`.
 /// @spec TUI-RENDER-021
-fn prompt_text_cut(parts: &[String], digits: &str, place: usize) -> String {
-    let whole = prompt_text(parts, digits);
-    if whole.chars().count() <= place {
+fn prompt_pieces_cut(parts: &[(String, ResourceId)], digits: &str, place: usize) -> Vec<Piece> {
+    let whole = prompt_pieces(parts, digits, None);
+    if pieces_text(&whole).chars().count() <= place {
         return whole;
     }
     for k in (1..parts.len()).rev() {
-        let run = format!("×{digits}  {}, …", parts[..k].join(", "));
-        if run.chars().count() <= place {
+        let run = prompt_pieces(parts, digits, Some(k));
+        if pieces_text(&run).chars().count() <= place {
             return run;
         }
     }
-    format!("×{digits}  …")
+    prompt_pieces(parts, digits, Some(0))
 }
 
-/// What an open count prompt on `row` previews, in the row list's cost slot,
-/// or in the narrow swap's inspector (TUI-NAV-035): `×` and the digits as
-/// typed, then the priced components in the exact form. Shared by both, so
-/// neither ever disagrees with the other about what a prompt on the same row
-/// shows. @spec TUI-NAV-067, TUI-RENDER-021
-pub(crate) fn count_prompt_preview(state: &GameState, row: &Row, digits: &str) -> String {
+
+/// The preview as pieces, each component's name a piece of its own so it can
+/// wear its coat wherever the preview is drawn. @spec TUI-NAV-067, TUI-THEME-019
+pub(crate) fn count_prompt_preview_pieces(state: &GameState, row: &Row, digits: &str) -> Vec<Piece> {
     let comps = prompt_preview_components(state, row, digits);
-    prompt_text(&prompt_preview_parts(&comps), digits)
+    prompt_pieces(&prompt_preview_parts(&comps), digits, None)
 }
 
 /// A row's stable display name — a later row's own label (TUI-NAV-089) where
@@ -544,11 +694,15 @@ fn row_line(
         // needs no colour of its own. @spec TUI-THEME-007
         style = style.add_modifier(Modifier::REVERSED);
     }
+    // A coat is worn where the line is inherited, ready, or partial; a dim or
+    // reversed line says one thing with its whole colour, and no name on it
+    // wears a coat. @spec TUI-THEME-020
+    let coats = !focused && matches!(role, Role::Inherited | Role::Ready | Role::Partial);
 
     if let Some(p) = prompt {
         let fields = RowFields { width, counted, c };
-        let text = prompt_row_text(state, row, cursor, marker, &label, &fields, &p.digits);
-        return Line::from(Span::styled(fmt::fit(&text, width), style));
+        let pieces = prompt_row_pieces(state, row, cursor, marker, &label, &fields, &p.digits);
+        return line_from_pieces(&pieces, style, coats, width);
     }
 
     let mut fixed = cursor.chars().count() + 2;
@@ -563,22 +717,18 @@ fn row_line(
     // A kitten's row states neither heading; the place its count and cost
     // fields would take instead names the kitten's one state
     // (TUI-NAV-101, TUI-RENDER-024).
-    let mut suffix = String::new();
+    let mut suffix: Vec<Piece> = Vec::new();
     if let RowKey::Kitten(ix, _) = row.key {
         let total = fixed - (cursor.chars().count() + 2);
         let place = total.saturating_sub(1);
-        suffix.push(' ');
-        suffix.push_str(&format!("{:<place$}", kitten_state_word(state, ix)));
+        suffix.push(Piece::plain(format!(" {:<place$}", kitten_state_word(state, ix))));
     } else {
-        let count_text = count_field_text(stated_count(state, row));
-        let cost_text = cost_field_text(stated_cost(state, row).as_deref(), c);
         if counted {
-            suffix.push(' ');
-            suffix.push_str(&count_text);
+            suffix.push(Piece::plain(format!(" {}", count_field_text(stated_count(state, row)))));
         }
         if costed {
-            suffix.push(' ');
-            suffix.push_str(&cost_text);
+            suffix.push(Piece::plain(" "));
+            suffix.extend(cost_field_pieces(stated_cost(state, row).as_deref(), c));
         }
     }
 
@@ -600,15 +750,20 @@ fn row_line(
         let trailing = name_w - name_len - 1 - mark.chars().count();
         let mut text = format!("{cursor}{marker} {label} {mark}");
         text.push_str(&" ".repeat(trailing));
-        text.push_str(&suffix);
+        text.push_str(&pieces_text(&suffix));
         return Line::from(Span::styled(fmt::fit(&text, width), style));
     }
 
     let Some(hint) = hint else {
         let name = fmt::fit(&label, name_w);
-        let mut text = format!("{cursor}{marker} {name:<name_w$}");
-        text.push_str(&suffix);
-        return Line::from(Span::styled(fmt::fit(&text, width), style));
+        let pad = name_w.saturating_sub(name.chars().count());
+        let mut pieces = vec![
+            Piece::plain(format!("{cursor}{marker} ")),
+            name_piece(row, &name, &label),
+            Piece::plain(" ".repeat(pad)),
+        ];
+        pieces.extend(suffix);
+        return line_from_pieces(&pieces, style, coats, width);
     };
 
     let hint_w = hint.chars().count();
@@ -625,7 +780,7 @@ fn row_line(
         spans.push(Span::styled(" ".repeat(trailing), style));
     }
     if !suffix.is_empty() {
-        spans.push(Span::styled(suffix, style));
+        spans.push(Span::styled(pieces_text(&suffix), style));
     }
     Line::from(spans)
 }
@@ -695,13 +850,11 @@ struct RowFields {
     c: usize,
 }
 
-/// The row an open count prompt is held to, drawn as TUI-RENDER-021: its
-/// count and exact preview begun at the left edge of the cost field's place
-/// (or, where the section gives none, of the place one would take), the name
-/// giving way to it first — down to one character and its ellipsis — and,
-/// where the section counts, the count field kept whole but moved left
-/// alongside it.
-fn prompt_row_text(
+/// The row's pieces while a count prompt is open on it: cursor, marker, the
+/// name fitted to what the prompt's text leaves it, the count field where
+/// the list gives one, and the prompt's count and preview in the cost field's
+/// place (TUI-RENDER-021). @spec TUI-RENDER-021
+fn prompt_row_pieces(
     state: &GameState,
     row: &Row,
     cursor: &str,
@@ -709,7 +862,7 @@ fn prompt_row_text(
     label: &str,
     fields: &RowFields,
     digits: &str,
-) -> String {
+) -> Vec<Piece> {
     let &RowFields { width, counted, c } = fields;
     let comps = prompt_preview_components(state, row, digits);
     let parts = prompt_preview_parts(&comps);
@@ -719,23 +872,30 @@ fn prompt_row_text(
     let reserved = cursor.chars().count() + 2 + if counted { 1 + 7 } else { 0 } + 1;
     let base_name = width.saturating_sub(reserved).saturating_sub(c);
 
-    let (name_w, field) = if len <= c {
-        (base_name, format!("{whole:<c$}"))
+    let (name_w, mut field) = if len <= c {
+        let mut field = prompt_pieces(&parts, digits, None);
+        field.push(Piece::plain(" ".repeat(c - len)));
+        (base_name, field)
     } else if base_name >= 2 + (len - c) {
-        (base_name - (len - c), whole)
+        (base_name - (len - c), prompt_pieces(&parts, digits, None))
     } else {
         let place = c + base_name.saturating_sub(2);
-        (2, format!("{:<place$}", prompt_text_cut(&parts, digits, place)))
+        let mut field = prompt_pieces_cut(&parts, digits, place);
+        let used = pieces_text(&field).chars().count();
+        field.push(Piece::plain(" ".repeat(place.saturating_sub(used))));
+        (2, field)
     };
 
     let name = fmt::fit(label, name_w);
-    let mut text = format!("{cursor}{marker} {name:<name_w$} ");
+    let pad = name_w.saturating_sub(name.chars().count());
+    let mut out = vec![Piece::plain(format!("{cursor}{marker} ")), name_piece(row, &name, label)];
+    out.push(Piece::plain(format!("{} ", " ".repeat(pad))));
     if counted {
-        text.push_str(&count_field_text(stated_count(state, row)));
-        text.push(' ');
+        out.push(Piece::plain(count_field_text(stated_count(state, row))));
+        out.push(Piece::plain(" "));
     }
-    text.push_str(&field);
-    text
+    out.append(&mut field);
+    out
 }
 
 /// The space a narrow body's single pane leaves once its divider — taken

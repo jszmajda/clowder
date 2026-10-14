@@ -233,15 +233,15 @@ arrows:
     next: null
     drift: null
   theme:
-    status: PARTIAL
+    status: IMPLEMENTED
     parent: tui
-    sampled: 2026-08-10
+    sampled: 2026-10-14
     audited: null
     audited_sha: null
     blocks: [render]
     blockedBy: []
     detail: tui/theme/theme.md
-    next: "3 spec(s) not yet implemented"
+    next: null
     drift: null
 
 unmapped:

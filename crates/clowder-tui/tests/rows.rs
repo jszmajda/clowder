@@ -3259,3 +3259,172 @@ fn a_section_whose_every_row_is_folded_keeps_its_tab() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// Coats on a partial row — TUI-THEME-019, TUI-THEME-020
+// ---------------------------------------------------------------------------
+
+/// A resource's stores-row name — the variant spaced at each capital.
+fn resource_name(r: ResourceId) -> String {
+    let tag = format!("{r:?}");
+    let mut out = String::new();
+    for (i, c) in tag.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            out.push(' ');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// A content item's flavour name, as its row spells it.
+fn content_name(id: ContentId) -> String {
+    use clowder_core::content;
+    match id {
+        ContentId::Structure(s) => content::structure_def(s).name.to_string(),
+        ContentId::Idea(i) => content::idea_def(i).name.to_string(),
+        ContentId::Craft(c) => content::craft_def(c).name.to_string(),
+        ContentId::Job(j) => content::job_def(j).name.to_string(),
+        ContentId::Rite(r) => content::rite_def(r).name.to_string(),
+        ContentId::Arch(a) => content::arch_def(a).name.to_string(),
+        ContentId::Refinement(r) => content::refinement_def(r).name.to_string(),
+        ContentId::Rule(r) => content::rule_def(r).name.to_string(),
+        ContentId::Tradition(t) => resource_name_like(&format!("{t:?}")),
+        ContentId::DreamLoom(l) => content::dream_loom_def(l).name.to_string(),
+    }
+}
+
+fn resource_name_like(tag: &str) -> String {
+    let mut out = String::new();
+    for (i, c) in tag.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            out.push(' ');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// Draw `section` wide with `focus` under the cursor, and find the line whose
+/// name column — five cells in, after the list's divider, the cursor column,
+/// and the marker — holds `name` whole: the buffer, the list, and the line.
+fn drawn_line_named(
+    state: &GameState,
+    section: Section,
+    focus: &RowKey,
+    name: &str,
+) -> Option<(ratatui::buffer::Buffer, ratatui::layout::Rect, u16, String)> {
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+
+    let (w, h) = (150u16, 60u16);
+    let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
+    let mut view = nav::ViewState { section: Some(section), ..Default::default() };
+    view.focus[section.index()] = Some(focus.clone());
+    unfold_focus(state, &mut view);
+    let mut layout = None;
+    term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, &view, None)))
+        .expect("TestBackend is infallible");
+    let list = match layout.expect("frame returns its layout").body {
+        clowder_tui::render::layout::Body::Wide { list, .. } => list,
+        other => panic!("fixture: {w}x{h} lays out a list pane, not {other:?}"),
+    };
+    let buf = term.backend().buffer().clone();
+    for y in list.y..list.bottom() {
+        let line: String =
+            (list.x..list.right()).map(|x| buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" ")).collect();
+        let column: String = line.chars().skip(5).collect();
+        if column.starts_with(&format!("{name}  ")) {
+            return Some((buf, list, y, line));
+        }
+    }
+    None
+}
+
+/// A row of a kind with no reveal ladder, short of its price with some of it
+/// in hand, wears `◐` in `partial` — and on that line each name in its cost
+/// field wears its coat, while the figure before it keeps the row's colour.
+///
+/// @spec TUI-THEME-019, TUI-THEME-020
+#[test]
+fn a_partial_row_wears_coats_on_its_cost_names() {
+    use clowder_core::LockReason;
+    use clowder_tui::theme::{coat, coat_colours, Role};
+
+    let mut state = poor_but_unlocked();
+    for r in ResourceId::ALL {
+        state.resources[r.ix()] = 1.0;
+    }
+    let partial = Role::Partial.color().expect("a state colour");
+
+    let mut verified = 0usize;
+    let mut tried: Vec<String> = Vec::new();
+    for (section, row) in all_rows(&state) {
+        let RowKey::Content(id, tag) = &row.key else { continue };
+        if *tag == "tinker" || id.is_reveal_tracked() || !row.selectable() {
+            continue;
+        }
+        if !matches!(state.lock_reason(*id), Some(LockReason::ShortBy { .. })) {
+            continue;
+        }
+        let covered = state.affordability(*id);
+        if covered <= 0.0 || covered >= 1.0 {
+            continue;
+        }
+        let cost = state.cost_of_next(*id, 1);
+        if cost.is_empty() {
+            continue;
+        }
+        // The cursor rests on the row beside this one, so this one is drawn
+        // unfocused and in view.
+        let listed = rows(&state, section);
+        let at = listed.iter().position(|r| r.key == row.key).expect("the row is listed");
+        let Some(beside) = listed[..at]
+            .iter()
+            .rev()
+            .chain(listed[at + 1..].iter())
+            .find(|r| r.selectable())
+        else {
+            continue;
+        };
+        let name = content_name(*id);
+        let Some((buf, list, y, line)) = drawn_line_named(&state, section, &beside.key, &name) else {
+            tried.push(format!("{name} in {} (not drawn in view)", section.title()));
+            continue;
+        };
+        let fg = |x: usize| buf.cell((list.x + x as u16, y)).map(|c| c.fg).unwrap_or_default();
+        let marker = buf.cell((list.x + 3, y)).map(|c| c.symbol().to_string()).unwrap_or_default();
+        assert_eq!(marker, "◐", "fixture: {name} in {} is short with some coverage: {line:?}", section.title());
+        assert_eq!(fg(3), partial, "fixture: a two-state kind's `◐` wears partial: {line:?}");
+
+        let mut names_checked = 0usize;
+        for (r, _) in &cost {
+            let rname = resource_name(*r);
+            let Some(at) = line.rfind(&format!(" {rname}")) else { continue };
+            let cx = line[..at].chars().count() + 1;
+            if cx < 5 + name.chars().count() {
+                continue;
+            }
+            for (k, want) in coat_colours(coat(*r), rname.chars().count()).iter().enumerate() {
+                let got = fg(cx + k);
+                assert_eq!(
+                    &got, want,
+                    "the partial row {name}'s cost name {rname}, character {k}, wears {got:?}, not \
+                     its coat's {want:?}: {line:?}"
+                );
+            }
+            assert_eq!(fg(cx - 2), partial, "the figure before {rname} wears the row's colour: {line:?}");
+            names_checked += 1;
+        }
+        if names_checked == 0 {
+            tried.push(format!("{name} in {} (no cost name drawn)", section.title()));
+            continue;
+        }
+        verified += 1;
+        break;
+    }
+    assert!(
+        verified > 0,
+        "fixture: no partial row of a two-state kind was drawn with a priced cost field; tried {tried:?}"
+    );
+}

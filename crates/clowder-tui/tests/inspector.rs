@@ -2952,3 +2952,115 @@ fn every_abbreviated_figure_has_its_exact_form_on_its_rows_inspector() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Coats in the inspector — TUI-THEME-019
+// ---------------------------------------------------------------------------
+
+fn fg_at(buf: &Buffer, x: u16, y: u16) -> ratatui::style::Color {
+    buf.cell((x, y)).map(|c| c.fg).unwrap_or_default()
+}
+
+/// A resource's stores-row name — the variant spaced at each capital.
+fn resource_name(r: ResourceId) -> String {
+    let tag = format!("{r:?}");
+    let mut out = String::new();
+    for (i, c) in tag.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            out.push(' ');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// Every cost line heads with its component's name in that resource's coat,
+/// short or covered alike, and nothing else on the line wears a colour; no
+/// other line of the inspector — the item's name, its statement, its reason —
+/// wears a hue of the ring.
+///
+/// @spec TUI-THEME-019
+#[test]
+fn the_inspectors_cost_lines_wear_each_components_coat_on_its_name_short_or_covered() {
+    use clowder_tui::theme::{coat, coat_colours, Hue};
+    use ratatui::style::Color;
+
+    let s = multi_component_structure();
+    let mut state = meadow(&[s]);
+    let cost = state.cost_of_next(ContentId::Structure(s), 1);
+    assert!(cost.len() >= 2, "fixture: two or more components");
+    let (r0, n0) = cost[0];
+    state.resources[r0.ix()] = n0 + 0.5;
+
+    let (w, h) = (200u16, 40u16);
+    let rect = pane_rect(w, h);
+    let buf = render(&state, &looking_at(Section::Meadow, structure_row(s)), w, h, rect);
+    let lines = region_lines(&buf, rect);
+    let ring: Vec<Color> = Hue::RING.iter().map(|h| h.color()).collect();
+
+    let mut found = 0;
+    for (i, line) in lines.iter().enumerate() {
+        let y = rect.y + i as u16;
+        let trimmed = line.trim_start();
+        let indent = line.chars().count() - trimmed.chars().count();
+        let heads = cost.iter().find(|(r, _)| trimmed.starts_with(&format!("{}:", resource_name(*r))));
+        if let Some((r, _)) = heads {
+            found += 1;
+            let name = resource_name(*r);
+            let expected = coat_colours(coat(*r), name.chars().count());
+            for (k, want) in expected.iter().enumerate() {
+                let got = fg_at(&buf, rect.x + (indent + k) as u16, y);
+                assert_eq!(
+                    &got, want,
+                    "the cost line for {name}, character {k}, wears {got:?}, not its coat's {want:?}: \
+                     {line:?}"
+                );
+            }
+            for x in (indent + name.chars().count())..line.trim_end().chars().count() {
+                let got = fg_at(&buf, rect.x + x as u16, y);
+                assert_eq!(
+                    got,
+                    Color::Reset,
+                    "the cost line for {name}: cell {x} past the name wears {got:?}: {line:?}"
+                );
+            }
+        } else {
+            for x in 0..line.chars().count() {
+                let got = fg_at(&buf, rect.x + x as u16, y);
+                assert!(
+                    !ring.contains(&got),
+                    "line {i} ({line:?}) is no cost line, yet cell {x} wears the ring colour {got:?}"
+                );
+            }
+        }
+    }
+    assert_eq!(found, cost.len(), "fixture: every component has a cost line: {lines:?}");
+    assert_eq!(fg_at(&buf, rect.x, rect.y), Color::Reset, "a structure's name line wears no colour");
+}
+
+/// A stores row's description opens with the store's name, in its coat.
+///
+/// @spec TUI-THEME-019
+#[test]
+fn a_stores_rows_name_line_in_the_inspector_wears_its_coat() {
+    use clowder_tui::theme::{coat, coat_colours};
+    use ratatui::style::Color;
+
+    let r = ResourceId::ALL[0];
+    let mut state = GameState::new(11);
+    state.resources[r.ix()] = 5.0;
+    let (w, h) = (160u16, 40u16);
+    let rect = pane_rect(w, h);
+    let buf = render(&state, &looking_at(Section::Meadow, RowKey::Resource(r)), w, h, rect);
+    let first = region_lines(&buf, rect)[0].clone();
+    let name = resource_name(r);
+    assert!(first.starts_with(&name), "fixture: the description opens with the name: {first:?}");
+    let expected = coat_colours(coat(r), name.chars().count());
+    for (k, want) in expected.iter().enumerate() {
+        let got = fg_at(&buf, rect.x + k as u16, rect.y);
+        assert_eq!(&got, want, "the name line for {name}, character {k}, wears {got:?}: {first:?}");
+    }
+    for x in name.chars().count()..first.chars().count() {
+        assert_eq!(fg_at(&buf, rect.x + x as u16, rect.y), Color::Reset, "past the name, no colour");
+    }
+}

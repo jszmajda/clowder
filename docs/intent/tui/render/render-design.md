@@ -116,6 +116,8 @@ A figure that is not finite has no digits to state, and is said in words instead
   - *Its width.* The text begins at the left edge of the cost field's place and runs rightward. Where it is longer than that place, the row's count field, where the list gives one, and its name move left by what it needs, the count field keeping its figure and its seven columns, and the name shortening as far as a single character and its ellipsis. Text that still does not fit keeps the count whole and draws the longest leading run of components that fits with `, …` after it where any is left out, as the cost field does; where not even the first component fits, the count is followed by its two blank columns and `…`. Only the prompt's row gives way, and only while the prompt is open; every other row keeps its columns.
   - *In the narrow swap.* Where the inspector holds the list's space and carries the prompt (TUI-NAV-035), the prompt's count and preview take the same text.
 
+**A resource's name in a field wears its coat.** Wherever this leaf draws a resource's name as a field — in the sidebar, on its stores row, in a cost field, in a count prompt's preview, and at the head of the inspector's cost lines — the name's characters wear the colours the theme leaf gives that resource (theme leaf: Coats), on the lines that leaf says may carry one, and only the name wears them: the figures, separators, and blank columns beside it wear the line's own colour, so a column of figures still reads as one column. A shortened name's ellipsis wears the colour of the character it replaces, so a store's leading characters look the same at every width.
+
 **Names truncate, but never into ambiguity.** Where a name will not fit, it is shortened with an explicit ellipsis so the player can see that something was cut. A truncated name is always resolvable. In the list, the inspector shows it in full, and the cursor is already on it. In the sidebar, where no cursor stands, the floor under the name column keeps every cut name distinct from every other in place, and the store's row in the stores group spells it whole.
 
 ## The Frame Budget
@@ -180,6 +182,6 @@ Every question here is one that a real terminal answers better than a document, 
 ## References
 
 - Parent: `../tui-design.md`
-- Consumes: `navigation/` for glyphs, markers, and every size-dependent behaviour (TUI-NAV-017, 019, 029, 034, 045, 047, 048); `theme/` for colour roles; `runtime/` for the per-frame budget
+- Consumes: `navigation/` for glyphs, markers, and every size-dependent behaviour (TUI-NAV-017, 019, 029, 034, 045, 047, 048); `theme/` for colour roles and for the coat a resource's name wears in a field; `runtime/` for the per-frame budget
 - Supplies: `navigation/` with each frame's pointer record (The Pointer Record), against which pointer events are resolved
 - Renders from: `clowder_core::GameState` snapshots and the core's derived queries — never from shell-side copies of game data

@@ -350,16 +350,30 @@ fn choose_stores(state: &GameState, listed: &[ResourceId], capacity: usize) -> V
 }
 
 /// A store's two lines: its name, stock, `/`, and cap at the right edge; then
-/// its fill bar, its rate, and — while capped — the `full` tag. Only the
-/// `full` tag wears `attention` (TUI-THEME-015); everything else, including
-/// the fill bar, stays in the inherited foreground so colour never carries a
-/// meaning the glyphs do not. @spec TUI-RENDER-019, TUI-NAV-022
+/// its fill bar, its rate, and — while capped — the `full` tag. The name
+/// wears its coat (TUI-THEME-019); only the `full` tag wears `attention`
+/// (TUI-THEME-015); everything else, including the fill bar, stays in the
+/// inherited foreground so colour never carries a meaning the glyphs do not.
+/// @spec TUI-RENDER-019, TUI-NAV-022, TUI-THEME-019
 fn store_lines(state: &GameState, r: ResourceId, name_col: usize, width: usize) -> [Line<'static>; 2] {
     let stock = state.stock(r);
     let cap = state.cap(r);
-    let name = fmt::fit(&humanize(&format!("{r:?}")), name_col);
+    let label = humanize(&format!("{r:?}"));
+    let name = fmt::fit(&label, name_col);
     let cap_part = if cap.is_finite() { format!("/{:<6}", fmt::compact(cap)) } else { " ".repeat(7) };
-    let first = format!("{name:<name_col$} {:>6}{cap_part}", fmt::compact(stock));
+    // The name wears its coat — a cut name keeping each character's colour by
+    // its position in the whole — and the figures beside it wear none.
+    // @spec TUI-THEME-019, TUI-THEME-021
+    let pad = name_col.saturating_sub(name.chars().count());
+    let first = crate::render::line_from_pieces(
+        &[
+            crate::render::Piece::name(r, name, label.chars().count()),
+            crate::render::Piece::plain(format!("{} {:>6}{cap_part}", " ".repeat(pad), fmt::compact(stock))),
+        ],
+        ratatui::style::Style::default(),
+        true,
+        usize::MAX,
+    );
 
     let bar = fill_bar(stock, cap);
     let rate = fmt::rate(state.net_rate(r));
@@ -375,7 +389,7 @@ fn store_lines(state: &GameState, r: ResourceId, name_col: usize, width: usize) 
     if drawn_len < width {
         spans.push(Span::raw(" ".repeat(width - drawn_len)));
     }
-    [Line::from(first), Line::from(spans)]
+    [first, Line::from(spans)]
 }
 
 /// A curated glance: the stores the stores group lists, each drawn whole
