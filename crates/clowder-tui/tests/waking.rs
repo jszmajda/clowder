@@ -405,24 +405,43 @@ fn a_longer_catch_up_draws_the_waking_screen_on_every_frame_until_it_finishes() 
 // ---------------------------------------------------------------------------
 
 /// The poll for input does not wait out the frame budget while waking; once
-/// awake, it does.
-/// @spec TUI-RUN-035
+/// awake, it does. What a waking frame asks for instead is the briefest wait
+/// — longer than none, because the input source reads nothing in a wait of
+/// no time, and no longer than a millisecond, which is nothing beside the
+/// time a bound takes to replay.
+/// @spec TUI-RUN-035, TUI-RUN-059
 #[test]
 fn waking_polls_without_waiting_and_play_waits_out_the_frame_budget() {
+    fn expect_the_briefest_wait(wait: Duration, which: &str) {
+        assert!(
+            wait > Duration::ZERO,
+            "{which} asks its input source to wait no time at all, and the source reads nothing \
+             in such a wait — a waking game would never hear its quit key"
+        );
+        assert!(
+            wait <= Duration::from_millis(1),
+            "{which} waits {wait:?} for input: a waking frame checks for a key and moves on"
+        );
+    }
+
     let json = save_of(&meadow(35_001, 1.0));
     let mut t = term(100, 30);
     let mut w = waking(begin(&json, SAVED_AT + 100, 50, &mut t, "poll"));
-    assert_eq!(w.poll_timeout(), Duration::ZERO, "the first waking frame does not wait");
+    let first = w.poll_timeout();
+    expect_the_briefest_wait(first, "the first waking frame");
     let app = loop {
         match step(w, &mut t, still(), &[]) {
             Wake::Waking(next) => {
-                assert_eq!(next.poll_timeout(), Duration::ZERO, "no waking frame waits");
+                expect_the_briefest_wait(next.poll_timeout(), "a waking frame");
                 w = next;
             }
             Wake::Awake(app) => break app,
         }
     };
-    assert!(app.poll_timeout() > Duration::ZERO, "the awake game waits out its frame budget");
+    assert!(
+        app.poll_timeout() > Duration::from_millis(1) && app.poll_timeout() > first,
+        "the awake game waits out its frame budget, which is longer than waking's briefest wait"
+    );
 }
 
 // ---------------------------------------------------------------------------

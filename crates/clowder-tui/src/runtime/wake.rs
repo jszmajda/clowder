@@ -19,7 +19,7 @@ use ratatui::Terminal;
 use crate::nav;
 use crate::render;
 use crate::runtime::clock::Reading;
-use crate::runtime::{App, TickAccumulator};
+use crate::runtime::{App, TickAccumulator, BRIEFEST_WAIT};
 
 /// Waking's own per-frame bound: larger than live play's, since the waking
 /// screen has only its progress and the quit key to keep responsive.
@@ -47,6 +47,20 @@ pub struct Waking {
     bound: u64,
 }
 
+/// A waking frame that could not be written to the terminal, handing back the
+/// wake as that frame left it — the bound it replayed before its draw kept —
+/// so the shutdown that follows can save it. @spec TUI-RUN-047, TUI-RUN-048
+pub struct Refused {
+    pub error: io::Error,
+    pub waking: Waking,
+}
+
+impl std::fmt::Debug for Refused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Refused").field("error", &self.error).finish_non_exhaustive()
+    }
+}
+
 /// A key that answers quitting, and only quitting, while waking: `q` (plain)
 /// and Ctrl-C, exactly as everywhere (TUI-NAV-016). @spec TUI-NAV-103
 fn is_quit_key(key: KeyEvent) -> bool {
@@ -60,7 +74,7 @@ impl Wake {
         catch_up: CatchUp,
         save_path: PathBuf,
         terminal: &mut Terminal<B>,
-    ) -> io::Result<Wake> {
+    ) -> Result<Wake, Box<Refused>> {
         Self::begin_bounded(catch_up, save_path, terminal, WAKE_TICKS_PER_FRAME)
     }
 
@@ -72,7 +86,7 @@ impl Wake {
         save_path: PathBuf,
         terminal: &mut Terminal<B>,
         bound: u64,
-    ) -> io::Result<Wake> {
+    ) -> Result<Wake, Box<Refused>> {
         let waking = Waking {
             catch_up,
             clock: TickAccumulator::default(),
@@ -95,9 +109,10 @@ impl Waking {
     }
 
     /// No waiting while waking: the replay runs at the machine's pace, with
-    /// frames as its only pauses. @spec TUI-RUN-035
+    /// frames as its only pauses. The check for input is the briefest wait
+    /// the input source honours, never none. @spec TUI-RUN-035, TUI-RUN-059
     pub fn poll_timeout(&self) -> Duration {
-        Duration::ZERO
+        BRIEFEST_WAIT
     }
 
     /// One waking frame: quitting answers alone, every other key is
@@ -110,12 +125,16 @@ impl Waking {
         terminal: &mut Terminal<B>,
         reading: Reading,
         input: &[Event],
-    ) -> io::Result<Wake> {
+    ) -> Result<Wake, Box<Refused>> {
         for event in input {
             match event {
                 Event::Key(key) if is_quit_key(*key) => self.quitting = true,
                 // Only the final size matters, as for the awake loop.
-                Event::Resize(w, h) => terminal.resize(Rect::new(0, 0, *w, *h))?,
+                Event::Resize(w, h) => {
+                    if let Err(error) = terminal.resize(Rect::new(0, 0, *w, *h)) {
+                        return Err(Box::new(Refused { error, waking: self }));
+                    }
+                }
                 // Every other key is discarded, not held: it would otherwise
                 // act on a meadow the player has not yet seen.
                 _ => {}
@@ -155,7 +174,7 @@ impl Waking {
     /// play begins (TUI-RUN-038). Otherwise draw the waking screen having
     /// replayed no more than this bound, and come back pending.
     /// @spec TUI-RUN-033, TUI-RUN-034, TUI-RUN-037, TUI-RUN-038
-    fn advance_and_draw<B: Backend>(mut self, terminal: &mut Terminal<B>) -> io::Result<Wake> {
+    fn advance_and_draw<B: Backend>(mut self, terminal: &mut Terminal<B>) -> Result<Wake, Box<Refused>> {
         let bound = self.bound;
         match self.catch_up.advance(bound) {
             Advance::Finished(loaded) => {
@@ -178,10 +197,14 @@ impl Waking {
             Advance::Pending(next) => {
                 self.catch_up = next;
                 // @spec TUI-NAV-102
-                terminal.draw(|f| {
+                // @spec TUI-RUN-047, TUI-RUN-048
+                let drawn = terminal.draw(|f| {
                     render::waking(f, self.catch_up.total_ticks(), self.catch_up.remaining_ticks())
-                })?;
-                Ok(Wake::Waking(self))
+                });
+                match drawn {
+                    Ok(_) => Ok(Wake::Waking(self)),
+                    Err(error) => Err(Box::new(Refused { error, waking: self })),
+                }
             }
         }
     }

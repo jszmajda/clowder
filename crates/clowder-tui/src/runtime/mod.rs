@@ -1,7 +1,7 @@
 //! The boundary between the operating system and the pure core: terminal
 //! lifecycle, the loop, time, autosave, and the failure policy for a save that
 //! will not load. The only place in clowder that reads a clock, touches the
-//! filesystem, or handles a signal. @spec TUI-RUN-001..031
+//! filesystem, or handles a signal. @spec TUI-RUN-001..031, TUI-RUN-046..059
 
 pub mod clock;
 pub mod lock;
@@ -9,9 +9,10 @@ pub mod persist;
 pub mod term;
 pub mod wake;
 
+use std::io;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use clowder_core::GameState;
 
@@ -21,7 +22,7 @@ use crate::render::Layout;
 pub use clock::TickAccumulator;
 pub use lock::SessionLock;
 pub use term::TerminalGuard;
-pub use wake::{Wake, Waking, WAKE_TICKS_PER_FRAME};
+pub use wake::{Refused, Wake, Waking, WAKE_TICKS_PER_FRAME};
 
 /// The one place a save's timestamp is derived from the real clock, shared by
 /// a live session's save and a shutdown taken mid-wake. @spec TUI-RUN-027
@@ -194,105 +195,14 @@ pub fn run() -> ExitCode {
         let backend = ratatui::backend::CrosstermBackend::new(std::io::stdout());
         match ratatui::Terminal::new(backend) {
             Ok(mut terminal) => {
-                // TUI-RUN-033/034: a load's catch-up replays behind the waking
-                // screen, after the terminal is taken — never before.
-                let opened = match startup {
-                    Startup::NewGame(state) => {
-                        let mut view = ViewState::default();
-                        // TUI-NAV-024: the cold open is one section with one
-                        // focused row, and whatever the load already found
-                        // showing counts as known rather than freshly arrived.
-                        crate::nav::opening(&mut view, &state);
-                        Some(Box::new(App {
-                            state,
-                            view,
-                            clock: TickAccumulator::default(),
-                            save_path: save_path.clone(),
-                            last_save: Instant::now(),
-                            prev_layout: None,
-                            quitting: false,
-                            save_failed: false,
-                        }))
-                    }
-                    Startup::Loaded(catch_up) => {
-                        match run_wake(*catch_up, save_path.clone(), &mut terminal) {
-                            Ok(WakeOutcome::Opened(app)) => Some(app),
-                            Ok(WakeOutcome::ShutDown(Ok(()))) => None,
-                            Ok(WakeOutcome::ShutDown(Err(e))) => {
-                                parting.push(format!("clowder could not save on the way out: {e}"));
-                                None
-                            }
-                            Err(e) => {
-                                parting.push(format!("clowder stopped while waking: {e}"));
-                                None
-                            }
-                        }
-                    }
-                };
-
-                if let Some(mut app) = opened {
-                    // The only place real clocks are read. Both are sampled
-                    // together so their difference is meaningful: the wall
-                    // clock outrunning the monotonic one is the machine
-                    // having been suspended.
-                    // @spec TUI-RUN-021, TUI-RUN-022
-                    let mut last_mono = Instant::now();
-                    let mut last_wall = std::time::SystemTime::now();
-
-                    while !app.quitting && !term::termination_requested() {
-                        let now_mono = Instant::now();
-                        let now_wall = std::time::SystemTime::now();
-                        let reading = clock::Reading {
-                            monotonic: now_mono.duration_since(last_mono),
-                            // A backwards correction reads as zero elapsed
-                            // here; the accumulator keeps the monotonic
-                            // figure. @spec TUI-RUN-023
-                            wall: now_wall.duration_since(last_wall).unwrap_or_default(),
-                        };
-                        last_mono = now_mono;
-                        last_wall = now_wall;
-
-                        // The poll timeout IS the frame cadence; nothing to do
-                        // means we wait here. Bounded so a flood cannot starve
-                        // the frame.
-                        let mut input = Vec::new();
-                        let mut waited = false;
-                        while input.len() < App::MAX_INPUT_EVENTS_PER_FRAME {
-                            let timeout =
-                                if waited { std::time::Duration::ZERO } else { app.poll_timeout() };
-                            waited = true;
-                            match crossterm::event::poll(timeout) {
-                                Ok(true) => match crossterm::event::read() {
-                                    Ok(ev) => input.push(ev),
-                                    Err(e) => {
-                                        parting.push(format!("clowder lost its input: {e}"));
-                                        break;
-                                    }
-                                },
-                                Ok(false) => break,
-                                Err(e) => {
-                                    parting.push(format!("clowder lost its input: {e}"));
-                                    break;
-                                }
-                            }
-                        }
-
-                        if let Err(e) = app.step(&mut terminal, reading, &input) {
-                            parting.push(format!("clowder stopped: {e}"));
-                            break;
-                        }
-                    }
-                    // Every clean shutdown saves, and does not drain the
-                    // backlog first: the banked count goes into the save and
-                    // the next load runs it, so quitting mid-catch-up costs
-                    // nothing and waits for nothing. A failure does not
-                    // change the exit code — the session is ending either
-                    // way, and the player is better served by being told than
-                    // by a status nobody reads. @spec TUI-RUN-026, TUI-RUN-031
-                    if let Err(e) = app.save() {
-                        parting.push(format!("clowder could not save on the way out: {e}"));
-                    }
-                }
+                parting = session(startup, save_path.clone(), &mut terminal, &mut TerminalInput, &term::termination_requested);
+                // The drawing library shows the cursor again when it is let
+                // go, and answers a failure of that with a print — fatal when
+                // standard error is the terminal that was lost
+                // (TUI-RUN-052). So the one attempt is made here, its failure
+                // is nothing to report, and the handle is not let go.
+                let _ = terminal.show_cursor();
+                std::mem::forget(terminal);
             }
             Err(e) => {
                 parting.push(format!("clowder could not start drawing: {e}"));
@@ -319,10 +229,158 @@ pub fn run() -> ExitCode {
             }
         }
     }
-    for line in parting {
-        eprintln!("{line}");
+    // Said with a write whose failure is ignored, not `eprintln!`, which
+    // panics on one: standard error is usually the terminal that was lost.
+    // @spec TUI-RUN-052
+    {
+        use std::io::Write;
+        let mut err = std::io::stderr();
+        for line in parting {
+            let _ = writeln!(err, "{line}");
+        }
     }
     ExitCode::SUCCESS
+}
+
+/// Where the loop takes its input from. In the game: the terminal library's
+/// `event::poll` and `event::read`, and nothing else; a test can answer in its
+/// place. @spec TUI-RUN-058
+pub trait InputSource {
+    /// Wait up to `timeout` for an event; `Ok(true)` when one is ready.
+    fn poll(&mut self, timeout: Duration) -> io::Result<bool>;
+    /// Take the event a wait said was ready.
+    fn read(&mut self) -> io::Result<crossterm::event::Event>;
+}
+
+/// The terminal library's events, the library built with its terminal-device
+/// input source (the workspace's `use-dev-tty` feature). @spec TUI-RUN-058
+pub struct TerminalInput;
+
+impl InputSource for TerminalInput {
+    fn poll(&mut self, timeout: Duration) -> io::Result<bool> {
+        crossterm::event::poll(timeout)
+    }
+
+    fn read(&mut self) -> io::Result<crossterm::event::Event> {
+        crossterm::event::read()
+    }
+}
+
+/// The wait a frame asks for when it wants only the input already ready. The
+/// input source reads nothing in a wait of no time, so this is longer than
+/// none, and it is no longer than a millisecond. @spec TUI-RUN-059
+pub const BRIEFEST_WAIT: Duration = Duration::from_millis(1);
+
+/// One frame's input: the first wait is `first`, every wait after it the
+/// briefest, up to the frame's bound. Any failure of a wait or a read means
+/// the terminal is lost, and the events already taken are dropped with it.
+/// @spec TUI-RUN-014, TUI-RUN-016, TUI-RUN-046, TUI-RUN-059
+fn take_input(
+    input: &mut impl InputSource,
+    first: Duration,
+) -> io::Result<Vec<crossterm::event::Event>> {
+    let mut events = Vec::new();
+    let mut timeout = first;
+    while events.len() < App::MAX_INPUT_EVENTS_PER_FRAME {
+        if !input.poll(timeout)? {
+            break;
+        }
+        events.push(input.read()?);
+        timeout = BRIEFEST_WAIT;
+    }
+    Ok(events)
+}
+
+/// Everything between taking the terminal and giving it back: the wake where
+/// the load owes one, then play, until a quit key, a recorded termination
+/// (`terminated()` turning true), or a lost terminal — the input failing or a
+/// frame refused — and then the one shutdown save. A lost terminal is an
+/// ordinary ending, begun by whichever of these the loop sees first. Returns
+/// the parting lines, to be said once the player's own terminal is back.
+/// @spec TUI-RUN-004, TUI-RUN-026, TUI-RUN-046, TUI-RUN-047, TUI-RUN-048,
+/// TUI-RUN-050, TUI-RUN-051, TUI-RUN-057
+pub fn session<B: ratatui::backend::Backend>(
+    startup: Startup,
+    save_path: PathBuf,
+    terminal: &mut ratatui::Terminal<B>,
+    input: &mut impl InputSource,
+    terminated: &dyn Fn() -> bool,
+) -> Vec<String> {
+    let mut parting = Vec::new();
+    let opened = match startup {
+        Startup::NewGame(state) => {
+            let mut view = ViewState::default();
+            // TUI-NAV-024: the cold open is one section with one focused row,
+            // and whatever the load already found showing counts as known
+            // rather than freshly arrived.
+            crate::nav::opening(&mut view, &state);
+            Some(Box::new(App {
+                state,
+                view,
+                clock: TickAccumulator::default(),
+                save_path,
+                last_save: Instant::now(),
+                prev_layout: None,
+                quitting: false,
+                save_failed: false,
+            }))
+        }
+        // TUI-RUN-033/034: a load's catch-up replays behind the waking
+        // screen, after the terminal is taken — never before.
+        Startup::Loaded(catch_up) => run_wake(*catch_up, save_path, terminal, input, terminated, &mut parting),
+    };
+    let Some(mut app) = opened else {
+        return parting;
+    };
+
+    // The only place real clocks are read. Both are sampled together so their
+    // difference is meaningful: the wall clock outrunning the monotonic one
+    // is the machine having been suspended. @spec TUI-RUN-021, TUI-RUN-022
+    let mut last_mono = Instant::now();
+    let mut last_wall = std::time::SystemTime::now();
+
+    while !app.quitting && !terminated() {
+        let now_mono = Instant::now();
+        let now_wall = std::time::SystemTime::now();
+        let reading = clock::Reading {
+            monotonic: now_mono.duration_since(last_mono),
+            // A backwards correction reads as zero elapsed here; the
+            // accumulator keeps the monotonic figure. @spec TUI-RUN-023
+            wall: now_wall.duration_since(last_wall).unwrap_or_default(),
+        };
+        last_mono = now_mono;
+        last_wall = now_wall;
+
+        // The first wait IS the frame cadence; nothing to do means we wait
+        // here. Bounded so a flood cannot starve the frame.
+        let events = match take_input(input, app.poll_timeout()) {
+            Ok(events) => events,
+            Err(e) => {
+                // The events the frame had taken are dropped unapplied and
+                // nothing more is drawn. @spec TUI-RUN-046
+                parting.push(format!("clowder lost its input: {e}"));
+                break;
+            }
+        };
+
+        // A refused frame has applied and ticked before its draw, and that
+        // stands. @spec TUI-RUN-047
+        if let Err(e) = app.step(terminal, reading, &events) {
+            parting.push(format!("clowder stopped: {e}"));
+            break;
+        }
+    }
+    // Every clean shutdown saves, and does not drain the backlog first: the
+    // banked count goes into the save and the next load runs it, so quitting
+    // mid-catch-up costs nothing and waits for nothing. Tried once, whatever
+    // began the shutdown. A failure does not change the exit code — the
+    // session is ending either way, and the player is better served by being
+    // told than by a status nobody reads.
+    // @spec TUI-RUN-026, TUI-RUN-031, TUI-RUN-057
+    if let Err(e) = app.save() {
+        parting.push(format!("clowder could not save on the way out: {e}"));
+    }
+    parting
 }
 
 /// What startup found: a fresh game, or a load whose catch-up (SAVE-018) is
@@ -333,41 +391,51 @@ pub fn run() -> ExitCode {
 /// `GameState` is simply a large value; boxing it here would trade a bigger
 /// local for an allocation this one-shot, single-value match never needed.
 #[allow(clippy::large_enum_variant)]
-enum Startup {
+pub enum Startup {
     NewGame(GameState),
     Loaded(Box<clowder_core::CatchUp>),
-}
-
-/// What waking through a load's catch-up ended in: the game opened, or a quit
-/// key / termination signal that set the catch-up down and saved.
-/// @spec TUI-RUN-038, TUI-RUN-039
-enum WakeOutcome {
-    Opened(Box<App>),
-    ShutDown(std::io::Result<()>),
 }
 
 /// Drive a load's catch-up to completion behind the waking screen — polling
 /// without waiting out the frame budget (TUI-RUN-035), observing real time at
 /// the save's speed (TUI-RUN-036), taking no autosave (TUI-RUN-037) — until
-/// it finishes and the game opens, or a quit key or termination signal cuts
-/// it short. @spec TUI-RUN-033, TUI-RUN-034, TUI-RUN-038, TUI-RUN-039
+/// it finishes and the game opens (`Some`), or a quit key, a termination
+/// signal, or a lost terminal cuts it short: the catch-up is set down as it
+/// stands and saved once (`None`). @spec TUI-RUN-033, TUI-RUN-034,
+/// TUI-RUN-038, TUI-RUN-039, TUI-RUN-048, TUI-RUN-057
 fn run_wake<B: ratatui::backend::Backend>(
     catch_up: clowder_core::CatchUp,
-    save_path: std::path::PathBuf,
+    save_path: PathBuf,
     terminal: &mut ratatui::Terminal<B>,
-) -> std::io::Result<WakeOutcome> {
-    let mut wake = Wake::begin(catch_up, save_path, terminal)?;
+    input: &mut impl InputSource,
+    terminated: &dyn Fn() -> bool,
+    parting: &mut Vec<String>,
+) -> Option<Box<App>> {
+    let set_down = |w: Waking, parting: &mut Vec<String>| {
+        if let Err(e) = w.shut_down() {
+            parting.push(format!("clowder could not save on the way out: {e}"));
+        }
+    };
+    let mut wake = match Wake::begin(catch_up, save_path, terminal) {
+        Ok(wake) => wake,
+        Err(refused) => {
+            parting.push(format!("clowder stopped while waking: {}", refused.error));
+            set_down(refused.waking, parting);
+            return None;
+        }
+    };
     let mut last_mono = Instant::now();
     let mut last_wall = std::time::SystemTime::now();
     loop {
         let w = match wake {
-            Wake::Awake(app) => return Ok(WakeOutcome::Opened(Box::new(app))),
+            Wake::Awake(app) => return Some(Box::new(app)),
             Wake::Waking(w) => w,
         };
         // A termination signal mid-wake answers exactly as a quit key does:
         // set the catch-up down and save promptly. @spec TUI-RUN-039
-        if term::termination_requested() {
-            return Ok(WakeOutcome::ShutDown(w.shut_down()));
+        if terminated() {
+            set_down(w, parting);
+            return None;
         }
 
         let now_mono = Instant::now();
@@ -379,24 +447,29 @@ fn run_wake<B: ratatui::backend::Backend>(
         last_mono = now_mono;
         last_wall = now_wall;
 
-        // TUI-RUN-035: no waiting while waking — poll once, without the
-        // frame budget's timeout, and move on.
-        let mut input = Vec::new();
-        while input.len() < App::MAX_INPUT_EVENTS_PER_FRAME {
-            match crossterm::event::poll(w.poll_timeout()) {
-                Ok(true) => match crossterm::event::read() {
-                    Ok(ev) => input.push(ev),
-                    Err(_) => break,
-                },
-                _ => break,
+        // TUI-RUN-035: no waiting out the frame budget while waking — every
+        // wait is the briefest.
+        let events = match take_input(input, w.poll_timeout()) {
+            Ok(events) => events,
+            Err(e) => {
+                // @spec TUI-RUN-048
+                parting.push(format!("clowder lost its input: {e}"));
+                set_down(w, parting);
+                return None;
             }
-        }
+        };
 
-        match w.step(terminal, reading, &input)? {
-            Wake::Waking(next) if next.quitting => {
-                return Ok(WakeOutcome::ShutDown(next.shut_down()));
+        match w.step(terminal, reading, &events) {
+            Ok(Wake::Waking(next)) if next.quitting => {
+                set_down(next, parting);
+                return None;
             }
-            next => wake = next,
+            Ok(next) => wake = next,
+            Err(refused) => {
+                parting.push(format!("clowder stopped while waking: {}", refused.error));
+                set_down(refused.waking, parting);
+                return None;
+            }
         }
     }
 }
