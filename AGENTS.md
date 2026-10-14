@@ -4,20 +4,20 @@ Project instructions for coding agents working in this repository. The file is n
 
 ## Repository Purpose
 
-**Clowder** is a cozy terminal incremental game about raising a thriving clowder of kittens — Rust + ratatui, played entirely from the keyboard, at home inside a tmux pane. It is loosely inspired by Kittens Game, with every grim mechanic (starvation, sacrifice) redesigned as something playful. Nothing in Clowder ever dies and nothing is ever sacrificed.
+**Clowder** is a cozy terminal incremental game about raising a thriving clowder of kittens — Rust + ratatui, fully playable from the keyboard, with the mouse to move around, at home inside a tmux pane. It is loosely inspired by Kittens Game, with every grim mechanic (starvation, sacrifice) redesigned as something playful. Nothing in Clowder ever dies and nothing is ever sacrificed.
 
 ## Structure
 
 - `docs/high-level-design.md` — the HLD: game vision, architecture, tenets
 - `docs/intent/` — design tree: one folder per component, each holding its `{node}-design.md` and `{node}-specs.md`
 - `crates/clowder-core/` — deterministic, headless simulation library (game rules, tick, content tables, save/load)
-- `crates/clowder-tui/` — ratatui binary: screens, input mapping, truecolor theme (next segment; not yet built)
+- `crates/clowder-tui/` — ratatui binary: screens, input mapping, truecolor theme 
 
 The two-crate split is load-bearing: `clowder-core` never touches the terminal, and all game-balance tests run headless via `cargo test -p clowder-core`.
 
 ## Spoiler Policy
 
-Jess (the player-owner) wants to **discover the game's content by playing it**. Agents build this project autonomously through the LID workflow and must not reveal game content in conversation: no resource, structure, job, research, or event names; no balance numbers; no flavor text. Status updates stay structural — system counts, test results, file paths. Check in with Jess only on preference-affecting, non-spoiler aspects (pacing, scope, risk). Phase-boundary reviews resolve against the HLD's ratified tenets (cozy > idle-respect > whimsy-with-clarity) rather than user review; this standing override was granted explicitly, drift risk acknowledged. The override extends to gaps in a ratified LLD: where an LLD leaves a detail open that its specs need pinned, agents pin it in that LLD, resolved against the same tenets, because Jess wants to be surprised by what the game becomes rather than consulted on it. It does not extend to changing what a feature is, or to anything that crosses a segment boundary; those still stop for Jess. Everything under `docs/intent/` and `crates/` is spoiler territory for Jess until she has played past it.
+Jess (the player-owner) wants to **discover the game's content by playing it**. Agents build this project autonomously through the LID workflow and must not reveal game content in conversation: no resource, structure, job, research, or event names; no balance numbers; no flavor text. Status updates stay structural — system counts, test results, file paths. Check in with Jess only on preference-affecting, non-spoiler aspects (pacing, scope, risk). Phase-boundary reviews resolve against the HLD's ratified tenets (cozy > idle-respect > whimsy-with-clarity) rather than user review; this standing override was granted explicitly, drift risk acknowledged. The override extends to gaps in a ratified LLD: where an LLD leaves a detail open that its specs need pinned, agents pin it in that LLD, resolved against the same tenets, because Jess wants to be surprised by what the game becomes rather than consulted on it. It does not extend to changing what a feature is, or to anything that crosses a segment boundary; those still stop for Jess. A fix for a bug Jess has reported may cross segment boundaries without a separate ask; the agent says which segments it touched when it reports the fix. Changing what a feature is, and any change to the HLD, still stop for Jess. Everything under `docs/intent/` and `crates/` is spoiler territory for Jess until she has played past it.
 
 ## Conventions
 
