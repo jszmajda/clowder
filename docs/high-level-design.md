@@ -4,7 +4,7 @@
 
 Incremental games are good company for people who live in a terminal: they reward patience, run for weeks, and want to be glanced at between tasks rather than stared at. But the genre's classics are browser-native — they demand a browser tab, a mouse, and a context switch away from the terminal where the player already spends the day. And the genre's high-water mark for depth, Kittens Game, undercuts its own cuteness: kittens starve to death, unicorns are sacrificed, corruption spreads.
 
-There is no terminal-native incremental game with Kittens-Game-scale depth and a genuinely warm heart. Clowder is that game: a Rust + ratatui incremental that lives in a tmux pane, is played entirely from the keyboard, and is about raising a thriving clowder of kittens — where nothing ever dies and nothing is ever sacrificed.
+There is no terminal-native incremental game with Kittens-Game-scale depth and a genuinely warm heart. Clowder is that game: a Rust + ratatui incremental that lives in a tmux pane, is fully playable from the keyboard, and is about raising a thriving clowder of kittens — where nothing ever dies and nothing is ever sacrificed.
 
 ## Approach
 
@@ -53,7 +53,7 @@ People who live in a terminal — developers who keep a tmux session running for
 
 ## Non-Goals
 
-- **No mouse support.** The keyboard is the interface; mouse events are ignored.
+- **No acting by mouse.** The keyboard is the complete interface, and nothing ever needs the mouse. The mouse only moves around: a click puts the cursor on a tab or a row, and the wheel scrolls. A click never acts, because tmux passes the click that focuses a pane on to the program inside it.
 - **No multiplayer, server, accounts, or telemetry.** The game is a local, single-player artifact.
 - **No second frontend.** `clowder-core` stays frontend-agnostic on principle, but this project ships exactly one UI: the TUI.
 - **No mod or plugin system.** Content is compiled in.
@@ -73,7 +73,7 @@ Ordered: when two conflict, the higher one wins.
 ```mermaid
 flowchart LR
     subgraph tui["clowder-tui (binary)"]
-        Input["Input mapper<br/>(tmux-safe keys)"]
+        Input["Input mapper<br/>(tmux-safe keys, pointer)"]
         Screens["Screens & widgets"]
         Theme["Truecolor theme"]
         Autosave["Autosave timer"]
@@ -106,7 +106,7 @@ Major components, each a candidate leaf LLD in `docs/intent/` as work reaches it
 2. **Fixed-timestep deterministic ticks; wall-clock only at the boundary.** The sim advances in discrete ticks; the shell decides when ticks happen. Offline progress replays ticks through the same code path rather than a separate estimator, so live and away play can never disagree. Alternative — closed-form catch-up formulas — rejected as shadow math that drifts from the real rules.
 3. **Content as typed Rust tables.** Buildings, jobs, upgrades, and resources are `const`/`static` structures in `clowder-core`. Alternative — RON/TOML data files — buys mod-ability and no-recompile tweaking at the cost of a loader, schema validation, and losing compiler-checked refactors. With no mod system planned (non-goal), the type checker wins.
 4. **Truecolor-only theme.** The palette is designed once, in 24-bit color, for terminals that support it. Alternative — adaptive 256-color fallback — doubles the design and test surface for terminals the target user doesn't use.
-5. **tmux-first keyboard model.** All bindings are plain printable keys, Tab, and arrows. No Ctrl chords (Ctrl-B is the tmux prefix; other Ctrl keys collide with terminal conventions — only Ctrl-C is honored, as emergency quit), no Alt/Meta (ambiguous Esc-prefix encoding under tmux `escape-time`), no function keys (terminfo variance). Single-key mnemonics per screen, with a persistent hint bar so bindings are discoverable without a manual.
+5. **tmux-first keyboard model.** All bindings are plain printable keys, Tab, and arrows. No Ctrl chords (Ctrl-B is the tmux prefix; other Ctrl keys collide with terminal conventions — only Ctrl-C is honored, as emergency quit), no Alt/Meta (ambiguous Esc-prefix encoding under tmux `escape-time`), no function keys (terminfo variance). Single-key mnemonics per screen, with a persistent hint bar so bindings are discoverable without a manual. The mouse uses the left button and the wheel only — no drags, no modifier-clicks, no right or middle button — leaving those to tmux and the terminal.
 6. **Human-readable versioned saves.** Saves serialize via serde to a human-readable format carrying a schema version, in the platform data directory. Alternative — compact binary — saves bytes nobody is counting and costs debuggability and hand-rescue of a broken save.
 7. **Speed as saved state, not a UI setting.** The game-speed multiplier lives in the game state and scales offline catch-up identically to live play. Alternative — a shell-side playback setting — would make attended fast-play strictly better than absence, quietly breaking the idle-respect tenet.
 
