@@ -1692,6 +1692,72 @@ fn each_wheel_step_over_the_journal_scrolls_it_one_line_within_its_bounds() {
     }
 }
 
+/// While the Journal is open, ↓/j and ↑/k move it exactly as a wheel step
+/// down and up does, from every scroll and at both bounds, and [ and ] take it
+/// to its top and its foot; no key ends the arming beneath or retires the
+/// banner. Quantified over every supported size.
+///
+/// @spec TUI-NAV-134
+#[test]
+fn each_journal_key_scrolls_it_as_the_wheel_does() {
+    use clowder_tui::nav::{journal_key, Action};
+    let state = mid_game();
+    let (section, heavy) = heavy_rows(&state).remove(0);
+    for size in SIZES {
+        let mut base = armed_on(&with_banner(&standing_in(&state, section)), section, &heavy);
+        base.overlay = Some(Overlay::Journal { anchor: 0 });
+        let shot = shoot(&state, &base, size);
+        let max = shot.record.journal_max_scroll().expect("fixture: the Journal overflows");
+        let region = body_rect(&shot.layout);
+        let anchor = |v: &ViewState| match v.overlay {
+            Some(Overlay::Journal { anchor }) => anchor,
+            ref other => panic!("the Journal closed under a key: {other:?}"),
+        };
+        for at in 0..=max {
+            let mut view = base.clone();
+            view.overlay = Some(Overlay::Journal { anchor: at });
+            let shot = shoot(&state, &view, size);
+            for (action, wheel) in [(Action::CursorDown, true), (Action::CursorUp, false)] {
+                let mut by_key = view.clone();
+                assert!(journal_key(&action, &mut by_key, Some(&shot.record)), "{action:?} was not the Journal's");
+                let mut by_wheel = view.clone();
+                let (x, y) = (region.x, region.y);
+                point(if wheel { wheel_down(x, y) } else { wheel_up(x, y) }, &mut by_wheel, &state, &shot);
+                assert_eq!(anchor(&by_key), anchor(&by_wheel), "at {size:?} from {at}, {action:?} and the wheel disagree");
+                assert_eq!(by_key.armed, view.armed, "at {size:?} {action:?} in the Journal ended the arming");
+                assert_eq!(by_key.reports, view.reports, "at {size:?} {action:?} in the Journal retired the banner");
+            }
+            for (action, want) in [(Action::GroupPrev, 0), (Action::GroupNext, max)] {
+                let mut v = view.clone();
+                assert!(journal_key(&action, &mut v, Some(&shot.record)));
+                assert_eq!(anchor(&v), want, "at {size:?} from {at}, {action:?} went to {} rather than {want}", anchor(&v));
+                assert_eq!(v.armed, view.armed);
+                assert_eq!(v.reports, view.reports);
+            }
+        }
+    }
+}
+
+/// The Journal's keys belong to it alone: with help open, or no overlay, they
+/// are not taken here and the view is left as it stood.
+///
+/// @spec TUI-NAV-134
+#[test]
+fn journal_keys_are_not_taken_without_an_open_journal() {
+    use clowder_tui::nav::{journal_key, Action};
+    let state = mid_game();
+    for overlay in [None, Some(Overlay::Help)] {
+        let mut view = with_banner(&standing_in(&state, Section::Meadow));
+        view.overlay = overlay.clone();
+        let shot = shoot(&state, &view, (100, 30));
+        for action in [Action::CursorDown, Action::CursorUp, Action::GroupPrev, Action::GroupNext] {
+            let mut v = view.clone();
+            assert!(!journal_key(&action, &mut v, Some(&shot.record)), "{action:?} was taken under {overlay:?}");
+            assert_eq!(whole(&v), whole(&view), "{action:?} changed the view under {overlay:?}");
+        }
+    }
+}
+
 /// While the Journal or help is open, every press does nothing — on the
 /// overlay and on the tab bar beside it alike — and so does every step over
 /// anything but the Journal, and every step under help.

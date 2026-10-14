@@ -586,6 +586,12 @@ impl App {
                         crate::nav::toggle_inspector(&mut self.view, narrow_on_screen, pane_on_screen);
                         continue;
                     }
+                    // The Journal's own scrolling by key stops where the last
+                    // frame drew its last line, which only that frame's record
+                    // holds. @spec TUI-NAV-134
+                    if crate::nav::journal_key(&action, &mut self.view, self.pointer_record.as_ref()) {
+                        continue;
+                    }
                     match crate::nav::update(action, &mut self.view, &self.state) {
                         crate::nav::Outcome::Handled => {}
                         crate::nav::Outcome::Quit => self.quitting = true,

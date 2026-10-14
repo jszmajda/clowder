@@ -388,6 +388,45 @@ fn still() -> Reading {
     Reading { monotonic: Duration::ZERO, wall: Duration::ZERO }
 }
 
+/// In play, the keys scroll an open Journal within the frame the loop drew:
+/// `j` one line down, `]` to its foot and no further, `k` one line back, `[` to
+/// its top — the bound being the last frame's record, which only the loop holds.
+/// @spec TUI-NAV-134
+#[test]
+fn the_keys_scroll_an_open_journal_in_play() {
+    use clowder_core::{Event, StructureId};
+    use clowder_tui::nav::Overlay;
+    use crossterm::event::KeyCode;
+    let mut term = Terminal::new(TestBackend::new(100, 30)).unwrap();
+    let mut a = app(scratch("journal-keys"));
+    for i in 0..90u64 {
+        let id = StructureId::ALL[i as usize % StructureId::ALL.len()];
+        a.state.journal.record(2_000 + i, &Event::StructureBuilt { id, count: 2 });
+    }
+    let anchor = |a: &App| match a.view.overlay {
+        Some(Overlay::Journal { anchor }) => anchor,
+        ref other => panic!("the Journal is not open: {other:?}"),
+    };
+    a.step(&mut term, still(), &[key(KeyCode::Char('e'))]).unwrap();
+    assert_eq!(anchor(&a), 0, "the Journal opens at its top");
+    let max = a.pointer_record.as_ref().and_then(|r| r.journal_max_scroll()).expect("fixture: the Journal overflows");
+    assert!(max >= 2, "fixture: the Journal scrolls a few lines");
+
+    for (press, want) in [
+        (KeyCode::Char('j'), 1),
+        (KeyCode::Down, 2),
+        (KeyCode::Char(']'), max),
+        (KeyCode::Char('j'), max),
+        (KeyCode::Char('k'), max - 1),
+        (KeyCode::Up, max - 2),
+        (KeyCode::Char('['), 0),
+        (KeyCode::Char('k'), 0),
+    ] {
+        a.step(&mut term, still(), &[key(press)]).unwrap();
+        assert_eq!(anchor(&a), want, "{press:?} left the Journal at {} rather than {want}", anchor(&a));
+    }
+}
+
 /// An app focused on the nap row, armed by a real Enter through the loop.
 fn armed_on_the_nap(name: &str) -> (App, Terminal<TestBackend>) {
     use clowder_tui::nav::Section;

@@ -10,10 +10,33 @@
 use clowder_core::GameState;
 use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 
+use super::action::Action;
 use super::rows::{cursor_index, drawn_rows, has_tab};
 use super::update::{enter_section, guard_after_field, move_cursor, Outcome};
 use super::view::{Overlay, ViewState};
 use crate::render::pointer::PointerRecord;
+
+/// The open Journal's own scrolling by key: `↓`/`j` and `↑`/`k` one line, as a
+/// wheel step moves it, `[` to its top and `]` to its foot, never past where
+/// the last frame drew its last line — so the keys reach every line the wheel
+/// does. True where the Journal is open and `action` is one of those keys,
+/// whether or not it moved; such a key ends no arming and leaves the banner
+/// showing. @spec TUI-NAV-134
+pub fn journal_key(action: &Action, view: &mut ViewState, record: Option<&PointerRecord>) -> bool {
+    let Some(Overlay::Journal { anchor }) = view.overlay else {
+        return false;
+    };
+    let max = record.and_then(PointerRecord::journal_max_scroll).unwrap_or(0);
+    let next = match action {
+        Action::CursorDown => (anchor + 1).min(max),
+        Action::CursorUp => anchor.saturating_sub(1),
+        Action::GroupPrev => 0,
+        Action::GroupNext => max,
+        _ => return false,
+    };
+    view.overlay = Some(Overlay::Journal { anchor: next });
+    true
+}
 
 /// Resolve one mouse event against `record`, the last frame drawn, at the
 /// terminal's `present_size`. Always `Handled`: nothing here reaches the core.
