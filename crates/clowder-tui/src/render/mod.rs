@@ -16,7 +16,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
-use crate::nav::rows::{rows, Row, RowKey, RowKind};
+use crate::nav::rows::{Row, RowKey, RowKind};
 use crate::nav::{ArmedRow, CountPrompt, Overlay, Section, ViewState};
 use crate::theme::{self, Role};
 
@@ -430,11 +430,12 @@ fn draw_list(
     area: Rect,
     state: &GameState,
     section: Section,
-    cursor_key: Option<&RowKey>,
-    prompt: Option<&CountPrompt>,
-    armed: Option<&ArmedRow>,
+    view: &ViewState,
 ) {
-    let all = rows(state, section);
+    let cursor_key = view.focus.get(section.index()).and_then(|k| k.as_ref());
+    let prompt = view.prompt.as_ref();
+    let armed = view.armed.as_ref();
+    let all = crate::nav::rows::drawn_rows(state, section, view);
     // The list never highlights a header: where the remembered row has left
     // the list, it falls back to the first selectable row, never index 0
     // outright. @spec TUI-NAV-032, TUI-NAV-099
@@ -457,6 +458,14 @@ fn draw_list(
     for (i, row) in all.iter().enumerate().skip(win.start).take(win.len) {
         let focused = i == cursor && row.selectable();
         let on_this_row = prompt.filter(|_| prompt_key == Some(&row.key));
+        if crate::nav::rows::is_done_header(row) {
+            // @spec TUI-NAV-111
+            lines.push(Line::from(Span::styled(
+                fmt::done_header_line(crate::nav::rows::done_count(state), view.done_open, area.width as usize),
+                style_for(Role::Dim),
+            )));
+            continue;
+        }
         lines.push(row_line(state, row, focused, area.width as usize, section, on_this_row));
         // The row an arming holds expands in place, on the lines directly
         // beneath it — never anywhere else, and only while the arming still
@@ -814,7 +823,6 @@ pub fn frame(
     }
 
     let section = view.section.unwrap_or(DEFAULT_SECTION);
-    let cursor_key = view.focus.get(section.index()).and_then(|k| k.as_ref());
 
     // Each region is drawn by the widget that owns it. This function composes;
     // it decides nothing about what any region contains.
@@ -857,14 +865,14 @@ pub fn frame(
                 if view.inspector_wanted {
                     widgets::inspector::draw(f, space, state, view);
                 } else {
-                    draw_list(f, space, state, section, cursor_key, view.prompt.as_ref(), view.armed.as_ref());
+                    draw_list(f, space, state, section, view);
                 }
                 draw_dividers(f, &[main.x], main.y, main.height, state.season());
             }
             Body::Wide { sidebar, list, inspector } => {
                 widgets::chrome::sidebar(f, sidebar, state);
                 let space = left_between_dividers(list);
-                draw_list(f, space, state, section, cursor_key, view.prompt.as_ref(), view.armed.as_ref());
+                draw_list(f, space, state, section, view);
                 // TUI-NAV-035's count-prompt substitution belongs to the
                 // narrow-mode swap alone — "while the inspector holds the
                 // list's space" — so the persistent pane never loses its next

@@ -1184,10 +1184,32 @@ fn an_armed_rows_expansion_keeps_attention_on_what_is_drawn_and_nothing_else_tak
     let widths: [u16; 2] = [80, 150];
     let heights: [u16; 5] = [24, 25, 31, 40, tall(&state).1];
 
+    // The same rules armed in the meadow with nothing on its Ideas screen
+    // done: with no done group at the list's foot (TUI-NAV-110), the last rule
+    // is the list's end, so its expansion can fall wholly out of view.
+    let mut nothing_done = state.clone();
+    nothing_done.ideas = BTreeSet::new();
+    nothing_done.refinements = BTreeSet::new();
+    nothing_done.rules = BTreeSet::new();
+    let rule_armings: Vec<(String, ViewState)> = RuleId::ALL
+        .into_iter()
+        .map(|rule| {
+            (
+                format!("AdoptRule({rule:?}), nothing on the Ideas screen done"),
+                armed_by_enter(&nothing_done, Section::Ideas, &rule_key(&nothing_done, rule)),
+            )
+        })
+        .collect();
+    let sweep: Vec<(&GameState, (String, ViewState))> = every_arming(&state)
+        .into_iter()
+        .map(|a| (&state, a))
+        .chain(rule_armings.into_iter().map(|a| (&nothing_done, a)))
+        .collect();
+
     let (mut whole, mut part, mut none) = (0usize, 0usize, 0usize);
-    for (name, mut view) in every_arming(&state) {
+    for (st, (name, mut view)) in sweep {
         view.armed.as_mut().expect("armed").expires_at = Instant::now() + Duration::from_secs(3600);
-        let full_len = expansion(&state, &view, tall(&state)).len();
+        let full_len = expansion(st, &view, tall(st)).len();
 
         // The list, and in a wide frame the inspector pane beside it.
         let mut frames: Vec<((u16, u16), bool)> = Vec::new();
@@ -1205,8 +1227,8 @@ fn an_armed_rows_expansion_keeps_attention_on_what_is_drawn_and_nothing_else_tak
             // drawn over an arming made fresh for it.
             let mut view = ViewState { inspector_wanted: swap, ..view.clone() };
             view.armed.as_mut().expect("armed").expires_at = Instant::now() + Duration::from_secs(3600);
-            let armed = draw(&state, &view, size);
-            let plain = draw(&state, &unarmed(&view), size);
+            let armed = draw(st, &view, size);
+            let plain = draw(st, &unarmed(&view), size);
             let what = format!("the armed {name} row at {size:?} (swap {swap})");
 
             // Where the expansion is drawn: beneath the row in the list, or

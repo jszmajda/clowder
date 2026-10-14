@@ -1313,6 +1313,12 @@ fn a_letter_acts_exactly_where_it_is_a_live_mnemonic_and_is_silent_everywhere_el
         for (section, focus) in mnemonic_contexts(&state) {
             let live = live_mnemonics(&state, section, focus.as_ref());
             for c in (' '..='~').filter(|c| !GLOBAL_PRINTABLES.contains(*c)) {
+                // On the Ideas screen `d` is the done key, which TUI-NAV-046
+                // names as one of the two letters a screen binds that are not
+                // mnemonics; its own tests (TUI-NAV-115) cover it there.
+                if c == 'd' && section == Section::Ideas {
+                    continue;
+                }
                 let before = mnemonic_view(section, focus.clone());
                 let mut view = before.clone();
                 let out = press_char(c, &mut view, &state);
@@ -2418,6 +2424,9 @@ fn x_opens_the_count_prompt_on_exactly_the_rows_that_take_a_count() {
 
     for (section, row) in every_row(&state) {
         let mut view = focused(section, row.key.clone());
+        // A finished Ideas row is reached only through the open done group
+        // (TUI-NAV-113).
+        unfold_focus(&state, &mut view);
         let out = update(Action::CountPrompt, &mut view, &state);
         assert_eq!(
             commands_of(&out),
@@ -3059,6 +3068,9 @@ fn x_and_x_max_say_why_on_every_row_they_do_not_act_on() {
             }
             for action in [Action::Activate, Action::CountPrompt, Action::MaxAffordable] {
                 let mut view = focused(section, row.key.clone());
+                // A finished Ideas row is reached only through the open done group
+                // (TUI-NAV-113).
+                unfold_focus(&state, &mut view);
                 let out = update(action.clone(), &mut view, &state);
                 assert_eq!(
                     commands_of(&out),
@@ -3084,6 +3096,9 @@ fn x_and_x_max_say_why_on_every_row_they_do_not_act_on() {
 
         if nothing_to_count {
             let mut view = focused(section, row.key.clone());
+            // A finished Ideas row is reached only through the open done group
+            // (TUI-NAV-113).
+            unfold_focus(&state, &mut view);
             let out = update(Action::CountPrompt, &mut view, &state);
             assert_eq!(commands_of(&out), None, "x on {what}, which has nothing to count, acted");
             assert!(view.prompt.is_none(), "x on {what} opened a count prompt");
@@ -3093,6 +3108,9 @@ fn x_and_x_max_say_why_on_every_row_they_do_not_act_on() {
         }
 
         let mut view = focused(section, row.key.clone());
+        // A finished Ideas row is reached only through the open done group
+        // (TUI-NAV-113).
+        unfold_focus(&state, &mut view);
         let out = update(Action::MaxAffordable, &mut view, &state);
         if row.heavy {
             if nothing_to_count {
@@ -4410,4 +4428,1244 @@ fn slash_opens_the_palette_only_where_no_prompt_or_overlay_is_open() {
         Some("/"),
         "/ inside the palette must be a character of the query, not a re-open"
     );
+}
+
+// ---------------------------------------------------------------------------
+// The done group (Ideas) — TUI-NAV-112, TUI-NAV-113, TUI-NAV-115, TUI-NAV-116,
+// TUI-NAV-117, TUI-NAV-118, TUI-NAV-119, TUI-NAV-120, TUI-NAV-121, TUI-NAV-123
+//
+// The fold is the shell's own view state, read here only through what it
+// changes: `drawn_rows`, the rows the list draws and the cursor visits. A row
+// is finished exactly where the core's lock reason names its item already the
+// player's (TUI-NAV-110), and nothing else here decides it.
+//
+// Where a claim turns on a command the core accepts — a row finishing under
+// the cursor — it is driven through a real `App::step`, so wherever the shell
+// settles the cursor after a command (in the reducer, or in the frame's own
+// per-frame pass) is what is observed. No time passes in a step unless a test
+// says so.
+// ---------------------------------------------------------------------------
+
+use clowder_tui::nav::rows::drawn_rows;
+use clowder_tui::runtime::clock::Reading;
+use clowder_tui::runtime::{App, TickAccumulator};
+use crossterm::event::Event;
+use ratatui::backend::TestBackend;
+use ratatui::Terminal;
+
+/// Whether the core names `row`'s item already the player's.
+fn finished(state: &GameState, row: &Row) -> bool {
+    owned(state, row)
+}
+
+/// Whether the core would take `row`'s item right now: it reports no lock
+/// reason at all.
+fn actionable(state: &GameState, row: &Row) -> bool {
+    match &row.key {
+        RowKey::Content(id, _) => state.lock_reason(*id).is_none(),
+        _ => false,
+    }
+}
+
+/// The Ideas section's rows as the list draws them under `view`'s fold.
+fn drawn(state: &GameState, view: &ViewState) -> Vec<Row> {
+    drawn_rows(state, Section::Ideas, view)
+}
+
+/// The drawn Ideas rows the cursor can land on, in order.
+fn drawn_selectable(state: &GameState, view: &ViewState) -> Vec<RowKey> {
+    drawn(state, view).into_iter().filter(|r| r.selectable()).map(|r| r.key).collect()
+}
+
+/// Whether the done group is drawn open: some finished row is drawn.
+fn is_open(state: &GameState, view: &ViewState) -> bool {
+    drawn(state, view).iter().any(|r| finished(state, r))
+}
+
+/// The cursor's remembered row on the Ideas screen.
+fn ideas_cursor(view: &ViewState) -> Option<RowKey> {
+    view.focus[Section::Ideas.index()].clone()
+}
+
+/// A pause long enough that the next press is a distinct one, by any reading
+/// of TUI-NAV-051's gate.
+fn gap() {
+    std::thread::sleep(Duration::from_millis(250));
+}
+
+/// `d` pressed, then the repeat clock cleared, so an Enter right after it in
+/// the same test is a distinct press of its own.
+fn press_d(view: &mut ViewState, state: &GameState) -> Outcome {
+    let out = press_char('d', view, state);
+    view.last_repeat = None;
+    out
+}
+
+/// Where `view`'s focused row is listed but folded into the done group, open
+/// the group by its key, keeping the focus on that row — the one way a player
+/// reaches such a row (TUI-NAV-113).
+fn unfold_focus(state: &GameState, view: &mut ViewState) {
+    let Some(section) = view.section else { return };
+    let Some(key) = view.focus[section.index()].clone() else { return };
+    if drawn_rows(state, section, view).iter().any(|r| r.key == key)
+        || !rows(state, section).iter().any(|r| r.key == key)
+    {
+        return;
+    }
+    press_d(view, state);
+    view.focus[section.index()] = Some(key);
+}
+
+/// A sitting opened on `state` and then the Ideas screen entered by its digit.
+fn in_ideas(state: &GameState) -> ViewState {
+    let mut v = ViewState::default();
+    clowder_tui::nav::opening(&mut v, state);
+    press_char('3', &mut v, state);
+    v
+}
+
+/// The Ideas section's three kinds, in the order its groups stand.
+fn ideas_rank(row: &Row) -> usize {
+    match &row.key {
+        RowKey::Content(ContentId::Idea(_), _) => 0,
+        RowKey::Content(ContentId::Refinement(_), _) => 1,
+        RowKey::Content(ContentId::Rule(_), _) => 2,
+        other => panic!("{other:?} is not an Ideas row"),
+    }
+}
+
+/// A row's place in the Ideas section's list: the place it holds in its own
+/// kind's group — its kind's rank, then the order the core lists that kind.
+fn ideas_place(key: &RowKey) -> (usize, usize) {
+    fn at<T: PartialEq>(all: &[T], x: &T) -> usize {
+        all.iter().position(|y| y == x).expect("in its kind's table")
+    }
+    match key {
+        RowKey::Content(ContentId::Idea(i), _) => (0, at(&IdeaId::ALL, i)),
+        RowKey::Content(ContentId::Refinement(r), _) => (1, at(&clowder_core::RefinementId::ALL, r)),
+        RowKey::Content(ContentId::Rule(r), _) => (2, at(&RuleId::ALL, r)),
+        other => panic!("{other:?} is not an Ideas row"),
+    }
+}
+
+/// The row that closes up into `gone`'s place in `after`'s drawn list: the
+/// first drawn row following that place, else the last drawn row before it,
+/// else none (TUI-NAV-117).
+fn closes_up(after: &[RowKey], gone: &RowKey) -> Option<RowKey> {
+    let p = ideas_place(gone);
+    after
+        .iter()
+        .find(|k| ideas_place(k) > p)
+        .or_else(|| after.iter().rev().find(|k| ideas_place(k) < p))
+        .cloned()
+}
+
+/// Where TUI-NAV-032 lands a cursor among `drawn`: the first row whose item
+/// the core reports Available, else the first row.
+fn landing_among(state: &GameState, drawn: &[RowKey]) -> Option<RowKey> {
+    drawn
+        .iter()
+        .find(|k| match k {
+            RowKey::Content(id, _) => {
+                state.availability(*id) == Availability::Available
+                    && state.lock_reason(*id) != Some(LockReason::AlreadyYours)
+            }
+            _ => false,
+        })
+        .or_else(|| drawn.first())
+        .cloned()
+}
+
+/// Make `row`'s item the player's, directly.
+fn finish(state: &mut GameState, row: &Row) {
+    match &row.key {
+        RowKey::Content(ContentId::Idea(i), _) => {
+            state.ideas.insert(*i);
+        }
+        RowKey::Content(ContentId::Refinement(r), _) => {
+            state.refinements.insert(*r);
+        }
+        RowKey::Content(ContentId::Rule(r), _) => {
+            state.rules.insert(*r);
+        }
+        other => panic!("{other:?} is not an Ideas row"),
+    }
+}
+
+/// The footer note a row key leaves where there is no row to act on
+/// (TUI-NAV-085), read from a focused section that lists nothing.
+fn nothing_to_act_on_note() -> String {
+    let state = sky_emptied();
+    let (_, mut v) = standing_in_an_empty_sky().remove(0);
+    press(key(KeyCode::Enter), &mut v, &state);
+    footer_text(&v).expect("fixture: Enter in an emptied section leaves a note")
+}
+
+/// A meadow mid-game: the open meadow with every other idea that no other idea
+/// needs left unresearched, every other refinement on offer bought, and one
+/// rule adopted from each of two of the four pairs — so each of the Ideas
+/// section's three kinds lists several rows finished and several not, the
+/// unfinished ones the core would take at once.
+fn mid_game() -> GameState {
+    use clowder_core::content::{idea_def, refinement_def, rule_def};
+    use clowder_core::RefinementId;
+    let mut s = rich();
+    let leaves: Vec<IdeaId> = IdeaId::ALL
+        .iter()
+        .copied()
+        .filter(|i| !IdeaId::ALL.iter().any(|j| idea_def(*j).prereqs.contains(i)))
+        .collect();
+    for (n, i) in leaves.iter().enumerate() {
+        if n % 2 == 0 {
+            s.ideas.remove(i);
+        }
+    }
+    let mut n = 0;
+    for r in RefinementId::ALL {
+        if s.ideas.contains(&refinement_def(r).gate) {
+            if n % 2 == 0 {
+                s.refinements.insert(r);
+            }
+            n += 1;
+        }
+    }
+    let mut paired: Vec<RuleId> = Vec::new();
+    let mut pair = 0;
+    for r in RuleId::ALL {
+        if paired.contains(&r) {
+            continue;
+        }
+        paired.push(r);
+        paired.push(rule_def(r).blocks);
+        if pair % 2 == 0 {
+            s.rules.insert(r);
+        }
+        pair += 1;
+    }
+    let list = rows(&s, Section::Ideas);
+    for rank in 0..3 {
+        let of_kind: Vec<&Row> = list.iter().filter(|r| r.selectable() && ideas_rank(r) == rank).collect();
+        let done = of_kind.iter().filter(|r| finished(&s, r)).count();
+        let ready = of_kind.iter().filter(|r| actionable(&s, r)).count();
+        assert!(
+            done >= 2 && ready >= 2,
+            "fixture: mid-game, Ideas kind {rank} lists {done} finished and {ready} ready rows; \
+             several of each are needed"
+        );
+    }
+    s
+}
+
+/// The open meadow with every idea researched, every refinement bought, and
+/// one rule of every pair adopted: every row the Ideas section lists is
+/// finished.
+fn all_ideas_done() -> GameState {
+    use clowder_core::content::rule_def;
+    let mut s = rich();
+    s.refinements = clowder_core::RefinementId::ALL.iter().copied().collect();
+    let mut paired: Vec<RuleId> = Vec::new();
+    for r in RuleId::ALL {
+        if !paired.contains(&r) {
+            paired.push(r);
+            paired.push(rule_def(r).blocks);
+            s.rules.insert(r);
+        }
+    }
+    let list = rows(&s, Section::Ideas);
+    assert!(list.iter().any(|r| r.selectable()), "fixture: the Ideas section lists rows");
+    assert!(
+        list.iter().filter(|r| r.selectable()).all(|r| finished(&s, r)),
+        "fixture: every row the Ideas section lists is finished"
+    );
+    s
+}
+
+/// The open meadow before anything on the Ideas screen is done: rows listed,
+/// none finished, so no done group is listed.
+fn no_ideas_done() -> GameState {
+    let mut s = rich();
+    s.ideas = BTreeSet::new();
+    s.refinements = BTreeSet::new();
+    s.rules = BTreeSet::new();
+    let list = rows(&s, Section::Ideas);
+    assert!(list.iter().any(|r| r.selectable()), "fixture: the Ideas section lists rows");
+    assert!(!list.iter().any(|r| finished(&s, r)), "fixture: no Ideas row is finished");
+    s
+}
+
+/// A unique save path under the build's own scratch directory.
+fn dg_scratch(name: &str) -> std::path::PathBuf {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join(format!("clowder-done-{}-{name}-{n}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir.join("save.json")
+}
+
+fn still() -> Reading {
+    Reading { monotonic: Duration::ZERO, wall: Duration::ZERO }
+}
+
+fn ev(code: KeyCode) -> Event {
+    Event::Key(KeyEvent::new(code, KeyModifiers::NONE))
+}
+
+fn ev_char(c: char) -> Event {
+    ev(KeyCode::Char(c))
+}
+
+fn step(a: &mut App, t: &mut Terminal<TestBackend>, input: &[Event]) {
+    a.step(t, still(), input).expect("a step against a TestBackend does not fail");
+}
+
+/// A session opened on `state` at a three-pane size, its first frame drawn,
+/// and the Ideas screen entered by its digit.
+fn ideas_session(state: GameState, name: &str) -> (App, Terminal<TestBackend>) {
+    let mut view = ViewState::default();
+    clowder_tui::nav::opening(&mut view, &state);
+    let mut a = App {
+        state,
+        view,
+        clock: TickAccumulator::default(),
+        save_path: dg_scratch(name),
+        last_save: Instant::now(),
+        prev_layout: None,
+        quitting: false,
+        save_failed: false,
+    };
+    let mut t = Terminal::new(TestBackend::new(130, 40)).expect("TestBackend is infallible");
+    step(&mut a, &mut t, &[]);
+    step(&mut a, &mut t, &[ev_char('3')]);
+    assert_eq!(a.view.section, Some(Section::Ideas), "fixture: 3 entered the Ideas screen");
+    (a, t)
+}
+
+/// `d` pressed in a session, then the repeat clock cleared.
+fn session_d(a: &mut App, t: &mut Terminal<TestBackend>) {
+    step(a, t, &[ev_char('d')]);
+    a.view.last_repeat = None;
+}
+
+// ---- TUI-NAV-112 -----------------------------------------------------------
+
+/// Every sitting opens with the done group folded — a new game and a load
+/// alike — and nothing of its state reaches the save: a save written with the
+/// group open loads as the same game a save written with it folded does, and
+/// a sitting opened from it starts folded again.
+///
+/// @spec TUI-NAV-112
+#[test]
+fn every_sitting_opens_with_the_done_group_folded_and_the_save_holds_nothing_of_it() {
+    let state = mid_game();
+    let loaded = clowder_core::load_string(&clowder_core::save_string(&state, 0), 0)
+        .expect("fixture: the meadow round-trips through a save")
+        .state;
+    for (label, s) in [("a new game", &state), ("a load", &loaded)] {
+        let v = in_ideas(s);
+        assert!(
+            rows(s, Section::Ideas).iter().any(|r| finished(s, r)),
+            "fixture: {label} lists finished Ideas rows"
+        );
+        assert!(!is_open(s, &v), "{label} opened with the done group open; every sitting opens it folded");
+    }
+
+    let (mut a, mut t) = ideas_session(state, "save");
+    let path = a.save_path.clone();
+    a.save().expect("fixture: the save is written");
+    let folded_save = std::fs::read_to_string(&path).expect("fixture: the save is read back");
+    session_d(&mut a, &mut t);
+    assert!(is_open(&a.state, &a.view), "d did not open the done group (TUI-NAV-115)");
+    a.save().expect("fixture: the save is written");
+    let open_save = std::fs::read_to_string(&path).expect("fixture: the save is read back");
+    let as_game = |text: &str| {
+        let g = clowder_core::load_string(text, 0).expect("the save loads").state;
+        clowder_core::save_string(&g, 0)
+    };
+    assert_eq!(
+        as_game(&open_save),
+        as_game(&folded_save),
+        "a save written with the done group open loads as a different game from one written with \
+         it folded; the shell saves nothing of the fold"
+    );
+    let reopened = clowder_core::load_string(&open_save, 0).expect("the save loads").state;
+    assert!(
+        !is_open(&reopened, &in_ideas(&reopened)),
+        "a sitting opened from a save written with the group open opened it open"
+    );
+}
+
+/// Within a sitting the group changes only on `d`: leaving the section and
+/// returning — by a section cycle or by digits — `Esc`, a resize, and the
+/// simulation advancing each leave it as it stands, open or folded.
+///
+/// @spec TUI-NAV-112
+#[test]
+fn within_a_sitting_the_done_group_stays_as_the_player_left_it() {
+    let (mut a, mut t) = ideas_session(mid_game(), "stays");
+    for want_open in [true, false] {
+        gap();
+        session_d(&mut a, &mut t);
+        assert_eq!(is_open(&a.state, &a.view), want_open, "d did not set the done group open={want_open} (TUI-NAV-115)");
+
+        let check = |a: &App, what: &str| {
+            assert_eq!(
+                is_open(&a.state, &a.view),
+                want_open,
+                "{what} changed the done group (it was open={want_open}); within a sitting only d, \
+                 the palette's jump, or the group leaving the list changes it"
+            );
+        };
+        step(&mut a, &mut t, &[ev(KeyCode::Tab)]);
+        check(&a, "a section cycle away");
+        step(&mut a, &mut t, &[ev_char('3')]);
+        check(&a, "returning by the section's digit");
+        step(&mut a, &mut t, &[ev_char('1'), ev_char('3')]);
+        check(&a, "leaving for home and returning");
+        step(&mut a, &mut t, &[ev(KeyCode::BackTab), ev(KeyCode::Tab)]);
+        check(&a, "a cycle back and forth");
+        step(&mut a, &mut t, &[ev(KeyCode::Esc)]);
+        check(&a, "Esc");
+        for (w, h) in [(80u16, 24u16), (99, 30), (200, 60), (60, 20), (130, 40)] {
+            t.backend_mut().resize(w, h);
+            step(&mut a, &mut t, &[Event::Resize(w, h)]);
+            check(&a, &format!("a resize to {w}x{h}"));
+        }
+        let ticks = a.state.ticks;
+        a.step(&mut t, Reading { monotonic: Duration::from_secs(3), wall: Duration::from_secs(3) }, &[])
+            .expect("a step against a TestBackend does not fail");
+        assert!(a.state.ticks > ticks, "fixture: the simulation advanced");
+        check(&a, "the simulation advancing");
+        assert_eq!(a.view.section, Some(Section::Ideas), "fixture: the sweep ends on the Ideas screen");
+    }
+}
+
+/// A done group that stops being listed — nothing on the Ideas screen
+/// finished, as after a Move — is folded when it is next listed, whether the
+/// player stood on the Ideas screen through the gap or elsewhere.
+///
+/// @spec TUI-NAV-112
+#[test]
+fn a_done_group_that_stops_being_listed_comes_back_folded() {
+    for stay in [true, false] {
+        let (mut a, mut t) = ideas_session(mid_game(), "relisted");
+        session_d(&mut a, &mut t);
+        assert!(is_open(&a.state, &a.view), "d did not open the done group (TUI-NAV-115)");
+        if !stay {
+            step(&mut a, &mut t, &[ev_char('1')]);
+        }
+        let kept = a.state.clone();
+        a.state = no_ideas_done();
+        step(&mut a, &mut t, &[]);
+        a.state = kept;
+        step(&mut a, &mut t, &[]);
+        if !stay {
+            step(&mut a, &mut t, &[ev_char('3')]);
+        }
+        assert!(
+            !is_open(&a.state, &a.view),
+            "a done group that left the list came back open (player on the Ideas screen throughout: \
+             {stay}); it comes back folded"
+        );
+    }
+}
+
+// ---- TUI-NAV-113 -----------------------------------------------------------
+
+/// A meadow whose Ideas rows still to take are all out of reach while some of
+/// its folded rows are ones the core reports Available: the landing rule's
+/// first Available row in the whole list would be a folded one.
+fn ready_rows_all_folded() -> GameState {
+    use clowder_core::content::{idea_def, refinement_def};
+    let mut s = all_ideas_done();
+    let leaf = IdeaId::ALL
+        .iter()
+        .copied()
+        .find(|i| {
+            !IdeaId::ALL.iter().any(|j| idea_def(*j).prereqs.contains(i))
+                && !clowder_core::RefinementId::ALL.iter().any(|r| refinement_def(*r).gate == *i)
+        })
+        .expect("fixture: some idea gates nothing");
+    s.ideas.remove(&leaf);
+    s.resources[ResourceId::Curiosity.ix()] = 0.0;
+    let list = rows(&s, Section::Ideas);
+    let unfinished: Vec<&Row> = list.iter().filter(|r| r.selectable() && !finished(&s, r)).collect();
+    assert!(
+        !unfinished.is_empty()
+            && unfinished.iter().all(|r| match r.key {
+                RowKey::Content(id, _) => s.availability(id) != Availability::Available,
+                _ => false,
+            }),
+        "fixture: every unfinished Ideas row is out of reach"
+    );
+    assert!(
+        list.iter().any(|r| finished(&s, r)
+            && matches!(r.key, RowKey::Content(id, _) if s.availability(id) == Availability::Available)),
+        "fixture: some finished Ideas row is one the core reports Available"
+    );
+    s
+}
+
+/// While the done group is folded the cursor visits none of its rows: from
+/// every row drawn, ↓, ↑, j, k, `]` and `[` pressed again and again land only
+/// on drawn rows, a sweep down visits exactly the drawn rows in order, and a
+/// first visit's landing chooses among drawn rows only. While it is open the
+/// cursor visits them: a sweep down visits every listed row in order, and `]`
+/// from the last row above the done header jumps to the group's first row.
+///
+/// @spec TUI-NAV-113
+#[test]
+fn the_cursor_never_lands_on_a_folded_row_and_reaches_every_open_one() {
+    let state = mid_game();
+    let v = in_ideas(&state);
+    let folded = drawn_selectable(&state, &v);
+    let moves = [
+        key(KeyCode::Down),
+        key(KeyCode::Up),
+        key(KeyCode::Char('j')),
+        key(KeyCode::Char('k')),
+        key(KeyCode::Char(']')),
+        key(KeyCode::Char('[')),
+    ];
+    for start in &folded {
+        for k in moves {
+            let mut w = v.clone();
+            w.focus[Section::Ideas.index()] = Some(start.clone());
+            for n in 0..folded.len() + 2 {
+                press(k, &mut w, &state);
+                let at = ideas_cursor(&w);
+                assert!(
+                    at.as_ref().is_some_and(|c| folded.contains(c)),
+                    "from {start:?}, {:?} pressed {} time(s) left the cursor on {at:?}, which is not a \
+                     drawn row; while the group is folded the cursor visits none of its rows",
+                    k.code,
+                    n + 1
+                );
+            }
+        }
+    }
+
+    let sweep = |mut w: ViewState, len: usize| -> Vec<RowKey> {
+        let mut seen = vec![ideas_cursor(&w).expect("a cursor")];
+        for _ in 0..len {
+            press(key(KeyCode::Down), &mut w, &state);
+            let at = ideas_cursor(&w).expect("a cursor");
+            if seen.last() != Some(&at) {
+                seen.push(at);
+            }
+        }
+        seen
+    };
+    let mut w = v.clone();
+    w.focus[Section::Ideas.index()] = folded.first().cloned();
+    assert_eq!(sweep(w, folded.len() + 2), folded, "a sweep down the folded list does not visit exactly the drawn rows");
+
+    let mut o = v.clone();
+    press_d(&mut o, &state);
+    let listed: Vec<RowKey> =
+        rows(&state, Section::Ideas).into_iter().filter(|r| r.selectable()).map(|r| r.key).collect();
+    o.focus[Section::Ideas.index()] = listed.first().cloned();
+    assert_eq!(
+        sweep(o.clone(), listed.len() + 2),
+        listed,
+        "a sweep down the open list does not visit every listed row, the done group's included"
+    );
+    let last_above = folded.last().cloned().expect("fixture: rows are drawn above the done header");
+    let first_done = listed
+        .iter()
+        .find(|k| rows(&state, Section::Ideas).iter().any(|r| &r.key == *k && finished(&state, r)))
+        .cloned()
+        .expect("fixture: the done group holds rows");
+    o.focus[Section::Ideas.index()] = Some(last_above);
+    press(key(KeyCode::Char(']')), &mut o, &state);
+    assert_eq!(ideas_cursor(&o), Some(first_done), "] from the last row above the open done group does not jump to its first row");
+
+    let poor = ready_rows_all_folded();
+    let entered = in_ideas(&poor);
+    assert_eq!(
+        ideas_cursor(&entered),
+        drawn_selectable(&poor, &entered).first().cloned(),
+        "a first visit landed on {:?}; with nothing drawn Available it lands on the first drawn row, \
+         never on a folded one the core reports Available",
+        ideas_cursor(&entered)
+    );
+}
+
+/// While the done group is open its rows' keys answer as any row's do: Enter,
+/// x and X on a finished row answer exactly as they do on any row whose item
+/// is already the player's — a bought arch's on the Wonders screen.
+///
+/// @spec TUI-NAV-113
+#[test]
+fn an_open_done_rows_keys_answer_as_any_owned_rows_do() {
+    let state = mid_game();
+    let (arch, _) = find_row(&state, Section::Wonders, |c| matches!(c, Command::BuyArch(ArchId::EverdreamArch)));
+    let mut o = in_ideas(&state);
+    press_d(&mut o, &state);
+    let done: Vec<RowKey> = rows(&state, Section::Ideas)
+        .into_iter()
+        .filter(|r| finished(&state, r))
+        .map(|r| r.key)
+        .collect();
+    assert!(!done.is_empty(), "fixture: the done group holds rows");
+    for k in [key(KeyCode::Enter), key(KeyCode::Char('x')), key(KeyCode::Char('X'))] {
+        let mut owned_view = focused(Section::Wonders, arch.clone());
+        let owned_out = press(k, &mut owned_view, &state);
+        for row in &done {
+            let mut w = o.clone();
+            w.focus[Section::Ideas.index()] = Some(row.clone());
+            let out = press(k, &mut w, &state);
+            assert_eq!(out, owned_out, "{:?} on the open done row {row:?} answered {out:?}", k.code);
+            assert_eq!(
+                footer_text(&w),
+                footer_text(&owned_view),
+                "{:?} on the open done row {row:?} left a different note than on an owned row",
+                k.code
+            );
+            assert!(w.armed.is_none() && w.prompt.is_none(), "{:?} on {row:?} armed or prompted", k.code);
+        }
+    }
+}
+
+// ---- TUI-NAV-115 -----------------------------------------------------------
+
+/// `d` opens a folded done group and folds an open one, each distinct press
+/// once, and a press is no command and no navigation: it asks the core for
+/// nothing, leaves an armed row armed, leaves the report banner unread, counts
+/// as no visit, leaves the cursor and the section where they were, and leaves
+/// the layout — the narrow-mode swap called for — as it stood.
+///
+/// @spec TUI-NAV-115
+#[test]
+fn d_opens_and_folds_the_done_group_and_is_no_command_and_no_navigation() {
+    let state = mid_game();
+    let mut v = in_ideas(&state);
+    let rule = drawn(&state, &v)
+        .into_iter()
+        .find(|r| r.heavy && actionable(&state, r))
+        .expect("fixture: a rule is drawn to arm");
+    v.focus[Section::Ideas.index()] = Some(rule.key.clone());
+    press(key(KeyCode::Enter), &mut v, &state);
+    assert!(v.armed.is_some(), "fixture: Enter armed the rule");
+    v.reports = vec![PendingReport { entry: 0, dismissed: false }];
+    v.inspector_wanted = true;
+    v.last_repeat = None;
+
+    for want_open in [true, false, true] {
+        let before = v.clone();
+        let out = press_char('d', &mut v, &state);
+        assert_eq!(out, Outcome::Handled, "d asked the core for {out:?}; it issues no command");
+        assert_eq!(is_open(&state, &v), want_open, "d did not turn the done group open={want_open}");
+        assert_eq!(v.armed, before.armed, "d ended or changed the arming");
+        assert_eq!(v.reports, before.reports, "d retired the report banner");
+        assert_eq!(v.seen, before.seen, "d counted as a visit");
+        assert_eq!(v.section, before.section, "d moved the focused section");
+        assert_eq!(v.focus, before.focus, "d moved a cursor");
+        assert_eq!(v.inspector_wanted, before.inspector_wanted, "d changed the layout");
+        assert!(v.footer.is_none(), "d left a footer note");
+        gap();
+    }
+}
+
+/// A held `d` changes the group once: a run of presses each too soon after the
+/// last to be a distinct one changes it on the first alone, from folded and
+/// from open, and the next distinct press changes it again.
+///
+/// @spec TUI-NAV-115
+#[test]
+fn a_held_d_changes_the_done_group_once() {
+    let state = mid_game();
+    let mut v = in_ideas(&state);
+    for want_open in [true, false] {
+        for _ in 0..12 {
+            press_char('d', &mut v, &state);
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        assert_eq!(
+            is_open(&state, &v),
+            want_open,
+            "a held d left the group open={}; a key held down changes it once",
+            !want_open
+        );
+        gap();
+    }
+}
+
+/// Wherever `d` is not live it is an unbound key, ignored with nothing changed
+/// and no footer note: on every other screen with every drawn row and none
+/// under the cursor, on an Ideas screen with nothing finished, and as
+/// uppercase `D`. An open field takes it as the field takes a letter — the
+/// palette into its query, the count prompt not at all — and a full-screen
+/// overlay suspends it; in each the group is as it was once they close.
+///
+/// @spec TUI-NAV-115
+#[test]
+fn d_is_ignored_wherever_it_is_not_live_and_held_by_whatever_holds_the_keyboard() {
+    let state = mid_game();
+    for section in Section::ALL.into_iter().filter(|s| *s != Section::Ideas) {
+        let listed = rows(&state, section);
+        if listed.is_empty() {
+            continue;
+        }
+        let mut contexts: Vec<Option<RowKey>> = vec![None];
+        contexts.extend(listed.iter().filter(|r| r.selectable()).map(|r| Some(r.key.clone())));
+        for focus in contexts {
+            let mut before = ViewState { section: Some(section), ..Default::default() };
+            before.focus[section.index()] = focus.clone();
+            let mut w = before.clone();
+            let out = press_char('d', &mut w, &state);
+            assert_eq!(out, Outcome::Handled, "{}: d told the core {out:?}", describe(section, &focus));
+            assert_eq!(observable(&w), observable(&before), "{}: d changed the view", describe(section, &focus));
+            assert!(w.footer.is_none(), "{}: d left a footer note", describe(section, &focus));
+        }
+    }
+
+    let none_done = no_ideas_done();
+    let before = in_ideas(&none_done);
+    let mut w = before.clone();
+    assert_eq!(press_char('d', &mut w, &none_done), Outcome::Handled);
+    assert_eq!(observable(&w), observable(&before), "d changed the view on an Ideas screen with nothing finished");
+    assert!(w.footer.is_none(), "d left a note on an Ideas screen with nothing finished");
+
+    let before = in_ideas(&state);
+    let mut w = before.clone();
+    press(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::SHIFT), &mut w, &state);
+    assert_eq!(observable(&w), observable(&before), "uppercase D changed the view; it is unbound");
+    assert!(w.footer.is_none(), "uppercase D left a note");
+
+    // A field takes it.
+    let mut w = in_ideas(&state);
+    press_char('/', &mut w, &state);
+    press_char('d', &mut w, &state);
+    assert_eq!(palette_query(&w).as_deref(), Some("d"), "the palette did not take d into its query");
+    clowder_tui::nav::dismiss(&mut w, false);
+    assert!(!is_open(&state, &w), "d typed into the palette changed the done group");
+
+    let mut w = in_ideas(&state);
+    let refinement = drawn(&state, &w)
+        .into_iter()
+        .find(|r| opens_prompt(&state, r))
+        .expect("fixture: a row on the Ideas screen opens the count prompt");
+    w.focus[Section::Ideas.index()] = Some(refinement.key.clone());
+    press_char('x', &mut w, &state);
+    assert!(w.prompt.is_some(), "fixture: x opened the count prompt");
+    press_char('d', &mut w, &state);
+    assert_eq!(prompt_digits(&w).as_deref(), Some(""), "the count prompt took d");
+    clowder_tui::nav::dismiss(&mut w, false);
+    assert!(!is_open(&state, &w), "d pressed into the count prompt changed the done group");
+
+    // A full-screen overlay suspends it.
+    for opener in ['?', 'e'] {
+        let mut w = in_ideas(&state);
+        press_char(opener, &mut w, &state);
+        let overlay = w.overlay.clone();
+        assert!(overlay.is_some(), "fixture: {opener} opened a full-screen overlay");
+        press_char('d', &mut w, &state);
+        assert_eq!(w.overlay, overlay, "d under the overlay changed it");
+        clowder_tui::nav::dismiss(&mut w, false);
+        assert!(!is_open(&state, &w), "d under a full-screen overlay changed the done group");
+    }
+}
+
+// ---- TUI-NAV-116 -----------------------------------------------------------
+
+/// Opening the group leaves the cursor on the row it rests on, whichever drawn
+/// row that is; where it rests on no row, every row being folded, it lands as
+/// a first visit does among the rows the open group draws.
+///
+/// @spec TUI-NAV-116
+#[test]
+fn opening_the_done_group_leaves_the_cursor_on_its_row() {
+    let state = mid_game();
+    let v = in_ideas(&state);
+    for start in drawn_selectable(&state, &v) {
+        let mut w = v.clone();
+        w.focus[Section::Ideas.index()] = Some(start.clone());
+        press_d(&mut w, &state);
+        assert!(is_open(&state, &w), "d did not open the done group (TUI-NAV-115)");
+        assert_eq!(ideas_cursor(&w), Some(start.clone()), "opening the done group moved the cursor off {start:?}");
+    }
+
+    let all = all_ideas_done();
+    let mut w = in_ideas(&all);
+    assert!(drawn_selectable(&all, &w).is_empty(), "with every row finished and the group folded, a row is still drawn (TUI-NAV-113)");
+    press_d(&mut w, &all);
+    let open = drawn_selectable(&all, &w);
+    assert_eq!(
+        ideas_cursor(&w),
+        landing_among(&all, &open),
+        "opening the group with the cursor on no row did not land it as a first visit does"
+    );
+}
+
+/// Folding the group with the cursor on one of its rows moves the cursor to
+/// the last row drawn above the done header; where no row is drawn above it,
+/// the cursor rests on no row, and a row key says there is nothing to act on.
+///
+/// @spec TUI-NAV-116
+#[test]
+fn folding_the_done_group_from_one_of_its_rows_moves_the_cursor_above_its_header() {
+    for (label, state) in [("mid-game", mid_game()), ("every row done", all_ideas_done())] {
+        let mut template = in_ideas(&state);
+        let above = drawn_selectable(&state, &template).last().cloned();
+        press_d(&mut template, &state);
+        let done: Vec<RowKey> = rows(&state, Section::Ideas)
+            .into_iter()
+            .filter(|r| finished(&state, r))
+            .map(|r| r.key)
+            .collect();
+        gap();
+        for row in &done {
+            let mut w = template.clone();
+            w.focus[Section::Ideas.index()] = Some(row.clone());
+            press_char('d', &mut w, &state);
+            assert!(!is_open(&state, &w), "d did not fold the done group (TUI-NAV-115)");
+            match &above {
+                Some(k) => assert_eq!(
+                    ideas_cursor(&w).as_ref(),
+                    Some(k),
+                    "in {label}, folding from {row:?} left the cursor on {:?}, not the last row drawn \
+                     above the done header",
+                    ideas_cursor(&w)
+                ),
+                None => {
+                    w.last_repeat = None;
+                    let out = press(key(KeyCode::Enter), &mut w, &state);
+                    assert_eq!(out, Outcome::Handled, "in {label}, Enter after folding from {row:?} acted");
+                    assert_eq!(
+                        footer_text(&w),
+                        Some(nothing_to_act_on_note()),
+                        "in {label}, with no row drawn above the header, folding from {row:?} left \
+                         the cursor on a row"
+                    );
+                }
+            }
+        }
+    }
+}
+
+// ---- TUI-NAV-117 -----------------------------------------------------------
+
+/// With the group folded, a row that finishes under the cursor hands the
+/// cursor to the row that closes up into its place — the first drawn row after
+/// that place, else the last drawn row before it, else none — for an idea, a
+/// refinement and a rule finished by the player's own Enter. The move is not
+/// navigation: the report banner stays unread and no visit is counted.
+///
+/// @spec TUI-NAV-117
+#[test]
+fn a_row_finishing_under_the_cursor_hands_it_to_the_row_that_closes_up() {
+    let base = mid_game();
+    let start = in_ideas(&base);
+    let ready: Vec<Row> = drawn(&base, &start).into_iter().filter(|r| actionable(&base, r)).collect();
+    let (mut after_seen, mut before_seen) = (0, 0);
+    for row in &ready {
+        let (mut a, mut t) = ideas_session(base.clone(), "closes-up");
+        a.view.focus[Section::Ideas.index()] = Some(row.key.clone());
+        a.view.reports = vec![PendingReport { entry: 0, dismissed: false }];
+        let seen = a.view.seen;
+        step(&mut a, &mut t, &[ev(KeyCode::Enter)]);
+        if row.heavy {
+            gap();
+            step(&mut a, &mut t, &[ev(KeyCode::Enter)]);
+        }
+        assert!(finished(&a.state, row), "fixture: the core took {:?}", row.key);
+        let expected = closes_up(&drawn_selectable(&a.state, &a.view), &row.key);
+        assert_eq!(
+            ideas_cursor(&a.view),
+            expected,
+            "{:?} finished under the cursor with the group folded; the cursor should take the row \
+             that closes up into its place",
+            row.key
+        );
+        match &expected {
+            Some(k) if ideas_place(k) > ideas_place(&row.key) => after_seen += 1,
+            Some(_) => before_seen += 1,
+            None => {}
+        }
+        assert_eq!(a.view.reports, vec![PendingReport { entry: 0, dismissed: false }], "the move retired the banner");
+        assert_eq!(a.view.seen, seen, "the move counted as a visit");
+    }
+    assert!(after_seen > 0, "fixture: no finished row was followed by a drawn row");
+    assert!(before_seen > 0, "fixture: no finished row was the last drawn row");
+
+    // Neither: the one row still to take finishes, and nothing is left drawn.
+    let mut last = all_ideas_done();
+    let only = clowder_core::RefinementId::ALL
+        .iter()
+        .copied()
+        .find(|r| {
+            let mut s = last.clone();
+            s.refinements.remove(r);
+            s.lock_reason(ContentId::Refinement(*r)).is_none()
+        })
+        .expect("fixture: some refinement can be bought again once un-bought");
+    last.refinements.remove(&only);
+    let (mut a, mut t) = ideas_session(last, "neither");
+    let key_ = RowKey::Content(ContentId::Refinement(only), "");
+    assert_eq!(ideas_cursor(&a.view), Some(key_.clone()), "fixture: the cursor is on the one row left to take");
+    step(&mut a, &mut t, &[ev(KeyCode::Enter)]);
+    assert!(a.state.refinements.contains(&only), "fixture: the core took it");
+    let mut w = a.view.clone();
+    w.last_repeat = None;
+    w.field_guard = false;
+    assert_eq!(update(Action::Activate, &mut w, &a.state), Outcome::Handled);
+    assert_eq!(
+        footer_text(&w),
+        Some(nothing_to_act_on_note()),
+        "with no drawn row left after it finished, the cursor should rest on no row"
+    );
+}
+
+/// With the group folded, returning to the Ideas screen when the row the
+/// cursor remembered there has finished meanwhile places the cursor where that
+/// row closes up, by the same rule — for every row the cursor could have
+/// remembered.
+///
+/// @spec TUI-NAV-117
+#[test]
+fn returning_to_a_remembered_row_that_finished_meanwhile_places_the_cursor_where_it_closes_up() {
+    let base = mid_game();
+    let start = in_ideas(&base);
+    let mut checked = 0;
+    for row in drawn(&base, &start).into_iter().filter(|r| r.selectable()) {
+        let mut v = start.clone();
+        v.focus[Section::Ideas.index()] = Some(row.key.clone());
+        press_char('1', &mut v, &base);
+        let mut after = base.clone();
+        finish(&mut after, &row);
+        if !finished(&after, &row) {
+            continue;
+        }
+        press_char('3', &mut v, &after);
+        let expected = closes_up(&drawn_selectable(&after, &v), &row.key);
+        assert_eq!(
+            ideas_cursor(&v),
+            expected,
+            "the remembered {:?} finished while the Ideas screen was out of focus; returning should \
+             place the cursor where it closes up",
+            row.key
+        );
+        checked += 1;
+    }
+    assert!(checked > 10, "fixture: too few remembered rows were checked");
+}
+
+// ---- TUI-NAV-118 -----------------------------------------------------------
+
+/// With the group open, a row that finishes under the cursor keeps the cursor:
+/// it stays on the row, now drawn in the done group.
+///
+/// @spec TUI-NAV-118
+#[test]
+fn with_the_group_open_a_row_finishing_under_the_cursor_keeps_it() {
+    let base = mid_game();
+    let start = in_ideas(&base);
+    let ready: Vec<Row> =
+        drawn(&base, &start).into_iter().filter(|r| actionable(&base, r) && !r.heavy).collect();
+    assert!(ready.len() > 4, "fixture: several rows are ready to take");
+    for row in &ready {
+        let (mut a, mut t) = ideas_session(base.clone(), "open-keeps");
+        session_d(&mut a, &mut t);
+        assert!(is_open(&a.state, &a.view), "d did not open the done group (TUI-NAV-115)");
+        a.view.focus[Section::Ideas.index()] = Some(row.key.clone());
+        step(&mut a, &mut t, &[ev(KeyCode::Enter)]);
+        assert!(finished(&a.state, row), "fixture: the core took {:?}", row.key);
+        assert_eq!(ideas_cursor(&a.view), Some(row.key.clone()), "the cursor left {:?} as it finished", row.key);
+        let list = drawn(&a.state, &a.view);
+        let header = list.iter().rposition(|r| matches!(r.kind, RowKind::Group)).expect("a header");
+        assert!(
+            list[header + 1..].iter().any(|r| r.key == row.key),
+            "{:?} finished with the group open but is not drawn in the done group",
+            row.key
+        );
+    }
+}
+
+// ---- TUI-NAV-119 -----------------------------------------------------------
+
+/// Enter held for `held` steps, `pace` apart.
+fn hold_enter_steps(a: &mut App, t: &mut Terminal<TestBackend>, held: usize, pace: Duration) {
+    for _ in 0..held {
+        step(a, t, &[ev(KeyCode::Enter)]);
+        std::thread::sleep(pace);
+    }
+}
+
+/// When a row folds away from under the cursor, a held or auto-repeating
+/// continuation of the press acts on nothing the cursor lands on — no idea
+/// researched, no refinement bought, no rule armed — and the next distinct
+/// press does act there.
+///
+/// @spec TUI-NAV-119
+#[test]
+fn a_held_enter_never_acts_on_the_row_a_folded_row_hands_the_cursor_to() {
+    let base = mid_game();
+    let start = in_ideas(&base);
+    let drawn_rows_now = drawn(&base, &start);
+    for rank in 0..3 {
+        let first = drawn_rows_now
+            .iter()
+            .find(|r| r.selectable() && ideas_rank(r) == rank && actionable(&base, r))
+            .unwrap_or_else(|| panic!("fixture: kind {rank} has a row ready to take"))
+            .clone();
+        let (mut a, mut t) = ideas_session(base.clone(), "held");
+        a.view.focus[Section::Ideas.index()] = Some(first.key.clone());
+        step(&mut a, &mut t, &[ev(KeyCode::Enter)]);
+        if first.heavy {
+            gap();
+            step(&mut a, &mut t, &[ev(KeyCode::Enter)]);
+        }
+        assert!(finished(&a.state, &first), "fixture: the core took {:?}", first.key);
+        let next = ideas_cursor(&a.view).expect("the cursor rests on no row after the row folded away (TUI-NAV-117)");
+        let next_row = rows(&a.state, Section::Ideas).into_iter().find(|r| r.key == next).expect("listed");
+        assert!(
+            actionable(&a.state, &next_row) && ideas_rank(&next_row) == rank,
+            "when {:?} folded away the cursor did not move to the next row of its kind ready to take \
+             (TUI-NAV-117)",
+            first.key
+        );
+
+        hold_enter_steps(&mut a, &mut t, 15, Duration::from_millis(30));
+        assert!(
+            !finished(&a.state, &next_row),
+            "a held Enter took {next:?}, the row the cursor landed on when {:?} folded away",
+            first.key
+        );
+        assert!(a.view.armed.is_none(), "a held Enter armed {next:?} after {:?} folded away", first.key);
+
+        gap();
+        step(&mut a, &mut t, &[ev(KeyCode::Enter)]);
+        let acted = finished(&a.state, &next_row) || a.view.armed.as_ref().is_some_and(|x| x.key == next);
+        assert!(acted, "a distinct Enter after the hold did not act on {next:?}");
+    }
+}
+
+/// The same fence holds against a held X on a row that finishes under it.
+///
+/// @spec TUI-NAV-119
+#[test]
+fn a_held_x_never_acts_on_the_row_a_folded_row_hands_the_cursor_to() {
+    let base = mid_game();
+    let start = in_ideas(&base);
+    let drawn_rows_now = drawn(&base, &start);
+    for rank in 0..3 {
+        let Some(first) = drawn_rows_now
+            .iter()
+            .find(|r| r.selectable() && ideas_rank(r) == rank && actionable(&base, r) && !r.heavy)
+            .cloned()
+        else {
+            continue;
+        };
+        let (mut a, mut t) = ideas_session(base.clone(), "heldx");
+        a.view.focus[Section::Ideas.index()] = Some(first.key.clone());
+        step(&mut a, &mut t, &[ev(KeyCode::Char('X'))]);
+        if !finished(&a.state, &first) {
+            continue;
+        }
+        let Some(next) = ideas_cursor(&a.view) else { continue };
+        let next_row = rows(&a.state, Section::Ideas).into_iter().find(|r| r.key == next).expect("listed");
+        for _ in 0..15 {
+            step(&mut a, &mut t, &[ev(KeyCode::Char('X'))]);
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        assert!(
+            !finished(&a.state, &next_row),
+            "a held X took {next:?}, the row the cursor landed on when {:?} folded away",
+            first.key
+        );
+    }
+}
+
+// ---- TUI-NAV-120 -----------------------------------------------------------
+
+/// While every row the Ideas section lists is folded, the list draws the done
+/// header alone, the section keeps its tab, and every row key — Enter, x, X,
+/// the count keys and Backspace — finds no row: it asks the core for nothing,
+/// changes nothing, and leaves the one note a section with nothing listed
+/// leaves (TUI-NAV-085).
+///
+/// @spec TUI-NAV-120
+#[test]
+fn with_every_row_folded_the_header_stands_alone_and_every_row_key_finds_nothing() {
+    let state = all_ideas_done();
+    let v = in_ideas(&state);
+    let list = drawn(&state, &v);
+    assert!(
+        list.len() == 1 && matches!(list[0].kind, RowKind::Group),
+        "with every row folded the list draws {} line(s), not the done header alone",
+        list.len()
+    );
+    for focus in [Some(Section::Ideas), Some(Section::Meadow)] {
+        assert!(
+            clowder_tui::nav::rows::tab_sections(&state, focus).contains(&Section::Ideas),
+            "the Ideas section lost its tab with focus on {focus:?}"
+        );
+    }
+    let note = nothing_to_act_on_note();
+    for k in [
+        key(KeyCode::Enter),
+        key(KeyCode::Char('x')),
+        key(KeyCode::Char('X')),
+        key(KeyCode::Char('+')),
+        key(KeyCode::Char('=')),
+        key(KeyCode::Char('-')),
+        key(KeyCode::Backspace),
+    ] {
+        let mut w = v.clone();
+        let out = press(k, &mut w, &state);
+        assert_eq!(out, Outcome::Handled, "{:?} with every row folded told the core {out:?}", k.code);
+        assert_eq!(footer_text(&w), Some(note.clone()), "{:?} with every row folded left another note", k.code);
+        let (mut a, mut b) = (w.clone(), v.clone());
+        a.last_repeat = None;
+        b.last_repeat = None;
+        assert_eq!(all_but_the_footer(&a), all_but_the_footer(&b), "{:?} with every row folded changed the view", k.code);
+    }
+}
+
+/// When a row the cursor can visit is next drawn beside an all-folded list,
+/// the cursor lands on the first drawn row the core reports Available, else
+/// the first drawn row — as on entering a section with no row remembered.
+///
+/// @spec TUI-NAV-120
+#[test]
+fn when_a_row_is_next_drawn_the_cursor_lands_on_the_first_available_one() {
+    use clowder_core::content::{idea_def, refinement_def};
+    let (mut a, mut t) = ideas_session(all_ideas_done(), "next-drawn");
+    assert!(drawn_selectable(&a.state, &a.view).is_empty(), "with every row finished and the group folded, a row is still drawn (TUI-NAV-113)");
+
+    let mut s = all_ideas_done();
+    let leaf = IdeaId::ALL
+        .iter()
+        .copied()
+        .find(|i| {
+            !IdeaId::ALL.iter().any(|j| idea_def(*j).prereqs.contains(i))
+                && !clowder_core::RefinementId::ALL.iter().any(|r| refinement_def(*r).gate == *i)
+        })
+        .expect("fixture: some idea gates nothing");
+    s.ideas.remove(&leaf);
+    s.resources[ResourceId::Curiosity.ix()] = 0.0;
+    let back = *s.refinements.iter().next().expect("fixture: a refinement is held");
+    s.refinements.remove(&back);
+    a.state = s;
+    step(&mut a, &mut t, &[]);
+    let now = drawn_selectable(&a.state, &a.view);
+    assert!(now.len() >= 2, "fixture: two rows are drawn again");
+    assert!(
+        matches!(&now[0], RowKey::Content(id, _) if a.state.availability(*id) != Availability::Available),
+        "fixture: the first drawn row is not Available, so the landing rule is under test"
+    );
+    assert_eq!(
+        ideas_cursor(&a.view),
+        landing_among(&a.state, &now),
+        "a row returned beside an all-folded list and the cursor did not land on the first Available one"
+    );
+}
+
+// ---- TUI-NAV-121 -----------------------------------------------------------
+
+/// The palette's jump to an item whose row is folded opens the done group and
+/// focuses that row; the jump is otherwise the palette's jump — it closes the
+/// palette, lands in the Ideas section as a visit, and retires the banner —
+/// and the group stays open after it. Quantified over every finished item the
+/// palette's query can aim at alone.
+///
+/// @spec TUI-NAV-121
+#[test]
+fn the_palettes_jump_to_a_folded_row_opens_the_done_group_and_focuses_it() {
+    let state = mid_game();
+    let finished_rows: Vec<RowKey> = rows(&state, Section::Ideas)
+        .into_iter()
+        .filter(|r| finished(&state, r))
+        .map(|r| r.key)
+        .collect();
+    let all = clowder_tui::nav::palette::results(&state, "");
+    let mut jumped = 0;
+    for target in &finished_rows {
+        let name = all.iter().find(|r| &r.key == target).expect("a finished row is a palette result").name.clone();
+        if clowder_tui::nav::palette::results(&state, &name).first().map(|r| &r.key) != Some(target) {
+            continue;
+        }
+        let mut v = ViewState::default();
+        clowder_tui::nav::opening(&mut v, &state);
+        v.reports = vec![PendingReport { entry: 0, dismissed: false }];
+        v.overlay = Some(Overlay::Palette { query: name.clone(), selected: 0 });
+        let out = press(key(KeyCode::Enter), &mut v, &state);
+        assert_eq!(out, Outcome::Handled);
+        assert!(v.overlay.is_none(), "the jump to {target:?} left the palette open");
+        assert_eq!(v.section, Some(Section::Ideas), "the jump to {target:?} did not land on the Ideas screen");
+        assert_eq!(ideas_cursor(&v).as_ref(), Some(target), "the jump did not focus {target:?}");
+        assert!(is_open(&state, &v), "the jump to the folded {target:?} did not open the done group");
+        assert!(drawn_selectable(&state, &v).contains(target), "the jump focused {target:?}, which is not drawn");
+        assert!(v.reports[0].dismissed, "the jump did not retire the banner");
+        assert!(v.seen[Section::Ideas.index()].visited, "the jump did not count as a visit");
+
+        v.field_guard = false;
+        press_char('1', &mut v, &state);
+        press_char('3', &mut v, &state);
+        assert!(is_open(&state, &v), "the group the jump opened did not stay open");
+        jumped += 1;
+    }
+    assert!(jumped * 2 > finished_rows.len(), "fixture: the palette could aim at too few finished items alone");
+}
+
+// ---- TUI-NAV-123 -----------------------------------------------------------
+
+/// `d` is no screen's mnemonic and no row-bound key: no screen spends it on a
+/// mnemonic, no state and cursor make it a live one, and on every screen,
+/// with every drawn row and none under the cursor, it asks the core for
+/// nothing — and off the Ideas screen changes nothing at all.
+///
+/// @spec TUI-NAV-123
+#[test]
+fn d_is_no_screens_mnemonic_nor_row_bound_key_and_asks_the_core_for_nothing() {
+    use clowder_tui::nav::mnemonics;
+    for section in Section::ALL {
+        assert!(
+            !mnemonics::section_letters(section).contains(&'d'),
+            "the {} screen spends d on a mnemonic",
+            section.title()
+        );
+    }
+    let mut pressed = 0;
+    for (label, state) in [("mid-game", mid_game()), ("far along", rich()), ("new", fresh()), ("all done", all_ideas_done())] {
+        for section in Section::ALL {
+            let mut base = ViewState { section: Some(section), ..Default::default() };
+            let mut views = vec![base.clone()];
+            for k in drawn_rows(&state, section, &base).into_iter().filter(|r| r.selectable()).map(|r| r.key) {
+                base.focus[section.index()] = Some(k);
+                views.push(base.clone());
+            }
+            if section == Section::Ideas {
+                let mut open = ViewState { section: Some(section), ..Default::default() };
+                press_d(&mut open, &state);
+                for k in drawn_rows(&state, section, &open).into_iter().filter(|r| r.selectable()).map(|r| r.key) {
+                    let mut w = open.clone();
+                    w.focus[section.index()] = Some(k);
+                    views.push(w);
+                }
+            }
+            for before in views {
+                let focus = before.focus[section.index()].clone();
+                assert!(
+                    !mnemonics::live(&state, section, focus.as_ref()).iter().any(|(c, _, _)| *c == 'd'),
+                    "in {label}, {} d is a live mnemonic",
+                    describe(section, &focus)
+                );
+                let mut w = before.clone();
+                let out = press_char('d', &mut w, &state);
+                assert!(
+                    !matches!(out, Outcome::Apply(_) | Outcome::Repeat(..)),
+                    "in {label}, {} d told the core {out:?}",
+                    describe(section, &focus)
+                );
+                if section != Section::Ideas {
+                    assert_eq!(observable(&w), observable(&before), "in {label}, {} d changed the view", describe(section, &focus));
+                }
+                pressed += 1;
+            }
+        }
+    }
+    assert!(pressed > 100, "fixture: too few contexts swept");
 }

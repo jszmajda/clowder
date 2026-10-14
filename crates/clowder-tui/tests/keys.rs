@@ -327,6 +327,14 @@ const NO_MNEMONIC_SECTIONS: [Section; 7] = [
 /// (`global_bindings` above), not a mnemonic (TUI-NAV-046).
 const MNEMONIC_LETTERS: [char; 4] = ['g', 'f', 'r', 'p'];
 
+/// The Ideas screen's done key (TUI-NAV-115): one of the two letters a screen
+/// binds that are not mnemonics (TUI-NAV-046). Live only on the Ideas screen
+/// while its done group is listed — which only game state can say — so the
+/// map may hand it to `update` on any screen; it is excluded from the sweeps
+/// here, and what it does, and that it is silent wherever it is not live, is
+/// asserted through the reducer in `tests/update.rs`.
+const DONE_KEY: char = 'd';
+
 // ---------------------------------------------------------------------------
 // TUI-NAV-001 — the admissible set, and its closure
 // ---------------------------------------------------------------------------
@@ -815,7 +823,7 @@ fn observing_the_sky_answers_from_every_screen() {
 fn on_a_screen_with_no_mnemonics_a_printable_key_is_a_global_binding_or_silence() {
     for section in NO_MNEMONIC_SECTIONS {
         let view = screen(section);
-        for c in printables() {
+        for c in printables().filter(|c| *c != DONE_KEY) {
             let got = resolve(ch(c), &view);
             match global_meaning(c) {
                 Some(expected) => assert_eq!(
@@ -844,7 +852,7 @@ fn on_a_screen_with_no_mnemonics_a_printable_key_is_a_global_binding_or_silence(
 #[test]
 fn an_unbound_printable_is_ignored_with_no_message_on_every_screen() {
     let never_bound: Vec<char> = printables()
-        .filter(|c| global_meaning(*c).is_none() && !MNEMONIC_LETTERS.contains(c))
+        .filter(|c| global_meaning(*c).is_none() && !MNEMONIC_LETTERS.contains(c) && *c != DONE_KEY)
         .collect();
     assert!(
         never_bound.len() > 20,

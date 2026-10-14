@@ -120,4 +120,8 @@ pub struct ViewState {
     /// genuinely distinct Enter — judged the same way a heavy row's commit
     /// is — clears it and reaches the row. @spec TUI-NAV-061
     pub field_guard: bool,
+    /// Whether the Ideas section's done group is open. Every sitting begins
+    /// with it folded, nothing of it is saved, and it folds again whenever
+    /// the group stops being listed. @spec TUI-NAV-112, TUI-NAV-113
+    pub done_open: bool,
 }

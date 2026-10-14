@@ -15,7 +15,8 @@ use super::view::{Overlay, ViewState};
 /// jumps sections on a bare screen and types into an open prompt.
 /// @spec TUI-NAV-001, TUI-NAV-002, TUI-NAV-003, TUI-NAV-004, TUI-NAV-005,
 /// TUI-NAV-006, TUI-NAV-007, TUI-NAV-028, TUI-NAV-030, TUI-NAV-033,
-/// TUI-NAV-037, TUI-NAV-040, TUI-NAV-042, TUI-NAV-046, TUI-NAV-052
+/// TUI-NAV-037, TUI-NAV-040, TUI-NAV-042, TUI-NAV-046, TUI-NAV-052,
+/// TUI-NAV-115, TUI-NAV-123
 pub fn resolve(key: KeyEvent, view: &ViewState) -> Action {
     // Ctrl-C is the one chord, and it quits from every context, even mid-type
     // in a field. @spec TUI-NAV-001, TUI-NAV-052
@@ -108,6 +109,10 @@ pub fn resolve(key: KeyEvent, view: &ViewState) -> Action {
         // reads the focused row and its gate to decide whether it acts.
         // @spec TUI-NAV-094
         KeyCode::Char('n') => Action::AppointElder,
+        // `d` is the Ideas screen's done key and nothing else: no mnemonic,
+        // no row-bound key, an unbound key on every other screen.
+        // @spec TUI-NAV-115, TUI-NAV-123
+        KeyCode::Char('d') if view.section == Some(Section::Ideas) => Action::ToggleDone,
         // Everything left is either a digit's section jump, a letter the
         // design spends on *this* screen's mnemonics — live or not; whether
         // its row is actually listed is `update`'s to read from game state —

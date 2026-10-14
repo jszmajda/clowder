@@ -482,6 +482,7 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
         let mut items: Vec<String> = strs(&base);
         add_mnemonics(&mut items, state, view);
         add_appoint_elder(&mut items, state, view);
+        add_done_key(&mut items, state, view);
         items
     };
 
@@ -587,4 +588,18 @@ fn add_appoint_elder(items: &mut Vec<String>, state: &GameState, view: &ViewStat
         Some(at) => items.insert(at + 1, entry),
         None => items.push(entry),
     }
+}
+
+/// Names the Ideas screen's done key last, just before the help key, while it
+/// is live: `d show done` while the group is folded, `d fold done` while open.
+/// Named last, it is the first key the bar sheds for width.
+/// @spec TUI-NAV-122
+fn add_done_key(items: &mut Vec<String>, state: &GameState, view: &ViewState) {
+    if view.overlay.is_some() || view.section != Some(Section::Ideas) {
+        return;
+    }
+    if crate::nav::rows::done_count(state) == 0 {
+        return;
+    }
+    items.push(if view.done_open { "d fold done" } else { "d show done" }.to_string());
 }

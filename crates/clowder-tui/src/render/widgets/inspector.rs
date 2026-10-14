@@ -538,7 +538,7 @@ fn draw_body(
 /// @spec TUI-NAV-018, TUI-NAV-073, TUI-NAV-078, TUI-NAV-079, TUI-NAV-080
 pub fn draw(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     let section = view.section.unwrap_or(DEFAULT_SECTION);
-    let all = rows(state, section);
+    let all = crate::nav::rows::drawn_rows(state, section, view);
 
     // The row the cursor is on is the row the list highlights, re-derived
     // every frame: when the remembered key has left the list, the list falls

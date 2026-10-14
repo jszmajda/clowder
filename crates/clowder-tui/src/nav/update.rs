@@ -6,7 +6,9 @@
 //! the answer depends on the focused row, and rows come from game state.
 //! @spec TUI-NAV-002, TUI-NAV-011, TUI-NAV-015, TUI-NAV-037, TUI-NAV-038,
 //! TUI-NAV-041, TUI-NAV-051, TUI-NAV-058, TUI-NAV-060, TUI-NAV-061,
-//! TUI-NAV-064, TUI-NAV-065, TUI-NAV-050, TUI-NAV-083, TUI-NAV-084
+//! TUI-NAV-064, TUI-NAV-065, TUI-NAV-050, TUI-NAV-083, TUI-NAV-084,
+//! TUI-NAV-112, TUI-NAV-113, TUI-NAV-114, TUI-NAV-116, TUI-NAV-118,
+//! TUI-NAV-120, TUI-NAV-121
 
 use std::time::{Duration, Instant};
 
@@ -15,7 +17,10 @@ use clowder_core::{Command, GameState, LockReason};
 use super::action::{Action, CountSemantics};
 use super::mnemonics;
 use super::palette;
-use super::rows::{has_tab, lists_selectable, rows, tab_sections, Row, RowKey, RowKind};
+use super::rows::{
+    done_count, drawn_rows, has_tab, ideas_place, lists_selectable, rows, tab_sections, Row, RowKey,
+    RowKind,
+};
 use super::section::Section;
 use super::view::{ArmedRow, CountPrompt, Overlay, SeenMark, ViewState};
 
@@ -61,6 +66,8 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
         return Outcome::Quit;
     }
 
+    fold_unlisted_done(view, state);
+
     match action {
         Action::CursorUp
         | Action::CursorDown
@@ -101,6 +108,7 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
         Action::Decrement => handle_increment_decrement(view, state, false),
         Action::Mnemonic(c) => handle_mnemonic(view, state, c),
         Action::AppointElder => handle_appoint_elder(view, state),
+        Action::ToggleDone => handle_toggle_done(view, state),
         Action::Type(c) => handle_type(view, c),
         Action::Erase => handle_erase(view),
         Action::Dismiss => handle_dismiss(view),
@@ -176,6 +184,7 @@ pub fn opening(view: &mut ViewState, state: &GameState) {
             view.seen[idx] = SeenMark { visited: true, revealed_at_last_visit: rows(state, section).len() };
         }
     }
+    view.done_open = false;
     enter_section(view, state, Section::Meadow);
 }
 
@@ -226,7 +235,7 @@ fn handle_navigation(action: Action, view: &mut ViewState, state: &GameState) {
 /// @spec TUI-NAV-002, TUI-NAV-007
 fn move_cursor(view: &mut ViewState, state: &GameState, delta: isize) {
     let Some(section) = view.section else { return };
-    let list = rows(state, section);
+    let list = drawn_rows(state, section, view);
     let selectable: Vec<&Row> = list.iter().filter(|r| r.selectable()).collect();
     if selectable.is_empty() {
         return;
@@ -261,7 +270,7 @@ fn cycle_section(view: &mut ViewState, state: &GameState, delta: isize) {
 /// @spec TUI-NAV-007
 fn move_to_group(view: &mut ViewState, state: &GameState, delta: isize) {
     let Some(section) = view.section else { return };
-    let list = rows(state, section);
+    let list = drawn_rows(state, section, view);
     let idx = section.index();
     let here = view.focus[idx]
         .as_ref()
@@ -327,26 +336,37 @@ fn nudge_speed(view: &mut ViewState, state: &GameState, up: bool) -> Outcome {
 /// @spec TUI-NAV-008, TUI-NAV-032
 fn enter_section(view: &mut ViewState, state: &GameState, section: Section) {
     view.section = Some(section);
-    let list = rows(state, section);
+    let listed = rows(state, section).len();
+    let list = drawn_rows(state, section, view);
     let idx = section.index();
 
     // A visit marks the section seen and clears its new-content watermark.
-    view.seen[idx] = SeenMark { visited: true, revealed_at_last_visit: list.len() };
-    view.focus[idx] = landing_for(state, &list, view.focus[idx].as_ref());
+    view.seen[idx] = SeenMark { visited: true, revealed_at_last_visit: listed };
+    view.focus[idx] = landing_for(state, section, &list, view.focus[idx].as_ref());
 }
 
 /// The remembered row if it is still one of `list`'s selectable rows, or
 /// else the first selectable one that is available, or else — nothing on
 /// the list is affordable — simply the first selectable row: a section is
-/// never entered with no cursor at all. @spec TUI-NAV-008, TUI-NAV-032
-fn landing_for(state: &GameState, list: &[Row], remembered: Option<&RowKey>) -> Option<RowKey> {
+/// never entered with no cursor at all. A remembered row that has finished
+/// into the folded done group gives its place to the row that closes up into
+/// it. `list` is the drawn list. @spec TUI-NAV-008, TUI-NAV-032, TUI-NAV-117
+fn landing_for(
+    state: &GameState,
+    section: Section,
+    list: &[Row],
+    remembered: Option<&RowKey>,
+) -> Option<RowKey> {
     let remembered_still_present =
         remembered.is_some_and(|k| list.iter().any(|r| r.selectable() && &r.key == k));
     if remembered_still_present {
         return remembered.cloned();
     }
+    if let Some(gone) = remembered.filter(|k| folded_away(state, section, list, k)) {
+        return closes_up(list, gone);
+    }
     list.iter()
-        .find(|r| r.selectable() && is_available(state, r))
+        .find(|r| r.selectable() && is_available(state, section, r))
         .or_else(|| list.iter().find(|r| r.selectable()))
         .map(|r| r.key.clone())
 }
@@ -360,20 +380,99 @@ fn landing_for(state: &GameState, list: &[Row], remembered: Option<&RowKey>) -> 
 /// command with no key pressed at all; a section actually left and
 /// re-entered lands through `enter_section`, the ordinary doorway, and never
 /// reaches here. @spec TUI-NAV-085, TUI-NAV-008, TUI-NAV-032
+///
+/// The same pass hands the cursor on when the row it rests on has finished
+/// into the folded done group, and fences that move off from a held press.
+/// @spec TUI-NAV-117, TUI-NAV-119, TUI-NAV-120, TUI-NAV-112
 pub fn relist_focus(view: &mut ViewState, state: &GameState) {
+    fold_unlisted_done(view, state);
     let Some(section) = view.section else { return };
     let idx = section.index();
-    let list = rows(state, section);
-    if !list.iter().any(|r| r.selectable()) {
-        return;
-    }
+    let list = drawn_rows(state, section, view);
     let remembered_still_present = view.focus[idx]
         .as_ref()
         .is_some_and(|k| list.iter().any(|r| r.selectable() && &r.key == k));
     if remembered_still_present {
         return;
     }
-    view.focus[idx] = landing_for(state, &list, view.focus[idx].as_ref());
+    if let Some(gone) = view.focus[idx].clone().filter(|k| folded_away(state, section, &list, k)) {
+        view.focus[idx] = closes_up(&list, &gone);
+        // No held or auto-repeating continuation of the press that finished
+        // the row may act on the row the cursor was handed to.
+        guard_after_field(view);
+        return;
+    }
+    if !list.iter().any(|r| r.selectable()) {
+        return;
+    }
+    view.focus[idx] = landing_for(state, section, &list, view.focus[idx].as_ref());
+}
+
+/// Whether `key` is a row of the Ideas section that is listed but not drawn:
+/// one folded away in the done group. @spec TUI-NAV-113, TUI-NAV-117
+fn folded_away(state: &GameState, section: Section, drawn: &[Row], key: &RowKey) -> bool {
+    section == Section::Ideas
+        && ideas_place(key).is_some()
+        && !drawn.iter().any(|r| &r.key == key)
+        && rows(state, section).iter().any(|r| &r.key == key)
+}
+
+/// The drawn row that closes up into `gone`'s place in the Ideas list: the
+/// first drawn row following that place, else the last drawn row before it,
+/// else none. @spec TUI-NAV-117
+fn closes_up(drawn: &[Row], gone: &RowKey) -> Option<RowKey> {
+    let place = ideas_place(gone)?;
+    let placed: Vec<(&Row, (usize, usize))> =
+        drawn.iter().filter(|r| r.selectable()).filter_map(|r| Some((r, ideas_place(&r.key)?))).collect();
+    placed
+        .iter()
+        .find(|(_, p)| *p > place)
+        .or_else(|| placed.iter().rev().find(|(_, p)| *p < place))
+        .map(|(r, _)| r.key.clone())
+}
+
+/// A done group that is no longer listed is folded, so it comes back folded.
+/// @spec TUI-NAV-112
+fn fold_unlisted_done(view: &mut ViewState, state: &GameState) {
+    if view.done_open && done_count(state) == 0 {
+        view.done_open = false;
+    }
+}
+
+/// `d` — opens the Ideas section's done group where it is folded and folds it
+/// where it is open, once per distinct press, judged as a distinct Enter is.
+/// It issues no command and is no navigation: it ends no arming, retires no
+/// banner, counts as no visit, and leaves the layout alone. Where it is not
+/// live it is an unbound key. @spec TUI-NAV-115, TUI-NAV-116
+fn handle_toggle_done(view: &mut ViewState, state: &GameState) -> Outcome {
+    let live = view.section == Some(Section::Ideas)
+        && view.overlay.is_none()
+        && view.prompt.is_none()
+        && done_count(state) > 0;
+    if !live {
+        return Outcome::Handled;
+    }
+    let now = Instant::now();
+    let distinct = view.last_repeat.is_none_or(|last| now.duration_since(last) >= REPEAT_GATE);
+    view.last_repeat = Some(now);
+    if !distinct {
+        return Outcome::Handled;
+    }
+
+    let idx = Section::Ideas.index();
+    view.done_open = !view.done_open;
+    let drawn = drawn_rows(state, Section::Ideas, view);
+    let on_drawn_row = view.focus[idx]
+        .as_ref()
+        .is_some_and(|k| drawn.iter().any(|r| r.selectable() && &r.key == k));
+    if !on_drawn_row {
+        view.focus[idx] = if view.done_open {
+            landing_for(state, Section::Ideas, &drawn, None)
+        } else {
+            drawn.iter().rev().find(|r| r.selectable()).map(|r| r.key.clone())
+        };
+    }
+    Outcome::Handled
 }
 
 /// Retires the one report banner currently showing — the first still-
@@ -385,9 +484,17 @@ fn dismiss_active_report(view: &mut ViewState) {
     }
 }
 
-fn is_available(state: &GameState, row: &Row) -> bool {
+/// Whether `row` is one TUI-NAV-032 lands on first: the core reports its item
+/// Available and, in the Ideas section, the item is not finished — a finished
+/// item stands only in the open done group, which no landing prefers.
+/// @spec TUI-NAV-032, TUI-NAV-120
+fn is_available(state: &GameState, section: Section, row: &Row) -> bool {
     match &row.key {
-        RowKey::Content(id, "") => state.availability(*id) == clowder_core::Availability::Available,
+        RowKey::Content(id, "") => {
+            state.availability(*id) == clowder_core::Availability::Available
+                && !(section == Section::Ideas
+                    && state.lock_reason(*id) == Some(LockReason::AlreadyYours))
+        }
         _ => true,
     }
 }
@@ -400,7 +507,7 @@ fn is_available(state: &GameState, row: &Row) -> bool {
 fn current_row(view: &ViewState, state: &GameState) -> Option<Row> {
     let section = view.section?;
     let key = view.focus[section.index()].clone()?;
-    rows(state, section).into_iter().find(|r| r.key == key)
+    drawn_rows(state, section, view).into_iter().find(|r| r.key == key)
 }
 
 /// The row `key` names, if it is still listed in the current section — never
@@ -672,6 +779,12 @@ fn accept_palette(view: &mut ViewState, state: &GameState) -> Outcome {
     };
     let (section, key) = (top.section, top.key);
 
+    // A jump to a row folded away in the done group opens the group, so the
+    // row it focuses is drawn. @spec TUI-NAV-121
+    if section == Section::Ideas && !drawn_rows(state, section, view).iter().any(|r| r.key == key) {
+        view.done_open = true;
+    }
+
     view.overlay = None;
     view.armed = None;
     // The landing is navigation like any other: it disarms, retires the
@@ -753,9 +866,15 @@ fn handle_max_affordable(view: &mut ViewState, state: &GameState) -> Outcome {
     let now = Instant::now();
     if let Some(last) = view.last_repeat {
         if now.duration_since(last) < REPEAT_GATE {
+            // A press dropped while the fold's fence stands renews the clock,
+            // so a continuous hold never wears the fence down. @spec TUI-NAV-119
+            if view.field_guard {
+                view.last_repeat = Some(now);
+            }
             return Outcome::Handled;
         }
     }
+    view.field_guard = false;
 
     let Some(row) = current_row(view, state) else {
         return no_row_to_act_on(view);

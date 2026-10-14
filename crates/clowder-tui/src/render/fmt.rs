@@ -210,6 +210,22 @@ pub fn group_header_line(words: &str, width: usize) -> String {
     format!("{PREFIX}{shown} {}", "\u{2500}".repeat(dashes))
 }
 
+/// The Ideas section's done header: `done`, the number of rows the group
+/// holds in parentheses, and ` · d to show` while folded or ` · d to fold`
+/// while open, drawn as a group header. Where the list cannot hold the leading
+/// rule, all those words, and a space, the key clause goes whole and the rest
+/// is drawn as any header's words are. @spec TUI-NAV-111
+pub fn done_header_line(count: usize, open: bool, width: usize) -> String {
+    let short = format!("done ({count})");
+    let full = format!("{short} \u{b7} d to {}", if open { "fold" } else { "show" });
+    let leading = "\u{2500}\u{2500} ".chars().count();
+    if width > leading + full.chars().count() {
+        group_header_line(&full, width)
+    } else {
+        group_header_line(&short, width)
+    }
+}
+
 /// Shorten a name to fit, with an explicit ellipsis so the player can see that
 /// text was cut. The full name stays available in the inspector.
 /// @spec TUI-RENDER-014

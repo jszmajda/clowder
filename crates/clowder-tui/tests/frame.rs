@@ -65,7 +65,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::Terminal;
 
-use nav::rows::{rows, Row, RowKey, RowKind};
+use nav::rows::{drawn_rows, rows, Row, RowKey, RowKind};
 use nav::{Section, ViewState};
 use render::layout::{compute, Body, Layout};
 
@@ -864,6 +864,9 @@ struct HeaderLine {
 fn header_above(state: &GameState, section: Section, beneath: &RowKey, w: u16, h: u16) -> HeaderLine {
     let mut view = ViewState { section: Some(section), ..Default::default() };
     view.focus[section.index()] = Some(beneath.clone());
+    // The rows beneath the Ideas section's done header are drawn only while
+    // its group is open (TUI-NAV-113).
+    unfold_focus(state, &mut view);
     let d = cold(state, &view, w, h);
     let rect = list_rect(&d.layout);
     let lines = region_lines(&d.buffer, rect);
@@ -912,32 +915,41 @@ fn words_of(line: &str) -> String {
 /// over a section's own verbs in every section that has them, `stores` over
 /// resources, and the plain plural for every other kind — lowercase, carrying
 /// no figure. Quantified over every header of every several-group section, in
-/// a meadow that lists every group the design names, which the test checks.
+/// meadows that between them list every group the design names, which the
+/// test checks — the done header aside, which TUI-NAV-111 words.
 ///
 /// @spec TUI-NAV-100
 #[test]
 fn every_group_header_is_worded_as_the_plain_plural_of_its_kind() {
-    let state = every_group_listed();
     let mut seen: BTreeSet<(usize, &'static str)> = BTreeSet::new();
 
-    for (section, beneath) in headers_of(&state) {
-        let expected = header_words_for(&beneath);
-        let line = header_above(&state, section, &beneath.key, WIDE, TALL);
-        let words = words_of(&line.text);
-        assert_eq!(
-            words, expected,
-            "{}'s header over {:?} reads {:?}; the design words it {expected:?}. Line: {:?}",
-            section.title(),
-            beneath.key,
-            words,
-            line.text
-        );
-        assert!(
-            !words.chars().any(|c| c.is_ascii_digit() || c.is_uppercase()),
-            "{}'s header {words:?} carries a figure or a capital",
-            section.title()
-        );
-        seen.insert((section.index(), expected));
+    // The every-group meadow has researched every idea, so its ideas group is
+    // gathered into the done group; the part-done meadow lists it.
+    for state in [every_group_listed(), ideas_part_done()] {
+        for (section, beneath) in headers_of(&state) {
+            // The Ideas section's done header is worded as TUI-NAV-111 has it,
+            // and tested there; it is the one header above finished rows.
+            if section == Section::Ideas && is_done(&state, &beneath) {
+                continue;
+            }
+            let expected = header_words_for(&beneath);
+            let line = header_above(&state, section, &beneath.key, WIDE, TALL);
+            let words = words_of(&line.text);
+            assert_eq!(
+                words, expected,
+                "{}'s header over {:?} reads {:?}; the design words it {expected:?}. Line: {:?}",
+                section.title(),
+                beneath.key,
+                words,
+                line.text
+            );
+            assert!(
+                !words.chars().any(|c| c.is_ascii_digit() || c.is_uppercase()),
+                "{}'s header {words:?} carries a figure or a capital",
+                section.title()
+            );
+            seen.insert((section.index(), expected));
+        }
     }
 
     let missing: Vec<String> = designed_headers()
@@ -1359,6 +1371,7 @@ fn inspector_name(state: &GameState, section: Section, key: &RowKey) -> String {
     let (w, h) = (180u16, 6u16);
     let mut view = ViewState { section: Some(section), ..Default::default() };
     view.focus[section.index()] = Some(key.clone());
+    unfold_focus(state, &mut view);
     let mut term = terminal(w, h);
     term.draw(|f| inspector::draw(f, area(w, h), state, &view)).expect("TestBackend is infallible");
     cell_lines(term.backend().buffer(), area(w, h))[0].concat().trim().to_string()
@@ -1603,6 +1616,11 @@ fn every_list_row_draws_its_count_and_cost_in_fixed_fields_at_its_right() {
             for (w, h) in [(FLOOR_W, FLOOR_H), (99, 30), (100, 30), (130, TALL), (200, 60)] {
                 for cursor in [first, last] {
                     let mut view = ViewState { section: Some(section), ..Default::default() };
+                    // Every listed row is drawn, in list order, only with the
+                    // Ideas section's done group open (TUI-NAV-113).
+                    if drawn_rows(state, section, &view) != all {
+                        press_done_key(state, &mut view);
+                    }
                     view.focus[section.index()] = Some(all[cursor].key.clone());
                     let d = cold(state, &view, w, h);
                     let space = list_space(&d.layout);
@@ -2926,5 +2944,285 @@ fn a_kittens_state_word_follows_the_core_on_the_next_frame() {
                 line.concat()
             );
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-111, TUI-NAV-113, TUI-NAV-120 — the done group (Ideas), drawn
+// ---------------------------------------------------------------------------
+
+/// Whether the core names `row`'s item already the player's.
+fn is_done(state: &GameState, row: &Row) -> bool {
+    match &row.key {
+        RowKey::Content(id, _) => state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours),
+        _ => false,
+    }
+}
+
+/// `d` pressed as the player presses it, the repeat clock cleared after.
+fn press_done_key(state: &GameState, view: &mut ViewState) {
+    let d = nav::keys::resolve(
+        crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Char('d'), crossterm::event::KeyModifiers::NONE),
+        view,
+    );
+    nav::update(d, view, state);
+    view.last_repeat = None;
+}
+
+/// Where `view`'s focused row is listed but folded into the done group, open
+/// the group by its key, keeping the focus on that row.
+fn unfold_focus(state: &GameState, view: &mut ViewState) {
+    let Some(section) = view.section else { return };
+    let Some(key) = view.focus[section.index()].clone() else { return };
+    if drawn_rows(state, section, view).iter().any(|r| r.key == key)
+        || !rows(state, section).iter().any(|r| r.key == key)
+    {
+        return;
+    }
+    press_done_key(state, view);
+    view.focus[section.index()] = Some(key);
+}
+
+/// The every-group meadow with part of its Ideas screen done: every other idea
+/// no other idea needs left unresearched, every other refinement on offer
+/// bought, and one rule adopted from each of two pairs.
+fn ideas_part_done() -> GameState {
+    use clowder_core::content::{idea_def, refinement_def, rule_def};
+    use clowder_core::{IdeaId, RefinementId, RuleId};
+    let mut s = every_group_listed();
+    let leaves: Vec<IdeaId> = IdeaId::ALL
+        .iter()
+        .copied()
+        .filter(|i| !IdeaId::ALL.iter().any(|j| idea_def(*j).prereqs.contains(i)))
+        .collect();
+    for (n, i) in leaves.iter().enumerate() {
+        if n % 2 == 0 {
+            s.ideas.remove(i);
+        }
+    }
+    let mut n = 0;
+    for r in RefinementId::ALL {
+        if s.ideas.contains(&refinement_def(r).gate) {
+            if n % 2 == 0 {
+                s.refinements.insert(r);
+            }
+            n += 1;
+        }
+    }
+    let mut paired: Vec<RuleId> = Vec::new();
+    let mut pair = 0;
+    for r in RuleId::ALL {
+        if paired.contains(&r) {
+            continue;
+        }
+        paired.push(r);
+        paired.push(rule_def(r).blocks);
+        if pair % 2 == 0 {
+            s.rules.insert(r);
+        }
+        pair += 1;
+    }
+    s
+}
+
+/// The every-group meadow with every row of its Ideas screen done.
+fn ideas_all_done() -> GameState {
+    use clowder_core::content::rule_def;
+    use clowder_core::{RefinementId, RuleId};
+    let mut s = every_group_listed();
+    s.refinements = RefinementId::ALL.iter().copied().collect();
+    let mut paired: Vec<RuleId> = Vec::new();
+    for r in RuleId::ALL {
+        if !paired.contains(&r) {
+            paired.push(r);
+            paired.push(rule_def(r).blocks);
+            s.rules.insert(r);
+        }
+    }
+    s
+}
+
+/// The every-group meadow with nothing on its Ideas screen done.
+fn ideas_none_done() -> GameState {
+    let mut s = every_group_listed();
+    s.ideas = BTreeSet::new();
+    s.refinements = BTreeSet::new();
+    s.rules = BTreeSet::new();
+    s
+}
+
+/// The Ideas screen entered as a player enters it, its group open or folded,
+/// and the cursor then put on `at` where one is given.
+fn ideas_view(state: &GameState, open: bool, at: Option<RowKey>) -> ViewState {
+    let mut v = ViewState::default();
+    nav::opening(&mut v, state);
+    nav::update(nav::Action::SectionJump(Section::Ideas), &mut v, state);
+    if open {
+        press_done_key(state, &mut v);
+    }
+    if let Some(k) = at {
+        v.focus[Section::Ideas.index()] = Some(k);
+    }
+    v
+}
+
+/// The words of every drawn line of the list that reads as the done header.
+fn done_headers_drawn(d: &Drawn) -> Vec<String> {
+    list_lines(d)
+        .iter()
+        .filter(|l| l.starts_with("\u{2500}\u{2500} done"))
+        .map(|l| words_of(l))
+        .collect()
+}
+
+/// The done header's words are `done`, the number of rows its group holds in
+/// parentheses, and ` · d to show` while folded or ` · d to fold` while open,
+/// drawn as one header at the supported floor and wide; the count is the
+/// group's rows, the same folded or open, and is re-derived on the frame after
+/// another row finishes. With nothing finished there is no done header.
+///
+/// @spec TUI-NAV-111
+#[test]
+fn the_done_header_counts_its_rows_and_names_its_key_folded_and_open() {
+    for (label, state) in [("part done", ideas_part_done()), ("all done", ideas_all_done())] {
+        let n = rows(&state, Section::Ideas).iter().filter(|r| is_done(&state, r)).count();
+        assert!(n > 0, "fixture: {label} has finished Ideas rows");
+        for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE, TALL)] {
+            for open in [false, true] {
+                let want = format!("done ({n}) \u{b7} d to {}", if open { "fold" } else { "show" });
+                // The cursor sits next to the header so it is in view: the
+                // last row drawn above it while folded, its first row open.
+                let probe = ideas_view(&state, open, None);
+                let drawn = drawn_rows(&state, Section::Ideas, &probe);
+                let header = drawn.iter().rposition(|r| matches!(r.kind, RowKind::Group)).expect("a header is drawn");
+                let at = if open {
+                    drawn.get(header + 1).map(|r| r.key.clone())
+                } else {
+                    drawn[..header].iter().rev().find(|r| r.selectable()).map(|r| r.key.clone())
+                };
+                let view = ideas_view(&state, open, at);
+                let d = cold(&state, &view, w, h);
+                assert_eq!(
+                    done_headers_drawn(&d),
+                    vec![want.clone()],
+                    "{label} at {w}x{h} (group open: {open}): the done header is not drawn once as \
+                     {want:?}. List:\n{}",
+                    list_lines(&d).join("\n")
+                );
+            }
+        }
+    }
+
+    // Re-derived on every frame: one more finished row, one more in the count.
+    let state = ideas_part_done();
+    let view = ideas_view(&state, true, None);
+    let n = rows(&state, Section::Ideas).iter().filter(|r| is_done(&state, r)).count();
+    let mut more = state.clone();
+    let next = rows(&state, Section::Ideas)
+        .into_iter()
+        .find_map(|r| match r.key {
+            RowKey::Content(ContentId::Idea(i), _) if !is_done(&state, &r) && state.lock_reason(ContentId::Idea(i)).is_none() => Some(i),
+            _ => None,
+        })
+        .expect("fixture: an idea is ready to research");
+    more.ideas.insert(next);
+    let m = rows(&more, Section::Ideas).iter().filter(|r| is_done(&more, r)).count();
+    assert!(m > n, "fixture: researching an idea finishes one more row");
+    let mut v = view.clone();
+    let drawn = drawn_rows(&more, Section::Ideas, &v);
+    let header = drawn.iter().rposition(|r| matches!(r.kind, RowKind::Group)).expect("a header is drawn");
+    v.focus[Section::Ideas.index()] = drawn.get(header + 1).map(|r| r.key.clone());
+    let d = cold(&more, &v, WIDE, VERY_TALL);
+    assert_eq!(
+        done_headers_drawn(&d),
+        vec![format!("done ({m}) \u{b7} d to fold")],
+        "after another row finished the done header did not count it"
+    );
+
+    let none = ideas_none_done();
+    assert!(rows(&none, Section::Ideas).iter().any(|r| r.selectable()), "fixture: the Ideas screen lists rows");
+    for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE, VERY_TALL)] {
+        let d = cold(&none, &ideas_view(&none, false, None), w, h);
+        assert!(done_headers_drawn(&d).is_empty(), "with nothing finished a done header is drawn at {w}x{h}");
+    }
+}
+
+/// Where the list cannot hold the leading rule, all of the done header's
+/// words, and a space, the header leaves out its key clause whole and draws the
+/// rest as any header's words are drawn; where it can, it draws them all.
+/// Quantified over every list width up to past the longest header, both
+/// clauses, and counts of one to four digits.
+///
+/// @spec TUI-NAV-111
+#[test]
+fn the_done_headers_key_clause_gives_way_whole_where_the_list_cannot_hold_it() {
+    for count in [1usize, 9, 12, 100, 1234] {
+        for open in [false, true] {
+            let full = format!("done ({count}) \u{b7} d to {}", if open { "fold" } else { "show" });
+            let short = format!("done ({count})");
+            for width in 0..=60usize {
+                let got = render::fmt::done_header_line(count, open, width);
+                let want = if width > 3 + full.chars().count() {
+                    render::fmt::group_header_line(&full, width)
+                } else {
+                    render::fmt::group_header_line(&short, width)
+                };
+                assert_eq!(
+                    got, want,
+                    "the done header holding {count} row(s) (open: {open}) at {width} columns reads \
+                     {got:?}, not {want:?}"
+                );
+            }
+        }
+    }
+}
+
+/// While every row the Ideas section lists is folded, the list draws the done
+/// header alone and no cursor, at the supported floor and wide.
+///
+/// @spec TUI-NAV-120
+#[test]
+fn with_every_row_folded_the_list_draws_the_done_header_alone_and_no_cursor() {
+    let state = ideas_all_done();
+    let view = ideas_view(&state, false, None);
+    for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE, TALL)] {
+        let d = cold(&state, &view, w, h);
+        let lines: Vec<String> = list_lines(&d).into_iter().filter(|l| !l.trim().is_empty()).collect();
+        assert_eq!(lines.len(), 1, "at {w}x{h} the all-folded list draws {} line(s):\n{}", lines.len(), lines.join("\n"));
+        assert!(lines[0].starts_with("\u{2500}\u{2500} done"), "at {w}x{h} the one line drawn is not the done header: {:?}", lines[0]);
+        assert!(!lines[0].contains('\u{25B8}'), "at {w}x{h} a cursor is drawn on the done header");
+    }
+}
+
+/// While the done group is open its rows are rows like any other: the cursor
+/// is drawn on the open row it rests on, and the inspector describes that row,
+/// naming its item.
+///
+/// @spec TUI-NAV-113
+#[test]
+fn an_open_done_row_is_drawn_under_the_cursor_and_described_by_the_inspector() {
+    let state = ideas_part_done();
+    let done: Vec<RowKey> = rows(&state, Section::Ideas)
+        .into_iter()
+        .filter(|r| is_done(&state, r))
+        .map(|r| r.key)
+        .collect();
+    let names = nav::palette::results(&state, "");
+    for key in &done {
+        let view = ideas_view(&state, true, Some(key.clone()));
+        let d = cold(&state, &view, WIDE, TALL);
+        let name = &names.iter().find(|r| &r.key == key).expect("a finished row is a palette result").name;
+        let head: String = name.chars().take(8).collect();
+        let cursor_line = list_lines(&d)
+            .into_iter()
+            .find(|l| l.contains('\u{25B8}'))
+            .unwrap_or_else(|| panic!("no cursor is drawn with the open done row {key:?} focused"));
+        assert!(cursor_line.contains(&head), "the cursor is drawn on {cursor_line:?}, not on {key:?}");
+        let inspector = match d.layout.body {
+            Body::Wide { inspector, .. } => inspector,
+            other => panic!("fixture: {WIDE}x{TALL} lays out the inspector pane, not {other:?}"),
+        };
+        let pane = region_lines(&d.buffer, inspector).join("\n");
+        assert!(pane.contains(&head), "the inspector does not describe the open done row {key:?}:\n{pane}");
     }
 }

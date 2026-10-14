@@ -4,11 +4,12 @@
 
 use clowder_core::{
     AdventureId, ArchId, ColonyId, Command, ContentId, CraftId, DreamLoomId, GameState, IdeaId,
-    JobId, RefinementId, ResourceId, RiteId, RuleId, SiteId, StructureId, TraditionId,
+    JobId, LockReason, RefinementId, ResourceId, RiteId, RuleId, SiteId, StructureId, TraditionId,
 };
 
 use super::action::CountSemantics;
 use super::section::Section;
+use super::view::ViewState;
 
 /// A row's stable identity. The cursor remembers *this*, never a list index,
 /// so returning to a section restores the same item even after intervening
@@ -228,34 +229,94 @@ fn clowder_rows(state: &GameState) -> Vec<Row> {
     out
 }
 
+/// The key of the Ideas section's done group header. @spec TUI-NAV-111
+pub const DONE_HEADER: &str = "done";
+
+/// Whether the core names `id`'s item already the player's — the answer
+/// behind a row's ✓, and the one rule for what is finished. The shell judges
+/// by no rule of its own. @spec TUI-NAV-110
+fn finished(state: &GameState, id: ContentId) -> bool {
+    state.lock_reason(id) == Some(LockReason::AlreadyYours)
+}
+
+/// The Ideas section: its three kinds' unfinished rows in table order, then
+/// one done group of every finished row, ideas first, then refinements, then
+/// rules. @spec TUI-NAV-009, TUI-NAV-097, TUI-NAV-098, TUI-NAV-110
 fn ideas_rows(state: &GameState) -> Vec<Row> {
-    let mut ideas = Vec::new();
+    let (mut ideas, mut refinements, mut rules) = (Vec::new(), Vec::new(), Vec::new());
+    let (mut done_ideas, mut done_refinements, mut done_rules) = (Vec::new(), Vec::new(), Vec::new());
     for i in IdeaId::ALL {
         let id = ContentId::Idea(i);
         if revealed(state, id) {
-            ideas.push(Row { key: RowKey::Content(id, ""), kind: act(Command::ResearchIdea(i), CountSemantics::Single), heavy: false });
+            let row = Row { key: RowKey::Content(id, ""), kind: act(Command::ResearchIdea(i), CountSemantics::Single), heavy: false };
+            if finished(state, id) { done_ideas.push(row) } else { ideas.push(row) }
         }
     }
-    let mut out = headed_group(state, "ideas", ideas);
-
-    let mut refinements = Vec::new();
     for r in RefinementId::ALL {
         let id = ContentId::Refinement(r);
         if revealed(state, id) {
-            refinements.push(Row { key: RowKey::Content(id, ""), kind: act(Command::BuyRefinement(r), CountSemantics::RepeatN), heavy: false });
+            let row = Row { key: RowKey::Content(id, ""), kind: act(Command::BuyRefinement(r), CountSemantics::RepeatN), heavy: false };
+            if finished(state, id) { done_refinements.push(row) } else { refinements.push(row) }
         }
     }
-    out.extend(headed_group(state, "refinements", refinements));
-
-    let mut rules = Vec::new();
     for r in RuleId::ALL {
         let id = ContentId::Rule(r);
         if revealed(state, id) {
-            rules.push(Row { key: RowKey::Content(id, ""), kind: act(Command::AdoptRule(r), CountSemantics::Single), heavy: true });
+            let row = Row { key: RowKey::Content(id, ""), kind: act(Command::AdoptRule(r), CountSemantics::Single), heavy: true };
+            if finished(state, id) { done_rules.push(row) } else { rules.push(row) }
         }
     }
+
+    let mut out = headed_group(state, "ideas", ideas);
+    out.extend(headed_group(state, "refinements", refinements));
     out.extend(headed_group(state, "rules", rules));
+    let mut done = done_ideas;
+    done.extend(done_refinements);
+    done.extend(done_rules);
+    out.extend(headed_group(state, DONE_HEADER, done));
     out
+}
+
+/// How many rows the Ideas section's done group holds — zero when it is not
+/// listed. @spec TUI-NAV-111
+pub fn done_count(state: &GameState) -> usize {
+    let list = rows(state, Section::Ideas);
+    match list.iter().position(is_done_header) {
+        Some(h) => list.len() - h - 1,
+        None => 0,
+    }
+}
+
+/// Whether `row` is the Ideas section's done group header. @spec TUI-NAV-111
+pub fn is_done_header(row: &Row) -> bool {
+    matches!(row.kind, RowKind::Group) && row.key == RowKey::Fixed(DONE_HEADER)
+}
+
+/// The rows `section`'s list draws under `view`: every listed row, save that
+/// the Ideas section's done group, while folded, draws its header and none of
+/// its rows. The cursor visits exactly the selectable rows of this list.
+/// @spec TUI-NAV-113
+pub fn drawn_rows(state: &GameState, section: Section, view: &ViewState) -> Vec<Row> {
+    let mut list = rows(state, section);
+    if section == Section::Ideas && !view.done_open {
+        if let Some(h) = list.iter().position(is_done_header) {
+            list.truncate(h + 1);
+        }
+    }
+    list
+}
+
+/// A row of the Ideas section's place in its own kind's group, in the order
+/// the core lists the kind, the kinds in the order the groups stand — the
+/// place a finished row held before it moved to the done group. `None` for a
+/// row that is not an idea, refinement or rule. @spec TUI-NAV-117
+pub fn ideas_place(key: &RowKey) -> Option<(usize, usize)> {
+    match key {
+        RowKey::Content(ContentId::Idea(i), _) => IdeaId::ALL.iter().position(|x| x == i).map(|p| (0, p)),
+        RowKey::Content(ContentId::Refinement(r), _) => RefinementId::ALL.iter().position(|x| x == r).map(|p| (1, p)),
+        RowKey::Content(ContentId::Rule(r), _) => RuleId::ALL.iter().position(|x| x == r).map(|p| (2, p)),
+        _ => None,
+    }
 }
 
 fn crafts_rows(state: &GameState) -> Vec<Row> {

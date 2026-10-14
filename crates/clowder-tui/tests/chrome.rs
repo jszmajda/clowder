@@ -49,7 +49,7 @@ use ratatui::layout::Rect;
 use ratatui::Terminal;
 
 use clowder_tui::nav::palette::results;
-use clowder_tui::nav::rows::{rows, tab_sections, Row, RowKey, RowKind};
+use clowder_tui::nav::rows::{drawn_rows, rows, tab_sections, Row, RowKey, RowKind};
 use clowder_tui::nav::{
     opening, reset_hidden_tabs, update, Action, ArmedRow, CountPrompt, CountSemantics, Overlay,
     PendingReport, Section, SeenMark, ViewState,
@@ -176,7 +176,33 @@ fn focus_on(state: &GameState, section: Section, key: RowKey) -> ViewState {
     let mut v = calm_view(state);
     v.section = Some(section);
     v.focus[section.index()] = Some(key);
+    unfold_focus(state, &mut v);
     v
+}
+
+/// `d` pressed as the player presses it, the repeat clock cleared after.
+fn press_done_key(state: &GameState, view: &mut ViewState) {
+    let d = clowder_tui::nav::keys::resolve(
+        crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Char('d'), crossterm::event::KeyModifiers::NONE),
+        view,
+    );
+    update(d, view, state);
+    view.last_repeat = None;
+}
+
+/// Where `view`'s focused row is listed but folded into the Ideas section's
+/// done group, open the group by its key — the one way a player reaches such
+/// a row (TUI-NAV-113) — keeping the focus on that row.
+fn unfold_focus(state: &GameState, view: &mut ViewState) {
+    let Some(section) = view.section else { return };
+    let Some(key) = view.focus[section.index()].clone() else { return };
+    if drawn_rows(state, section, view).iter().any(|r| r.key == key)
+        || !rows(state, section).iter().any(|r| r.key == key)
+    {
+        return;
+    }
+    press_done_key(state, view);
+    view.focus[section.index()] = Some(key);
 }
 
 /// The first row of a section matching a predicate, by identity.
@@ -2149,6 +2175,7 @@ fn among_the_compressed_run_each_glyph_wears_only_its_own_colour() {
                 let mut v = base.clone();
                 v.section = Some(section);
                 v.focus[section.index()] = Some(key.clone());
+                unfold_focus(&state, &mut v);
                 v.inspector_wanted = true;
                 views.push((format!("{} section, cursor on {key:?}", section.title()), v, vec![pane]));
             }
@@ -2688,6 +2715,7 @@ fn nothing_but_a_chip_or_a_full_tag_wears_attention_in_a_frame_with_nothing_arme
                 let mut v = base.clone();
                 v.section = Some(section);
                 v.focus[section.index()] = Some(key.clone());
+                unfold_focus(state, &mut v);
                 v.inspector_wanted = true;
                 views.push((format!("{} section, cursor on {key:?}", section.title()), v, vec![pane]));
             }
@@ -4004,12 +4032,25 @@ fn the_hint_bar_names_every_live_mnemonic_but_the_focused_rows_own_in_its_place(
                     .collect();
                 own_unnamed += (live.len() - expected.len()) as u32;
 
+                // The Ideas screen's done key is the other letter TUI-NAV-082
+                // names that is not a mnemonic; where it is named, it is named
+                // as TUI-NAV-122 has it, and its own test covers where.
+                if section == Section::Ideas {
+                    for entry in hint_entries(&line).iter().filter(|e| e.starts_with("d ")) {
+                        assert!(
+                            entry == "d show done" || entry == "d fold done",
+                            "{whr}, the hint bar names the done key as {entry:?}.\nhint bar: {line:?}"
+                        );
+                    }
+                }
+
                 // Exactly the expected letters, each once, and no other letter
                 // outside the global table.
                 let mut named_letters: Vec<char> = keys
                     .iter()
                     .filter_map(|k| k.chars().next().filter(|_| k.chars().count() == 1))
                     .filter(|c| c.is_ascii_lowercase() && !GLOBAL_LETTERS.contains(c))
+                    .filter(|c| !(section == Section::Ideas && *c == 'd'))
                     .collect();
                 named_letters.sort_unstable();
                 let mut want: Vec<char> = expected.iter().map(|(c, _)| *c).collect();
@@ -5353,5 +5394,206 @@ fn stores_at_nothing_stay_among_the_stores_the_sidebar_chooses_from_and_counts()
             side.width as usize,
             &format!("a sidebar {} wide with room for all", side.width),
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-122, TUI-NAV-123 — the done key, named
+// ---------------------------------------------------------------------------
+
+/// Whether the core names `row`'s item already the player's.
+fn is_done(state: &GameState, row: &Row) -> bool {
+    match &row.key {
+        RowKey::Content(id, _) => state.lock_reason(*id) == Some(LockReason::AlreadyYours),
+        _ => false,
+    }
+}
+
+/// A view on the Ideas screen with the cursor where a player entering it
+/// would find it, its done group open or folded.
+fn on_ideas(state: &GameState, open: bool) -> ViewState {
+    let mut v = calm_view(state);
+    update(Action::SectionJump(Section::Ideas), &mut v, state);
+    if open {
+        press_done_key(state, &mut v);
+    }
+    v
+}
+
+/// Every view of the Ideas screen with nothing holding the hint bar: the
+/// cursor on each drawn row, with the group folded and then open.
+fn ideas_hint_views(state: &GameState) -> Vec<(bool, ViewState)> {
+    let mut out = Vec::new();
+    for open in [false, true] {
+        let base = on_ideas(state, open);
+        out.push((open, base.clone()));
+        for row in drawn_rows(state, Section::Ideas, &base).into_iter().filter(|r| r.selectable()) {
+            let mut v = base.clone();
+            v.focus[Section::Ideas.index()] = Some(row.key);
+            out.push((open, v));
+        }
+    }
+    out
+}
+
+/// The every-section meadow with every row of its Ideas screen done.
+fn ideas_all_done(state: &GameState) -> GameState {
+    let mut s = state.clone();
+    s.refinements = clowder_core::RefinementId::ALL.iter().copied().collect();
+    let mut paired: Vec<RuleId> = Vec::new();
+    for r in RuleId::ALL {
+        if !paired.contains(&r) {
+            paired.push(r);
+            paired.push(content::rule_def(r).blocks);
+            s.rules.insert(r);
+        }
+    }
+    assert!(
+        rows(&s, Section::Ideas).iter().filter(|r| r.selectable()).all(|r| is_done(&s, r)),
+        "fixture: every Ideas row is done"
+    );
+    s
+}
+
+/// The every-section meadow with nothing on its Ideas screen done.
+fn ideas_none_done(state: &GameState) -> GameState {
+    let mut s = state.clone();
+    s.ideas = BTreeSet::new();
+    s.refinements = BTreeSet::new();
+    s.rules = BTreeSet::new();
+    let list = rows(&s, Section::Ideas);
+    assert!(list.iter().any(|r| r.selectable()), "fixture: the Ideas screen lists rows");
+    assert!(!list.iter().any(|r| is_done(&s, r)), "fixture: no Ideas row is done");
+    s
+}
+
+/// Wherever the hint bar shows the focused row's keys and `d` is live, it
+/// names the done key — `d show done` while the group is folded, `d fold
+/// done` while it is open — after every other context key and directly before
+/// the help key: on every drawn row of the Ideas screen, folded and open, and
+/// with the cursor resting on no row because every row is folded. Since it is
+/// named last, it is the first key the bar drops for width: at every width
+/// the bar's keys are the head of the widest bar's.
+///
+/// @spec TUI-NAV-122
+#[test]
+fn the_hint_bar_names_the_done_key_last_before_help_wherever_it_is_live() {
+    let far = every_section_revealed();
+    let all_done = ideas_all_done(&far);
+    let mut checked = 0;
+    for (label, state) in [("far along", &far), ("every Ideas row done", &all_done)] {
+        assert!(rows(state, Section::Ideas).iter().any(|r| is_done(state, r)), "fixture: {label} has a done group");
+        for (open, view) in ideas_hint_views(state) {
+            let want = if open { "d fold done" } else { "d show done" };
+            let line = hint_line(state, &view, WIDE_W);
+            let entries = hint_entries(&line);
+            let n = entries.len();
+            assert!(
+                n >= 2 && entries[n - 2] == want && entries[n - 1] == "? help",
+                "{label}, Ideas screen (group open: {open}, cursor {:?}): the hint bar does not name \
+                 `{want}` directly before the help key.\nhint bar: {line:?}",
+                view.focus[Section::Ideas.index()]
+            );
+            let wide: Vec<String> = entries[..n - 1].to_vec();
+            for w in (20..WIDE_W).step_by(3) {
+                let narrow = hint_entries(&hint_line(state, &view, w));
+                let kept = &narrow[..narrow.len().saturating_sub(1)];
+                assert!(
+                    wide.starts_with(kept),
+                    "{label}, at {w} columns the hint bar keeps {kept:?}, which is not the head of \
+                     {wide:?}; the done key, named last, is the first dropped"
+                );
+            }
+            checked += 1;
+        }
+    }
+    let rested = on_ideas(&all_done, false);
+    assert!(
+        !drawn_rows(&all_done, Section::Ideas, &rested).iter().any(|r| r.selectable()),
+        "with every Ideas row done and the group folded, a row is still drawn (TUI-NAV-113)"
+    );
+    assert!(checked > 10, "fixture: too few Ideas views were checked");
+}
+
+/// The done key is named nowhere it is not live, nor while anything else holds
+/// the hint bar: on every other screen with every row focused, on an Ideas
+/// screen with nothing done, and on the Ideas screen under an open field, a
+/// full-screen overlay, or an armed row.
+///
+/// @spec TUI-NAV-122
+#[test]
+fn the_hint_bar_names_the_done_key_nowhere_it_is_not_live() {
+    let far = every_section_revealed();
+    let named = |line: &str| hint_entries(line).iter().any(|e| e.starts_with("d "));
+    for section in Section::ALL.into_iter().filter(|s| *s != Section::Ideas) {
+        for row in rows(&far, section).into_iter().filter(|r| r.selectable()) {
+            let line = hint_line(&far, &focus_on(&far, section, row.key.clone()), WIDE_W);
+            assert!(!named(&line), "on the {} screen with {:?} focused the hint bar names d: {line:?}", section.title(), row.key);
+        }
+    }
+    let none = ideas_none_done(&far);
+    for (_, view) in ideas_hint_views(&none) {
+        let line = hint_line(&none, &view, WIDE_W);
+        assert!(!named(&line), "with nothing done on the Ideas screen the hint bar names d: {line:?}");
+    }
+
+    let base = on_ideas(&far, false);
+    let mut palette = base.clone();
+    palette.overlay = Some(Overlay::Palette { query: String::new(), selected: 0 });
+    let mut prompt = base.clone();
+    prompt.prompt = Some(CountPrompt { digits: "3".to_string(), ..Default::default() });
+    let mut help = base.clone();
+    help.overlay = Some(Overlay::Help);
+    let mut journal = base.clone();
+    journal.overlay = Some(Overlay::Journal { anchor: 0 });
+    let rule = drawn_rows(&far, Section::Ideas, &base)
+        .into_iter()
+        .find(|r| r.heavy && !is_done(&far, r))
+        .expect("fixture: a rule is drawn to arm");
+    let mut armed = base.clone();
+    armed.focus[Section::Ideas.index()] = Some(rule.key.clone());
+    armed.armed = Some(ArmedRow {
+        key: rule.key.clone(),
+        command: match rule.kind {
+            RowKind::Act { command, .. } => command,
+            _ => panic!("fixture: a rule row acts"),
+        },
+        expires_at: Instant::now() + Duration::from_secs(8),
+    });
+    for (what, view) in [("the palette", palette), ("the count prompt", prompt), ("help", help), ("the Journal", journal), ("an armed row", armed)] {
+        let line = hint_line(&far, &view, WIDE_W);
+        assert!(!named(&line), "with {what} holding the hint bar on the Ideas screen it names d: {line:?}");
+    }
+}
+
+/// The help overlay lists the done key among the Ideas screen's keys, worded
+/// `d show or fold done`, and lists `d` among no other screen's keys.
+///
+/// @spec TUI-NAV-122, TUI-NAV-123
+#[test]
+fn the_help_overlay_lists_d_show_or_fold_done_among_the_ideas_keys_alone() {
+    let (w, h) = (120u16, 60u16);
+    let mut term = terminal(w, h);
+    term.draw(|f| {
+        let area = f.area();
+        overlays::help(f, area);
+    })
+    .expect("TestBackend is infallible");
+    let lines = region_lines(term.backend().buffer(), Rect::new(0, 0, w, h));
+    let screen_line = |s: Section| lines.iter().find(|l| l.trim_start().starts_with(s.title())).cloned();
+    let ideas = screen_line(Section::Ideas).unwrap_or_else(|| panic!("the help overlay has no line for the Ideas screen's keys"));
+    assert!(
+        ideas.contains("d show or fold done"),
+        "the help overlay's Ideas line does not list the done key as `d show or fold done`.\nline: {ideas:?}"
+    );
+    for section in Section::ALL.into_iter().filter(|s| *s != Section::Ideas) {
+        if let Some(line) = screen_line(section) {
+            let rest = line.trim_start().strip_prefix(section.title()).unwrap_or("");
+            assert!(
+                !rest.split('/').any(|e| e.trim_start().starts_with("d ")),
+                "the help overlay lists d among the {} screen's keys: {line:?}",
+                section.title()
+            );
+        }
     }
 }

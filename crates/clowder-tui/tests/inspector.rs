@@ -131,10 +131,33 @@ fn terminal(w: u16, h: u16) -> Terminal<TestBackend> {
 
 /// Draw the inspector into `rect` of an otherwise blank terminal.
 fn render(state: &GameState, view: &ViewState, w: u16, h: u16, rect: Rect) -> Buffer {
+    let view = &reachable(state, view);
     let mut term = terminal(w, h);
     term.draw(|f| inspector::draw(f, rect, state, view))
         .expect("TestBackend is infallible");
     term.backend().buffer().clone()
+}
+
+/// The view a player could be in with the same row under the cursor: where
+/// that row is an Ideas row folded into the done group, the group opened by
+/// its key first, the focus kept on the row (TUI-NAV-113).
+fn reachable(state: &GameState, view: &ViewState) -> ViewState {
+    let mut v = view.clone();
+    let Some(section) = v.section else { return v };
+    let Some(key) = v.focus[section.index()].clone() else { return v };
+    if clowder_tui::nav::rows::drawn_rows(state, section, &v).iter().any(|r| r.key == key)
+        || !rows(state, section).iter().any(|r| r.key == key)
+    {
+        return v;
+    }
+    let d = clowder_tui::nav::keys::resolve(
+        crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Char('d'), crossterm::event::KeyModifiers::NONE),
+        &v,
+    );
+    clowder_tui::nav::update(d, &mut v, state);
+    v.last_repeat = None;
+    v.focus[section.index()] = Some(key);
+    v
 }
 
 /// Draw the inspector into `rect` of a terminal already covered in `SENTINEL`,

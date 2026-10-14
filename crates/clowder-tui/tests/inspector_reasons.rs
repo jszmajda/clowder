@@ -48,11 +48,34 @@ use clowder_tui::render::widgets::inspector::{self, lock_reason_text};
 const WIDE: u16 = 200;
 const TALL: u16 = 40;
 
+/// The view a player could be in with the same row under the cursor: where
+/// that row is an Ideas row folded into the done group, the group opened by
+/// its key first, the focus kept on the row (TUI-NAV-113).
+fn reachable(state: &GameState, view: &ViewState) -> ViewState {
+    let mut v = view.clone();
+    let Some(section) = v.section else { return v };
+    let Some(key) = v.focus[section.index()].clone() else { return v };
+    if clowder_tui::nav::rows::drawn_rows(state, section, &v).iter().any(|r| r.key == key)
+        || !rows(state, section).iter().any(|r| r.key == key)
+    {
+        return v;
+    }
+    let d = clowder_tui::nav::keys::resolve(
+        crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Char('d'), crossterm::event::KeyModifiers::NONE),
+        &v,
+    );
+    clowder_tui::nav::update(d, &mut v, state);
+    v.last_repeat = None;
+    v.focus[section.index()] = Some(key);
+    v
+}
+
 fn pane_text(state: &GameState, view: &ViewState) -> String {
     let rect = match compute(Rect::new(0, 0, WIDE, TALL), None, false).body {
         Body::Wide { inspector, .. } => inspector,
         other => panic!("fixture: {WIDE}x{TALL} should lay out three columns, but laid out {other:?}"),
     };
+    let view = &reachable(state, view);
     let mut term = Terminal::new(TestBackend::new(WIDE, TALL)).expect("TestBackend is infallible");
     term.draw(|f| inspector::draw(f, rect, state, view)).expect("TestBackend is infallible");
     let buf = term.backend().buffer().clone();

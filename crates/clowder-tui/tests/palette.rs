@@ -48,7 +48,8 @@ use ratatui::layout::Rect;
 use ratatui::Terminal;
 
 use clowder_tui::nav::palette::{results, PaletteResult};
-use clowder_tui::nav::rows::{revealed_sections, rows};
+use clowder_tui::nav::rows::{drawn_rows, revealed_sections, rows};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use clowder_tui::nav::{update, Action, Outcome, Overlay, RowKey, Section, ViewState};
 use clowder_tui::render;
 use clowder_tui::render::layout::{compute, Body};
@@ -375,6 +376,13 @@ fn displayed_after_cursor(state: &GameState, section: Section, key: &RowKey) -> 
     let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
     let mut view = ViewState { section: Some(section), ..Default::default() };
     view.focus[section.index()] = Some(key.clone());
+    // A finished Ideas row is drawn only with the done group open
+    // (TUI-NAV-113): open it by its key, keeping the focus on the row.
+    if !drawn_rows(state, section, &view).iter().any(|r| &r.key == key) {
+        let d = clowder_tui::nav::keys::resolve(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE), &view);
+        update(d, &mut view, state);
+        view.focus[section.index()] = Some(key.clone());
+    }
     let mut layout = None;
     term.draw(|f| layout = Some(render::frame(f, state, &view, None)))
         .expect("TestBackend is infallible");
@@ -841,4 +849,114 @@ fn enter_lands_on_the_top_results_first_row_and_does_nothing_else() {
         revealed_sections(&state).len(),
         "fixture: the queries land in every revealed section"
     );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-114 — a folded row is still found
+// ---------------------------------------------------------------------------
+
+/// Whether the core names `key`'s item already the player's.
+fn is_finished(state: &GameState, key: &RowKey) -> bool {
+    match key {
+        RowKey::Content(id, _) => state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours),
+        _ => false,
+    }
+}
+
+/// The far-along meadow with part of the Ideas screen done: every other idea
+/// no other idea needs left unresearched, every other refinement on offer
+/// bought, and one rule adopted from each of two pairs.
+fn ideas_part_done() -> GameState {
+    use clowder_core::content::{idea_def, refinement_def, rule_def};
+    use clowder_core::{RefinementId, RuleId};
+    let mut s = rich();
+    let leaves: Vec<IdeaId> = IdeaId::ALL
+        .iter()
+        .copied()
+        .filter(|i| !IdeaId::ALL.iter().any(|j| idea_def(*j).prereqs.contains(i)))
+        .collect();
+    for (n, i) in leaves.iter().enumerate() {
+        if n % 2 == 0 {
+            s.ideas.remove(i);
+        }
+    }
+    let mut n = 0;
+    for r in RefinementId::ALL {
+        if s.ideas.contains(&refinement_def(r).gate) {
+            if n % 2 == 0 {
+                s.refinements.insert(r);
+            }
+            n += 1;
+        }
+    }
+    let mut paired: Vec<RuleId> = Vec::new();
+    let mut pair = 0;
+    for r in RuleId::ALL {
+        if paired.contains(&r) {
+            continue;
+        }
+        paired.push(r);
+        paired.push(rule_def(r).blocks);
+        if pair % 2 == 0 {
+            s.rules.insert(r);
+        }
+        pair += 1;
+    }
+    s
+}
+
+/// The far-along meadow with every row of the Ideas screen done.
+fn ideas_all_done() -> GameState {
+    use clowder_core::content::rule_def;
+    use clowder_core::{RefinementId, RuleId};
+    let mut s = rich();
+    s.ideas = IdeaId::ALL.iter().copied().collect();
+    s.refinements = RefinementId::ALL.iter().copied().collect();
+    let mut paired: Vec<RuleId> = Vec::new();
+    for r in RuleId::ALL {
+        if !paired.contains(&r) {
+            paired.push(r);
+            paired.push(rule_def(r).blocks);
+            s.rules.insert(r);
+        }
+    }
+    s
+}
+
+/// A row folded in the done group is a palette result exactly as a drawn row
+/// is: the Ideas section's results are every item it lists, folded ones
+/// included, in its list order — the done group at its foot — and each folded
+/// item is found by its own name.
+///
+/// @spec TUI-NAV-114
+#[test]
+fn a_folded_row_is_a_palette_result_exactly_as_a_drawn_one_is() {
+    for (label, state) in [("part done", ideas_part_done()), ("all done", ideas_all_done())] {
+        let listed: Vec<RowKey> =
+            rows(&state, Section::Ideas).into_iter().filter(|r| r.selectable()).map(|r| r.key).collect();
+        let folded: Vec<RowKey> = listed.iter().filter(|k| is_finished(&state, k)).cloned().collect();
+        assert!(!folded.is_empty(), "fixture: {label}, the Ideas screen has finished rows");
+        let view = ViewState { section: Some(Section::Ideas), ..Default::default() };
+        let drawn: Vec<RowKey> = drawn_rows(&state, Section::Ideas, &view).into_iter().map(|r| r.key).collect();
+        assert!(
+            folded.iter().all(|k| !drawn.contains(k)),
+            "{label}: a finished row is drawn with the done group folded (TUI-NAV-113)"
+        );
+
+        let all = results(&state, "");
+        let found: Vec<RowKey> =
+            all.iter().filter(|r| r.section == Section::Ideas).map(|r| r.key.clone()).collect();
+        assert_eq!(
+            found, listed,
+            "{label}: the palette's Ideas results are not every item the section lists, folded ones \
+             included, in list order"
+        );
+        for k in &folded {
+            let name = &all.iter().find(|r| &r.key == k).expect("found above").name;
+            assert!(
+                results(&state, name).iter().any(|r| &r.key == k),
+                "{label}: the folded {k:?} is not found by its own name"
+            );
+        }
+    }
 }

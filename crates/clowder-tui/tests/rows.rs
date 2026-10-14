@@ -25,8 +25,10 @@ use clowder_core::{
     StructureId, TraditionId,
 };
 
-use nav::rows::{rows, Row, RowKey, RowKind};
-use nav::{CountSemantics, Section};
+use nav::rows::{drawn_rows, lists_selectable, rows, tab_sections, Row, RowKey, RowKind};
+use nav::{CountSemantics, Section, ViewState};
+
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 // ---------------------------------------------------------------------------
 // The command census
@@ -1050,6 +1052,9 @@ fn drawn_marker(state: &GameState, section: Section, key: &RowKey) -> DrawnMarke
     let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
     let mut view = nav::ViewState { section: Some(section), ..Default::default() };
     view.focus[section.index()] = Some(key.clone());
+    // A finished Ideas row is drawn only while the done group is open
+    // (TUI-NAV-113), so it is read with the group opened.
+    unfold_focus(state, &mut view);
     let mut layout = None;
     term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, &view, None)))
         .expect("TestBackend is infallible");
@@ -1548,6 +1553,7 @@ fn item_name(state: &GameState, section: Section, key: &RowKey) -> String {
     let (w, h) = (160u16, 12u16);
     let mut view = nav::ViewState { section: Some(section), ..Default::default() };
     view.focus[section.index()] = Some(key.clone());
+    unfold_focus(state, &mut view);
     let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
     term.draw(|f| inspector::draw(f, Rect::new(0, 0, w, h), state, &view))
         .expect("TestBackend is infallible");
@@ -1569,7 +1575,12 @@ fn drawn_name_fields(state: &GameState, section: Section, w: u16, h: u16) -> Vec
     use ratatui::Terminal;
 
     let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
-    let view = nav::ViewState { section: Some(section), ..Default::default() };
+    let mut view = nav::ViewState { section: Some(section), ..Default::default() };
+    // Every listed row is drawn, in list order, only with the Ideas section's
+    // done group open (TUI-NAV-113).
+    if drawn_rows(state, section, &view) != rows(state, section) {
+        press_done_key(state, &mut view);
+    }
     let mut layout = None;
     term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, &view, None)))
         .expect("TestBackend is infallible");
@@ -2327,6 +2338,9 @@ fn a_store_a_stated_price_names_is_listed_before_any_is_held() {
 // content item) is the section's own verb, and every other row is about a
 // structure, a job, a kitten, a resource, a colony, a site, an adventure, or a
 // content item of some other kind. A group header is the one row with no kind.
+// The one exception is the Ideas section's done group (TUI-NAV-110): a row of
+// that section the core names already the player's stands there, whatever its
+// kind, so its group is read as `Done` rather than off its identity.
 // The design's table is restated here as data — which kinds each section
 // lists, in what order, and the order of its verbs — and every assertion below
 // is a comparison between a built list and that table.
@@ -2352,6 +2366,19 @@ enum GroupKind {
     LoomUpgrades,
     Traditions,
     Adventures,
+    /// The Ideas section's done group: every finished row of its three kinds.
+    Done,
+}
+
+/// The group `row` stands in on `section`'s list: the Ideas section's done
+/// group for a row of that section the core names already the player's
+/// (TUI-NAV-097, TUI-NAV-110), and otherwise the kind of thing it is about —
+/// `None` for a group header.
+fn kind_in(state: &GameState, section: Section, row: &Row) -> Option<GroupKind> {
+    if section == Section::Ideas && finished(state, row) {
+        return Some(GroupKind::Done);
+    }
+    group_kind(row)
 }
 
 /// The kind of thing `row` is about, or `None` for a group header.
@@ -2385,7 +2412,7 @@ fn design_groups(section: Section) -> Vec<GroupKind> {
     match section {
         Section::Meadow => vec![ThingsToDo, Structures, Stores],
         Section::Clowder => vec![Jobs, Kittens, ThingsToDo],
-        Section::Ideas => vec![Ideas, Refinements, Rules],
+        Section::Ideas => vec![Ideas, Refinements, Rules, Done],
         Section::Crafts => vec![Crafts],
         Section::Sunbeams => vec![ThingsToDo, Rites],
         Section::Wonders => vec![ThingsToDo, Arches],
@@ -2438,7 +2465,18 @@ fn core_position(id: ContentId) -> usize {
 /// item's several rows share one position, so a non-decreasing run is one in
 /// which they stand adjacent. `None` for a verb the design does not name for
 /// this section.
-fn place_in_group(section: Section, row: &Row) -> Option<usize> {
+fn place_in_group(state: &GameState, section: Section, row: &Row) -> Option<usize> {
+    // The done group stands its finished ideas first, then refinements, then
+    // rules, each kind in the order the core lists it (TUI-NAV-110).
+    if kind_in(state, section, row) == Some(GroupKind::Done) {
+        let rank = match &row.key {
+            RowKey::Content(ContentId::Idea(_), _) => 0,
+            RowKey::Content(ContentId::Refinement(_), _) => 1,
+            _ => 2,
+        };
+        let RowKey::Content(id, _) = &row.key else { return None };
+        return Some(rank * 10_000 + core_position(*id));
+    }
     match &row.key {
         RowKey::Fixed(_) => {
             let fired = commands_of(row);
@@ -2504,6 +2542,8 @@ fn grouping_spread() -> Vec<(&'static str, GameState)> {
         ("the maximal meadow, a small named roster", every_multi_row_item_listed()),
         ("the maximal meadow, no whale and no friends", maximal_no_whale_no_friends()),
         ("the maximal meadow, its Clowder verbs gated shut", maximal_clowder_verbs_shut()),
+        ("a meadow mid-game, its ideas part done", mid_game()),
+        ("a meadow whose every idea is done", all_ideas_done()),
     ]
 }
 
@@ -2539,7 +2579,7 @@ fn every_row_of_a_kind_stands_contiguous_in_its_kinds_one_group_in_the_specs_ord
 
             let mut positions: HashMap<GroupKind, Vec<usize>> = HashMap::new();
             for (i, row) in list.iter().enumerate() {
-                let Some(kind) = group_kind(row) else { continue };
+                let Some(kind) = kind_in(&state, section, row) else { continue };
                 assert!(
                     design.contains(&kind),
                     "in {label}, {} lists {:?}, a row of kind {kind:?}, which is not one of its \
@@ -2571,7 +2611,7 @@ fn every_row_of_a_kind_stands_contiguous_in_its_kinds_one_group_in_the_specs_ord
                 let mut previous: Option<usize> = None;
                 for i in at {
                     let row = &list[*i];
-                    let place = place_in_group(section, row).unwrap_or_else(|| {
+                    let place = place_in_group(&state, section, row).unwrap_or_else(|| {
                         panic!(
                             "in {label}, {} lists the verb row {:?}, which its things-to-do \
                              group does not name",
@@ -2631,7 +2671,7 @@ fn a_sections_groups_stand_in_the_designs_fixed_order_whichever_are_listed() {
         for section in Section::ALL {
             let list = rows(&state, section);
             let mut order: Vec<GroupKind> = Vec::new();
-            for kind in list.iter().filter_map(group_kind) {
+            for kind in list.iter().filter_map(|r| kind_in(&state, section, r)) {
                 if order.last() != Some(&kind) {
                     order.push(kind);
                 }
@@ -2677,7 +2717,7 @@ fn every_listed_group_of_a_several_group_section_and_no_other_wears_one_header_d
             let headers: Vec<usize> = list
                 .iter()
                 .enumerate()
-                .filter(|(_, r)| group_kind(r).is_none())
+                .filter(|(_, r)| kind_in(&state, section, r).is_none())
                 .map(|(i, _)| i)
                 .collect();
 
@@ -2708,7 +2748,7 @@ fn every_listed_group_of_a_several_group_section_and_no_other_wears_one_header_d
             // Each listed group's first row, and the kinds listed.
             let mut firsts: Vec<(GroupKind, usize)> = Vec::new();
             for (i, row) in list.iter().enumerate() {
-                if let Some(kind) = group_kind(row) {
+                if let Some(kind) = kind_in(&state, section, row) {
                     if !firsts.iter().any(|(k, _)| *k == kind) {
                         firsts.push((kind, i));
                     }
@@ -2717,14 +2757,14 @@ fn every_listed_group_of_a_several_group_section_and_no_other_wears_one_header_d
 
             for (kind, first) in &firsts {
                 assert!(
-                    *first > 0 && group_kind(&list[first - 1]).is_none(),
+                    *first > 0 && kind_in(&state, section, &list[first - 1]).is_none(),
                     "in {label}, {}'s {kind:?} group is listed with no header directly above its \
                      first row. List:\n{}",
                     section.title(),
                     describe_list(&list)
                 );
                 assert!(
-                    *first < 2 || group_kind(&list[first - 2]).is_some(),
+                    *first < 2 || kind_in(&state, section, &list[first - 2]).is_some(),
                     "in {label}, {}'s {kind:?} group has two headers above it. List:\n{}",
                     section.title(),
                     describe_list(&list)
@@ -2742,7 +2782,7 @@ fn every_listed_group_of_a_several_group_section_and_no_other_wears_one_header_d
             );
             for h in &headers {
                 assert!(
-                    list.get(h + 1).is_some_and(|r| group_kind(r).is_some()),
+                    list.get(h + 1).is_some_and(|r| kind_in(&state, section, r).is_some()),
                     "in {label}, {}'s header at line {h} stands above nothing — at the list's \
                      end or above another header. List:\n{}",
                     section.title(),
@@ -2754,7 +2794,7 @@ fn every_listed_group_of_a_several_group_section_and_no_other_wears_one_header_d
             for (kind, first) in &firsts {
                 let members: Vec<&Row> = list[*first..]
                     .iter()
-                    .take_while(|r| group_kind(r) == Some(*kind))
+                    .take_while(|r| kind_in(&state, section, r) == Some(*kind))
                     .collect();
                 if members.iter().all(|r| match r.key {
                     RowKey::Content(id, _) => state.availability(id) == Availability::Teased,
@@ -2780,4 +2820,442 @@ fn every_listed_group_of_a_several_group_section_and_no_other_wears_one_header_d
         gated_group_seen,
         "fixture: the spread never lists a several-group section with its verbs all held back by a gate"
     );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-110, TUI-NAV-113, TUI-NAV-114, TUI-NAV-099 — the done group (Ideas)
+//
+// What counts as finished is the core's answer alone: a row whose item the
+// core's lock reason names already the player's, the answer behind its `✓`
+// (TUI-NAV-053). These tests read nothing else — no set of known ideas, bought
+// refinements or adopted rules — so a shell that judged by such a set would
+// disagree with them exactly where the set and the core disagree, which one
+// fixture below is built to make happen.
+//
+// Folding is how the list is drawn, never what it lists: `rows` is what the
+// section lists, folded rows included, and `drawn_rows` is what the list draws
+// and the cursor visits under the view's fold.
+// ---------------------------------------------------------------------------
+
+/// Whether the core names `row`'s item already the player's — the one thing
+/// TUI-NAV-110 calls finished.
+fn finished(state: &GameState, row: &Row) -> bool {
+    match &row.key {
+        RowKey::Content(id, _) => state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours),
+        _ => false,
+    }
+}
+
+/// `d` pressed as the player presses it: resolved against the view, then
+/// folded in. The repeat clock is cleared after, so a later press in the same
+/// test reads as a distinct one.
+fn press_done_key(state: &GameState, view: &mut ViewState) {
+    let action = nav::keys::resolve(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE), view);
+    nav::update(action, view, state);
+    view.last_repeat = None;
+}
+
+/// Where `view`'s focused row is listed but folded into the Ideas section's
+/// done group, open the group by its key — the one way a player reaches such a
+/// row (TUI-NAV-113) — keeping the focus on that row.
+fn unfold_focus(state: &GameState, view: &mut ViewState) {
+    let Some(section) = view.section else { return };
+    let Some(key) = view.focus[section.index()].clone() else { return };
+    if drawn_rows(state, section, view).iter().any(|r| r.key == key)
+        || !rows(state, section).iter().any(|r| r.key == key)
+    {
+        return;
+    }
+    press_done_key(state, view);
+    view.focus[section.index()] = Some(key);
+}
+
+/// The Ideas section in focus, its done group as every sitting opens it.
+fn ideas_view() -> ViewState {
+    ViewState { section: Some(Section::Ideas), ..Default::default() }
+}
+
+/// The Ideas section in focus with its done group opened by its key.
+fn ideas_open(state: &GameState) -> ViewState {
+    let mut v = ideas_view();
+    press_done_key(state, &mut v);
+    v
+}
+
+/// Which of the Ideas section's three kinds a row is about: ideas, then
+/// refinements, then rules — the order its groups stand in, and the order the
+/// done group gathers them in.
+fn ideas_rank(row: &Row) -> Option<usize> {
+    match &row.key {
+        RowKey::Content(ContentId::Idea(_), _) => Some(0),
+        RowKey::Content(ContentId::Refinement(_), _) => Some(1),
+        RowKey::Content(ContentId::Rule(_), _) => Some(2),
+        _ => None,
+    }
+}
+
+/// A row's place in the Ideas section with nothing gathered: its kind's rank,
+/// then the order the core lists that kind.
+fn ideas_place(row: &Row) -> (usize, usize) {
+    let RowKey::Content(id, _) = &row.key else { panic!("an Ideas row is about a content item: {:?}", row.key) };
+    (ideas_rank(row).expect("an Ideas row is an idea, a refinement, or a rule"), core_position(*id))
+}
+
+/// A meadow mid-game: the open meadow with every other idea that no other idea
+/// needs left unresearched, every other refinement on offer bought, and one
+/// rule adopted from each of two of the four pairs — so each of the Ideas
+/// section's three kinds lists several rows finished and several not.
+fn mid_game() -> GameState {
+    use clowder_core::content::{idea_def, refinement_def, rule_def};
+    let mut s = maximal();
+    let leaves: Vec<IdeaId> = IdeaId::ALL
+        .iter()
+        .copied()
+        .filter(|i| !IdeaId::ALL.iter().any(|j| idea_def(*j).prereqs.contains(i)))
+        .collect();
+    for (n, i) in leaves.iter().enumerate() {
+        if n % 2 == 0 {
+            s.ideas.remove(i);
+        }
+    }
+    let mut n = 0;
+    for r in RefinementId::ALL {
+        if s.ideas.contains(&refinement_def(r).gate) {
+            if n % 2 == 0 {
+                s.refinements.insert(r);
+            }
+            n += 1;
+        }
+    }
+    let mut paired: Vec<RuleId> = Vec::new();
+    let mut pair = 0;
+    for r in RuleId::ALL {
+        if paired.contains(&r) {
+            continue;
+        }
+        paired.push(r);
+        paired.push(rule_def(r).blocks);
+        if pair % 2 == 0 {
+            s.rules.insert(r);
+        }
+        pair += 1;
+    }
+
+    let list = rows(&s, Section::Ideas);
+    for rank in 0..3 {
+        let of_kind: Vec<&Row> = list.iter().filter(|r| ideas_rank(r) == Some(rank)).collect();
+        let done = of_kind.iter().filter(|r| finished(&s, r)).count();
+        assert!(
+            done >= 2 && of_kind.len() - done >= 2,
+            "fixture: mid-game, Ideas kind {rank} lists {done} finished and {} unfinished rows; \
+             several of each are needed",
+            of_kind.len() - done
+        );
+    }
+    s
+}
+
+/// The open meadow with every idea researched, every refinement bought, and
+/// one rule of every pair adopted: every row the Ideas section lists is
+/// finished.
+fn all_ideas_done() -> GameState {
+    use clowder_core::content::rule_def;
+    let mut s = maximal();
+    s.refinements = RefinementId::ALL.iter().copied().collect();
+    let mut paired: Vec<RuleId> = Vec::new();
+    for r in RuleId::ALL {
+        if !paired.contains(&r) {
+            paired.push(r);
+            paired.push(rule_def(r).blocks);
+            s.rules.insert(r);
+        }
+    }
+    let list = rows(&s, Section::Ideas);
+    assert!(list.iter().any(|r| r.selectable()), "fixture: the Ideas section lists rows");
+    assert!(
+        list.iter().filter(|r| r.selectable()).all(|r| finished(&s, r)),
+        "fixture: every row the Ideas section lists is finished"
+    );
+    s
+}
+
+/// A meadow holding an idea whose prerequisite it does not hold: the idea sits
+/// in the state's set of known ideas, yet the core's lock reason for it is not
+/// ownership, so its row wears `○`, not `✓`. A shell that read the set would
+/// call it finished; the core does not.
+fn an_idea_held_past_a_missing_prerequisite() -> (GameState, IdeaId) {
+    use clowder_core::content::idea_def;
+    let mut s = maximal();
+    let held = IdeaId::ALL
+        .iter()
+        .copied()
+        .find(|i| !idea_def(*i).prereqs.is_empty())
+        .expect("fixture: some idea has a prerequisite");
+    s.ideas.remove(&idea_def(held).prereqs[0]);
+    assert!(s.ideas.contains(&held), "fixture: the idea is in the state's set of known ideas");
+    assert_ne!(
+        s.lock_reason(ContentId::Idea(held)),
+        Some(clowder_core::LockReason::AlreadyYours),
+        "fixture: the core does not name the idea already the player's"
+    );
+    assert!(
+        rows(&s, Section::Ideas).iter().any(|r| r.key == RowKey::Content(ContentId::Idea(held), "")),
+        "fixture: the idea's row is listed"
+    );
+    (s, held)
+}
+
+/// Every meadow the done group's claims are quantified over.
+fn done_spread() -> Vec<(&'static str, GameState)> {
+    let mut spread = grouping_spread();
+    spread.push(("a meadow holding an idea past a missing prerequisite", an_idea_held_past_a_missing_prerequisite().0));
+    spread
+}
+
+/// A list broken at its group headers into each group's rows, headers set
+/// aside. A list that does not open with a header is one group.
+fn groups_of(list: &[Row]) -> Vec<Vec<Row>> {
+    let mut out: Vec<Vec<Row>> = Vec::new();
+    for row in list {
+        if matches!(row.kind, RowKind::Group) {
+            out.push(Vec::new());
+        } else {
+            match out.last_mut() {
+                Some(g) => g.push(row.clone()),
+                None => out.push(vec![row.clone()]),
+            }
+        }
+    }
+    out
+}
+
+fn keys_of(groups: &[Vec<Row>]) -> Vec<Vec<RowKey>> {
+    groups.iter().map(|g| g.iter().map(|r| r.key.clone()).collect()).collect()
+}
+
+/// In the Ideas section, a row is finished exactly where the core's lock reason
+/// names its item already the player's, and every finished row stands in one
+/// done group after the ideas, refinements and rules groups and in no other:
+/// the section lists its unfinished ideas, its unfinished refinements, its
+/// unfinished rules, and then every finished row — finished ideas first, then
+/// refinements, then rules — each in the order the core lists its kind, each
+/// group under its own header, and no group listed empty. Quantified over a
+/// spread of meadows that list every kind finished and unfinished, every row
+/// finished, and none; one holds an idea the state's set calls known while the
+/// core does not, and its row stays among the ideas.
+///
+/// @spec TUI-NAV-110
+#[test]
+fn every_finished_ideas_row_stands_in_one_done_group_at_the_sections_foot() {
+    let mut reached = [[false; 2]; 3];
+    for (label, state) in done_spread() {
+        let list = rows(&state, Section::Ideas);
+        if list.is_empty() {
+            continue;
+        }
+        assert!(
+            matches!(list[0].kind, RowKind::Group),
+            "in {label}, the Ideas list opens with {:?} rather than a group header",
+            list[0].key
+        );
+        let all: Vec<Row> = list.iter().filter(|r| r.selectable()).cloned().collect();
+        let mut expected: Vec<Vec<Row>> = Vec::new();
+        for (rank, seen) in reached.iter_mut().enumerate() {
+            let mut g: Vec<Row> =
+                all.iter().filter(|r| ideas_rank(r) == Some(rank) && !finished(&state, r)).cloned().collect();
+            g.sort_by_key(ideas_place);
+            if !g.is_empty() {
+                seen[0] = true;
+                expected.push(g);
+            }
+        }
+        let mut done: Vec<Row> = all.iter().filter(|r| finished(&state, r)).cloned().collect();
+        done.sort_by_key(ideas_place);
+        for r in &done {
+            reached[ideas_rank(r).expect("an Ideas row")][1] = true;
+        }
+        if !done.is_empty() {
+            expected.push(done);
+        }
+        assert_eq!(
+            keys_of(&groups_of(&list)),
+            keys_of(&expected),
+            "in {label}, the Ideas section's groups are not its unfinished ideas, refinements and \
+             rules followed by one done group of every finished row. List:\n{}",
+            describe_list(&list)
+        );
+    }
+    for (rank, kind) in ["ideas", "refinements", "rules"].iter().enumerate() {
+        assert!(reached[rank][0], "fixture: no meadow lists an unfinished row among the {kind}");
+        assert!(reached[rank][1], "fixture: no meadow lists a finished row among the {kind}");
+    }
+
+    let (state, held) = an_idea_held_past_a_missing_prerequisite();
+    let groups = groups_of(&rows(&state, Section::Ideas));
+    let key = RowKey::Content(ContentId::Idea(held), "");
+    assert!(
+        groups.first().is_some_and(|g| g.iter().any(|r| r.key == key)),
+        "an idea the state's set calls known, whose lock reason the core does not name ownership, \
+         must stand among the unfinished ideas, not in the done group: the shell judges by the \
+         core's answer alone. Groups: {:?}",
+        keys_of(&groups)
+    );
+}
+
+/// No section but Ideas gathers its finished rows: every other section's
+/// groups each hold one kind, no kind is split across two groups, and a row
+/// the core names already the player's stands in its own kind's group beside
+/// the rest. Quantified over the spread, which lists finished rows outside the
+/// Ideas section — a held rite and a bought arch among them — checked below.
+///
+/// @spec TUI-NAV-110
+#[test]
+fn no_section_but_ideas_has_a_done_group() {
+    let mut finished_elsewhere = 0;
+    for (label, state) in done_spread() {
+        for section in Section::ALL.into_iter().filter(|s| *s != Section::Ideas) {
+            let list = rows(&state, section);
+            let groups = groups_of(&list);
+            let mut kinds: Vec<GroupKind> = Vec::new();
+            for g in &groups {
+                let mut here: Vec<GroupKind> = g.iter().filter_map(group_kind).collect();
+                here.dedup();
+                assert_eq!(
+                    here.len(),
+                    1,
+                    "in {label}, a group of {} holds rows of {} kinds ({here:?}); outside the Ideas \
+                     section a group holds one kind. List:\n{}",
+                    section.title(),
+                    here.len(),
+                    describe_list(&list)
+                );
+                assert!(
+                    !kinds.contains(&here[0]),
+                    "in {label}, {} lists its {:?} rows in two groups — a done group of its own. \
+                     List:\n{}",
+                    section.title(),
+                    here[0],
+                    describe_list(&list)
+                );
+                kinds.push(here[0]);
+            }
+            finished_elsewhere += list.iter().filter(|r| finished(&state, r)).count();
+        }
+    }
+    assert!(finished_elsewhere > 0, "fixture: no section but Ideas lists a finished row");
+}
+
+/// While the done group is folded the list draws its header and none of its
+/// rows, every other row and header exactly as listed; while it is open the
+/// list draws every row the section lists, in list order. No other section's
+/// drawing is touched by the fold either way. Quantified over the spread.
+///
+/// @spec TUI-NAV-113
+#[test]
+fn a_folded_done_group_draws_only_its_header_and_an_open_one_draws_every_listed_row() {
+    let mut folded_seen = 0;
+    for (label, state) in done_spread() {
+        let listed = rows(&state, Section::Ideas);
+        let folded = drawn_rows(&state, Section::Ideas, &ideas_view());
+        let expected: Vec<Row> = listed.iter().filter(|r| !finished(&state, r)).cloned().collect();
+        assert_eq!(
+            folded.iter().map(|r| r.key.clone()).collect::<Vec<_>>(),
+            expected.iter().map(|r| r.key.clone()).collect::<Vec<_>>(),
+            "in {label}, the folded Ideas list does not draw exactly the listed rows less the done \
+             group's, its header kept. Listed:\n{}\nDrawn:\n{}",
+            describe_list(&listed),
+            describe_list(&folded)
+        );
+        if listed.iter().any(|r| finished(&state, r)) {
+            folded_seen += 1;
+        }
+
+        let open = ideas_open(&state);
+        assert_eq!(
+            drawn_rows(&state, Section::Ideas, &open),
+            listed,
+            "in {label}, the open Ideas list does not draw every listed row in list order"
+        );
+
+        for section in Section::ALL.into_iter().filter(|s| *s != Section::Ideas) {
+            for (how, view) in [("folded", ideas_view()), ("open", open.clone())] {
+                let view = ViewState { section: Some(section), ..view };
+                assert_eq!(
+                    drawn_rows(&state, section, &view),
+                    rows(&state, section),
+                    "in {label}, with the Ideas done group {how}, {} draws other than it lists",
+                    section.title()
+                );
+            }
+        }
+    }
+    assert!(folded_seen > 0, "fixture: no meadow lists a done group to fold");
+}
+
+/// The done header is listed exactly while its group holds a row, and while
+/// the group is folded it stands alone, the last line of the drawn list, the
+/// one header with no row beneath it; every other header still stands
+/// directly above a drawn row. Quantified over the spread.
+///
+/// @spec TUI-NAV-099
+#[test]
+fn while_folded_the_done_header_stands_alone_as_the_lists_last_line() {
+    let mut alone_seen = 0;
+    for (label, state) in done_spread() {
+        let has_done = rows(&state, Section::Ideas).iter().any(|r| finished(&state, r));
+        let drawn = drawn_rows(&state, Section::Ideas, &ideas_view());
+        for (i, row) in drawn.iter().enumerate() {
+            if !matches!(row.kind, RowKind::Group) {
+                continue;
+            }
+            let last = i + 1 == drawn.len();
+            if has_done && last {
+                alone_seen += 1;
+                continue;
+            }
+            assert!(
+                drawn.get(i + 1).is_some_and(|r| r.selectable()),
+                "in {label}, the folded Ideas list draws a header at line {i} above no row, which only \
+                 the done header may do, and only as the last line while its group holds a row. \
+                 Drawn:\n{}",
+                describe_list(&drawn)
+            );
+        }
+        if has_done {
+            assert!(
+                drawn.last().is_some_and(|r| matches!(r.kind, RowKind::Group)),
+                "in {label}, the done group holds rows but the folded list does not end with its \
+                 header standing alone. Drawn:\n{}",
+                describe_list(&drawn)
+            );
+        }
+    }
+    assert!(alone_seen > 0, "fixture: no meadow folds a done group");
+}
+
+/// A row folded in the done group counts toward its section's tab exactly as a
+/// drawn row does: a section whose every row is folded still lists rows the
+/// cursor could land on, so it keeps its tab whichever section holds focus,
+/// and the tab bar is the same whether its group is folded or open.
+///
+/// @spec TUI-NAV-114
+#[test]
+fn a_section_whose_every_row_is_folded_keeps_its_tab() {
+    let state = all_ideas_done();
+    assert!(
+        !drawn_rows(&state, Section::Ideas, &ideas_view()).iter().any(|r| r.selectable()),
+        "with its group folded, the Ideas section must draw no row the cursor can land on, every \
+         row it lists being finished (TUI-NAV-113)"
+    );
+    assert!(
+        lists_selectable(&state, Section::Ideas),
+        "the Ideas section's folded rows are still listed, and count as selectable for its tab"
+    );
+    for focus in [None, Some(Section::Meadow), Some(Section::Ideas)] {
+        assert!(
+            tab_sections(&state, focus).contains(&Section::Ideas),
+            "with focus on {focus:?}, the Ideas section lost its tab although every row it lists \
+             is only folded"
+        );
+    }
 }

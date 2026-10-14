@@ -367,6 +367,9 @@ pub fn help(f: &mut Frame, area: Rect) {
         ("Meadow", "g gather / f forage / r rummage"),
         ("Clowder", "p promote (kitten) / n appoint Elder (kitten)"),
         ("Friends", "p send a pen-pal (colony)"),
+        // The Ideas screen's done key is no mnemonic (TUI-NAV-046) but is
+        // listed beside them as a per-screen key. @spec TUI-NAV-122
+        ("Ideas", "d show or fold done"),
     ];
     const LEGEND: &[(&str, &str)] = &[
         ("\u{25cf}", "affordable now"),
@@ -383,19 +386,50 @@ pub fn help(f: &mut Frame, area: Rect) {
         ("!", "open sky-event window"),
     ];
 
+    let width = area.width as usize;
+    let keys_whole: Vec<String> = KEYS.iter().map(|(k, a)| format!("{k:<14} {a}")).collect();
+    let keys_packed = pack(&KEYS.iter().map(|(k, a)| format!("{k} {a}")).collect::<Vec<_>>(), width);
+    let screens: Vec<String> = MNEMONICS.iter().map(|(s, k)| format!("{s:<10} {k}")).collect();
+    let legend_whole: Vec<String> = LEGEND.iter().map(|(g, m)| format!("{g}  {m}")).collect();
+    let legend_packed = pack(&LEGEND.iter().map(|(g, m)| format!("{g} {m}")).collect::<Vec<_>>(), width);
+
+    // Pack as little as fits, so nothing is cut at any supported size: the
+    // legend before the key map, and at each step the blank lines between the
+    // lists kept while the rows still hold them. The screens' keys are never
+    // packed. @spec TUI-NAV-124
+    let height = area.height as usize;
+    let steps = [(&keys_whole, &legend_whole), (&keys_whole, &legend_packed), (&keys_packed, &legend_packed)];
+    let (keys, legend, gaps) = steps
+        .iter()
+        .flat_map(|&(keys, legend)| [(keys, legend, true), (keys, legend, false)])
+        .find(|&(keys, legend, gaps)| keys.len() + screens.len() + legend.len() + if gaps { 2 } else { 0 } <= height)
+        .unwrap_or((&keys_packed, &legend_packed, false));
+
     let mut lines: Vec<Line<'static>> = Vec::new();
-    for (key, action) in KEYS {
-        lines.push(Line::raw(format!("{key:<14} {action}")));
-    }
-    lines.push(Line::raw(String::new()));
-    for (section, keys) in MNEMONICS {
-        lines.push(Line::raw(format!("{section:<10} {keys}")));
-    }
-    lines.push(Line::raw(String::new()));
-    for (glyph, meaning) in LEGEND {
-        lines.push(Line::raw(format!("{glyph}  {meaning}")));
+    for (i, list) in [keys, &screens, legend].into_iter().enumerate() {
+        if i > 0 && gaps {
+            lines.push(Line::raw(String::new()));
+        }
+        lines.extend(list.iter().cloned().map(Line::raw));
     }
     f.render_widget(Paragraph::new(lines), area);
+}
+
+/// Entries set side by side, three spaces apart so each entry's own inner
+/// space never reads as a boundary, filling each line of `width` columns
+/// before starting the next; an entry is never split.
+fn pack(entries: &[String], width: usize) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for e in entries {
+        match out.last_mut() {
+            Some(line) if line.chars().count() + 3 + e.chars().count() <= width => {
+                line.push_str("   ");
+                line.push_str(e);
+            }
+            _ => out.push(e.clone()),
+        }
+    }
+    out
 }
 
 /// Find-anything over the sections' own lists, narrowing by substring as

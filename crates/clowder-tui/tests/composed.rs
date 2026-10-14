@@ -946,6 +946,135 @@ fn an_open_help_overlay_is_the_help_widgets_drawing() {
     }
 }
 
+/// At every supported size — the floor with a banner row included, where the
+/// overlay has the fewest rows — the help overlay shows every entry of its three
+/// lists, in their order, each screen's keys on a line of their own.
+/// @spec TUI-NAV-124, TUI-NAV-122
+#[test]
+fn the_help_overlay_at_every_size_cuts_no_entry() {
+    let state = settled();
+    let plain = ViewState { overlay: Some(Overlay::Help), ..looking_at(&state, near_row()) };
+    let banner = ViewState { overlay: Some(Overlay::Help), ..returning(&state) };
+    let cases = SIZES
+        .iter()
+        .map(|&(w, h)| (w, h, &plain, ""))
+        .chain([(FLOOR_W, FLOOR_H, &banner, " with a banner"), (NARROW_W, FLOOR_H, &banner, " with a banner")]);
+    for (w, h, view, how) in cases {
+        let d = cold(&state, view, w, h);
+        let lines = region_lines(&d.buffer, d.buffer.area);
+        let text = lines.join("\n");
+        for needle in HELP_ENTRIES {
+            assert!(text.contains(needle), "the {w}x{h}{how} help overlay does not show {needle:?}:\n{text}");
+        }
+        assert!(lines.iter().any(|l| shows_cursor_entry(l)), "the {w}x{h}{how} help overlay does not show the cursor glyph's entry:\n{text}");
+        let at = |needle: &str| lines.iter().position(|l| l.contains(needle)).unwrap();
+        assert!(
+            at("Emergency quit") < at("g gather") && at("d show or fold done") < at("affordable now"),
+            "the {w}x{h}{how} help overlay does not keep the order key map, screens' keys, legend:\n{text}"
+        );
+        for screen in SCREEN_ENTRIES {
+            let line = &lines[at(screen)];
+            let others = HELP_ENTRIES.iter().filter(|o| *o != screen && line.contains(*o)).count();
+            assert_eq!(others, 0, "at {w}x{h}{how} the screen keys {screen:?} share a line: {line:?}");
+        }
+    }
+}
+
+/// Where the overlay has the rows, nothing is packed: each entry has its line
+/// and a blank line parts the lists.
+/// @spec TUI-NAV-124
+#[test]
+fn the_help_overlay_with_room_draws_one_entry_to_a_line() {
+    let state = settled();
+    let view = ViewState { overlay: Some(Overlay::Help), ..looking_at(&state, near_row()) };
+    let d = cold(&state, &view, 120, 60);
+    let lines = region_lines(&d.buffer, d.buffer.area);
+    for needle in HELP_ENTRIES {
+        let holding: Vec<&String> = lines.iter().filter(|l| l.contains(needle)).collect();
+        assert_eq!(holding.len(), 1, "at 120x60 {needle:?} should be on exactly one line");
+        let others = HELP_ENTRIES.iter().filter(|o| *o != needle && holding[0].contains(*o)).count();
+        assert_eq!(others, 0, "at 120x60 {needle:?} shares its line with another entry: {:?}", holding[0]);
+        assert!(!shows_cursor_entry(holding[0]), "at 120x60 {needle:?} shares its line with the cursor glyph's entry");
+    }
+    assert_eq!(lines.iter().filter(|l| shows_cursor_entry(l)).count(), 1, "at 120x60 the cursor glyph's entry should have one line");
+    let at = |needle: &str| lines.iter().position(|l| l.contains(needle)).unwrap();
+    for after in ["Emergency quit", "d show or fold done"] {
+        assert!(lines[at(after) + 1].trim().is_empty(), "at 120x60 no blank line follows the list ending {after:?}");
+    }
+}
+
+/// It packs as little as fits: where packing the legend alone leaves room, the
+/// key map keeps one entry to a line.
+/// @spec TUI-NAV-124
+#[test]
+fn the_help_overlay_packs_the_legend_before_the_key_map() {
+    let state = settled();
+    let view = ViewState { overlay: Some(Overlay::Help), ..looking_at(&state, near_row()) };
+    let d = cold(&state, &view, 100, 30);
+    let lines = region_lines(&d.buffer, d.buffer.area);
+    let line_of = |needle: &str| lines.iter().find(|l| l.contains(needle)).unwrap();
+    for needle in &HELP_ENTRIES[..KEY_ENTRY_COUNT] {
+        let line = line_of(needle);
+        let others = HELP_ENTRIES.iter().filter(|o| *o != needle && line.contains(*o)).count();
+        assert_eq!(others, 0, "at 100x30 the key map is packed although the legend alone would fit: {line:?}");
+    }
+    let packed = HELP_ENTRIES[KEY_ENTRY_COUNT + SCREEN_ENTRIES.len()..]
+        .iter()
+        .any(|needle| HELP_ENTRIES.iter().filter(|o| line_of(needle).contains(*o)).count() > 1);
+    assert!(packed, "at 100x30 the legend should be packed for the overlay to fit:\n{}", lines.join("\n"));
+}
+
+/// The legend's entry for the cursor glyph, packed or one to a line.
+fn shows_cursor_entry(line: &str) -> bool {
+    line.contains("\u{25b8} cursor") || line.contains("\u{25b8}  cursor")
+}
+
+/// How many of `HELP_ENTRIES` come from the key map, which lists them first.
+const KEY_ENTRY_COUNT: usize = 17;
+
+/// The screens' keys among `HELP_ENTRIES`.
+const SCREEN_ENTRIES: &[&str] =
+    &["g gather / f forage / r rummage", "p promote (kitten)", "p send a pen-pal (colony)", "d show or fold done"];
+
+/// One distinctive phrase from every entry of the key map, the screens' keys,
+/// and the glyph legend, none a substring of another. The legend's cursor entry
+/// is the one whose meaning is a word another entry also uses, so it is matched
+/// with its glyph by `shows_cursor_entry`.
+const HELP_ENTRIES: &[&str] = &[
+    "Jump to that section",
+    "Next / previous revealed section",
+    "Move the cursor, cycle sections",
+    "Previous / next group header",
+    "commits an armed row",
+    "Toggle the inspector",
+    "Open the count prompt",
+    "x max affordable",
+    "Increment / decrement a count row",
+    "Find-anything palette",
+    "Journal: full scrollback",
+    "Observe the sky",
+    "Game speed down / up",
+    "This help overlay",
+    "Quit (saves first)",
+    "Close the topmost transient",
+    "Emergency quit",
+    "g gather / f forage / r rummage",
+    "p promote (kitten)",
+    "p send a pen-pal (colony)",
+    "d show or fold done",
+    "affordable now",
+    "partially affordable",
+    "revealed, not yet affordable",
+    "owned / done",
+    "milestone / new content",
+    "flavor event",
+    "mechanical event",
+    "idle kitten",
+    "the Elder",
+    "unread offline report",
+    "open sky-event window",
+];
+
 /// An open palette is the palette widget's drawing, and the chrome keeps
 /// rendering behind it.
 /// @spec TUI-NAV-038
