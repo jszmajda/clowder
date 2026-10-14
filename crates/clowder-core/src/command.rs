@@ -531,6 +531,11 @@ impl GameState {
         let Some(kitten) = self.kittens.get(ix) else {
             return Err(CommandError::UnknownId);
         };
+        // Naming the sitting Elder again changes nothing: accepted, silent.
+        // @spec SIM-ENG-058
+        if self.elder == Some(ix) {
+            return Ok(Vec::new());
+        }
         self.elder = Some(ix);
         Ok(vec![Event::ElderAppointed { name: kitten.name.clone() }])
     }

@@ -154,6 +154,9 @@ impl Event {
             | Event::Passed { .. }
             | Event::AdventureDeclared { .. }
             | Event::WhaleFed { .. }
+            // Free and repeatable without limit, so not bounded over a playthrough.
+            // @spec SIM-ENG-057
+            | Event::ElderAppointed { .. }
             | Event::DejaVuDay
             | Event::Napped { .. }
             // A year turns every ~31 real seconds at the fastest speed; as a
@@ -162,7 +165,6 @@ impl Event {
             | Event::NewYear { .. } => EventClass::Mechanical,
 
             Event::IdeaResearched { .. }
-            | Event::ElderAppointed { .. }
             | Event::KittenPromoted { .. }
             | Event::RiteBought { .. }
             | Event::Enlightened { .. }

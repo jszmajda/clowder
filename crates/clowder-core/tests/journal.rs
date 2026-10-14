@@ -675,3 +675,348 @@ fn time_alone_never_grows_the_retained_side_of_the_journal() {
         s.journal.kept.len()
     );
 }
+
+// ---------------------------------------------------------------------------
+// SIM-ENG-057 / SIM-ENG-058 / SIM-ENG-059 — an appointment's event, and where
+// a journal entry is kept
+//
+// Appointing an Elder is free and repeatable without limit, so its event is
+// mechanical and rolls with the window; an appointment that names the kitten
+// already the Elder is accepted and changes nothing; and where an entry is
+// kept is settled when it is recorded, so a save's journal loads as written.
+// ---------------------------------------------------------------------------
+
+/// A meadow reached by play with a roster to appoint from: five kittens, one
+/// of them a namesake of the first (the core tells kittens apart by position,
+/// never by name), one at work, and no Elder yet.
+fn appointing_meadow(seed: u64) -> GameState {
+    let mut s = played_state(seed);
+    adopt(&mut s, 3);
+    assert_eq!(s.kittens.len(), 5, "fixture: five kittens in the roster");
+    let first = s.kittens[0].name.clone();
+    s.kittens[4].name = first;
+    s.apply(Command::AssignJob(JobId::Gardener)).expect("fixture: an idle kitten takes a job");
+    assert!(s.kittens.iter().any(|k| k.job.is_some()), "fixture: a kitten is at work");
+    assert_eq!(s.elder, None, "fixture: nobody has been appointed yet");
+    s
+}
+
+/// Every standing a roster can have before an appointment: no Elder, or each
+/// roster position the Elder.
+fn standings(s: &GameState) -> Vec<Option<usize>> {
+    std::iter::once(None).chain((0..s.kittens.len()).map(Some)).collect()
+}
+
+/// Every appointment that changes the Elder — any position while there is no
+/// Elder (a meadow's first appointment), and every position other than the
+/// Elder's, a namesake of the Elder included — emits exactly one event, which
+/// is classified mechanical, and its journal entry joins the rolling window
+/// while the permanent entries stay as they were.
+///
+/// @spec SIM-ENG-057
+#[test]
+fn every_appointment_that_changes_the_elder_is_mechanical_and_joins_the_rolling_window() {
+    let base = appointing_meadow(5_701);
+    let mut checked = 0u32;
+    let mut namesake_checked = false;
+    for before in standings(&base) {
+        for target in 0..base.kittens.len() {
+            if before == Some(target) {
+                continue;
+            }
+            let mut s = base.clone();
+            s.elder = before;
+            let kept = s.journal.kept.clone();
+            let recent_len = s.journal.recent.len();
+            let name = s.kittens[target].name.clone();
+            let whr = format!("appointing position {target} with {before:?} the Elder");
+
+            let events = s
+                .apply(Command::AppointElder(target))
+                .unwrap_or_else(|e| panic!("{whr}: the appointment was refused ({e:?})"));
+
+            assert_eq!(s.elder, Some(target), "{whr}: the Elder did not change");
+            assert_eq!(
+                events,
+                vec![Event::ElderAppointed { name: name.clone() }],
+                "{whr}: an appointment that changes the Elder emits its one event"
+            );
+            assert_eq!(
+                events[0].class(),
+                EventClass::Mechanical,
+                "{whr}: the appointment's event is classified {:?}; appointments are free and \
+                 repeatable without limit, so their event is mechanical (SIM-ENG-057, SIM-ENG-042)",
+                events[0].class()
+            );
+            assert_eq!(
+                s.journal.kept, kept,
+                "{whr}: the appointment's entry was kept permanently; it joins the rolling window"
+            );
+            assert_eq!(s.journal.recent.len(), recent_len + 1, "{whr}: the rolling window gained one entry");
+            let last = s.journal.recent.back().expect("the window holds the appointment");
+            assert_eq!(
+                *last,
+                JournalEntry { tick: s.ticks, item: JournalItem::Happened(Event::ElderAppointed { name: name.clone() }) },
+                "{whr}: the window's newest entry is not the appointment"
+            );
+            if let Some(e) = before {
+                if base.kittens[e].name == name {
+                    namesake_checked = true;
+                }
+            }
+            checked += 1;
+        }
+    }
+    let n = base.kittens.len() as u32;
+    assert_eq!(checked, n + n * (n - 1), "fixture: every changing appointment was checked");
+    assert!(namesake_checked, "fixture: a namesake of the Elder was appointed");
+
+    // The class is the event's, whoever it names.
+    for name in ["Pib", "Marmalade-of-the-Long-Whiskers", ""] {
+        assert_eq!(
+            Event::ElderAppointed { name: name.into() }.class(),
+            EventClass::Mechanical,
+            "an appointment naming {name:?} is not classified mechanical"
+        );
+    }
+}
+
+/// An appointment's entry is evicted in turn, as any rolling entry is: a
+/// window-full of later occurrences carries it out of the journal.
+///
+/// @spec SIM-ENG-057, SIM-ENG-029
+#[test]
+fn an_appointment_entry_is_evicted_in_turn_like_any_rolling_entry() {
+    let mut s = appointing_meadow(5_702);
+    let name = s.kittens[1].name.clone();
+    s.apply(Command::AppointElder(1)).expect("the appointment is accepted");
+    let appointment = Event::ElderAppointed { name };
+    assert_eq!(count_of(&s.journal, &appointment), 1, "fixture: the appointment is journaled");
+
+    let plain = a_non_milestone();
+    let from = s.ticks + 1;
+    for t in from..from + 1_000 {
+        s.journal.record(t, &plain);
+    }
+    assert_eq!(
+        count_of(&s.journal, &appointment),
+        0,
+        "a window-full of later occurrences left the appointment in the journal; its entry rolls \
+         with the window and is evicted in turn (SIM-ENG-057)"
+    );
+}
+
+/// An appointment naming the roster position already the Elder's is accepted
+/// — success, never a CommandError — and changes nothing: the same Elder, no
+/// event, no journal entry, and the saved state byte-identical. Quantified
+/// over every roster position as the Elder, a namesake's position included,
+/// and over repeated presses.
+///
+/// @spec SIM-ENG-058
+#[test]
+fn appointing_the_kitten_already_the_elder_is_accepted_and_changes_nothing() {
+    let base = appointing_meadow(5_801);
+    for elder in 0..base.kittens.len() {
+        let mut s = base.clone();
+        s.apply(Command::AppointElder(elder)).expect("fixture: the appointment is accepted");
+        assert_eq!(s.elder, Some(elder), "fixture: position {elder} is the Elder");
+        let saved = save_string(&s, 58_000);
+        let journal = s.journal.clone();
+
+        for press in 1..=20 {
+            let whr = format!("press {press} appointing position {elder}, already the Elder");
+            let events = s.apply(Command::AppointElder(elder)).unwrap_or_else(|e| {
+                panic!("{whr}: refused with {e:?}; the command is accepted, never a CommandError")
+            });
+            assert!(events.is_empty(), "{whr}: emitted {events:?}; an appointment that changes nothing emits no event");
+            assert_eq!(s.elder, Some(elder), "{whr}: the Elder moved");
+            assert_eq!(s.journal, journal, "{whr}: the journal gained an entry for no change");
+            assert_eq!(save_string(&s, 58_000), saved, "{whr}: the game state changed");
+        }
+    }
+}
+
+/// In a meadow whose holdings were never recorded, appointing the sitting
+/// Elder changes nothing but what the reveal recording after every applied
+/// command records: every other part of the saved state is identical, and
+/// the record only grows.
+///
+/// @spec SIM-ENG-058, SIM-ENG-054
+#[test]
+fn appointing_the_sitting_elder_changes_nothing_but_the_reveal_record() {
+    let base = appointing_meadow(5_802);
+    for elder in 0..base.kittens.len() {
+        let mut s = base.clone();
+        s.elder = Some(elder);
+        s.revealed_resources.clear();
+        let before = s.clone();
+
+        let events = s
+            .apply(Command::AppointElder(elder))
+            .unwrap_or_else(|e| panic!("appointing the sitting Elder {elder} was refused ({e:?})"));
+
+        assert!(events.is_empty(), "appointing the sitting Elder {elder} emitted {events:?}");
+        assert!(
+            s.revealed_resources.is_superset(&before.revealed_resources),
+            "the reveal record lost an entry"
+        );
+        let strip = |g: &GameState| {
+            let mut v: serde_json::Value = serde_json::from_str(&save_string(g, 58_000)).unwrap();
+            v["state"].as_object_mut().unwrap().remove("revealed_resources");
+            v
+        };
+        assert_eq!(
+            strip(&s),
+            strip(&before),
+            "appointing the sitting Elder {elder} changed game state beyond the reveal record"
+        );
+    }
+}
+
+/// A held key and a key alternated between two kittens' rows never grow the
+/// permanent journal: a held appointment appoints once and then changes
+/// nothing, and an alternating one writes only rolling entries, the window
+/// staying within its bound.
+///
+/// @spec SIM-ENG-057, SIM-ENG-058
+#[test]
+fn appointments_held_or_alternated_never_grow_the_permanent_journal() {
+    let mut s = appointing_meadow(5_703);
+    let kept = s.journal.kept.clone();
+
+    // Held on one kitten: one appointment, then nothing.
+    let mut emitted = 0usize;
+    for _ in 0..50 {
+        emitted += s.apply(Command::AppointElder(2)).expect("accepted").len();
+    }
+    assert_eq!(emitted, 1, "fifty presses on one kitten emitted {emitted} events; only the first changes the Elder");
+    assert_eq!(s.journal.kept, kept, "a held appointment grew the permanent journal");
+
+    // Alternated between two kittens: every press changes the Elder.
+    for press in 0..3_000usize {
+        let target = if press % 2 == 0 { 1 } else { 2 };
+        let events = s.apply(Command::AppointElder(target)).expect("accepted");
+        assert_eq!(events.len(), 1, "alternating press {press} changed the Elder and emitted {events:?}");
+        assert_eq!(
+            s.journal.kept.len(),
+            kept.len(),
+            "alternating press {press} grew the permanent journal"
+        );
+    }
+    assert_eq!(s.journal.kept, kept, "alternating appointments left permanent entries behind");
+    assert!(s.journal.recent.len() <= 1_000, "the rolling window overran its bound");
+}
+
+/// Where an entry is kept is settled by its event's class when it is
+/// recorded: a milestone among the permanent entries, anything else in the
+/// rolling window — for every event the journal records.
+///
+/// @spec SIM-ENG-059
+#[test]
+fn where_an_entry_is_kept_is_settled_by_its_class_when_recorded() {
+    let mut recorded = 0;
+    for e in vocabulary() {
+        let mut j = Journal::default();
+        j.record(7, &e);
+        if j.kept.is_empty() && j.recent.is_empty() {
+            assert!(
+                matches!(e, Event::SpeedChanged { .. } | Event::Napped { .. }),
+                "{} was not journaled at all",
+                variant_name(&e)
+            );
+            continue;
+        }
+        let entry = JournalEntry { tick: 7, item: JournalItem::Happened(e.clone()) };
+        if e.class() == EventClass::Milestone {
+            assert_eq!((j.kept, j.recent.len()), (vec![entry], 0), "{} is a milestone and was not kept", variant_name(&e));
+        } else {
+            assert_eq!(j.kept, vec![], "{} is not a milestone and was kept permanently", variant_name(&e));
+            assert_eq!(j.recent.into_iter().collect::<Vec<_>>(), vec![entry], "{} did not join the window", variant_name(&e));
+        }
+        recorded += 1;
+    }
+    assert!(recorded > 40, "fixture: the vocabulary was recorded");
+}
+
+/// A save's journal loads with every entry where the save holds it — a
+/// permanent appointment entry from a version that classed appointments as
+/// milestones stays permanent, as does any other entry, in either part, in
+/// its place — whether the load replays an absence or not; and the kept entry
+/// stays kept through any amount of play after.
+///
+/// @spec SIM-ENG-059
+#[test]
+fn a_saved_journal_loads_with_every_entry_where_the_save_holds_it() {
+    let mut s = appointing_meadow(5_901);
+    let legacy = Event::ElderAppointed { name: s.kittens[0].name.clone() };
+    assert_ne!(
+        legacy.class(),
+        EventClass::Milestone,
+        "fixture: the scenario needs a kept entry whose event is no longer classed a milestone"
+    );
+    let milestone = a_milestone();
+    let plain = a_non_milestone();
+    let happened = |tick: u64, e: &Event| JournalEntry { tick, item: JournalItem::Happened(e.clone()) };
+    let journal = Journal {
+        kept: vec![happened(3, &legacy), happened(4, &milestone), happened(5, &legacy)],
+        recent: (10..1_010u64).map(|t| happened(t, if t == 500 { &milestone } else { &plain })).collect(),
+    };
+    s.journal = journal.clone();
+
+    let saved_at = 1_800_000_000;
+    let json = save_string(&s, saved_at);
+
+    let now = load_string(&json, saved_at).expect("the save loads").state;
+    assert_eq!(now.journal, journal, "a load with no absence moved, rewrote or dropped a journal entry");
+
+    let later = load_string(&json, saved_at + 3_600).expect("the save loads after an absence").state;
+    assert_eq!(later.journal.recent, journal.recent, "a catch-up load moved an entry of the rolling window");
+    assert_eq!(
+        &later.journal.kept[..journal.kept.len()],
+        &journal.kept[..],
+        "a catch-up load moved, rewrote or dropped a permanent entry"
+    );
+    assert!(
+        later.journal.kept[journal.kept.len()..].iter().all(|e| matches!(e.item, JournalItem::Away(_))),
+        "a catch-up load added something to the permanent entries besides its away report"
+    );
+
+    // Kept for good: play after the load never evicts it.
+    let mut played = now;
+    for t in 0..3_000u64 {
+        played.journal.record(2_000 + t, &plain);
+    }
+    assert_eq!(
+        played.journal.kept.iter().filter(|e| e.item == JournalItem::Happened(legacy.clone())).count(),
+        2,
+        "a permanent appointment entry from the save did not stay permanent"
+    );
+}
+
+/// A committed save of the version before the reclassification, carrying
+/// permanent appointment entries, loads with them where it wrote them.
+///
+/// @spec SIM-ENG-059
+#[test]
+fn a_prior_version_save_keeps_its_permanent_appointment_entries_as_written() {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/save_v5.json");
+    let mut save: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let kept = save["state"]["journal"]["kept"].as_array_mut().expect("fixture: the save has permanent entries");
+    for (i, name) in ["Pib", "Mopsy"].iter().enumerate() {
+        kept.push(serde_json::json!({ "tick": 100 + i, "item": { "Happened": { "ElderAppointed": { "name": name } } } }));
+    }
+    let written: Journal = serde_json::from_value(save["state"]["journal"].clone()).expect("fixture: a journal");
+    let saved_at = save["saved_at_unix"].as_u64().unwrap();
+
+    let state = load_string(&save.to_string(), saved_at).expect("the prior-version save loads").state;
+    assert_eq!(state.journal.recent, written.recent, "the load moved an entry of the rolling window");
+    assert_eq!(
+        &state.journal.kept[..written.kept.len()],
+        &written.kept[..],
+        "the load moved, rewrote or dropped a permanent appointment entry the save wrote"
+    );
+    assert!(
+        state.journal.kept[written.kept.len()..].iter().all(|e| matches!(e.item, JournalItem::Away(_))),
+        "the load added something to the permanent entries besides an away report"
+    );
+}

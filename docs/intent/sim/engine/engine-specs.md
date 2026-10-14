@@ -28,6 +28,9 @@
 - [x] **SIM-ENG-043**: The system shall not journal a game-speed change: the journal records what happened in the meadow, and speed is the pace the meadow is watched at rather than an occurrence within it.
 - [x] **SIM-ENG-040**: The system shall decide live-versus-replay journaling within the core, offering replay its own non-journaling entry point, so that no caller can journal a replay by omission and the rule holds for any frontend.
 - [x] **SIM-ENG-029**: When the rolling window is full, the system shall evict its oldest non-milestone entry, so growth is bounded without ever discarding a milestone or a retained away-report.
+- [x] **SIM-ENG-057**: The system shall classify as mechanical the event of every appointment that changes the Elder — one naming a roster position other than the Elder's, or any position while there is no Elder, a meadow's first appointment included — so its journal entry joins the rolling window and is evicted in turn, appointments being free and repeatable without limit and so not bounded over a playthrough (SIM-ENG-042).
+- [x] **SIM-ENG-058**: When AppointElder names the roster position the system already holds as the Elder, the system shall accept the command, returning success and never a CommandError, and shall leave the Elder as it stands, emit no event, and add no journal entry, changing no game state but what the reveal recording after every applied command (SIM-ENG-054) records.
+- [x] **SIM-ENG-059**: The system shall decide whether a journal entry is kept permanently or held in the rolling window by its event's classification when the entry is recorded, and shall load a saved journal with every entry where the save holds it — a permanently kept entry whose event is no longer classified a milestone staying permanent — rewriting, moving, or dropping no entry on load.
 
 ## Derived Queries
 

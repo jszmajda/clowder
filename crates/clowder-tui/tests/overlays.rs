@@ -616,7 +616,7 @@ fn occurrences_of_one_class_are_drawn_at_one_tier() {
         Event::SeasonChanged { season: Season::Winter },
     ];
     let remembered =
-        [Event::IdeaResearched { id: IdeaId::ALL[0] }, Event::ElderAppointed { name: "Mopsy".to_string() }];
+        [Event::IdeaResearched { id: IdeaId::ALL[0] }, Event::KittenPromoted { name: "Mopsy".to_string(), rank: 1 }];
 
     for pair in [ordinary, remembered] {
         let [a, b] = pair;
