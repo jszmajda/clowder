@@ -2,7 +2,7 @@
 //! driven by a scripted input source and a screen that can refuse writes.
 //!
 //! @spec TUI-RUN-046, TUI-RUN-047, TUI-RUN-048, TUI-RUN-050, TUI-RUN-051,
-//! TUI-RUN-057, TUI-RUN-059
+//! TUI-RUN-057, TUI-RUN-059, TUI-RUN-064
 //!
 //! **The seam.** `terminal_lost.rs` runs the built game on a real
 //! pseudo-terminal and asserts how a lost terminal *ends*: saved, unlocked,
@@ -80,7 +80,7 @@ use clowder_core::{begin_load, save_string, Advance, GameState, SetDown};
 use clowder_tui::nav::{self, ViewState};
 use clowder_tui::runtime::clock::Reading;
 use clowder_tui::runtime::{session, App, InputSource, Startup, TickAccumulator, WAKE_TICKS_PER_FRAME};
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::backend::{Backend, ClearType, TestBackend, WindowSize};
 use ratatui::buffer::Cell;
 use ratatui::layout::{Position, Size};
@@ -509,6 +509,7 @@ fn opened_app(save_path: PathBuf) -> App {
         save_path,
         last_save: Instant::now(),
         prev_layout: None,
+        pointer_record: None,
         quitting: false,
         save_failed: false,
     }
@@ -1030,4 +1031,225 @@ fn a_shutdown_save_that_cannot_be_written_is_tried_once_whatever_began_the_shutd
             );
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-064 — a frame's input bound is two bounds
+// ---------------------------------------------------------------------------
+//
+// The two bounds' values are not given to these tests: the pointer bound's
+// exact multiple is deferred to tuning (runtime design, Deferred 2). Each is
+// read off the loop instead, as the number of events a frame takes from a
+// flood of one kind far larger than any bound, and the claims are held
+// against what was read.
+
+/// Every kind of mouse event the terminal library can hand over: each
+/// button's press, release and drag, motion with no button down, and the
+/// wheel's four steps.
+fn every_mouse_kind() -> Vec<MouseEventKind> {
+    let mut kinds = Vec::new();
+    for b in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
+        kinds.extend([MouseEventKind::Down(b), MouseEventKind::Up(b), MouseEventKind::Drag(b)]);
+    }
+    kinds.extend([
+        MouseEventKind::Moved,
+        MouseEventKind::ScrollDown,
+        MouseEventKind::ScrollUp,
+        MouseEventKind::ScrollLeft,
+        MouseEventKind::ScrollRight,
+    ]);
+    kinds
+}
+
+/// Every set of modifiers a mouse report can carry.
+fn every_mouse_modifier() -> Vec<KeyModifiers> {
+    let mut sets = Vec::new();
+    for bits in 0u8..8 {
+        let mut m = KeyModifiers::NONE;
+        if bits & 1 != 0 {
+            m |= KeyModifiers::SHIFT;
+        }
+        if bits & 2 != 0 {
+            m |= KeyModifiers::CONTROL;
+        }
+        if bits & 4 != 0 {
+            m |= KeyModifiers::ALT;
+        }
+        sets.push(m);
+    }
+    sets
+}
+
+fn mouse_event(kind: MouseEventKind, modifiers: KeyModifiers) -> Event {
+    Event::Mouse(MouseEvent { kind, column: 30, row: 4, modifiers })
+}
+
+/// A wheel step: the mouse event a fling of the wheel delivers by the dozen.
+fn wheel() -> Event {
+    mouse_event(MouseEventKind::ScrollDown, KeyModifiers::NONE)
+}
+
+/// Events that are not mouse events, one of each kind the library hands
+/// over, none of which ends the session: a key no screen answers, a resize to
+/// the size already drawn at, focus gained and lost, a paste.
+fn every_other_kind() -> Vec<(&'static str, Event)> {
+    vec![
+        ("a key", Event::Key(KeyEvent::new(KeyCode::F(12), KeyModifiers::NONE))),
+        ("a resize", Event::Resize(WIDE.0, WIDE.1)),
+        ("focus gained", Event::FocusGained),
+        ("focus lost", Event::FocusLost),
+        ("a paste", Event::Paste("x".to_string())),
+    ]
+}
+
+/// How many events the session's first frame takes when `events` are all
+/// ready at once. A termination signal is recorded as the first of them is
+/// taken, so the session ends with that frame.
+fn first_frame_takes(setup: Setup, events: Vec<Event>) -> usize {
+    let mut cues: Vec<Cue> = events.into_iter().map(ready).collect();
+    cues[0] = cues[0].clone().and_a_signal();
+    let run = play_out(setup, cues);
+    let frames = run.frames_of_input();
+    assert!(!frames.is_empty(), "fixture: the session took input at least once");
+    frames[0].1
+}
+
+/// A flood far larger than any bound either kind could be given.
+const FLOOD: usize = 1 << 16;
+
+/// The two bounds of a frame's input, read off the loop: (the bound on
+/// every event that is not a mouse event, the bound on mouse events).
+fn bounds(setup: impl Fn(PathBuf) -> Setup, what: &str) -> (usize, usize) {
+    let other = first_frame_takes(setup(scratch("bound-other")), vec![inert(); FLOOD]);
+    let mouse = first_frame_takes(setup(scratch("bound-mouse")), vec![wheel(); FLOOD]);
+    assert!(
+        other < FLOOD,
+        "{what}: a frame took all {FLOOD} ready events that are not mouse events — a frame's \
+         input must be bounded"
+    );
+    assert!(
+        mouse < FLOOD,
+        "{what}: a frame took all {FLOOD} ready mouse events — the mouse bound is a bound too, and \
+         the sum of the two is a frame's whole bound on input"
+    );
+    (other, mouse)
+}
+
+/// The bound on mouse events is a bound of its own, at least four times the
+/// bound on everything else — in play and while waking — so a fling of the
+/// wheel that outnumbers a frame's keys several times over still lets the key
+/// behind it into the same frame; and a frame is bounded for each.
+/// @spec TUI-RUN-064, TUI-RUN-016
+#[test]
+fn a_frames_mouse_bound_is_its_own_and_at_least_four_times_the_bound_on_other_input() {
+    for (what, setup) in [("in play", play as fn(PathBuf) -> Setup), ("while waking", waking)] {
+        let (other, mouse) = bounds(setup, what);
+        assert!(other > 0, "{what}: fixture — a frame takes some input");
+        assert!(
+            mouse >= 4 * other,
+            "{what}: a frame takes {mouse} mouse events and {other} other events — the mouse bound \
+             must be at least four times the other, so a burst of wheel reports cannot crowd a key \
+             out of its frame"
+        );
+    }
+}
+
+/// Every mouse event the library hands over counts against the mouse bound,
+/// whatever navigation will make of it — a release, a drag, motion, a right
+/// or middle press, a horizontal wheel step, any modifier held — and every
+/// other event against the other bound; a frame stops at whichever is reached
+/// first, the rest left for the frames after it.
+/// @spec TUI-RUN-064
+#[test]
+fn every_mouse_event_counts_against_the_mouse_bound_and_every_other_event_against_the_other() {
+    for (what, setup) in [("in play", play as fn(PathBuf) -> Setup), ("while waking", waking)] {
+        let (other, mouse) = bounds(setup, what);
+        for kind in every_mouse_kind() {
+            for modifiers in every_mouse_modifier() {
+                let taken = first_frame_takes(setup(scratch("bound-kind")), vec![mouse_event(kind, modifiers); mouse + 1]);
+                assert_eq!(
+                    taken, mouse,
+                    "{what}: {kind:?} with {modifiers:?} held is a mouse event, counted against the \
+                     mouse bound ({mouse}) — a frame took {taken} of {} of them",
+                    mouse + 1
+                );
+            }
+        }
+        for (name, event) in every_other_kind() {
+            let taken = first_frame_takes(setup(scratch("bound-other-kind")), vec![event; other + 1]);
+            assert_eq!(
+                taken, other,
+                "{what}: {name} is not a mouse event, counted against the other bound ({other}) — \
+                 a frame took {taken} of {} of them",
+                other + 1
+            );
+        }
+
+        // Whichever bound is reached first ends the frame's taking.
+        let mut events = vec![inert(); other];
+        events.extend(vec![wheel(); 5]);
+        let taken = first_frame_takes(setup(scratch("bound-other-first")), events);
+        assert_eq!(taken, other, "{what}: the other bound was reached, and the frame went on taking mouse events");
+
+        let mut events = vec![wheel(); mouse];
+        events.extend(vec![inert(); 5]);
+        let taken = first_frame_takes(setup(scratch("bound-mouse-first")), events);
+        assert_eq!(taken, mouse, "{what}: the mouse bound was reached, and the frame went on taking other events");
+
+        let events: Vec<Event> = (0..other).flat_map(|_| [wheel(), inert()]).chain([wheel(), inert()]).collect();
+        let taken = first_frame_takes(setup(scratch("bound-interleaved")), events);
+        assert_eq!(
+            taken,
+            2 * other,
+            "{what}: mouse events and others interleaved — the frame should stop as the other bound \
+             is reached, having taken as many mouse events beside them"
+        );
+    }
+}
+
+/// A key ready behind fewer mouse events than the mouse bound is taken in the
+/// same frame as they are and applied in that frame, after them: in play, the
+/// speed key and the quit key behind a burst one short of the bound are both
+/// read in the burst's frame, the speed stands in the save, and nothing more
+/// is asked for; while waking, the quit key behind such a burst ends the wake
+/// in that frame. A key behind as many mouse events as the bound waits for the
+/// next frame, as a key behind a flood of keys does.
+/// @spec TUI-RUN-064
+#[test]
+fn a_key_behind_fewer_mouse_events_than_the_mouse_bound_is_taken_in_their_frame() {
+    let (_, sped_up) = speeds();
+    let (_, mouse) = bounds(play, "in play");
+
+    // In play: a frame drawn first, so the burst lands on a game on screen.
+    let mut cues = vec![quiet()];
+    cues.extend((0..mouse - 1).map(|_| ready(wheel())));
+    cues.extend([ready(speed_key()), ready(quit_key()), quiet()]);
+    let run = play_out(play(scratch("burst-play")), cues);
+    run.expect_it_stopped_there("a burst then two keys, in play");
+    let reads: Vec<usize> = run.frames_of_input().iter().map(|(_, n)| *n).collect();
+    assert_eq!(
+        reads,
+        vec![0, mouse + 1],
+        "in play: {} wheel steps and the two keys behind them should all be taken in one frame",
+        mouse - 1
+    );
+    assert_eq!(run.saved("a burst then two keys").state.speed, sped_up, "in play: the key behind the burst was not applied");
+
+    let mut cues = vec![quiet()];
+    cues.extend((0..mouse).map(|_| ready(wheel())));
+    cues.extend([ready(quit_key()), quiet()]);
+    let run = play_out(play(scratch("burst-play-full")), cues);
+    run.expect_it_stopped_there("a full burst then the quit key, in play");
+    let reads: Vec<usize> = run.frames_of_input().iter().map(|(_, n)| *n).collect();
+    assert_eq!(reads, vec![0, mouse, 1], "in play: a key behind a full mouse bound is taken in the next frame");
+
+    // While waking.
+    let (_, mouse) = bounds(waking, "while waking");
+    let mut cues: Vec<Cue> = (0..mouse - 1).map(|_| ready(wheel())).collect();
+    cues.extend([ready(quit_key()), quiet()]);
+    let run = play_out(waking(scratch("burst-waking")), cues);
+    run.expect_it_stopped_there("a burst then the quit key, while waking");
+    let reads: Vec<usize> = run.frames_of_input().iter().map(|(_, n)| *n).collect();
+    assert_eq!(reads, vec![mouse], "while waking: the quit key behind the burst should be taken in its frame");
+    run.expect_the_wake_set_down_after(2, "a burst then the quit key, while waking");
 }

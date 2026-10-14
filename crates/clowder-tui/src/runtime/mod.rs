@@ -46,6 +46,10 @@ pub struct App {
     /// Previous frame's layout, so breakpoints can apply their dead-band.
     /// @spec TUI-RENDER-008
     pub prev_layout: Option<Layout>,
+    /// What the last frame drawn put where a pointer can address it, for the
+    /// pointer events that arrive before the next frame. Not there until a
+    /// frame of play has been drawn. @spec TUI-RUN-065
+    pub pointer_record: Option<crate::render::pointer::PointerRecord>,
     pub quitting: bool,
     /// Whether a save failure has already been reported this session, so the
     /// notice is said once rather than every cadence. @spec TUI-RUN-028
@@ -274,18 +278,27 @@ pub const BRIEFEST_WAIT: Duration = Duration::from_millis(1);
 /// One frame's input: the first wait is `first`, every wait after it the
 /// briefest, up to the frame's bound. Any failure of a wait or a read means
 /// the terminal is lost, and the events already taken are dropped with it.
-/// @spec TUI-RUN-014, TUI-RUN-016, TUI-RUN-046, TUI-RUN-059
+/// Mouse events count against a bound of their own, so a burst of them cannot
+/// crowd a key out of the frame; the frame stops when either is reached.
+/// @spec TUI-RUN-014, TUI-RUN-016, TUI-RUN-046, TUI-RUN-059, TUI-RUN-064
 fn take_input(
     input: &mut impl InputSource,
     first: Duration,
 ) -> io::Result<Vec<crossterm::event::Event>> {
     let mut events = Vec::new();
     let mut timeout = first;
-    while events.len() < App::MAX_INPUT_EVENTS_PER_FRAME {
+    let (mut others, mut mice) = (0, 0);
+    while others < App::MAX_INPUT_EVENTS_PER_FRAME && mice < App::MAX_MOUSE_EVENTS_PER_FRAME {
         if !input.poll(timeout)? {
             break;
         }
-        events.push(input.read()?);
+        let event = input.read()?;
+        if matches!(event, crossterm::event::Event::Mouse(_)) {
+            mice += 1;
+        } else {
+            others += 1;
+        }
+        events.push(event);
         timeout = BRIEFEST_WAIT;
     }
     Ok(events)
@@ -321,6 +334,7 @@ pub fn session<B: ratatui::backend::Backend>(
                 save_path,
                 last_save: Instant::now(),
                 prev_layout: None,
+                pointer_record: None,
                 quitting: false,
                 save_failed: false,
             }))
@@ -482,6 +496,10 @@ impl App {
     /// retire; past this many the rest waits for the next frame, so a flood
     /// can never starve the simulation or the renderer.
     const MAX_INPUT_EVENTS_PER_FRAME: usize = 64;
+    /// TUI-RUN-064. Mouse events are counted apart from the rest, and the
+    /// bound is at least four times the other, so a fling of the wheel that
+    /// outnumbers a frame's keys still lets the key behind it into the frame.
+    const MAX_MOUSE_EVENTS_PER_FRAME: usize = 4 * Self::MAX_INPUT_EVENTS_PER_FRAME;
     /// TUI-RUN-025. A long catch-up drains across frames rather than blocking
     /// in one. The count, not a wall-time budget: the accumulator cannot know
     /// what a tick costs, so the caller chooses.
@@ -493,7 +511,8 @@ impl App {
     /// Generic over the backend so the ordering can be tested against an
     /// in-memory terminal; `reading` is passed in for the same reason, and
     /// because `run` is the only thing that should be reading real clocks.
-    /// @spec TUI-RUN-014, TUI-RUN-015, TUI-RUN-016, TUI-RUN-017, TUI-RUN-026
+    /// @spec TUI-RUN-014, TUI-RUN-015, TUI-RUN-016, TUI-RUN-017, TUI-RUN-026,
+    /// TUI-RUN-065
     pub fn step<B: ratatui::backend::Backend>(
         &mut self,
         terminal: &mut ratatui::Terminal<B>,
@@ -534,7 +553,21 @@ impl App {
         // frozen layout. @spec TUI-NAV-088
         let pane_on_screen =
             matches!(self.prev_layout.map(|l| l.body), Some(crate::render::Body::Wide { .. }));
-        for event in input.iter().take(Self::MAX_INPUT_EVENTS_PER_FRAME) {
+        let (mut others, mut mice) = (0, 0);
+        for event in input {
+            // The frame's two bounds, as input is taken under them; a step
+            // handed more than they allow leaves the rest. @spec TUI-RUN-016,
+            // TUI-RUN-064
+            let taken = if matches!(event, crossterm::event::Event::Mouse(_)) {
+                mice += 1;
+                mice <= Self::MAX_MOUSE_EVENTS_PER_FRAME
+            } else {
+                others += 1;
+                others <= Self::MAX_INPUT_EVENTS_PER_FRAME
+            };
+            if !taken {
+                continue;
+            }
             match event {
                 crossterm::event::Event::Key(key) => {
                     let action = crate::nav::keys::resolve(*key, &self.view);
@@ -609,6 +642,15 @@ impl App {
                 // Only the final size matters; recomputing layout for every
                 // intermediate width of a drag is wasted work. @spec TUI-RUN-016
                 crossterm::event::Event::Resize(w, h) => last_resize = Some((*w, *h)),
+                // Handed to navigation at the size as of this event, and
+                // never to the core; before the first frame of play there is
+                // no record, and the event is let go. @spec TUI-RUN-065
+                crossterm::event::Event::Mouse(mouse) => {
+                    if let Some(record) = &self.pointer_record {
+                        let size = last_resize.unwrap_or_else(|| record.size());
+                        let _ = crate::nav::pointer_event(*mouse, &mut self.view, &self.state, record, size);
+                    }
+                }
                 _ => {}
             }
         }
@@ -665,9 +707,13 @@ impl App {
         // @spec TUI-RUN-014
         let mut used = None;
         terminal.draw(|f| {
-            used = Some(crate::render::frame(f, &self.state, &self.view, self.prev_layout.as_ref()));
+            used = Some(crate::render::frame_recorded(f, &self.state, &self.view, self.prev_layout.as_ref()));
         })?;
-        self.prev_layout = used;
+        if let Some((layout, record)) = used {
+            self.prev_layout = Some(layout);
+            // @spec TUI-RUN-065
+            self.pointer_record = Some(record);
+        }
         Ok(())
     }
 

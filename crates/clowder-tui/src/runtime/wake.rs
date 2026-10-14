@@ -190,6 +190,7 @@ impl Waking {
                     save_path: self.save_path,
                     last_save: self.last_save,
                     prev_layout: None,
+                    pointer_record: None,
                     quitting: self.quitting,
                     save_failed: false,
                 }))

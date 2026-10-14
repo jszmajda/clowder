@@ -16,7 +16,8 @@
 //! re-derives the size from it, so the coalescing leaves nothing outside
 //! `step` to observe. It is stated here rather than asserted falsely.
 //!
-//! @spec TUI-RUN-014, TUI-RUN-015, TUI-RUN-016, TUI-RUN-017, TUI-RUN-026
+//! @spec TUI-RUN-014, TUI-RUN-015, TUI-RUN-016, TUI-RUN-017, TUI-RUN-026,
+//! TUI-RUN-064, TUI-RUN-065
 
 use clowder_tui::nav::ViewState;
 use clowder_tui::runtime::clock::Reading;
@@ -46,6 +47,7 @@ fn app(save_path: PathBuf) -> App {
         save_path,
         last_save: Instant::now(),
         prev_layout: None,
+        pointer_record: None,
         quitting: false,
         save_failed: false,
     }
@@ -963,4 +965,309 @@ fn n_on_every_kittens_row_of_a_full_meadow_leaves_no_footer_note() {
         );
     }
     assert!(own_row, "fixture: the Elder's own row was pressed");
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-065 — pointer events handed to navigation, in order, against the
+// frame last drawn; TUI-RUN-064 — none taken is dropped
+// ---------------------------------------------------------------------------
+//
+// Where the last frame drew each row is read from the record of that frame,
+// drawn again here from the same state, view and previous layout into a
+// terminal of the same size: the record's own correctness is the render
+// leaf's to show (`pointer.rs`); what is shown here is that the loop hands
+// each pointer event to navigation with the record of the frame the player
+// was looking at, at the size as of that event, in the order the events
+// arrived.
+
+use clowder_tui::nav::{self as navigation, Action, RowKey, Section};
+use clowder_tui::render::pointer::PointerRecord;
+use crossterm::event::{Event, KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+
+/// The terminal size every app below is drawn at.
+const DRAWN: (u16, u16) = (100, 30);
+
+/// A session opened on a meadow whose first section lists a hundred rows and
+/// more, as the session opens it — not yet drawn.
+fn opened_lively(name: &str) -> App {
+    let mut a = app(scratch(name));
+    a.state = actionable();
+    navigation::opening(&mut a.view, &a.state);
+    a
+}
+
+/// The same, with its first frame drawn.
+fn drawn_lively(name: &str) -> (App, Terminal<TestBackend>) {
+    let mut a = opened_lively(name);
+    let mut term = Terminal::new(TestBackend::new(DRAWN.0, DRAWN.1)).unwrap();
+    a.step(&mut term, still(), &[]).expect("the first frame draws");
+    (a, term)
+}
+
+/// The record of the frame `a` would draw now — after a step with no input,
+/// the frame it last drew.
+fn record_of(a: &App) -> PointerRecord {
+    let mut term = Terminal::new(TestBackend::new(DRAWN.0, DRAWN.1)).unwrap();
+    let mut out = None;
+    term.draw(|f| out = Some(clowder_tui::render::frame_recorded(f, &a.state, &a.view, a.prev_layout.as_ref())))
+        .unwrap();
+    out.unwrap().1
+}
+
+/// Each line of the list on which a row was drawn: its line, a column on
+/// it, and the row's identity, top to bottom.
+fn row_lines(record: &PointerRecord) -> Vec<(u16, u16, RowKey)> {
+    (0..DRAWN.1)
+        .filter_map(|y| {
+            (0..DRAWN.0).find_map(|x| record.row_at(x, y).map(|(_, key)| (y, x + 4, key)))
+        })
+        .collect()
+}
+
+/// Where the cursor stands in the section in focus.
+fn cursor(a: &App) -> Option<RowKey> {
+    a.view.section.and_then(|s| a.view.focus[s.index()].clone())
+}
+
+/// The selectable rows of the section in focus, in order.
+fn selectable(a: &App) -> Vec<RowKey> {
+    let section = a.view.section.expect("a section is in focus");
+    clowder_tui::nav::rows::drawn_rows(&a.state, section, &a.view)
+        .into_iter()
+        .filter(|r| r.selectable())
+        .map(|r| r.key)
+        .collect()
+}
+
+fn pointer(kind: MouseEventKind, x: u16, y: u16, modifiers: KeyModifiers) -> Event {
+    Event::Mouse(MouseEvent { kind, column: x, row: y, modifiers })
+}
+
+fn click_at(x: u16, y: u16) -> Event {
+    pointer(MouseEventKind::Down(MouseButton::Left), x, y, KeyModifiers::NONE)
+}
+
+fn wheel_down_at(x: u16, y: u16) -> Event {
+    pointer(MouseEventKind::ScrollDown, x, y, KeyModifiers::NONE)
+}
+
+fn wheel_up_at(x: u16, y: u16) -> Event {
+    pointer(MouseEventKind::ScrollUp, x, y, KeyModifiers::NONE)
+}
+
+/// A click after keys in the same frame lands on the row the last frame drew
+/// under it, though the keys before it have moved the cursor far enough down
+/// the list that a frame drawn now would put another row on that line.
+/// @spec TUI-RUN-065
+#[test]
+fn a_click_is_resolved_against_the_frame_last_drawn_though_keys_before_it_moved_the_list() {
+    let (mut a, mut term) = drawn_lively("pointer-last-frame");
+    let lines = row_lines(&record_of(&a));
+    assert!(lines.len() > 6, "fixture: the list fills the screen with rows");
+    let (y, x, target) = lines[3].clone();
+
+    let downs: Vec<Event> = (0..60).map(|_| key(KeyCode::Down)).collect();
+    let (mut twin, mut twin_term) = drawn_lively("pointer-last-frame-twin");
+    twin.step(&mut twin_term, still(), &downs).unwrap();
+    assert_ne!(
+        record_of(&twin).row_at(x, y).map(|(_, k)| k),
+        Some(target.clone()),
+        "fixture: after the keys, a frame drawn anew puts another row on the clicked line"
+    );
+
+    let mut events = downs;
+    events.push(click_at(x, y));
+    a.step(&mut term, still(), &events).unwrap();
+    assert_eq!(
+        cursor(&a),
+        Some(target),
+        "a click after keys in its frame should land on the row the last frame drew under it"
+    );
+}
+
+/// Pointer events and keys are handed on in the order they arrived: a key
+/// after a click acts where the click left the cursor, and a click after a
+/// key lands where it was aimed; a key after wheel steps moves on from where
+/// the steps left the cursor, and wheel steps after a key move on from it.
+/// @spec TUI-RUN-065
+#[test]
+fn pointer_events_and_keys_are_handed_on_in_the_order_they_arrived() {
+    let (probe, _) = drawn_lively("pointer-order-probe");
+    let lines = row_lines(&record_of(&probe));
+    let (y, x, target) = lines[3].clone();
+    let order = selectable(&probe);
+
+    // A click, then ↓: one past the clicked row.
+    let (mut a, mut term) = drawn_lively("pointer-order-click-key");
+    a.step(&mut term, still(), &[click_at(x, y), key(KeyCode::Down)]).unwrap();
+    let mut by_hand = a.view.clone();
+    by_hand.focus[Section::Meadow.index()] = Some(target.clone());
+    navigation::update(Action::CursorDown, &mut by_hand, &a.state);
+    assert_eq!(
+        cursor(&a),
+        by_hand.focus[Section::Meadow.index()].clone(),
+        "a key after a click should act where the click left the cursor"
+    );
+    assert_ne!(cursor(&a), Some(target.clone()), "fixture: ↓ moves on from the clicked row");
+
+    // ↓ ×8, then a click: the clicked row.
+    let (mut a, mut term) = drawn_lively("pointer-order-key-click");
+    let mut events: Vec<Event> = (0..8).map(|_| key(KeyCode::Down)).collect();
+    events.push(click_at(x, y));
+    a.step(&mut term, still(), &events).unwrap();
+    assert_eq!(cursor(&a), Some(target.clone()), "a click after keys should land where it was aimed");
+
+    // Three steps down, then ↑: the third row.
+    let (mut a, mut term) = drawn_lively("pointer-order-wheel-key");
+    let (wy, wx, _) = lines[0].clone();
+    let mut events: Vec<Event> = (0..3).map(|_| wheel_down_at(wx, wy)).collect();
+    events.push(key(KeyCode::Up));
+    a.step(&mut term, still(), &events).unwrap();
+    assert_eq!(cursor(&a), Some(order[2].clone()), "↑ after three steps down should leave the cursor on the third row");
+
+    // ↑, then three steps down: the fourth row.
+    let (mut a, mut term) = drawn_lively("pointer-order-key-wheel");
+    let mut events = vec![key(KeyCode::Up)];
+    events.extend((0..3).map(|_| wheel_down_at(wx, wy)));
+    a.step(&mut term, still(), &events).unwrap();
+    assert_eq!(cursor(&a), Some(order[3].clone()), "three steps down after ↑ at the top should reach the fourth row");
+}
+
+/// A pointer event is judged at the terminal's size as of it among its
+/// frame's events: after a resize to a size no frame has been drawn at, it
+/// does nothing; after a resize back to the size the last frame was drawn
+/// at, or a resize reporting that size, or before any resize in its frame, it
+/// resolves against the last frame's record.
+/// @spec TUI-RUN-065
+#[test]
+fn a_pointer_event_is_judged_at_the_terminal_size_as_of_it_among_its_frames_events() {
+    let (probe, _) = drawn_lively("pointer-size-probe");
+    let lines = row_lines(&record_of(&probe));
+    let (y, x, target) = lines[3].clone();
+    let opening = cursor(&probe);
+    let other = Event::Resize(DRAWN.0 + 20, DRAWN.1 + 10);
+    let same = Event::Resize(DRAWN.0, DRAWN.1);
+
+    let cases: [(&str, Vec<Event>, bool); 5] = [
+        ("a click after a resize to another size", vec![other.clone(), click_at(x, y)], false),
+        ("a click after a resize to another size and back", vec![other.clone(), same.clone(), click_at(x, y)], true),
+        ("a click after a resize reporting the size drawn at", vec![same.clone(), click_at(x, y)], true),
+        ("a click before a resize to another size", vec![click_at(x, y), other.clone()], true),
+        ("a click with no resize", vec![click_at(x, y)], true),
+    ];
+    for (what, events, lands) in cases {
+        let (mut a, mut term) = drawn_lively("pointer-size");
+        a.step(&mut term, still(), &events).unwrap();
+        let want = if lands { Some(target.clone()) } else { opening.clone() };
+        assert_eq!(cursor(&a), want, "{what}: the click should {}", if lands { "land" } else { "do nothing" });
+    }
+}
+
+/// Before the first frame of play is drawn there is no record of play to
+/// resolve against: a pointer event then does nothing, and is not held for
+/// a later frame — the session goes on exactly as one that received none.
+/// @spec TUI-RUN-065
+#[test]
+fn a_pointer_event_before_the_first_frame_of_play_does_nothing_and_is_not_held() {
+    let mut a = opened_lively("pointer-before-first");
+    let mut b = opened_lively("pointer-before-first-twin");
+    let lines = row_lines(&record_of(&a));
+    assert!(lines.len() > 6, "fixture: the first frame will fill the screen with rows");
+    let mut events = Vec::new();
+    for (y, x, _) in &lines[1..] {
+        events.push(click_at(*x, *y));
+        events.push(wheel_down_at(*x, *y));
+    }
+    for x in 0..DRAWN.0 {
+        events.push(click_at(x, 1));
+    }
+
+    let mut ta = Terminal::new(TestBackend::new(DRAWN.0, DRAWN.1)).unwrap();
+    let mut tb = Terminal::new(TestBackend::new(DRAWN.0, DRAWN.1)).unwrap();
+    a.step(&mut ta, still(), &events).unwrap();
+    b.step(&mut tb, still(), &[]).unwrap();
+    assert_eq!(format!("{:?}", a.view), format!("{:?}", b.view), "a pointer event before the first frame did something");
+    for _ in 0..2 {
+        a.step(&mut ta, still(), &[]).unwrap();
+        b.step(&mut tb, still(), &[]).unwrap();
+    }
+    assert_eq!(format!("{:?}", a.view), format!("{:?}", b.view), "a pointer event before the first frame was held for a later one");
+    assert_eq!(ta.backend().buffer(), tb.backend().buffer(), "and the screens drawn after it differ");
+}
+
+/// No pointer event applies a core command: every kind of mouse event, with
+/// every set of modifiers, across the whole screen — tabs, rows, the list's
+/// edges, the panes beside it — leaves the meadow exactly as it was.
+/// @spec TUI-RUN-065
+#[test]
+fn no_pointer_event_applies_a_core_command() {
+    let (mut a, mut term) = drawn_lively("pointer-no-command");
+    let before = clowder_core::save_string(&a.state, 0);
+    let mut kinds = Vec::new();
+    for b in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
+        kinds.extend([MouseEventKind::Down(b), MouseEventKind::Up(b), MouseEventKind::Drag(b)]);
+    }
+    kinds.extend([
+        MouseEventKind::Moved,
+        MouseEventKind::ScrollDown,
+        MouseEventKind::ScrollUp,
+        MouseEventKind::ScrollLeft,
+        MouseEventKind::ScrollRight,
+    ]);
+    let modifier_sets = [
+        KeyModifiers::NONE,
+        KeyModifiers::SHIFT,
+        KeyModifiers::CONTROL,
+        KeyModifiers::ALT,
+        KeyModifiers::SHIFT | KeyModifiers::CONTROL | KeyModifiers::ALT,
+    ];
+    let mut events = Vec::new();
+    for y in 0..DRAWN.1 {
+        for x in (0..DRAWN.0).step_by(9) {
+            for kind in &kinds {
+                events.push(pointer(*kind, x, y, KeyModifiers::NONE));
+            }
+        }
+        for modifiers in &modifier_sets[1..] {
+            for kind in &kinds {
+                events.push(pointer(*kind, 26, y, *modifiers));
+            }
+        }
+    }
+    let mut moved = false;
+    let opening = cursor(&a);
+    for batch in events.chunks(40) {
+        a.step(&mut term, still(), batch).unwrap();
+        moved |= cursor(&a) != opening;
+        assert!(
+            clowder_core::save_string(&a.state, 0) == before,
+            "a pointer event changed the meadow — it reached the core"
+        );
+        assert!(!a.quitting, "a pointer event ended the session");
+    }
+    assert!(moved, "fixture: the pointer events reached navigation and moved the cursor");
+}
+
+/// Every wheel step a frame takes is handed on, past the bound on keys: forty
+/// steps down and back up and one more down leave the cursor one row down,
+/// and ninety steps down leave it ninety rows down. A frame that dropped any
+/// step, or took no more of them than of keys, would stop the cursor short.
+/// @spec TUI-RUN-064, TUI-RUN-065
+#[test]
+fn every_wheel_step_a_frame_takes_is_handed_to_navigation() {
+    let (probe, _) = drawn_lively("pointer-every-step-probe");
+    let (y, x, _) = row_lines(&record_of(&probe))[0].clone();
+    let order = selectable(&probe);
+    assert!(order.len() > 91, "fixture: the list is longer than ninety rows");
+
+    let (mut a, mut term) = drawn_lively("pointer-every-step-pairs");
+    let mut events: Vec<Event> = (0..40).flat_map(|_| [wheel_down_at(x, y), wheel_up_at(x, y)]).collect();
+    events.push(wheel_down_at(x, y));
+    a.step(&mut term, still(), &events).unwrap();
+    assert_eq!(cursor(&a), Some(order[1].clone()), "81 wheel steps netting one down should leave the cursor one row down");
+
+    let (mut a, mut term) = drawn_lively("pointer-every-step-ninety");
+    let events: Vec<Event> = (0..90).map(|_| wheel_down_at(x, y)).collect();
+    a.step(&mut term, still(), &events).unwrap();
+    assert_eq!(cursor(&a), Some(order[90].clone()), "90 wheel steps down should leave the cursor 90 rows down");
 }

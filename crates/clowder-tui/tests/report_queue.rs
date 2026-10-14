@@ -112,6 +112,7 @@ fn app(state: GameState, view: ViewState, name: &str) -> App {
         save_path: scratch(name),
         last_save: Instant::now(),
         prev_layout: None,
+        pointer_record: None,
         quitting: false,
         save_failed: false,
     }

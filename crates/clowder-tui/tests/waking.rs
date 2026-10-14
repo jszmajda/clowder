@@ -2,7 +2,7 @@
 //! bounded count per frame, behind the waking screen, until the game opens.
 //!
 //! @spec TUI-RUN-033, TUI-RUN-034, TUI-RUN-035, TUI-RUN-036, TUI-RUN-037,
-//! TUI-RUN-038, TUI-RUN-039, TUI-NAV-102, TUI-NAV-103
+//! TUI-RUN-038, TUI-RUN-039, TUI-RUN-065, TUI-NAV-102, TUI-NAV-103
 //!
 //! **The seam.** Start-up hands the core's pending catch-up (SAVE-018,
 //! `clowder_core::begin_load`) to `runtime::Wake::begin`, which advances the
@@ -325,6 +325,7 @@ fn waking_replays_by_its_own_count_and_not_live_plays() {
         save_path: scratch("live-bound"),
         last_save: Instant::now(),
         prev_layout: None,
+        pointer_record: None,
         quitting: false,
         save_failed: false,
     };
@@ -890,6 +891,7 @@ fn every_other_key_is_discarded_while_waking_and_none_is_held_for_the_game() {
         save_path: scratch("discard-reference"),
         last_save: Instant::now(),
         prev_layout: None,
+        pointer_record: None,
         quitting: false,
         save_failed: false,
     };
@@ -899,4 +901,91 @@ fn every_other_key_is_discarded_while_waking_and_none_is_held_for_the_game() {
     assert_eq!(state_bytes(&app.state), state_bytes(&reference.state), "no key was held for play");
     assert_eq!(view_of(&app.view), view_of(&reference.view), "the first frame of play acted on nothing");
     assert_eq!(t.backend().buffer(), rt.backend().buffer(), "and draws as a load that never woke");
+}
+
+/// Every mouse event taken while waking does nothing and is not held for the
+/// game: the waking screen addresses nothing, so every kind of mouse event,
+/// with every set of modifiers, over every cell — where the game's tabs and
+/// rows will stand once it opens included — leaves the game to open exactly
+/// as a load that never woke would, and its first frames of play act on
+/// nothing.
+/// @spec TUI-RUN-065
+#[test]
+fn every_mouse_event_is_discarded_while_waking_and_none_is_held_for_the_game() {
+    use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+
+    let mut kinds = Vec::new();
+    for b in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
+        kinds.extend([MouseEventKind::Down(b), MouseEventKind::Up(b), MouseEventKind::Drag(b)]);
+    }
+    kinds.extend([
+        MouseEventKind::Moved,
+        MouseEventKind::ScrollDown,
+        MouseEventKind::ScrollUp,
+        MouseEventKind::ScrollLeft,
+        MouseEventKind::ScrollRight,
+    ]);
+    let modifier_sets = [
+        KeyModifiers::NONE,
+        KeyModifiers::SHIFT,
+        KeyModifiers::CONTROL,
+        KeyModifiers::ALT,
+        KeyModifiers::SHIFT | KeyModifiers::CONTROL | KeyModifiers::ALT,
+    ];
+    // One waking frame per line of the screen, each taking every kind of
+    // event at every cell of that line under every set of modifiers.
+    let frames: Vec<Vec<TermEvent>> = (0..30u16)
+        .map(|y| {
+            let mut events = Vec::new();
+            for x in 0..100u16 {
+                for kind in &kinds {
+                    for modifiers in &modifier_sets {
+                        events.push(TermEvent::Mouse(MouseEvent { kind: *kind, column: x, row: y, modifiers: *modifiers }));
+                    }
+                }
+            }
+            events
+        })
+        .collect();
+
+    let json = save_of(&meadow(65_001, 1.0));
+    let now = SAVED_AT + 120; // 480 ticks, one a frame
+    let mut t = term(100, 30);
+    let mut w = waking(begin(&json, now, 1, &mut t, "mouse-discard"));
+    assert!(w.total_ticks() as usize > frames.len() + 1, "fixture: a waking frame for every line");
+    for events in &frames {
+        w = waking(step(w, &mut t, still(), events));
+        assert!(!w.quitting, "a mouse event is not a quit key");
+    }
+    let mut app = loop {
+        match step(w, &mut t, still(), &[]) {
+            Wake::Waking(next) => w = next,
+            Wake::Awake(app) => break app,
+        }
+    };
+    assert!(!app.quitting);
+
+    let one_call = load_string(&json, now).unwrap();
+    assert_eq!(state_bytes(&app.state), state_bytes(&one_call.state), "no mouse event acted on the meadow");
+    assert_eq!(view_of(&app.view), view_of(&opened_view(&one_call)), "no mouse event moved the view");
+
+    let mut reference = App {
+        state: one_call.state.clone(),
+        view: opened_view(&one_call),
+        clock: TickAccumulator::default(),
+        save_path: scratch("mouse-discard-reference"),
+        last_save: Instant::now(),
+        prev_layout: None,
+        pointer_record: None,
+        quitting: false,
+        save_failed: false,
+    };
+    let mut rt = term(100, 30);
+    for _ in 0..3 {
+        app.step(&mut t, still(), &[]).unwrap();
+        reference.step(&mut rt, still(), &[]).unwrap();
+    }
+    assert_eq!(state_bytes(&app.state), state_bytes(&reference.state), "no mouse event was held for play");
+    assert_eq!(view_of(&app.view), view_of(&reference.view), "the first frames of play acted on nothing");
+    assert_eq!(t.backend().buffer(), rt.backend().buffer(), "and draw as a load that never woke");
 }

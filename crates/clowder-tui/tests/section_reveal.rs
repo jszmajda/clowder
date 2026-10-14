@@ -220,6 +220,7 @@ fn opened(state: GameState, name: &str) -> App {
         save_path: save_path(name),
         last_save: Instant::now(),
         prev_layout: None,
+        pointer_record: None,
         quitting: false,
         save_failed: false,
     }

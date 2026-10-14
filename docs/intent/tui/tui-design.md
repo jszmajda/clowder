@@ -48,7 +48,7 @@ The loop is the sim's clock at the boundary (the HLD's "shell drives ticks" deci
 - **The shell owns wall-clock time; the sim owns none.** Elapsed real-time × speed → tick count, at the loop boundary. This is what makes live play and offline catch-up the same simulation.
 - **Render from snapshots + derived queries, never from shell-side game state.** The shell caches nothing the core owns; if it needs a number the core computes, it asks the core (see the navigation LLD's core-API dependencies). This keeps rule knowledge out of the shell.
 - **The pointer moves; only keys act.** A pointer event becomes at most a cursor or section move, resolved against the frame the player was looking at — the record that frame's drawing left of where it put each tab and row — never against a layout worked out again for the event, which could disagree with what was on screen. It never becomes a `Command`.
-- **Panic-safe terminal restore.** Any panic must restore the terminal (cooked mode, main screen) before unwinding, or a crash leaves the user's terminal wrecked — a hard requirement for a program that lives in a long-running pane.
+- **Panic-safe terminal restore.** Any panic must restore the terminal (mouse reporting off, cooked mode, main screen) before unwinding, or a crash leaves the user's terminal wrecked — a hard requirement for a program that lives in a long-running pane.
 
 ## Decisions & Alternatives
 

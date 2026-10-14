@@ -22,12 +22,7 @@ import sys
 # Specs whose behaviour genuinely cannot be asserted from a headless test, with
 # the reason. Anything here must also say so where the code lives, so the gap is
 # visible to a reader of the tests and not only to this script.
-EXEMPT = {
-    "TUI-RUN-002": "entering raw mode and the alternate screen needs a real pty; "
-                   "faking one would prove nothing about the real terminal (see tests/term.rs)",
-    "TUI-RUN-003": "restoring the terminal before the panic message needs the same pty "
-                   "(see tests/term.rs)",
-}
+EXEMPT: dict[str, str] = {}
 
 SPEC = re.compile(r"\s*-\s*\[x\]\s*\*\*([A-Z][A-Z0-9-]*-\d{3})\*\*")
 ID = re.compile(r"\b[A-Z][A-Z0-9-]*-\d{3}\b")

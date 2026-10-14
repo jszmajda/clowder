@@ -4,15 +4,23 @@
 //! error propagation, a panic hook for panics, and signal handlers for the
 //! kill that never unwinds at all. A tool that lives in a tmux pane is killed
 //! by the pane far more often than it is quit.
-//! @spec TUI-RUN-002, TUI-RUN-003, TUI-RUN-004
+//! Mouse reporting is part of the same taking and giving back: turned on after
+//! the screen is taken, off before it is given back, on every one of these
+//! paths. @spec TUI-RUN-002, TUI-RUN-003, TUI-RUN-004, TUI-RUN-060,
+//! TUI-RUN-061, TUI-RUN-062
 
-use std::io;
+use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Set by the signal handlers, observed by the event loop. Never touched by
 /// anything other than an atomic store/load, so it is safe to write from a
 /// signal handler.
 static TERMINATION_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+/// Whether the terminal is taken and not yet given back, so that a panic's
+/// restoration and the guard's drop during the unwinding that follows it give
+/// it back once between them. @spec TUI-RUN-061
+static TAKEN: AtomicBool = AtomicBool::new(false);
 
 /// Restores the terminal when dropped. @spec TUI-RUN-002
 #[derive(Debug)]
@@ -21,18 +29,19 @@ pub struct TerminalGuard {
 }
 
 impl TerminalGuard {
-    /// Enter raw mode and the alternate screen, and install the panic hook.
-    /// Called only after the save has been read, so a load failure can still
-    /// print to an ordinary terminal. @spec TUI-RUN-001, TUI-RUN-003
+    /// Enter raw mode and the alternate screen, turn on mouse reporting, and
+    /// install the panic hook. Called only after the save has been read, so a
+    /// load failure can still print to an ordinary terminal. Where any step
+    /// fails, everything entered so far is undone before the failure is
+    /// returned. @spec TUI-RUN-001, TUI-RUN-003, TUI-RUN-060, TUI-RUN-062
     pub fn enter() -> std::io::Result<Self> {
-        crossterm::terminal::enable_raw_mode()?;
-        if let Err(err) = crossterm::execute!(
-            io::stdout(),
-            crossterm::terminal::EnterAlternateScreen
-        ) {
-            // Don't leave raw mode enabled if entering the alternate screen
-            // failed partway through.
-            let _ = crossterm::terminal::disable_raw_mode();
+        TAKEN.store(true, Ordering::SeqCst);
+        let entered = crossterm::terminal::enable_raw_mode()
+            .and_then(|()| crossterm::execute!(io::stdout(), crossterm::terminal::EnterAlternateScreen))
+            .and_then(|()| write_flushed(MOUSE_REPORTING_ON));
+        if let Err(err) = entered {
+            // Don't leave any of it on if entering failed partway through.
+            restore_terminal();
             return Err(err);
         }
 
@@ -42,6 +51,23 @@ impl TerminalGuard {
     }
 }
 
+/// Normal tracking (`?1000`: each button's press and release, and each wheel
+/// step) in the SGR encoding (`?1006`, so a column past 223 arrives intact),
+/// and nothing else: no motion tracking, no other encoding. Written here
+/// rather than through the terminal library's mouse-capture command, which
+/// also asks for button-motion, any-motion and urxvt reports.
+/// @spec TUI-RUN-060
+const MOUSE_REPORTING_ON: &[u8] = b"\x1b[?1000h\x1b[?1006h";
+
+/// The reverse, in the reverse order. @spec TUI-RUN-061
+const MOUSE_REPORTING_OFF: &[u8] = b"\x1b[?1006l\x1b[?1000l";
+
+fn write_flushed(bytes: &[u8]) -> io::Result<()> {
+    let mut out = io::stdout();
+    out.write_all(bytes)?;
+    out.flush()
+}
+
 impl Drop for TerminalGuard {
     fn drop(&mut self) {
         // @spec TUI-RUN-002
@@ -49,10 +75,16 @@ impl Drop for TerminalGuard {
     }
 }
 
-/// Leave the alternate screen and disable raw mode. Best-effort: called from
+/// Turn off mouse reporting, leave the alternate screen, and disable raw
+/// mode, in that order. Best-effort: called from
 /// both the Drop guard and the panic hook, and a restore that is already
 /// failing (terminal gone, stdout closed) has nothing better to fall back to.
 fn restore_terminal() {
+    if !TAKEN.swap(false, Ordering::SeqCst) {
+        return;
+    }
+    // @spec TUI-RUN-061
+    let _ = write_flushed(MOUSE_REPORTING_OFF);
     let _ = crossterm::execute!(io::stdout(), crossterm::terminal::LeaveAlternateScreen);
     let _ = crossterm::terminal::disable_raw_mode();
 }

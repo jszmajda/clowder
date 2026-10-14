@@ -4732,6 +4732,7 @@ fn ideas_session(state: GameState, name: &str) -> (App, Terminal<TestBackend>) {
         save_path: dg_scratch(name),
         last_save: Instant::now(),
         prev_layout: None,
+        pointer_record: None,
         quitting: false,
         save_failed: false,
     };
