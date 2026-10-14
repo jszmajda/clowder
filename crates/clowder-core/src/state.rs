@@ -1065,6 +1065,10 @@ pub struct GameState {
     /// Permanently revealed content ids. @spec SIM-ENG-023
     #[serde(default)]
     pub revealed: BTreeSet<ContentId>,
+    /// Permanently revealed resources: held at some point, or named in a price
+    /// the core would state. Serialized in id order. @spec SIM-ENG-051
+    #[serde(default)]
+    pub revealed_resources: BTreeSet<ResourceId>,
     /// What the player has lived through — canonical state, because it cannot
     /// be recomputed from anything else. A save written before the journal
     /// existed defaults to empty, which is the honest representation of
@@ -1218,6 +1222,11 @@ pub struct GameState {
     pub(crate) unrevealed_structs: Vec<StructureId>,
     #[serde(skip)]
     pub(crate) unrevealed_ideas: Vec<IdeaId>,
+    /// Derived accelerator for the per-tick holdings check: the complement of
+    /// `revealed_resources`, in id order. Never serialized — rebuilt on load.
+    /// @spec SIM-ENG-055
+    #[serde(skip)]
+    pub(crate) unrevealed_resources: Vec<ResourceId>,
 }
 
 fn default_speed() -> f64 {
@@ -1253,6 +1262,7 @@ impl GameState {
             zoomies_until: 0,
             speed: 1.0,
             revealed: BTreeSet::new(),
+            revealed_resources: BTreeSet::new(),
             kites_high_water: 0.0,
             mess: 0.0,
             pending_sky_event: None,
@@ -1292,6 +1302,7 @@ impl GameState {
             deja_vu_until: 0,
             unrevealed_structs: StructureId::ALL.to_vec(),
             unrevealed_ideas: IdeaId::ALL.to_vec(),
+            unrevealed_resources: ResourceId::ALL.to_vec(),
         }
     }
 
@@ -1310,6 +1321,93 @@ impl GameState {
             .copied()
             .filter(|i| !self.revealed.contains(&ContentId::Idea(*i)))
             .collect();
+        self.unrevealed_resources = ResourceId::ALL
+            .iter()
+            .copied()
+            .filter(|r| !self.revealed_resources.contains(r))
+            .collect();
+    }
+
+    /// Whether a resource is revealed — revealed or not, never teased. Answers
+    /// for the persisted set and for whatever the meadow holds at the asking,
+    /// so a state built by hand is judged on what it plainly holds and a
+    /// caller listing stores infers nothing from a stock. @spec SIM-ENG-053
+    pub fn resource_revealed(&self, r: ResourceId) -> bool {
+        self.revealed_resources.contains(&r) || self.resources[r.ix()] > 0.0
+    }
+
+    /// The revealed resources, in the order the core lists resources.
+    /// @spec SIM-ENG-053
+    pub fn resources_revealed(&self) -> Vec<ResourceId> {
+        ResourceId::ALL.iter().copied().filter(|r| self.resource_revealed(*r)).collect()
+    }
+
+    /// Record every resource the meadow holds (stock above zero, no dust
+    /// guard). Walks only the not-yet-revealed worklist: one comparison per
+    /// unrevealed resource, nothing once all are revealed. @spec SIM-ENG-048,
+    /// SIM-ENG-055
+    pub(crate) fn record_holdings(&mut self) {
+        if self.unrevealed_resources.is_empty() {
+            return;
+        }
+        let resources = &self.resources;
+        let revealed = &mut self.revealed_resources;
+        self.unrevealed_resources.retain(|r| {
+            if resources[r.ix()] > 0.0 {
+                revealed.insert(*r);
+                false
+            } else {
+                true
+            }
+        });
+    }
+
+    /// Record the resources a content item's price names. @spec SIM-ENG-049
+    pub(crate) fn record_price_of(&mut self, id: ContentId) {
+        for (r, _) in self.cost_of_next(id, 1) {
+            self.reveal_resource(r);
+        }
+    }
+
+    fn reveal_resource(&mut self, r: ResourceId) {
+        if self.revealed_resources.insert(r) {
+            self.unrevealed_resources.retain(|u| *u != r);
+        }
+    }
+
+    /// Record every resource named in a price the core would state: the price
+    /// of every content item it reports Teased or Available, the per-unit
+    /// price of every count-taking command that query answers for, and a deep
+    /// nap's cost while its gate is open. @spec SIM-ENG-049
+    pub(crate) fn record_prices(&mut self) {
+        if self.unrevealed_resources.is_empty() {
+            return;
+        }
+        for id in crate::state::every_content_id() {
+            if self.availability(id) != Availability::Hidden {
+                self.record_price_of(id);
+            }
+        }
+        let mut priced = vec![crate::command::Command::Pounce(1)];
+        priced.extend(ColonyId::ALL.iter().map(|c| crate::command::Command::Trade(*c, 1)));
+        for cmd in &priced {
+            if let Some(price) = self.unit_price(cmd) {
+                for (r, _) in price {
+                    self.reveal_resource(r);
+                }
+            }
+        }
+        if self.command_gate_open(&crate::command::Command::DeepNap(1)) {
+            self.reveal_resource(ResourceId::Starshards);
+        }
+    }
+
+    /// The whole reveal rule, applied once to the state as it stands: what a
+    /// command leaves behind it, and what a migrated save is given.
+    /// @spec SIM-ENG-054, SAVE-024
+    pub(crate) fn record_reveals(&mut self) {
+        self.record_holdings();
+        self.record_prices();
     }
 
     // ---- Calendar (derived from ticks alone) ----
@@ -2034,6 +2132,22 @@ impl GameState {
     }
 }
 
+/// Every content id the core knows, across every kind.
+pub(crate) fn every_content_id() -> Vec<ContentId> {
+    let mut ids = Vec::new();
+    ids.extend(StructureId::ALL.iter().map(|x| ContentId::Structure(*x)));
+    ids.extend(IdeaId::ALL.iter().map(|x| ContentId::Idea(*x)));
+    ids.extend(CraftId::ALL.iter().map(|x| ContentId::Craft(*x)));
+    ids.extend(JobId::ALL.iter().map(|x| ContentId::Job(*x)));
+    ids.extend(RiteId::ALL.iter().map(|x| ContentId::Rite(*x)));
+    ids.extend(ArchId::ALL.iter().map(|x| ContentId::Arch(*x)));
+    ids.extend(RefinementId::ALL.iter().map(|x| ContentId::Refinement(*x)));
+    ids.extend(RuleId::ALL.iter().map(|x| ContentId::Rule(*x)));
+    ids.extend(TraditionId::ALL.iter().map(|x| ContentId::Tradition(*x)));
+    ids.extend(DreamLoomId::ALL.iter().map(|x| ContentId::DreamLoom(*x)));
+    ids
+}
+
 pub(crate) fn season_index_of_day(day: u64) -> usize {
     ((day / content::DAYS_PER_SEASON) % 4) as usize
 }
@@ -2076,7 +2190,8 @@ mod move_classification {
             arches_bought: _, dream_drift: _, promises: _, penpal: _,
             discovered: _, stirred_dreams: _, whale_visit_years: _,
             whale_contentment: _, deja_vu_until: _, tidy_progress: _,
-            unrevealed_structs: _, unrevealed_ideas: _,
+            unrevealed_structs: _, unrevealed_ideas: _, revealed_resources: _,
+            unrevealed_resources: _,
 
             // ---- preserved, and named as legacies by the spec ----
             rng: _, speed: _, serenity: _, enlightenment_tier: _,

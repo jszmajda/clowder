@@ -1,0 +1,637 @@
+{
+  "save_version": 5,
+  "saved_at_unix": 1760303600,
+  "owed_ticks": 5400,
+  "report_so_far": {
+    "elapsed_seconds": 3600,
+    "truncated": false,
+    "resource_deltas": [
+      20.0,
+      0.0,
+      0.0,
+      54.00000000000193,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "arrived": [],
+    "wandered": [],
+    "returned": [],
+    "seasons_passed": 36
+  },
+  "state": {
+    "ticks": 9430,
+    "rng": {
+      "state": 6670125992455861000,
+      "inc": 2885390081777926815
+    },
+    "resources": [
+      200.0,
+      40.0,
+      3.5,
+      56.58000000000192,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "structures": [
+      4,
+      3,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "kittens": [
+      {
+        "name": "Turnip",
+        "job": null,
+        "location": "Home",
+        "arrived_day": 1,
+        "job_seq": null,
+        "away_seq": null,
+        "skills": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 0.0,
+        "rank": 0,
+        "trait_id": "Alchemical",
+        "tinkering": null
+      },
+      {
+        "name": "Clover",
+        "job": "Gardener",
+        "location": "Home",
+        "arrived_day": 2,
+        "job_seq": 1,
+        "away_seq": null,
+        "skills": [
+          94.00000000001118,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 94.00000000001118,
+        "rank": 0,
+        "trait_id": "Bold",
+        "tinkering": null
+      },
+      {
+        "name": "Tangerine",
+        "job": "Gardener",
+        "location": "Home",
+        "arrived_day": 3,
+        "job_seq": 0,
+        "away_seq": null,
+        "skills": [
+          94.00000000001118,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 94.00000000001118,
+        "rank": 0,
+        "trait_id": "Charming",
+        "tinkering": null
+      }
+    ],
+    "ideas": [
+      "PantryOrganization",
+      "ScratchingArts",
+      "CouchSpelunking",
+      "PouncingPractice"
+    ],
+    "pity": 0,
+    "famine_days": 0,
+    "recovery_days": 255,
+    "grumpy": false,
+    "next_seq": 2,
+    "zoomies_until": 0,
+    "speed": 1.0,
+    "roster_high_water": 3,
+    "revealed": [
+      {
+        "Structure": "CatnipPatch"
+      },
+      {
+        "Structure": "CozyCushion"
+      },
+      {
+        "Structure": "CardboardBox"
+      },
+      {
+        "Structure": "Pantry"
+      },
+      {
+        "Structure": "CouchMine"
+      },
+      {
+        "Idea": "PantryOrganization"
+      },
+      {
+        "Idea": "ScratchingArts"
+      },
+      {
+        "Idea": "GroomedToPurrfection"
+      },
+      {
+        "Idea": "TwigArchitecture"
+      },
+      {
+        "Idea": "SelectiveHearing"
+      },
+      {
+        "Idea": "Horticulture"
+      },
+      {
+        "Idea": "Emberkeeping"
+      },
+      {
+        "Idea": "PouncingPractice"
+      }
+    ],
+    "journal": {
+      "recent": [
+        {
+          "tick": 1,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Structure": "CatnipPatch"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 1,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Idea": "PantryOrganization"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 1,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Idea": "ScratchingArts"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 10,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Turnip"
+              }
+            }
+          }
+        },
+        {
+          "tick": 20,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Clover"
+              }
+            }
+          }
+        },
+        {
+          "tick": 30,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Tangerine"
+              }
+            }
+          }
+        },
+        {
+          "tick": 30,
+          "item": {
+            "Happened": {
+              "JobAssigned": {
+                "name": "Tangerine",
+                "job": "Gardener"
+              }
+            }
+          }
+        },
+        {
+          "tick": 30,
+          "item": {
+            "Happened": {
+              "JobAssigned": {
+                "name": "Clover",
+                "job": "Gardener"
+              }
+            }
+          }
+        },
+        {
+          "tick": 31,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Structure": "CozyCushion"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 31,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Structure": "CardboardBox"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 31,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Structure": "Pantry"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 31,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Structure": "CouchMine"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 31,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Idea": "GroomedToPurrfection"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 31,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Idea": "TwigArchitecture"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 31,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Idea": "SelectiveHearing"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 31,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Idea": "Horticulture"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 31,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Idea": "Emberkeeping"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 31,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Idea": "PouncingPractice"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 90,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 8,
+                "kitten": null
+              }
+            }
+          }
+        },
+        {
+          "tick": 100,
+          "item": {
+            "Happened": {
+              "Flavor": {
+                "template": 5,
+                "kitten": "Clover"
+              }
+            }
+          }
+        },
+        {
+          "tick": 250,
+          "item": {
+            "Happened": {
+              "SeasonChanged": {
+                "season": "Summer"
+              }
+            }
+          }
+        },
+        {
+          "tick": 320,
+          "item": {
+            "Happened": {
+              "ZoomiesStarted": {
+                "until_tick": 441
+              }
+            }
+          }
+        }
+      ],
+      "kept": [
+        {
+          "tick": 0,
+          "item": {
+            "Happened": {
+              "StructureBuilt": {
+                "id": "CatnipPatch",
+                "count": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "kites_high_water": 0.0,
+    "mess": 0.0,
+    "pending_sky": null,
+    "elder": null,
+    "jamboree_until": 0,
+    "refinements": [],
+    "rules": [],
+    "devotion": 0.0,
+    "serenity": 0.0,
+    "peak_devotion": 0.0,
+    "enlightenment_tier": 0,
+    "rites": [],
+    "rite_counts": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "arches_bought": [],
+    "dream_drift": 0.0,
+    "promises": [],
+    "penpal": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "discovered": [
+      "Otters"
+    ],
+    "elder_wisdom": 0.0,
+    "warm_memories": 0.0,
+    "passed_down_wisdom": 0.0,
+    "generation": 0,
+    "traditions": [],
+    "family_album": [],
+    "armed_adventure": null,
+    "active_adventure": null,
+    "adventure_completions": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "adventure_rewards": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "adventure_done": false,
+    "tidy_progress": 0,
+    "sites_reached": [],
+    "dream_looms": [],
+    "stirred_dreams": 0.0,
+    "distant_dawn": false,
+    "whale_visit_years": 0,
+    "whale_contentment": 0,
+    "deja_vu_until": 0
+  }
+}

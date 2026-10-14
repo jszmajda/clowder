@@ -133,6 +133,10 @@ impl GameState {
             }
         }
 
+        // Holdings: a resource is revealed once the clamp leaves some of it.
+        // @spec SIM-ENG-048, SIM-ENG-054, SIM-ENG-055
+        self.record_holdings();
+
         // Reveal scan: sticky, ordered, event-emitting. We walk only the
         // unrevealed worklists (the complement of `revealed`, canonical order),
         // draining each item as it reveals — no per-tick membership probe of
@@ -140,6 +144,7 @@ impl GameState {
         // between `retain`'s &mut and `reveal_condition_met`'s &self; the taken
         // vec is empty during the scan, which that predicate never reads.
         // @spec SIM-ENG-023
+        let mut newly: Vec<crate::state::ContentId> = Vec::new();
         let mut pending = std::mem::take(&mut self.unrevealed_structs);
         if self.traditions.is_empty() {
             // Hot path (every tick until prestige): the wave-4 reveal loop.
@@ -147,6 +152,7 @@ impl GameState {
                 let id = crate::state::ContentId::Structure(s);
                 if self.reveal_condition_met(id) {
                     self.revealed.insert(id);
+                    newly.push(id);
                     events.push(Event::Revealed { id });
                     false
                 } else {
@@ -161,6 +167,7 @@ impl GameState {
                 let id = crate::state::ContentId::Structure(s);
                 if self.reveal_condition_met_priced(id, price_mult) {
                     self.revealed.insert(id);
+                    newly.push(id);
                     events.push(Event::Revealed { id });
                     false
                 } else {
@@ -178,6 +185,7 @@ impl GameState {
                 let id = crate::state::ContentId::Idea(i);
                 if self.idea_prereqs_met(i) {
                     self.revealed.insert(id);
+                    newly.push(id);
                     events.push(Event::Revealed { id });
                     false
                 } else {
@@ -185,6 +193,11 @@ impl GameState {
                 }
             });
             self.unrevealed_ideas = pending;
+        }
+        // A price comes into view on the tick its item climbs the ladder; a
+        // tick that reveals no item checks no price. @spec SIM-ENG-049, SIM-ENG-054, SIM-ENG-055
+        for id in newly {
+            self.record_price_of(id);
         }
 
         events

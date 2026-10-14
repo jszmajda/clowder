@@ -14,7 +14,9 @@
 - [x] **SAVE-016**: The system shall expose the catch-up cap as part of its public surface, so a caller applying the same limit to an interval it observed itself uses this value rather than a copy of it, there being one rule for how much absence is replayed.
 - [x] **SAVE-012**: Every persistence IO function shall take an explicit file path, with the default path helper resolving to the platform data directory + clowder/save.json.
 
-- [x] **SAVE-013**: When loading a save whose save_version is older than the current version, the system shall migrate it forward one version at a time — added fields receive their new-game defaults and existing state is preserved exactly — verified against a committed fixture file of each prior version.
+- [x] **SAVE-013**: When loading a save whose save_version is older than the current version, the system shall migrate it forward one version at a time — added fields receive their new-game defaults, save a field that its version step's own spec derives from the save's existing state (SAVE-024), and existing state is preserved exactly — verified against a committed fixture file of each prior version.
+- [x] **SAVE-023**: The system shall carry the engine's revealed-resource set (SIM-ENG-051) in a save as canonical state — that a store was once held and has since been spent to nothing cannot be recomputed — under a save version newer than any written without it, so an older binary refuses the save as too new rather than loading it and writing it back with the set dropped.
+- [x] **SAVE-024**: When migrating a save written before the revealed-resource set existed, the system shall fill the set by applying the engine's reveal rule (SIM-ENG-048, SIM-ENG-049) once to the save's state as loaded and normalized, before any catch-up tick: revealing every resource whose stock stands above zero, so every store a prior version listed for that save is still listed, and every resource named in a price the core would state for that state; and revealing no other resource — with migration fidelity tested against a committed fixture file of the prior version.
 
 ## Offline Catch-up
 

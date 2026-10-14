@@ -2006,6 +2006,320 @@ fn the_complete_resource_table_lives_in_home_and_nowhere_else() {
     assert_eq!(listed.len(), unique.len(), "home lists a resource twice");
 }
 
+// ---- which stores are listed: the core's answer, and nothing of the shell's ----
+//
+// When a resource is revealed, and that a revealed one stays so, is the core's
+// rule (SIM-ENG-053). The stores group asks it and holds no rule of its own:
+// no stock, cap, rate, or price decides whether a store has a row. The tests
+// below build their revealed-and-spent meadows by *playing* — commands and
+// ticks, which is where the core records a reveal — because a stock set by
+// hand and taken away by hand was never recorded and is, rightly, forgotten.
+
+/// A new meadow that gathered ten times and foraged once: everything gathered
+/// is spent to exactly nothing, with no tick between.
+fn gathered_and_spent() -> (GameState, Vec<ResourceId>) {
+    let mut s = GameState::new(49);
+    for _ in 0..10 {
+        s.apply(Command::GatherCatnip).expect("fixture: a new meadow can gather");
+    }
+    let gathered: Vec<ResourceId> = ResourceId::ALL.into_iter().filter(|r| s.stock(*r) > 0.0).collect();
+    s.apply(Command::Forage).expect("fixture: ten gathers pay for a forage");
+    assert!(!gathered.is_empty(), "fixture: gathering leaves something in store");
+    for r in &gathered {
+        assert_eq!(s.stock(*r), 0.0, "fixture: the forage spends {r:?} to exactly nothing");
+    }
+    (s, gathered)
+}
+
+/// The maximal meadow a tick on — so the core has recorded every store it
+/// holds — with every stock then spent to nothing.
+fn maximal_met_and_spent() -> GameState {
+    let mut s = maximal();
+    s.tick();
+    for r in ResourceId::ALL {
+        assert!(s.stock(r) > 0.0, "fixture: the maximal meadow holds {r:?} after a tick");
+    }
+    with_every_stock(&s, 0.0)
+}
+
+/// The maximal meadow with nothing in store, after a command: every price it
+/// shows has been recorded by the core, and none of what they name is held.
+fn poor_with_its_prices_recorded() -> GameState {
+    let mut s = poor_but_unlocked();
+    s.apply(Command::SetSpeed(1.0)).expect("fixture: setting the speed is always accepted");
+    s
+}
+
+/// A bare meadow with a whale visiting, after a command: the whale's price is
+/// recorded, and the store it names has neither stock nor room.
+fn a_whale_visiting_a_bare_meadow() -> GameState {
+    let mut s = GameState::new(49);
+    s.whale_visit_years = 3;
+    s.apply(Command::SetSpeed(1.0)).expect("fixture: setting the speed is always accepted");
+    s
+}
+
+/// A kitten at work on something the meadow has nowhere to keep: a positive
+/// rate, a zero cap, and a stock that never rises.
+fn making_what_it_cannot_keep() -> (GameState, ResourceId) {
+    let mut s = GameState::new(49);
+    s.kittens = vec![kitten("Ember", Some(JobId::Sunwarden))];
+    let made = ResourceId::Warmth;
+    for _ in 0..3 {
+        s.tick();
+    }
+    assert!(s.net_rate(made) > 0.0, "fixture: the kitten's work should produce {made:?}");
+    assert_eq!(s.cap(made), 0.0, "fixture: with nowhere to keep it");
+    assert_eq!(s.stock(made), 0.0, "fixture: so none is ever held");
+    (s, made)
+}
+
+/// The resources a price on screen names: the price of every content row any
+/// section lists, of every count-taking row the core prices per unit, and of
+/// the nap while its row is listed.
+fn resources_named_on_screen(state: &GameState) -> BTreeSet<ResourceId> {
+    let mut named = BTreeSet::new();
+    for (_, row) in all_rows(state) {
+        if let RowKey::Content(id, _) = row.key {
+            named.extend(state.cost_of_next(id, 1).into_iter().map(|(r, _)| r));
+        }
+        for c in commands_of(&row) {
+            if let Some(price) = state.unit_price(&c) {
+                named.extend(price.into_iter().map(|(r, _)| r));
+            }
+            if matches!(c, Command::DeepNap(_)) {
+                named.insert(ResourceId::Starshards);
+            }
+        }
+    }
+    named
+}
+
+/// The stores group is the core's answer and nothing else: one row for each
+/// resource the core reports revealed, for no other, in the core's order —
+/// over the whole grouping spread and over meadows built to tempt a rule of
+/// the shell's own, each asked as it stands, emptied, and filled. A store at
+/// nothing the core calls revealed is listed; a store with room, or a rising
+/// rate, or a price on screen naming it, that the core does not call revealed,
+/// is not.
+///
+/// @spec TUI-NAV-049
+#[test]
+fn the_stores_group_lists_exactly_the_resources_the_core_reports_revealed_in_the_cores_order() {
+    let mut spread: Vec<(&'static str, GameState)> = grouping_spread();
+    spread.push(("a meadow that gathered and spent it all", gathered_and_spent().0));
+    spread.push(("the maximal meadow, met and spent", maximal_met_and_spent()));
+    spread.push(("the maximal meadow, poor, its prices recorded", poor_with_its_prices_recorded()));
+    spread.push(("a meadow making what it cannot keep", making_what_it_cannot_keep().0));
+    spread.push(("a bare meadow with a whale visiting", a_whale_visiting_a_bare_meadow()));
+
+    let mut listed_at_nothing = 0;
+    let mut room_and_no_row = 0;
+    let mut rate_and_no_row = 0;
+    let mut price_and_no_row = 0;
+    let mut held_and_listed = 0;
+    let mut listed_without_room = 0;
+
+    for (what, base) in &spread {
+        for (stocks, state) in [
+            ("as it stands", base.clone()),
+            ("emptied", with_every_stock(base, 0.0)),
+            ("filled", with_every_stock(base, 1.0e12)),
+        ] {
+            let core = state.resources_revealed();
+            let listed = resource_rows(&state, home());
+            assert_eq!(
+                listed, core,
+                "in {what}, {stocks}: the stores group (left) is not the resources the core reports \
+                 revealed, in the core's order (right)"
+            );
+            for r in ResourceId::ALL {
+                assert_eq!(
+                    listed.contains(&r),
+                    state.resource_revealed(r),
+                    "in {what}, {stocks}: {r:?}'s row and the core's answer for it disagree"
+                );
+            }
+
+            let rates = state.net_rates();
+            let named = resources_named_on_screen(&state);
+            for r in ResourceId::ALL {
+                let row = listed.contains(&r);
+                if row && state.stock(r) == 0.0 {
+                    listed_at_nothing += 1;
+                }
+                if row && state.stock(r) > 0.0 {
+                    held_and_listed += 1;
+                }
+                if row && state.cap(r) == 0.0 {
+                    listed_without_room += 1;
+                }
+                if !row && state.cap(r) > 0.0 {
+                    room_and_no_row += 1;
+                }
+                if !row && rates[r.ix()] > 0.0 {
+                    rate_and_no_row += 1;
+                }
+                if !row && named.contains(&r) {
+                    price_and_no_row += 1;
+                }
+            }
+        }
+    }
+
+    assert!(held_and_listed > 0, "fixture: some held store should be listed");
+    assert!(listed_at_nothing > 0, "fixture: some store standing at nothing should be listed");
+    assert!(listed_without_room > 0, "fixture: some store with no room to keep any should be listed");
+    assert!(room_and_no_row > 0, "fixture: some store with room should be unrevealed, and unlisted");
+    assert!(rate_and_no_row > 0, "fixture: some store with a rising rate should be unrevealed, and unlisted");
+    assert!(
+        price_and_no_row > 0,
+        "fixture: some store a price on screen names should be unrevealed by the core, and unlisted"
+    );
+}
+
+/// The player's own report: a store spent to exactly nothing keeps its row,
+/// reading zero, where it stood — the cursor resting on it stays put, and its
+/// refill is watched from the row it was spent from.
+///
+/// @spec TUI-NAV-049
+#[test]
+fn a_store_spent_to_exactly_nothing_keeps_its_row_where_it_stood() {
+    // By a command, with no tick between the gain and the spend.
+    let mut s = GameState::new(49);
+    for _ in 0..10 {
+        s.apply(Command::GatherCatnip).expect("fixture: a new meadow can gather");
+    }
+    let before = resource_rows(&s, home());
+    assert!(!before.is_empty(), "fixture: the gathered store is listed");
+    let spent = before[0];
+    let key = RowKey::Resource(spent);
+    let list = rows(&s, home());
+    let stood = nav::rows::cursor_index(&list, Some(&key)).expect("the cursor finds the store's row");
+    assert_eq!(list[stood].key, key, "fixture: the cursor rests on the store");
+
+    s.apply(Command::Forage).expect("fixture: ten gathers pay for a forage");
+    assert_eq!(s.stock(spent), 0.0, "fixture: the forage spends {spent:?} to exactly nothing");
+
+    let after = resource_rows(&s, home());
+    assert!(
+        after.contains(&spent),
+        "{spent:?} was spent to nothing and its row left the stores group: {after:?}"
+    );
+    assert_eq!(&after[..before.len()], &before[..], "the stores listed before the spend moved");
+    let list = rows(&s, home());
+    let rests = nav::rows::cursor_index(&list, Some(&key)).expect("the cursor finds a row");
+    assert_eq!(
+        list[rests].key, key,
+        "the cursor resting on {spent:?} was thrown to {:?} when the store was spent",
+        list[rests].key
+    );
+    assert_eq!(list[rests].kind, RowKind::Display, "and its row is still a store's row");
+
+    // It stays while the meadow waits for more.
+    for _ in 0..40 {
+        s.tick();
+        assert!(
+            resource_rows(&s, home()).contains(&spent),
+            "{spent:?} left the stores group at tick {} while it stood at nothing",
+            s.ticks
+        );
+    }
+
+    // And every store there is: met, then all spent at once, the whole home
+    // list stands exactly as it stood.
+    let mut met = maximal();
+    met.tick();
+    let listed = resource_rows(&met, home());
+    assert_eq!(listed, ResourceId::ALL.to_vec(), "fixture: the maximal meadow lists every store after a tick");
+    let home_before = rows(&met, home());
+
+    let mut spent_out = with_every_stock(&met, 0.0);
+    assert_eq!(
+        rows(&spent_out, home()),
+        home_before,
+        "spending every store to nothing changed the home list: a store at zero keeps its row \
+         where it stood"
+    );
+    for _ in 0..5 {
+        spent_out.tick();
+        assert_eq!(
+            resource_rows(&spent_out, home()),
+            listed,
+            "a store left, or moved in, the stores group as the spent meadow played on"
+        );
+    }
+}
+
+/// A resource the meadow has never met has no row, and the group no header:
+/// the stores never name what the player has not met — not for the room to
+/// keep it, and not for a rate that never lands.
+///
+/// @spec TUI-NAV-049
+#[test]
+fn a_resource_never_met_has_no_stores_row() {
+    let mut s = GameState::new(49);
+    for tick in 0..=60 {
+        let list = rows(&s, home());
+        assert!(
+            resource_rows(&s, home()).is_empty(),
+            "a new meadow lists stores at tick {tick}: {:?}",
+            resource_rows(&s, home())
+        );
+        assert!(
+            !list.iter().any(|r| r.key == RowKey::Fixed("stores")),
+            "a new meadow draws the stores header above nothing at tick {tick}"
+        );
+        s.tick();
+    }
+    assert!(
+        ResourceId::ALL.iter().any(|r| s.cap(*r) > 0.0),
+        "fixture: the new meadow has room for stores it has not met"
+    );
+
+    // One gather: exactly what was gathered, and nothing else.
+    s.apply(Command::GatherCatnip).expect("fixture: a new meadow can gather");
+    let held: Vec<ResourceId> = ResourceId::ALL.into_iter().filter(|r| s.stock(*r) > 0.0).collect();
+    assert_eq!(resource_rows(&s, home()), held, "after one gather the stores are exactly what was gathered");
+
+    // Made every tick and never kept: never met.
+    let (working, made) = making_what_it_cannot_keep();
+    assert!(
+        !resource_rows(&working, home()).contains(&made),
+        "{made:?} has a stores row though the meadow has never held any"
+    );
+}
+
+/// A store a stated price names is listed before the meadow holds any, so
+/// the need a row states can be read against the store it speaks of — its
+/// stock, its cap, its rate. For every row on screen that states a price, in
+/// a meadow holding nothing.
+///
+/// @spec TUI-NAV-049
+#[test]
+fn a_store_a_stated_price_names_is_listed_before_any_is_held() {
+    let state = poor_with_its_prices_recorded();
+    for r in ResourceId::ALL {
+        assert_eq!(state.stock(r), 0.0, "fixture: nothing is in store");
+    }
+    let named = resources_named_on_screen(&state);
+    assert!(named.len() > 10, "fixture: the rows on screen should name a good many stores");
+
+    let listed = resource_rows(&state, home());
+    for r in &named {
+        assert!(
+            listed.contains(r),
+            "a row on screen states a price naming {r:?}, and the stores group has no {r:?} row \
+             to read it against"
+        );
+    }
+    let list = rows(&state, home());
+    for r in &listed {
+        let row = list.iter().find(|row| row.key == RowKey::Resource(*r)).expect("listed");
+        assert!(row.selectable() && row.kind == RowKind::Display, "{r:?}'s row at zero is inspectable");
+    }
+}
+
 // ---------------------------------------------------------------------------
 // TUI-NAV-097, TUI-NAV-098, TUI-NAV-099 — groups within a section
 //

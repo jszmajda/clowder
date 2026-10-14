@@ -52,3 +52,93 @@ pub fn names_of(events: &[Event]) -> Vec<String> {
         })
         .collect()
 }
+
+// ---------------------------------------------------------------------------
+// Revealed resources — the oracles SIM-ENG-048..056 and SAVE-023/024 share
+// ---------------------------------------------------------------------------
+
+use std::collections::BTreeSet;
+
+/// Every content id the core knows, across every kind.
+pub fn every_content_id() -> Vec<ContentId> {
+    let mut ids = Vec::new();
+    ids.extend(StructureId::ALL.iter().map(|x| ContentId::Structure(*x)));
+    ids.extend(IdeaId::ALL.iter().map(|x| ContentId::Idea(*x)));
+    ids.extend(CraftId::ALL.iter().map(|x| ContentId::Craft(*x)));
+    ids.extend(JobId::ALL.iter().map(|x| ContentId::Job(*x)));
+    ids.extend(RiteId::ALL.iter().map(|x| ContentId::Rite(*x)));
+    ids.extend(ArchId::ALL.iter().map(|x| ContentId::Arch(*x)));
+    ids.extend(RefinementId::ALL.iter().map(|x| ContentId::Refinement(*x)));
+    ids.extend(RuleId::ALL.iter().map(|x| ContentId::Rule(*x)));
+    ids.extend(TraditionId::ALL.iter().map(|x| ContentId::Tradition(*x)));
+    ids.extend(DreamLoomId::ALL.iter().map(|x| ContentId::DreamLoom(*x)));
+    ids
+}
+
+/// The resources a content item's price names: the components of the price of
+/// one more of it, as the cost query states them (SIM-ENG-038).
+pub fn price_components(s: &GameState, id: ContentId) -> BTreeSet<ResourceId> {
+    s.cost_of_next(id, 1).into_iter().map(|(r, _)| r).collect()
+}
+
+/// Every count-taking command priced per unit: a pounce, and a trade with
+/// every colony there is, the whale's exchange among them (SIM-ENG-047).
+pub fn per_unit_commands() -> Vec<Command> {
+    let mut out = vec![Command::Pounce(1)];
+    out.extend(ColonyId::ALL.map(|c| Command::Trade(c, 1)));
+    out
+}
+
+/// The resources a meadow holds: every stock standing above zero, by any
+/// amount (SIM-ENG-048 draws no dust guard).
+pub fn held_resources(s: &GameState) -> BTreeSet<ResourceId> {
+    ResourceId::ALL.into_iter().filter(|r| s.stock(*r) > 0.0).collect()
+}
+
+/// The resources named in a price the core would state for this meadow,
+/// assembled from the three queries SIM-ENG-049 names and nothing else: the
+/// price of one more of every content item the core reports Teased or
+/// Available (owned or not), the per-unit price of every count-taking command
+/// that query answers for, and a deep nap's cost — starshards, by
+/// SIM-DREAM-001 — while that command's gate is open.
+pub fn priced_resources(s: &GameState) -> BTreeSet<ResourceId> {
+    let mut out = BTreeSet::new();
+    for id in every_content_id() {
+        if s.availability(id) != Availability::Hidden {
+            out.extend(price_components(s, id));
+        }
+    }
+    for cmd in per_unit_commands() {
+        if let Some(price) = s.unit_price(&cmd) {
+            out.extend(price.into_iter().map(|(r, _)| r));
+        }
+    }
+    if s.command_gate_open(&Command::DeepNap(1)) {
+        out.insert(ResourceId::Starshards);
+    }
+    out
+}
+
+/// The revealed-resource set as the meadow would persist it: the
+/// `revealed_resources` array of the state's own serialization, in the order
+/// it is written. Read from the save bytes rather than from a field, so what
+/// is asserted is what is recorded — the query (SIM-ENG-053) also answers for
+/// a holding no record has yet been made of, and would hide a record that was
+/// never made.
+pub fn recorded_resources(s: &GameState) -> Vec<ResourceId> {
+    let v: serde_json::Value = serde_json::from_str(&save_string(s, 0)).expect("a save is JSON");
+    let set = v["state"].get("revealed_resources").unwrap_or_else(|| {
+        panic!(
+            "the meadow's state serializes no `revealed_resources`: the revealed resources are \
+             held in game state as a persisted set (SIM-ENG-051)"
+        )
+    });
+    serde_json::from_value(set.clone()).unwrap_or_else(|e| {
+        panic!("`revealed_resources` should serialize as a list of resource ids, got {set}: {e}")
+    })
+}
+
+/// As [`recorded_resources`], as a set.
+pub fn recorded_set(s: &GameState) -> BTreeSet<ResourceId> {
+    recorded_resources(s).into_iter().collect()
+}

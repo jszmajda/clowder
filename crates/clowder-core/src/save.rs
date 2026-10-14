@@ -14,8 +14,10 @@ use std::path::{Path, PathBuf};
 /// verified against committed fixtures; a pre-journal save migrates to an
 /// empty journal, which is the honest representation of history it never
 /// recorded.
-/// @spec SAVE-013, SAVE-014, SAVE-021
-pub const SAVE_VERSION: u32 = 5;
+/// v6 adds the revealed-resource set (SAVE-023), filled on migration from the
+/// save itself (SAVE-024).
+/// @spec SAVE-013, SAVE-014, SAVE-021, SAVE-023
+pub const SAVE_VERSION: u32 = 6;
 /// The shortest absence worth reporting. Public for the same reason the cap
 /// is: a caller deciding whether to surface a report must use this value, not
 /// a copy of it. @spec SAVE-015
@@ -429,6 +431,13 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
         if !reward.is_finite() || *reward < 0.0 {
             *reward = 0.0;
         }
+    }
+
+    // v5 -> v6: the revealed-resource set arrives filled by the engine's own
+    // reveal rule, applied once to the state as normalized and before any
+    // catch-up tick. @spec SAVE-024
+    if found < 6 {
+        state.record_reveals();
     }
 
     // Offline catch-up: same tick(), fast-forwarded at the save's own game

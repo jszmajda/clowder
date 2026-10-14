@@ -5185,3 +5185,173 @@ fn the_sidebar_draws_whole_stores_full_ones_first_and_counts_the_rest() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-049 — a store at nothing stays among the stores the sidebar draws
+//
+// The sidebar draws from the stores the stores group lists, and the stores
+// group lists what the core reports revealed — at any stock. So a store spent
+// to nothing keeps its two lines where they stood, reading zero, wherever the
+// sidebar holds every listed store; and where it cannot, the store is still
+// one of those it chooses from and counts.
+//
+// The meadows here are *played* into their state — a tick, a command — since
+// that is where the core records a reveal.
+// ---------------------------------------------------------------------------
+
+/// A meadow part-way along: a handful of stores in hand, a tick on, so the
+/// core has recorded each. One of them holds exactly the price of a forage.
+fn a_few_stores_met() -> GameState {
+    let mut s = GameState::new(11);
+    s.resources[ResourceId::Catnip.ix()] = content::FORAGE_COST;
+    s.resources[ResourceId::Twigs.ix()] = 5.0;
+    s.resources[ResourceId::Fluff.ix()] = 3.0;
+    s.resources[ResourceId::Pebbles.ix()] = 7.0;
+    s.tick();
+    assert_eq!(
+        s.stock(ResourceId::Catnip),
+        content::FORAGE_COST,
+        "fixture: nothing in a meadow this bare moves its stores"
+    );
+    assert_eq!(listed_stores(&s).len(), 4, "fixture: four stores met, four listed");
+    s
+}
+
+/// Every listed store's two lines, at their place in the sidebar, exactly as
+/// TUI-RENDER-019 lays them out for the stock the state holds now.
+fn assert_every_listed_store_is_drawn(
+    state: &GameState,
+    listed: &[ResourceId],
+    names: &std::collections::HashMap<ResourceId, String>,
+    lines: &[String],
+    width: usize,
+    what: &str,
+) {
+    assert!(lines.len() >= 2 * listed.len(), "fixture: the sidebar holds every listed store ({what})");
+    let rates = state.net_rates();
+    for (i, r) in listed.iter().enumerate() {
+        let bar: String = lines[2 * i + 1].chars().take(4).collect();
+        assert!(
+            draws_fill_bar(&lines[2 * i + 1]),
+            "{what}: {r:?} (stock {}) should be drawn whole at lines {} and {}; the sidebar read\n{}",
+            state.stock(*r),
+            2 * i,
+            2 * i + 1,
+            lines.join("\n")
+        );
+        let (first, second) = expected_store_lines(state, *r, &names[r], rates[r.ix()], width, &bar);
+        assert_eq!(
+            lines[2 * i], first,
+            "{what}: {r:?} (stock {}) should stand at line {} of the sidebar, reading its stock; \
+             the sidebar read\n{}",
+            state.stock(*r),
+            2 * i,
+            lines.join("\n")
+        );
+        assert_eq!(lines[2 * i + 1], second, "{what}: {r:?}'s second line");
+    }
+}
+
+/// The player's own report, at the floor and wide: a listed store spent to
+/// exactly nothing by a command is still listed, and still drawn — both its
+/// lines, where they stood, reading zero — with every other store unmoved.
+///
+/// @spec TUI-NAV-049
+#[test]
+fn a_store_spent_to_exactly_nothing_stays_in_the_sidebar_where_it_stood() {
+    for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE_W, WIDE_H)] {
+        let mut state = a_few_stores_met();
+        let spent = ResourceId::Catnip;
+        let listed = listed_stores(&state);
+        let names: std::collections::HashMap<ResourceId, String> =
+            listed.iter().map(|r| (*r, stores_row_name(&state, *r))).collect();
+        let (_, _, side, _) = regions(w, h);
+        let width = side.width as usize;
+        assert!(
+            2 * listed.len() <= side.height as usize,
+            "fixture: at {w}x{h} the sidebar holds every listed store"
+        );
+        assert!(listed.contains(&spent), "fixture: {spent:?} is listed before it is spent");
+
+        let before = sidebar_lines(&state, w, h);
+        assert_every_listed_store_is_drawn(&state, &listed, &names, &before, width, &format!("{w}x{h}, before the spend"));
+
+        state.apply(Command::Forage).expect("fixture: the meadow holds a forage's price");
+        assert_eq!(state.stock(spent), 0.0, "fixture: the forage spends {spent:?} to exactly nothing");
+
+        assert_eq!(
+            listed_stores(&state),
+            listed,
+            "at {w}x{h}: spending {spent:?} to nothing changed the stores the sidebar draws from"
+        );
+        let after = sidebar_lines(&state, w, h);
+        assert_every_listed_store_is_drawn(&state, &listed, &names, &after, width, &format!("{w}x{h}, after the spend"));
+        let at = listed.iter().position(|r| *r == spent).expect("listed");
+        assert!(
+            after[2 * at].contains(&format!("{:>6}", fmt::compact(0.0))),
+            "at {w}x{h}: {spent:?}'s line should read zero, it read {:?}",
+            after[2 * at]
+        );
+
+        // And it is still there to watch refill, ticks later.
+        for _ in 0..20 {
+            state.tick();
+        }
+        assert_eq!(state.stock(spent), 0.0, "fixture: nothing refills {spent:?} here");
+        let later = sidebar_lines(&state, w, h);
+        assert_every_listed_store_is_drawn(&state, &listed, &names, &later, width, &format!("{w}x{h}, ticks later"));
+    }
+}
+
+/// Where the sidebar cannot hold every listed store, the stores at nothing
+/// are still among those it chooses from: the note counts them, and a sidebar
+/// with room draws each in its place, reading zero.
+///
+/// @spec TUI-NAV-049
+#[test]
+fn stores_at_nothing_stay_among_the_stores_the_sidebar_chooses_from_and_counts() {
+    let mut met = every_store_held(0);
+    met.tick();
+    let listed = listed_stores(&met);
+    assert_eq!(listed, ResourceId::ALL.to_vec(), "fixture: every store is met, held, and listed");
+    let names: std::collections::HashMap<ResourceId, String> = stores_row_names().into_iter().collect();
+
+    let spent: Vec<ResourceId> = listed.iter().copied().step_by(3).collect();
+    let mut state = met.clone();
+    for r in &spent {
+        state.resources[r.ix()] = 0.0;
+    }
+    assert_eq!(
+        listed_stores(&state),
+        listed,
+        "spending {} stores to nothing took them out of the stores the sidebar draws from",
+        spent.len()
+    );
+
+    for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE_W, WIDE_H)] {
+        let (_, _, side, _) = regions(w, h);
+        let height = side.height as usize;
+        let k = listed.len();
+        assert!(2 * k > height, "fixture: at {w}x{h} the sidebar cannot hold every store");
+        let lines = sidebar_lines(&state, w, h);
+        let note = format!("+{} more", k - (height - 1) / 2);
+        assert_eq!(
+            lines.last().expect("a sidebar has lines").trim(),
+            note,
+            "at {w}x{h}: {k} stores are listed, {} of them at nothing, so the note counts them \
+             all.\n{}",
+            spent.len(),
+            lines.join("\n")
+        );
+
+        let (tall, _) = sidebar_in(&state, side.width, (2 * k) as u16);
+        assert_every_listed_store_is_drawn(
+            &state,
+            &listed,
+            &names,
+            &tall,
+            side.width as usize,
+            &format!("a sidebar {} wide with room for all", side.width),
+        );
+    }
+}

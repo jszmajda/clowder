@@ -176,9 +176,9 @@ fn meadow_rows(state: &GameState) -> Vec<Row> {
 
     // The stores group: every revealed resource as an inspectable row.
     // @spec TUI-NAV-049
-    let stores: Vec<Row> = ResourceId::ALL
+    let stores: Vec<Row> = state
+        .resources_revealed()
         .into_iter()
-        .filter(|r| state.stock(*r) > 0.0)
         .map(|r| Row { key: RowKey::Resource(r), kind: RowKind::Display, heavy: false })
         .collect();
     out.extend(headed_group(state, "stores", stores));

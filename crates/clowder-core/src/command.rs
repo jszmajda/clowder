@@ -122,6 +122,10 @@ impl GameState {
     // @spec SIM-ENG-028
     pub fn apply(&mut self, cmd: Command) -> Result<Vec<Event>, CommandError> {
         let events = self.apply_inner(cmd)?;
+        // An applied command leaves every holding and every stated price
+        // recorded; a refused one returned above and revealed nothing.
+        // @spec SIM-ENG-050, SIM-ENG-054
+        self.record_reveals();
         let tick = self.ticks;
         for event in &events {
             self.journal.record(tick, event);
@@ -1047,6 +1051,8 @@ impl GameState {
         self.whale_contentment = 0;
         self.deja_vu_until = 0;
         self.revealed.clear();
+        // @spec SIM-ENG-052
+        self.revealed_resources.clear();
         self.generation = gen + 1;
         self.rebuild_unrevealed();
 

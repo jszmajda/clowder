@@ -2,11 +2,16 @@ mod common;
 
 use clowder_core::*;
 use common::*;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
+/// A scratch directory of this call's own: tests run in parallel in one
+/// process, so the name carries a per-call counter as well as the process id.
 fn scratch_dir(test: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("clowder-test-{}-{}", std::process::id(), test));
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("clowder-test-{}-{}-{n}", std::process::id(), test));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     dir
@@ -221,6 +226,42 @@ fn thirty_day_catch_up_feels_like_loading_not_compiling() {
     let took = start.elapsed();
     assert_eq!(loaded.state.ticks, 30 * 86_400 * 4);
     assert!(took.as_secs_f64() < 5.0, "30-day catch-up took {took:?}");
+}
+
+/// The resource-reveal rule leaves that bound standing at either extreme of
+/// its own cost, on the same meadow SAVE-009's bound is measured on: with no
+/// resource yet revealed — every one still to be compared each tick, and the
+/// meadow's stores revealing as the replay fills them — and with every
+/// resource already revealed, nothing left to compare. A meadow that has met
+/// nothing at all, idling, is the third case: the whole comparison every tick
+/// for the whole absence.
+// @spec SAVE-009, SIM-ENG-055
+#[test]
+#[ignore = "perf bound is a release-build property; run with --release --ignored"]
+fn thirty_day_catch_up_holds_its_bound_under_the_resource_reveal_rule() {
+    let mut s = GameState::new(10);
+    grant(&mut s, StructureId::CatnipPatch, 5);
+    grant(&mut s, StructureId::CozyCushion, 8);
+    give(&mut s, ResourceId::Catnip, 200.0);
+    let none_met = save_string(&s, 0);
+    let all_met = {
+        let mut v: serde_json::Value = serde_json::from_str(&none_met).unwrap();
+        v["state"]["revealed_resources"] = serde_json::to_value(ResourceId::ALL.to_vec()).unwrap();
+        v.to_string()
+    };
+    let idle = save_string(&GameState::new(10), 0);
+
+    for (what, json) in [
+        ("SAVE-009's meadow, no resource yet revealed", none_met),
+        ("SAVE-009's meadow, every resource revealed", all_met),
+        ("an idle meadow that has met nothing", idle),
+    ] {
+        let start = std::time::Instant::now();
+        let loaded = load_string(&json, 30 * 86_400).unwrap();
+        let took = start.elapsed();
+        assert_eq!(loaded.state.ticks, 30 * 86_400 * 4);
+        assert!(took.as_secs_f64() < 5.0, "30-day catch-up of {what} took {took:?}");
+    }
 }
 
 // @spec SAVE-010
@@ -1426,4 +1467,434 @@ fn a_later_relaunch_extends_the_tale_by_the_time_between() {
     assert_eq!(g.report.elapsed_seconds, 600 + 45);
     assert_eq!(g.state.ticks, s.ticks + 2_400 + 180, "every owed tick, plus the new interval's");
     assert_eq!(away_entries(&g.state.journal).len(), away_entries(&s.journal).len() + 1);
+}
+
+// =====================================================================
+// Save format v6 — the revealed resources become persisted state
+// (SAVE-013, SAVE-023, SAVE-024)
+//
+// The engine keeps the set of resources its meadow has revealed
+// (SIM-ENG-051), and a save carries it: that a store was once held and has
+// since been spent to nothing can be recomputed from nothing else. A save
+// written before the set existed is not given an empty one. Its migration
+// applies the engine's own reveal rule once, to the state as loaded and
+// normalized and before any catch-up tick: every resource the save holds,
+// every resource named in a price the core would state for it, and no other.
+//
+// What is asserted here is the set as *persisted* — the `revealed_resources`
+// array of the state a load hands back, re-serialized — read through
+// `common::recorded_resources`. The rule it is checked against is assembled
+// from the core's own queries in `common::held_resources` and
+// `common::priced_resources`.
+// =====================================================================
+
+const V5_FIXTURE_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/save_v5.json");
+
+fn v5_fixture() -> String {
+    fs::read_to_string(V5_FIXTURE_PATH).unwrap_or_else(|e| {
+        panic!("SAVE-013 requires a committed v5 fixture at {V5_FIXTURE_PATH}: {e}")
+    })
+}
+
+/// The committed fixture of every version before the revealed-resource set.
+fn fixtures_without_the_set() -> Vec<(u32, String)> {
+    vec![
+        (1, include_str!("fixtures/save_v1.json").to_string()),
+        (2, v2_fixture()),
+        (3, v3_fixture()),
+        (4, v4_fixture()),
+        (5, v5_fixture()),
+    ]
+}
+
+fn saved_at(save: &serde_json::Value) -> u64 {
+    save["saved_at_unix"].as_u64().expect("a save stamps its save time")
+}
+
+/// A save as load hands it back before any catch-up tick: parsed, migrated,
+/// and normalized, its owed ticks still owed.
+fn loaded_unreplayed(json: &str, now_unix: u64) -> GameState {
+    begin_load(json, now_unix).expect("the save loads").set_down().state
+}
+
+/// The stores a build without the set listed for a save: exactly those whose
+/// stock, as written, stands above zero.
+fn stores_a_prior_version_listed(save: &serde_json::Value) -> BTreeSet<ResourceId> {
+    save["state"]["resources"]
+        .as_array()
+        .expect("a save carries its stocks")
+        .iter()
+        .enumerate()
+        .filter(|(_, v)| v.as_f64().is_some_and(|x| x > 0.0))
+        .map(|(i, _)| ResourceId::ALL[i])
+        .collect()
+}
+
+/// A v5 save reduced to a bare meadow: nothing built, nothing learnt, nobody
+/// met, nothing in store, every kitten home with no work, no ticks owed — so
+/// that no price is in view and whatever is revealed was revealed by a stock.
+fn bare_v5_save() -> serde_json::Value {
+    let mut v: serde_json::Value = serde_json::from_str(&v5_fixture()).unwrap();
+    v["owed_ticks"] = serde_json::json!(0);
+    let state = &mut v["state"];
+    for key in ["structures", "resources"] {
+        for x in state[key].as_array_mut().unwrap() {
+            *x = serde_json::json!(0);
+        }
+    }
+    for key in ["ideas", "revealed", "discovered", "refinements", "rules"] {
+        state[key] = serde_json::json!([]);
+    }
+    for k in state["kittens"].as_array_mut().unwrap() {
+        k["job"] = serde_json::Value::Null;
+        k["job_seq"] = serde_json::Value::Null;
+        k["location"] = serde_json::json!("Home");
+        k["away_seq"] = serde_json::Value::Null;
+        k["tinkering"] = serde_json::Value::Null;
+    }
+    let bare = loaded_unreplayed(&v.to_string(), saved_at(&v));
+    assert!(
+        priced_resources(&bare).is_empty() && held_resources(&bare).is_empty(),
+        "fixture: the bare save should hold nothing and show no price"
+    );
+    assert!(!bare.kittens.is_empty(), "fixture: somebody is home to eat");
+    v
+}
+
+/// @spec SAVE-013, SAVE-024
+#[test]
+fn the_v5_fixture_is_committed_and_predates_the_revealed_resources() {
+    let v: serde_json::Value = serde_json::from_str(&v5_fixture()).expect("the v5 fixture is JSON");
+    assert_eq!(v["save_version"], 5, "a v5 save, frozen as a historical artifact");
+    let state = v["state"].as_object().expect("a save carries a state object");
+    assert!(
+        !state.contains_key("revealed_resources"),
+        "it predates the revealed-resource set entirely — that is what makes it the migration case"
+    );
+    assert!(
+        v["report_so_far"].is_object() && v["owed_ticks"].as_u64().is_some_and(|n| n > 0),
+        "and it is v5, not a relabelled v4: it carries a report so far beside its owed count"
+    );
+    assert!(
+        state["ticks"].as_u64().is_some_and(|t| t > 0)
+            && !state["kittens"].as_array().unwrap().is_empty()
+            && state.contains_key("journal"),
+        "a played meadow, not a fresh game"
+    );
+
+    // And it holds each case the migration's rule has to tell apart.
+    let loaded = loaded_unreplayed(&v5_fixture(), saved_at(&v));
+    let held = held_resources(&loaded);
+    let priced = priced_resources(&loaded);
+    assert!(
+        held.difference(&priced).next().is_some(),
+        "fixture: a store held that no stated price names — revealed by its stock alone"
+    );
+    assert!(
+        priced.difference(&held).next().is_some(),
+        "fixture: a store standing at nothing that a stated price names — met, and spent"
+    );
+    assert!(
+        ResourceId::ALL.iter().any(|r| !held.contains(r) && !priced.contains(r)),
+        "fixture: a store neither held nor named — never met"
+    );
+}
+
+/// The set arrives under a version newer than any save written without it,
+/// so a build that predates it refuses such a save as too new rather than
+/// loading it and writing it back with the set dropped.
+/// @spec SAVE-023
+#[test]
+fn the_revealed_resources_arrive_under_a_newer_save_version() {
+    let v5: serde_json::Value = serde_json::from_str(&v5_fixture()).unwrap();
+    let last_without = v5["save_version"].as_u64().unwrap() as u32;
+    assert!(
+        SAVE_VERSION > last_without,
+        "SAVE_VERSION {SAVE_VERSION} must be newer than {last_without}, the last written without \
+         the revealed-resource set"
+    );
+    // The set is part of the format: written even where nothing is revealed.
+    let v: serde_json::Value =
+        serde_json::from_str(&save_string(&GameState::new(23_001), 1)).unwrap();
+    assert_eq!(v["save_version"], SAVE_VERSION);
+    assert_eq!(
+        v["state"].get("revealed_resources"),
+        Some(&serde_json::json!([])),
+        "a new meadow's save carries the set, empty"
+    );
+    // And a build one version back, shown such a save, is shown a version it
+    // does not know: the refusal SAVE-002 already makes.
+    let mut future = v.clone();
+    future["save_version"] = serde_json::json!(SAVE_VERSION + 1);
+    assert!(matches!(
+        load_string(&future.to_string(), 1),
+        Err(LoadError::TooNew { found }) if found == SAVE_VERSION + 1
+    ));
+}
+
+/// A reveal survives save and load. The save carries the set as canonical
+/// state: a store held, spent to exactly nothing, and named by no price is
+/// still revealed after the round trip — through the string and through the
+/// file — and the round trip is byte-stable with the set in it.
+/// @spec SAVE-023, SAVE-010
+#[test]
+fn a_reveal_survives_save_and_load() {
+    let mut s = GameState::new(23_002);
+    for _ in 0..10 {
+        s.apply(Command::GatherCatnip).unwrap();
+    }
+    let spent: Vec<ResourceId> = held_resources(&s).into_iter().collect();
+    s.apply(Command::Forage).expect("fixture: ten gathers pay for a forage");
+    run_ticks(&mut s, 30);
+    assert!(!spent.is_empty(), "fixture: something was gathered");
+    for r in &spent {
+        assert_eq!(s.stock(*r), 0.0, "fixture: {r:?} was spent to exactly nothing");
+        assert!(
+            !priced_resources(&s).contains(r),
+            "fixture: no stated price names {r:?}, so nothing but the set remembers it"
+        );
+    }
+    let before = recorded_resources(&s);
+    for r in &spent {
+        assert!(before.contains(r), "{r:?} was held and spent, and the meadow's save does not carry it as revealed");
+    }
+
+    let json = save_string(&s, 77_000);
+    let loaded = load_string(&json, 77_000).expect("the save loads").state;
+    assert_eq!(recorded_resources(&loaded), before, "the revealed resources changed across save and load");
+    assert_eq!(save_string(&loaded, 77_000), json, "save → load → save is byte-stable with the set in it");
+
+    let dir = scratch_dir("revealed-resources");
+    let path = dir.join("save.json");
+    write_save(&path, &s, 77_000).unwrap();
+    let mut from_file = read_save(&path, 77_000).expect("the file loads").state;
+    assert_eq!(recorded_resources(&from_file), before, "the revealed resources changed across the file");
+
+    // Still revealed as the reloaded meadow plays on with none in store.
+    run_ticks(&mut from_file, 50);
+    for r in &spent {
+        assert_eq!(from_file.stock(*r), 0.0, "fixture: still none of {r:?}");
+        assert!(recorded_resources(&from_file).contains(r), "{r:?} un-revealed after a reload");
+    }
+}
+
+/// A catch-up replays with the set the save carried: a store revealed and
+/// empty at the save is revealed when the absence is over.
+/// @spec SAVE-023
+#[test]
+fn a_reveal_survives_an_absence() {
+    let mut s = GameState::new(23_003);
+    for _ in 0..10 {
+        s.apply(Command::GatherCatnip).unwrap();
+    }
+    let spent: Vec<ResourceId> = held_resources(&s).into_iter().collect();
+    s.apply(Command::Forage).unwrap();
+    let json = save_string(&s, 5_000);
+
+    let woken = load_string(&json, 5_000 + 3_600).expect("the save loads").state;
+
+    assert!(woken.ticks > s.ticks, "fixture: an hour was replayed");
+    for r in &spent {
+        assert_eq!(woken.stock(*r), 0.0, "fixture: nothing refilled {r:?} while away");
+        assert!(recorded_resources(&woken).contains(r), "{r:?} un-revealed across an absence");
+    }
+}
+
+/// A v5 save migrates with its meadow, its owed count, and its report so far
+/// exactly as written, and gains one thing: the revealed-resource set.
+/// @spec SAVE-013
+#[test]
+fn a_v5_save_migrates_with_everything_else_exact() {
+    let fixture = v5_fixture();
+    let before: serde_json::Value = serde_json::from_str(&fixture).unwrap();
+    let at = saved_at(&before);
+
+    let c = begin_load(&fixture, at).expect("a v5 save loads");
+    assert_eq!(c.total_ticks(), before["owed_ticks"].as_u64().unwrap(), "the owed count survives migration");
+    let sd = c.set_down();
+    let resaved: serde_json::Value = serde_json::from_str(&save_string_carrying(
+        &sd.state,
+        at,
+        sd.owed_ticks,
+        Some(&sd.report_so_far),
+    ))
+    .unwrap();
+
+    assert_eq!(resaved["save_version"], SAVE_VERSION, "migrated forward, then stamped current");
+    assert!(json_eq(&before["owed_ticks"], &resaved["owed_ticks"]));
+    assert!(
+        json_eq(&before["report_so_far"], &resaved["report_so_far"]),
+        "the report so far changed across migration"
+    );
+    for (key, was) in before["state"].as_object().unwrap() {
+        let now = &resaved["state"][key];
+        assert!(json_eq(was, now), "migrating a v5 save changed `{key}`: {was} became {now}");
+    }
+    let added: Vec<&String> = resaved["state"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .filter(|k| !before["state"].as_object().unwrap().contains_key(*k))
+        .collect();
+    assert_eq!(
+        added,
+        vec!["revealed_resources"],
+        "the one field a v5 save gains is the revealed-resource set"
+    );
+}
+
+/// The migration fills the set by the engine's reveal rule, applied once to
+/// the save's state as loaded: every resource it holds, every resource named
+/// in a price the core would state for it, and no other.
+/// @spec SAVE-024
+#[test]
+fn a_v5_save_migrates_revealing_what_it_holds_and_what_its_prices_name_and_no_other() {
+    let fixture = v5_fixture();
+    let before: serde_json::Value = serde_json::from_str(&fixture).unwrap();
+    let state = loaded_unreplayed(&fixture, saved_at(&before));
+    assert_eq!(state.ticks, before["state"]["ticks"].as_u64().unwrap(), "fixture: no tick was replayed");
+
+    let held = held_resources(&state);
+    let priced = priced_resources(&state);
+    let recorded = recorded_set(&state);
+
+    for r in &held {
+        assert!(recorded.contains(r), "the save holds {r:?} and its migration did not reveal it");
+    }
+    for r in &priced {
+        assert!(
+            recorded.contains(r),
+            "a price the core states for the save names {r:?} (stock {}) and its migration did \
+             not reveal it — the save's evidence for a store met and since spent",
+            state.stock(*r)
+        );
+    }
+    for r in &recorded {
+        assert!(
+            held.contains(r) || priced.contains(r),
+            "the migration revealed {r:?}, which the save neither holds nor shows in a price"
+        );
+    }
+    // The set is written as the engine writes it: in id order, each once.
+    let written = recorded_resources(&state);
+    let mut sorted = written.clone();
+    sorted.sort_by_key(|r| r.ix());
+    sorted.dedup();
+    assert_eq!(written, sorted);
+}
+
+/// Every prior version's fixture migrates with every store that version
+/// listed for it still listed — a prior version listed exactly the stores
+/// with a stock above zero — and with the set the rule gives its state and
+/// no other.
+/// @spec SAVE-013, SAVE-024
+#[test]
+fn every_prior_version_migrates_with_every_store_it_listed_still_listed() {
+    let mut listed_somewhere = 0;
+    for (version, fixture) in fixtures_without_the_set() {
+        let before: serde_json::Value = serde_json::from_str(&fixture).unwrap();
+        assert_eq!(before["save_version"], version, "fixture: the v{version} fixture is a v{version} save");
+        assert!(
+            before["state"].get("revealed_resources").is_none(),
+            "fixture: v{version} predates the set"
+        );
+        let state = loaded_unreplayed(&fixture, saved_at(&before));
+        let recorded = recorded_set(&state);
+
+        let listed = stores_a_prior_version_listed(&before);
+        listed_somewhere += listed.len();
+        for r in &listed {
+            assert!(
+                recorded.contains(r),
+                "the v{version} fixture holds {r:?}, which its own version listed, and migration \
+                 left it unrevealed: migration must hide nothing its player could see"
+            );
+        }
+        assert_eq!(
+            recorded,
+            held_resources(&state).union(&priced_resources(&state)).copied().collect(),
+            "the v{version} fixture's migrated set is not its holdings and the resources its \
+             stated prices name (left: migrated, right: the rule)"
+        );
+
+        // And nothing is hidden once the catch-up has run either.
+        let caught_up = load_string(&fixture, saved_at(&before) + 120).expect("the fixture loads").state;
+        let after = recorded_set(&caught_up);
+        for r in &recorded {
+            assert!(after.contains(r), "v{version}: {r:?} was revealed by migration and lost in the catch-up");
+        }
+    }
+    assert!(listed_somewhere > 0, "fixture: the prior saves list stores");
+}
+
+/// The rule runs before any catch-up tick: a store the first replayed tick
+/// empties is revealed all the same, because the save held some.
+/// @spec SAVE-024
+#[test]
+fn migration_reveals_a_store_the_first_replayed_tick_empties() {
+    let mut v = bare_v5_save();
+    let morsel = ResourceId::Catnip;
+    v["state"]["resources"][morsel.ix()] = serde_json::json!(0.05);
+    let json = v.to_string();
+    let at = saved_at(&v);
+
+    let unreplayed = loaded_unreplayed(&json, at + 60);
+    assert_eq!(held_resources(&unreplayed), [morsel].into_iter().collect(), "fixture: the save holds a morsel");
+    assert_eq!(
+        recorded_set(&unreplayed),
+        [morsel].into_iter().collect(),
+        "the migration should reveal exactly what the bare save holds, before any tick"
+    );
+
+    let c = begin_load(&json, at + 60).unwrap();
+    assert!(c.total_ticks() > 0, "fixture: an absence to replay");
+    let one_tick_in = match c.advance(1) {
+        Advance::Pending(c) => c.set_down().state,
+        Advance::Finished(g) => g.state,
+    };
+    assert_eq!(one_tick_in.stock(morsel), 0.0, "fixture: the first replayed tick eats the morsel");
+    assert!(
+        recorded_set(&one_tick_in).contains(&morsel),
+        "{morsel:?} was in the save and gone after the first replayed tick, and was never \
+         revealed: the migration must record what the save holds before any catch-up tick"
+    );
+
+    let woken = load_string(&json, at + 60).unwrap().state;
+    assert_eq!(woken.stock(morsel), 0.0, "fixture: still none when the absence is over");
+    assert!(recorded_set(&woken).contains(&morsel), "{morsel:?} was lost by the end of the catch-up");
+}
+
+/// The rule reads the state as normalized: a hand-edited stock below zero is
+/// a zero, a stock in a store with no room is clamped away, and neither is a
+/// holding; a stock above its cap is clamped to it and still is one.
+/// @spec SAVE-024
+#[test]
+fn migration_judges_holdings_on_the_state_as_normalized() {
+    let bare = bare_v5_save();
+    let at = saved_at(&bare);
+    let meadow = loaded_unreplayed(&bare.to_string(), at);
+    let roomy: Vec<ResourceId> =
+        ResourceId::ALL.into_iter().filter(|r| meadow.cap(*r) > 0.0 && meadow.cap(*r).is_finite()).collect();
+    let no_room: Vec<ResourceId> = ResourceId::ALL.into_iter().filter(|r| meadow.cap(*r) == 0.0).collect();
+    assert!(roomy.len() >= 3 && !no_room.is_empty(), "fixture: stores with room and without");
+    let (negative, plain, brimming, roomless) = (roomy[0], roomy[1], roomy[2], no_room[0]);
+
+    let mut v = bare.clone();
+    v["state"]["resources"][negative.ix()] = serde_json::json!(-5.0);
+    v["state"]["resources"][plain.ix()] = serde_json::json!(2.0);
+    v["state"]["resources"][brimming.ix()] = serde_json::json!(1.0e12);
+    v["state"]["resources"][roomless.ix()] = serde_json::json!(7.0);
+
+    let state = loaded_unreplayed(&v.to_string(), at);
+    assert_eq!(state.stock(negative), 0.0, "fixture: a negative stock normalizes to zero");
+    assert_eq!(state.stock(roomless), 0.0, "fixture: a stock with no room is clamped away");
+    assert_eq!(state.stock(plain), 2.0);
+    assert_eq!(state.stock(brimming), state.cap(brimming), "fixture: a stock above its cap is clamped to it");
+
+    assert_eq!(
+        recorded_set(&state),
+        [plain, brimming].into_iter().collect::<BTreeSet<_>>(),
+        "the migration should reveal the two stores the normalized save holds, and neither the \
+         negative stock nor the one its store had no room for"
+    );
 }
