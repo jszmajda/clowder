@@ -7,6 +7,7 @@ pub mod action;
 pub mod keys;
 pub mod mnemonics;
 pub mod palette;
+pub mod pointer;
 pub mod reports;
 pub mod rows;
 pub mod section;
@@ -14,6 +15,7 @@ pub mod update;
 pub mod view;
 
 pub use action::{Action, CountSemantics};
+pub use pointer::pointer_event;
 pub use reports::{queue_command_reports, queue_load_report};
 pub use rows::{row_still_listed, Row, RowKey, RowKind};
 pub use section::Section;

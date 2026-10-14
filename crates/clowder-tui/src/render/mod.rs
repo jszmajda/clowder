@@ -8,6 +8,7 @@
 pub mod fmt;
 pub mod widgets;
 pub mod layout;
+pub mod pointer;
 
 use clowder_core::{content, Command, ContentId, GameState, Location, LockReason, ResourceId};
 use ratatui::layout::Rect;
@@ -21,6 +22,7 @@ use crate::nav::{ArmedRow, CountPrompt, Overlay, Section, ViewState};
 use crate::theme::{self, Role};
 
 pub use layout::{Body, Layout};
+use pointer::PointerRecord;
 
 /// The section a frame draws when the view state has not chosen one yet.
 const DEFAULT_SECTION: Section = Section::Meadow;
@@ -423,7 +425,7 @@ fn window_for(total: usize, cursor: usize, capacity: usize) -> Window {
 /// list) never previews on the wrong line. An armed row's consequence
 /// summary, likewise, expands only on the row an arming names, and only
 /// while it is still live — never a stale one past its expiry.
-/// @spec TUI-RENDER-009, TUI-RENDER-010, TUI-RENDER-011, TUI-RENDER-015,
+/// @spec TUI-RENDER-009, TUI-RENDER-010, TUI-RENDER-011, TUI-RENDER-015, TUI-RENDER-025,
 /// TUI-NAV-067, TUI-NAV-077, TUI-THEME-011
 fn draw_list(
     f: &mut Frame,
@@ -431,7 +433,7 @@ fn draw_list(
     state: &GameState,
     section: Section,
     view: &ViewState,
-) {
+) -> Vec<(Rect, RowKey)> {
     let cursor_key = view.focus.get(section.index()).and_then(|k| k.as_ref());
     let prompt = view.prompt.as_ref();
     let armed = view.armed.as_ref();
@@ -447,6 +449,9 @@ fn draw_list(
     let win = window_for(all.len(), cursor, capacity);
 
     let mut lines: Vec<Line<'static>> = Vec::with_capacity(win.len + 2);
+    // Where each row drew, whole line, for the frame's pointer record.
+    // @spec TUI-RENDER-025
+    let mut drawn_at: Vec<(Rect, RowKey)> = Vec::new();
     // TUI-RENDER-011: rows scrolled off above need saying too, or a cursor
     // deep in a long list looks like the top of it.
     if win.start > 0 {
@@ -465,6 +470,10 @@ fn draw_list(
                 style_for(Role::Dim),
             )));
             continue;
+        }
+        let y = area.y as usize + lines.len();
+        if row.selectable() && y < area.bottom() as usize {
+            drawn_at.push((Rect::new(area.x, y as u16, area.width, 1), row.key.clone()));
         }
         lines.push(row_line(state, row, focused, area.width as usize, section, on_this_row));
         // The row an arming holds expands in place, on the lines directly
@@ -489,6 +498,7 @@ fn draw_list(
     }
 
     f.render_widget(Paragraph::new(lines), area);
+    drawn_at
 }
 
 /// One list row, drawn as the design's anatomy: cursor, availability marker,
@@ -765,10 +775,18 @@ fn draw_dividers(f: &mut Frame, columns: &[u16], top: u16, height: u16, season: 
 /// beneath it regardless of which is drawn.
 /// @spec TUI-NAV-102
 pub fn waking(f: &mut Frame, total_ticks: u64, remaining_ticks: u64) {
+    waking_recorded(f, total_ticks, remaining_ticks);
+}
+
+/// The waking screen as `waking` draws it, with its pointer record: it draws
+/// nothing a pointer can address, so the record names no target.
+/// @spec TUI-RENDER-026
+pub fn waking_recorded(f: &mut Frame, total_ticks: u64, remaining_ticks: u64) -> PointerRecord {
     let area = f.area();
+    let record = PointerRecord::blank((area.width, area.height));
     if let Body::TooSmall(rect) = layout::compute(area, None, false).body {
         widgets::overlays::too_small(f, rect);
-        return;
+        return record;
     }
 
     // Both round down, so neither reads full until waking ends.
@@ -797,6 +815,7 @@ pub fn waking(f: &mut Frame, total_ticks: u64, remaining_ticks: u64) {
         let rect = Rect::new(x, y, w, 1);
         f.render_widget(Paragraph::new(Line::styled(text.to_string(), style_for(*role))), rect);
     }
+    record
 }
 
 /// Draw one frame, returning the layout it used.
@@ -811,7 +830,21 @@ pub fn frame(
     view: &ViewState,
     prev: Option<&Layout>,
 ) -> Layout {
+    frame_recorded(f, state, view, prev).0
+}
+
+/// Draw one frame as `frame` does, and with it the record of where it drew
+/// what a pointer can address. The record is a second output, never an input:
+/// drawing consults none of an earlier frame. @spec TUI-RENDER-025,
+/// TUI-RENDER-026
+pub fn frame_recorded(
+    f: &mut Frame,
+    state: &GameState,
+    view: &ViewState,
+    prev: Option<&Layout>,
+) -> (Layout, PointerRecord) {
     let area = f.area();
+    let mut record = PointerRecord::blank((area.width, area.height));
     // TUI-NAV-050: an unread report is what puts the banner on screen.
     let banner = view.reports.iter().any(|r| !r.dismissed);
     let layout = layout::compute(area, prev, banner);
@@ -819,7 +852,7 @@ pub fn frame(
     // @spec TUI-RENDER-004
     if let Body::TooSmall(rect) = layout.body {
         widgets::overlays::too_small(f, rect);
-        return layout;
+        return (layout, record);
     }
 
     let section = view.section.unwrap_or(DEFAULT_SECTION);
@@ -835,7 +868,7 @@ pub fn frame(
         layout.header,
         Style::default().add_modifier(Modifier::UNDERLINED).underline_color(theme::seasonal_accent(state.season())),
     );
-    widgets::chrome::tabs(f, layout.tabs, state, view);
+    record.record_tabs(widgets::chrome::tabs_recorded(f, layout.tabs, state, view));
 
     // @spec TUI-RENDER-003, TUI-NAV-027
     if let Some(rect) = layout.banner {
@@ -851,7 +884,13 @@ pub fn frame(
         Body::Wide { sidebar, inspector, .. } => sidebar.union(inspector),
     };
     match &view.overlay {
-        Some(Overlay::Journal { .. }) => widgets::overlays::journal(f, body_rect, state, view),
+        Some(Overlay::Journal { .. }) => {
+            widgets::overlays::journal(f, body_rect, state, view);
+            record.record_journal(
+                body_rect,
+                widgets::overlays::journal_max_scroll(state, view, body_rect.height),
+            );
+        }
         Some(Overlay::Help) => widgets::overlays::help(f, body_rect),
         Some(Overlay::Palette { .. }) => widgets::overlays::palette(f, body_rect, state, view),
         // @spec TUI-RENDER-016
@@ -865,14 +904,16 @@ pub fn frame(
                 if view.inspector_wanted {
                     widgets::inspector::draw(f, space, state, view);
                 } else {
-                    draw_list(f, space, state, section, view);
+                    let drawn = draw_list(f, space, state, section, view);
+                    record.record_list(space, section, drawn);
                 }
                 draw_dividers(f, &[main.x], main.y, main.height, state.season());
             }
             Body::Wide { sidebar, list, inspector } => {
                 widgets::chrome::sidebar(f, sidebar, state);
                 let space = left_between_dividers(list);
-                draw_list(f, space, state, section, view);
+                let drawn = draw_list(f, space, state, section, view);
+                record.record_list(space, section, drawn);
                 // TUI-NAV-035's count-prompt substitution belongs to the
                 // narrow-mode swap alone — "while the inspector holds the
                 // list's space" — so the persistent pane never loses its next
@@ -898,5 +939,5 @@ pub fn frame(
         None => widgets::chrome::hints(f, layout.hints, state, view),
     }
 
-    layout
+    (layout, record)
 }

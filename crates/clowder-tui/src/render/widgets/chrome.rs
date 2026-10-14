@@ -236,6 +236,13 @@ fn tab_spans(sections: &[Section], labels: &[String], focused: Option<Section>, 
 /// overlay drawn over it. @spec TUI-NAV-006, TUI-NAV-034, TUI-NAV-085,
 /// TUI-NAV-092
 pub fn tabs(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
+    tabs_recorded(f, area, state, view);
+}
+
+/// The tab bar as `tabs` draws it, answering where each tab's label stands:
+/// its section and the cells of its label — badge, digit and name as far as
+/// the bar draws them — clipped to the bar. @spec TUI-RENDER-025
+pub fn tabs_recorded(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) -> Vec<(Section, Rect)> {
     let revealed: Vec<Section> = tab_sections(state, view.section);
     let focused = view.section;
 
@@ -249,7 +256,7 @@ pub fn tabs(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     if full_line.chars().count() <= area.width as usize {
         let spans = tab_spans(&revealed, &full, focused, "  ");
         f.render_widget(Paragraph::new(Line::from(spans)), area);
-        return;
+        return label_cells(area, &revealed, &full, 2);
     }
 
     // Compact form: every tab keeps its digit; only the focused tab and any
@@ -269,6 +276,24 @@ pub fn tabs(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
         .collect();
     let spans = tab_spans(&revealed, &compact, focused, " ");
     f.render_widget(Paragraph::new(Line::from(spans)), area);
+    label_cells(area, &revealed, &compact, 1)
+}
+
+/// The cells each label covers on the bar, the labels laid left to right with
+/// `gap` blank columns between, the gaps belonging to no tab.
+fn label_cells(area: Rect, sections: &[Section], labels: &[String], gap: u16) -> Vec<(Section, Rect)> {
+    let mut x = area.x;
+    let mut out = Vec::with_capacity(sections.len());
+    for (section, label) in sections.iter().zip(labels) {
+        let width = label.chars().count() as u16;
+        let from = x.min(area.right());
+        let to = x.saturating_add(width).min(area.right());
+        if to > from {
+            out.push((*section, Rect::new(from, area.y, to - from, 1)));
+        }
+        x = x.saturating_add(width).saturating_add(gap);
+    }
+    out
 }
 
 // ---------------------------------------------------------------------------

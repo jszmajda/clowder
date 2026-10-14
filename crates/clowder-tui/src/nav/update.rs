@@ -233,7 +233,7 @@ fn handle_navigation(action: Action, view: &mut ViewState, state: &GameState) {
 /// Move the cursor by `delta` selectable rows, stopping at either end. Group
 /// headers are skipped: they are signposts, not destinations.
 /// @spec TUI-NAV-002, TUI-NAV-007
-fn move_cursor(view: &mut ViewState, state: &GameState, delta: isize) {
+pub(super) fn move_cursor(view: &mut ViewState, state: &GameState, delta: isize) {
     let Some(section) = view.section else { return };
     let list = drawn_rows(state, section, view);
     let selectable: Vec<&Row> = list.iter().filter(|r| r.selectable()).collect();
@@ -334,7 +334,7 @@ fn nudge_speed(view: &mut ViewState, state: &GameState, up: bool) -> Outcome {
 /// jump, and doing it again here would retire a *second* report out from
 /// under a caller that already retired one this same press.
 /// @spec TUI-NAV-008, TUI-NAV-032
-fn enter_section(view: &mut ViewState, state: &GameState, section: Section) {
+pub(super) fn enter_section(view: &mut ViewState, state: &GameState, section: Section) {
     view.section = Some(section);
     let listed = rows(state, section).len();
     let list = drawn_rows(state, section, view);
@@ -654,9 +654,16 @@ fn fire_once(view: &mut ViewState, command: Command) -> Outcome {
     let now = Instant::now();
     if let Some(last) = view.last_repeat {
         if now.duration_since(last) < REPEAT_GATE {
+            // A press dropped while a fence stands renews the clock, so a
+            // continuous hold never wears the fence down. @spec TUI-NAV-119,
+            // TUI-NAV-133
+            if view.field_guard {
+                view.last_repeat = Some(now);
+            }
             return Outcome::Handled;
         }
     }
+    view.field_guard = false;
     view.last_repeat = Some(now);
     Outcome::Apply(command)
 }
@@ -801,7 +808,7 @@ fn accept_palette(view: &mut ViewState, state: &GameState) -> Outcome {
 /// Guard the row a field just acted on: the continuation of the very Enter
 /// that accepted the field must not also act on the row it returns to.
 /// @spec TUI-NAV-061
-fn guard_after_field(view: &mut ViewState) {
+pub(super) fn guard_after_field(view: &mut ViewState) {
     view.field_guard = true;
     view.last_repeat = Some(Instant::now());
 }

@@ -66,6 +66,19 @@ A group header scrolls like any other line. Pinning the current group to the top
 
 When the list is longer than the viewport, the frame says so — a position indicator rather than a scrollbar, since a single column of scrollbar is both harder to read and more expensive in a narrow pane than a short "n more below".
 
+## The Pointer Record
+
+A pointer event is resolved against the frame the player was looking at (navigation leaf: The Pointer), and only the drawing knows where that frame put each thing. So every frame, as it draws, yields a **pointer record**: the terminal size it was drawn at, and the cells of each thing on it that a pointer can address, each naming what it is.
+
+- *Each tab.* The cells of the tab's label as the tab bar drew it — its `★` badge where it wears one, its digit, and its name where the bar draws the name, in the full form or the compact strip (TUI-NAV-034) — naming the tab's section. The blank columns between labels belong to no tab.
+- *Each row in view.* For each row of the focused section's list that the frame drew within the list's viewport (TUI-RENDER-009), the cells of the row's line within the list's space — from the list's left edge to the width the dividers leave (TUI-RENDER-016) — naming the row by its identity, as the cursor remembers it (TUI-NAV-008), and its section. A row scrolled out of the viewport, or folded in the done group, was not drawn and has no cells. A group header, the done header, an overflow note, an armed row's summary lines, and the blank lines below the last row are lines of the list but not rows, and name none.
+- *The list.* The cells of the list's space, naming the focused section's list, so the wheel can be over the list anywhere in it — on a row, a header, a note, or the blank lines below.
+- *The Journal.* While the Journal is drawn, the cells of its region, with how far it can scroll: the scroll at which its last line stands at the foot of the region, or none where every line fits.
+
+The record names only what the frame drew. Where the narrow-mode swap, the palette, the Journal, or help holds the list's space, it names no row and no list; where a full-screen overlay holds the body, the tab bar beside it is still drawn and still recorded, its tabs' meaning under the overlay being the navigation leaf's to say. A frame that draws the too-small card (TUI-RENDER-004) records no target at all, and nor does the waking screen (navigation leaf: The Waking Screen), which is drawn in the frame's place.
+
+The record is a second output of the pure function, never an input to one. Drawing consults no record of an earlier frame — the loop keeps the last one only to hand to navigation with the pointer events that arrive before the next frame — so a frame is still a function of its snapshot, its view state, and its size alone (TUI-RENDER-001), and recording costs only what drawing already visits (TUI-RENDER-015).
+
 ## Numbers and Names
 
 Space is the scarce resource here, and the tenet ordering decides how to spend it: whimsy names the row, but the plain truth must be reachable (tenet 3).
@@ -126,6 +139,7 @@ Whether frames run at a fixed cadence or only when something changed is deferred
 | Group headers | Scroll with the list | Pin the current group | Pinning costs a permanent body row for what `[` / `]` already provides |
 | A group header's line | A `dim` rule spanning the list with the header's words set in it near its left end | The words alone between short dashes; the words in bold or a palette colour; a blank line above | A rule that spans the list marks the break across every column the rows use, so the eye sees where a kind ends without reading the words; a colour or weight would say something about state that a header does not carry; a blank line costs a body row per group |
 | Overflow indicator | A short "more below" note | A scrollbar column | A column is expensive in a narrow pane and harder to read at a glance |
+| Where pointer targets come from | A record each frame yields as it draws, naming rows by identity | Navigation working the layout and the list's window out again for each event; a record naming rows by their position in the list | Only the drawing knows where the frame put each thing: a layout worked out again can disagree with the one on screen, its dead-band following the frame before, and a key earlier in the same batch can have scrolled the list. A position goes stale when an earlier event moves rows, where an identity still names the row that was drawn under the click |
 | Number precision | Compact when glanced, exact in the inspector; precision follows magnitude | Fixed decimal places everywhere; exact everywhere | Fixed places make small values look falsely precise and eat the columns alignment needs; exact everywhere does not fit |
 | Reach of the contract | The sidebar and list rows, each abbreviation with its exact form in the inspector | Every figure on screen held to having an exact form in the inspector | A report or a refusal has no row whose inspector could hold an exact form, so a figure in a banner, the Journal, a footer, or the hint bar cannot be held to one |
 | Compact form's reach | Four digits and a marker per three decades, `K` to `Q`, bounded by `<0.001` below and `>999Q` above | Scientific notation; markers without end; a fraction showing every leading zero | Scientific notation is notation to learn on a screen meant to be read at a glance; an unbounded form cannot be given a fixed field; a fraction's leading zeros grow it past the field. Past either bound the glance needs only that the figure is tiny or enormous, and the exact digits are in the inspector |
@@ -167,4 +181,5 @@ Every question here is one that a real terminal answers better than a document, 
 
 - Parent: `../tui-design.md`
 - Consumes: `navigation/` for glyphs, markers, and every size-dependent behaviour (TUI-NAV-017, 019, 029, 034, 045, 047, 048); `theme/` for colour roles; `runtime/` for the per-frame budget
+- Supplies: `navigation/` with each frame's pointer record (The Pointer Record), against which pointer events are resolved
 - Renders from: `clowder_core::GameState` snapshots and the core's derived queries — never from shell-side copies of game data

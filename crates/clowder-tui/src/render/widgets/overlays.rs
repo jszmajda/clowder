@@ -224,6 +224,24 @@ pub fn journal(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
         _ => 0,
     };
 
+    let lines = journal_lines(state, view);
+    let height = area.height as usize;
+    let start = anchor.min(lines.len());
+    let end = (start + height).min(lines.len());
+    let visible = lines[start..end].to_vec();
+    f.render_widget(Paragraph::new(visible), area);
+}
+
+/// The scroll at which the Journal's last line stands at the foot of a region
+/// `height` lines tall, or none where every line fits. What the wheel may
+/// scroll it to, recorded with the frame. @spec TUI-RENDER-025
+pub fn journal_max_scroll(state: &GameState, view: &ViewState, height: u16) -> Option<usize> {
+    let total = journal_lines(state, view).len();
+    (total > height as usize).then(|| total - height as usize)
+}
+
+/// Every line of the Journal, top to bottom, before any scroll.
+fn journal_lines(state: &GameState, view: &ViewState) -> Vec<Line<'static>> {
     let entries = state.journal.iter_chronological();
 
     // While this Journal is open, what is pinned is frozen to what was
@@ -265,12 +283,7 @@ pub fn journal(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
             JournalItem::Away(report) => lines.extend(away_report_lines(report)),
         }
     }
-
-    let height = area.height as usize;
-    let start = anchor.min(lines.len());
-    let end = (start + height).min(lines.len());
-    let visible = lines[start..end].to_vec();
-    f.render_widget(Paragraph::new(visible), area);
+    lines
 }
 
 /// The pinned entry's full folded detail: the span (stated as more than
