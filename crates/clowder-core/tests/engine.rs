@@ -478,7 +478,7 @@ fn converter_throttle_scales_by_worst_input() {
     assert_eq!(f, 1.0);
 }
 
-// @spec SIM-ENG-023
+// @spec SIM-ENG-023, SIM-ENG-061
 #[test]
 fn content_reveals_stick_and_availability_advises() {
     let mut s = GameState::new(32);
@@ -518,6 +518,101 @@ fn content_reveals_stick_and_availability_advises() {
         s.availability(ContentId::Structure(StructureId::Pantry)),
         Availability::Hidden
     );
+}
+
+/// Every structure behind a gate reveals in the first scan after that gate
+/// opens, on a meadow holding none of its price — on the hot path and on the
+/// post-prestige path a Tradition switches to alike. The price comes into view
+/// with the row, so every store it names is revealed too.
+// @spec SIM-ENG-060, SIM-ENG-049
+#[test]
+fn a_gated_structure_reveals_when_its_gate_opens_whatever_the_stock() {
+    let mut checked = 0;
+    for prestiged in [false, true] {
+        for st in StructureId::ALL {
+            let mut s = GameState::new(60);
+            if prestiged {
+                s.traditions.insert(TraditionId::TravelingBasketsI);
+            }
+            match content::structure_def(st).gate {
+                StructureGate::Always => continue,
+                StructureGate::Idea(i) => {
+                    s.ideas.insert(i);
+                }
+                StructureGate::Site(site) => {
+                    s.sites_reached.insert(site);
+                }
+            }
+            let id = ContentId::Structure(st);
+            assert_eq!(
+                s.availability(id),
+                Availability::Hidden,
+                "{st:?} before the scan"
+            );
+
+            let events = run_ticks(&mut s, 1);
+
+            let price = s.cost_of_next(id, 1);
+            assert!(
+                price.iter().any(|(r, amount)| s.stock(*r) < 0.30 * amount),
+                "fixture: the meadow must hold less than the reveal fraction of {st:?}'s price"
+            );
+            assert!(
+                events.contains(&Event::Revealed { id }),
+                "{st:?} (prestiged: {prestiged}) did not reveal when its gate opened"
+            );
+            assert_ne!(
+                s.availability(id),
+                Availability::Hidden,
+                "{st:?} after the scan"
+            );
+            for (r, _) in &price {
+                assert!(
+                    s.resource_revealed(*r),
+                    "{st:?}'s price names {r:?}, which stayed unrevealed"
+                );
+            }
+            checked += 1;
+        }
+    }
+    assert!(checked > 0, "fixture: some structures carry a gate");
+}
+
+/// The player's path: researching the idea that unlocks a structure brings the
+/// structure's row on the very next tick, with nothing of its price in stock.
+// @spec SIM-ENG-060
+#[test]
+fn researching_an_idea_reveals_the_structure_it_unlocks_on_the_next_tick() {
+    let mut s = GameState::new(61);
+    grant(&mut s, StructureId::CardboardBox, 1); // curiosity storage opens the idea tree
+    let mut pending = vec![IdeaId::Tinkering];
+    while let Some(i) = pending.pop() {
+        for p in content::idea_def(i).prereqs {
+            if s.ideas.insert(*p) {
+                pending.push(*p);
+            }
+        }
+    }
+    for (r, amount) in s.cost_of_next(ContentId::Idea(IdeaId::Tinkering), 1) {
+        give(&mut s, r, amount);
+    }
+    let gated = ContentId::Structure(StructureId::CraftCorner);
+    assert_eq!(
+        content::structure_def(StructureId::CraftCorner).gate,
+        StructureGate::Idea(IdeaId::Tinkering),
+        "fixture"
+    );
+
+    s.apply(Command::ResearchIdea(IdeaId::Tinkering)).unwrap();
+    assert_eq!(
+        s.availability(gated),
+        Availability::Hidden,
+        "the scan runs at the tick"
+    );
+    let events = run_ticks(&mut s, 1);
+
+    assert!(events.contains(&Event::Revealed { id: gated }));
+    assert_eq!(s.availability(gated), Availability::Teased);
 }
 
 // @spec SIM-ENG-024, SIM-ENG-043

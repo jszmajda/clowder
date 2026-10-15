@@ -68,7 +68,7 @@ The full id space (append-only; serialized as an enum-indexed array, so **new id
 
 ## BLD — Structures
 
-Cost of copy k+1 = `ceil(base × ratio^k)` per component. Reveal fraction 30% unless noted. Effects are effect-key contributions; "active" = the on-count for global/energy effects (built count for caps). Gates name ideas from the curiosity tree.
+Cost of copy k+1 = `ceil(base × ratio^k)` per component. A gated structure reveals when its gate opens; an ungated one when the meadow holds 30% of each cost component (engine leaf: Unlocks & Visibility). Effects are effect-key contributions; "active" = the on-count for global/energy effects (built count for caps). Gates name ideas from the curiosity tree.
 
 | # | Structure | Base cost | Ratio | Effects | Gate |
 |---|---|---|---|---|---|
@@ -90,7 +90,7 @@ Cost of copy k+1 = `ceil(base × ratio^k)` per component. Reveal fraction 30% un
 | 15 | Study Nook | 30 twigs, 45 pebbles, 80 curiosity | 1.15 | curiosity production +20%/bld; +200 curiosity cap | Notetaking |
 | 16 | Stargazing Ledge | 250 buttons, 800 curiosity, 20 tiles, 40 lattices | 1.10 | curiosity production +25%/bld; +800 curiosity cap; +10 skymap cap; sky-event chance +0.2%/bld; auto-observe +1%/bld | SkyCharts |
 | 17 | Whisker Lab | 1200 curiosity, 60 tiles, 40 brass | 1.10 | curiosity production +35%/bld; +1200 curiosity cap; energy −1 | DeepCuriosity |
-| 18 | Craft Corner | 80 twigs, 300 pebbles | 1.15 (reveal 1%) | craft ratio +6%/bld | Tinkering |
+| 18 | Craft Corner | 80 twigs, 300 pebbles | 1.15 | craft ratio +6%/bld | Tinkering |
 | 19 | Toy Workshop | 250 buttons, 12 pavers, 18 moonstone | 1.15 | craft ratio +5%/bld; +1 Tinkerer seat; energy −2; mess 2 (Tidy rota flips to −2) | Toymaking |
 | 20 | Gift Stand | 400 twigs, 150 pebbles, 8 shinies | 1.15 | trade ratio +1.5%/bld; luxury demand −4%/bld | GiftEconomy |
 | 21 | Story Circle | 160 twigs, 900 pebbles, 3 quills | 1.15 | crowding relief 0.048/bld (pooled with Stages, LDR cap 0.9 — kittens leaf consumes); +0.005 charm/t; +40 charm cap | OralTradition |

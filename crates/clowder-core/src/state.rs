@@ -922,7 +922,7 @@ pub enum MoodTier {
 
 /// One id space across every kind of revealable content.
 ///
-/// Two kinds are *reveal-tracked*: they climb the cost-fraction ladder of
+/// Two kinds are *reveal-tracked*: they reveal in the per-tick scan of
 /// SIM-ENG-023 and their reveals persist in `revealed`. The rest carry no
 /// ladder and answer with the two states they have. New variants are appended
 /// rather than inserted: `revealed` is a `BTreeSet<ContentId>` whose iteration
@@ -2127,14 +2127,19 @@ impl GameState {
     pub(crate) fn reveal_condition_met(&self, id: ContentId) -> bool {
         match id {
             ContentId::Structure(s) => {
-                // Allocation-free next_cost: this runs in the per-tick scan.
+                // A gate is a reveal: whatever opens a gated structure already
+                // told the player it exists. Only the ungated climb the cost
+                // ladder. @spec SIM-ENG-060, SIM-ENG-061
                 let def = content::structure_def(s);
+                if def.gate != StructureGate::Always {
+                    return self.structure_unlocked(s);
+                }
+                // Allocation-free next_cost: this runs in the per-tick scan.
                 let owned = self.structures[s.ix()] as i32;
-                self.structure_unlocked(s)
-                    && def.base_costs.iter().all(|(r, base)| {
-                        let amount = (base * def.ratio.powi(owned)).ceil();
-                        self.stock(*r) + EPSILON >= def.reveal_fraction * amount
-                    })
+                def.base_costs.iter().all(|(r, base)| {
+                    let amount = (base * def.ratio.powi(owned)).ceil();
+                    self.stock(*r) + EPSILON >= def.reveal_fraction * amount
+                })
             }
             ContentId::Idea(i) => self.idea_unlocked(i),
             // Kinds with no cost-reveal ladder never enter the scan worklist.
@@ -2149,13 +2154,16 @@ impl GameState {
     pub(crate) fn reveal_condition_met_priced(&self, id: ContentId, price_mult: f64) -> bool {
         match id {
             ContentId::Structure(s) => {
+                // @spec SIM-ENG-060, SIM-ENG-061
                 let def = content::structure_def(s);
+                if def.gate != StructureGate::Always {
+                    return self.structure_unlocked(s);
+                }
                 let owned = self.structures[s.ix()] as i32;
-                self.structure_unlocked(s)
-                    && def.base_costs.iter().all(|(r, base)| {
-                        let amount = (base * def.ratio.powi(owned) * price_mult).ceil();
-                        self.stock(*r) + EPSILON >= def.reveal_fraction * amount
-                    })
+                def.base_costs.iter().all(|(r, base)| {
+                    let amount = (base * def.ratio.powi(owned) * price_mult).ceil();
+                    self.stock(*r) + EPSILON >= def.reveal_fraction * amount
+                })
             }
             ContentId::Idea(i) => self.idea_unlocked(i),
             // Kinds with no cost-reveal ladder never enter the scan worklist.

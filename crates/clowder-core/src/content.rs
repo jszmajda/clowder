@@ -340,7 +340,9 @@ pub struct StructureDef {
     pub name: &'static str,
     pub base_costs: &'static [(ResourceId, f64)],
     pub ratio: f64,
-    /// Fraction of each cost component held before the silhouette reveals.
+    /// Fraction of each cost component held before an ungated structure
+    /// reveals. A gated structure reveals with its gate, so this goes unread
+    /// there.
     pub reveal_fraction: f64,
     /// (resource, amount per tick per copy). Structure production takes only
     /// the ☆ stack layers: base, per-source ratio, season.
@@ -607,7 +609,6 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
     StructureDef {
         name: "Craft Corner",
         base_costs: &[(ResourceId::Twigs, 80.0), (ResourceId::Pebbles, 300.0)],
-        reveal_fraction: 0.01, // an early tease: sawdust drifts from a corner
         craft_ratio: 0.06,
         gate: StructureGate::Idea(IdeaId::Tinkering),
         ..BLD
