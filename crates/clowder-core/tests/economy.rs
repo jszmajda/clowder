@@ -70,13 +70,23 @@ fn forage_trades_ten_catnip_for_a_twig() {
 fn manual_actions_reject_when_yield_is_capped() {
     let mut s = GameState::new(6);
     give(&mut s, ResourceId::Catnip, 200.0);
-    assert_eq!(s.apply(Command::GatherCatnip).unwrap_err(), CommandError::StorageFull);
+    assert_eq!(
+        s.apply(Command::GatherCatnip).unwrap_err(),
+        CommandError::StorageFull
+    );
     assert_eq!(s.stock(ResourceId::Catnip), 200.0);
 
     give(&mut s, ResourceId::Catnip, 100.0);
     give(&mut s, ResourceId::Twigs, 50.0);
-    assert_eq!(s.apply(Command::Forage).unwrap_err(), CommandError::StorageFull);
-    assert_eq!(s.stock(ResourceId::Catnip), 100.0, "no catnip spent on a trimmed yield");
+    assert_eq!(
+        s.apply(Command::Forage).unwrap_err(),
+        CommandError::StorageFull
+    );
+    assert_eq!(
+        s.stock(ResourceId::Catnip),
+        100.0,
+        "no catnip spent on a trimmed yield"
+    );
 }
 
 // @spec SIM-ECO-007
@@ -84,13 +94,25 @@ fn manual_actions_reject_when_yield_is_capped() {
 fn build_costs_ramp_exponentially_with_ceil() {
     let mut s = GameState::new(7);
     give(&mut s, ResourceId::Catnip, 200.0);
-    assert_eq!(s.next_cost(StructureId::CatnipPatch), vec![(ResourceId::Catnip, 10.0)]);
+    assert_eq!(
+        s.next_cost(StructureId::CatnipPatch),
+        vec![(ResourceId::Catnip, 10.0)]
+    );
     let events = s.apply(Command::Build(StructureId::CatnipPatch)).unwrap();
-    assert!(events.contains(&Event::StructureBuilt { id: StructureId::CatnipPatch, count: 1 }));
+    assert!(events.contains(&Event::StructureBuilt {
+        id: StructureId::CatnipPatch,
+        count: 1
+    }));
     assert_eq!(s.stock(ResourceId::Catnip), 190.0);
-    assert_eq!(s.next_cost(StructureId::CatnipPatch), vec![(ResourceId::Catnip, 12.0)]); // ceil(11.2)
+    assert_eq!(
+        s.next_cost(StructureId::CatnipPatch),
+        vec![(ResourceId::Catnip, 12.0)]
+    ); // ceil(11.2)
     s.apply(Command::Build(StructureId::CatnipPatch)).unwrap();
-    assert_eq!(s.next_cost(StructureId::CatnipPatch), vec![(ResourceId::Catnip, 13.0)]); // ceil(12.544)
+    assert_eq!(
+        s.next_cost(StructureId::CatnipPatch),
+        vec![(ResourceId::Catnip, 13.0)]
+    ); // ceil(12.544)
 }
 
 // @spec SIM-ECO-008
@@ -113,7 +135,10 @@ fn cozy_cushion_houses_one() {
     grant(&mut s, StructureId::CozyCushion, 3);
     assert_eq!(s.housing_capacity(), 3);
     let def = content::structure_def(StructureId::CozyCushion);
-    assert_eq!(def.base_costs, &[(ResourceId::Catnip, 25.0), (ResourceId::Twigs, 5.0)]);
+    assert_eq!(
+        def.base_costs,
+        &[(ResourceId::Catnip, 25.0), (ResourceId::Twigs, 5.0)]
+    );
     assert_eq!(def.ratio, 1.15);
 }
 
@@ -148,7 +173,10 @@ fn twig_pile_is_idea_gated_storage() {
     s.ideas.insert(IdeaId::TwigArchitecture);
     assert!(s.structure_unlocked(StructureId::TwigPile));
     let def = content::structure_def(StructureId::TwigPile);
-    assert_eq!(def.base_costs, &[(ResourceId::Catnip, 50.0), (ResourceId::Twigs, 10.0)]);
+    assert_eq!(
+        def.base_costs,
+        &[(ResourceId::Catnip, 50.0), (ResourceId::Twigs, 10.0)]
+    );
 }
 
 // @spec SIM-ECO-013
@@ -207,7 +235,10 @@ fn twig_collector_yield() {
 fn groomer_is_idea_gated_and_yields_fluff() {
     let mut s = GameState::new(17);
     adopt(&mut s, 1);
-    assert_eq!(s.apply(Command::AssignJob(JobId::Groomer)).unwrap_err(), CommandError::Locked);
+    assert_eq!(
+        s.apply(Command::AssignJob(JobId::Groomer)).unwrap_err(),
+        CommandError::Locked
+    );
     s.ideas.insert(IdeaId::GroomedToPurrfection);
     s.apply(Command::AssignJob(JobId::Groomer)).unwrap();
     s.ticks += 1;
@@ -222,7 +253,10 @@ fn groomer_is_idea_gated_and_yields_fluff() {
 fn observer_requires_a_box_and_yields_curiosity() {
     let mut s = GameState::new(18);
     adopt(&mut s, 1);
-    assert_eq!(s.apply(Command::AssignJob(JobId::Observer)).unwrap_err(), CommandError::Locked);
+    assert_eq!(
+        s.apply(Command::AssignJob(JobId::Observer)).unwrap_err(),
+        CommandError::Locked
+    );
     grant(&mut s, StructureId::CardboardBox, 1);
     s.apply(Command::AssignJob(JobId::Observer)).unwrap();
     s.ticks += 1;
@@ -293,7 +327,10 @@ fn affordability_tolerates_float_dust() {
     give(&mut s, ResourceId::Catnip, 10.0 - 1e-10); // displays as 10
     s.apply(Command::Forage).unwrap();
     assert_eq!(s.stock(ResourceId::Twigs), 1.0);
-    assert!(s.stock(ResourceId::Catnip) >= 0.0, "deduction floors at zero");
+    assert!(
+        s.stock(ResourceId::Catnip) >= 0.0,
+        "deduction floors at zero"
+    );
 }
 
 // @spec SIM-ECO-023
@@ -309,8 +346,14 @@ fn structures_never_feel_moods_or_zoomies() {
     run_ticks(&mut base, 1);
     run_ticks(&mut grumpy, 1);
     run_ticks(&mut zoomy, 1);
-    assert_eq!(base.stock(ResourceId::Catnip), grumpy.stock(ResourceId::Catnip));
-    assert_eq!(base.stock(ResourceId::Catnip), zoomy.stock(ResourceId::Catnip));
+    assert_eq!(
+        base.stock(ResourceId::Catnip),
+        grumpy.stock(ResourceId::Catnip)
+    );
+    assert_eq!(
+        base.stock(ResourceId::Catnip),
+        zoomy.stock(ResourceId::Catnip)
+    );
 }
 
 // SIM-ECO-024's reachability property moved to tests/economy_depth.rs, which

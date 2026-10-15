@@ -88,7 +88,10 @@ fn outside_the_safe_set() -> Vec<KeyEvent> {
             KeyCode::Char(c),
             KeyModifiers::CONTROL | KeyModifiers::SHIFT,
         ));
-        out.push(with(KeyCode::Char(c), KeyModifiers::ALT | KeyModifiers::SHIFT));
+        out.push(with(
+            KeyCode::Char(c),
+            KeyModifiers::ALT | KeyModifiers::SHIFT,
+        ));
     }
     for code in [
         KeyCode::Enter,
@@ -242,33 +245,109 @@ fn every_context() -> Vec<(&'static str, ViewState)> {
 fn global_bindings() -> Vec<(KeyEvent, Action, &'static str)> {
     let mut out: Vec<(KeyEvent, Action, &'static str)> = vec![
         (k(KeyCode::Up), Action::CursorUp, "↑ moves the list cursor"),
-        (ch('k'), Action::CursorUp, "k is the cursor-up synonym (full hjkl)"),
-        (k(KeyCode::Down), Action::CursorDown, "↓ moves the list cursor"),
-        (ch('j'), Action::CursorDown, "j is the cursor-down synonym (full hjkl)"),
-        (k(KeyCode::Tab), Action::SectionNext, "Tab moves to the next section"),
-        (k(KeyCode::BackTab), Action::SectionPrev, "BackTab moves to the previous section"),
-        (ch('l'), Action::SectionNext, "l is the next-section synonym"),
-        (ch('h'), Action::SectionPrev, "h is the previous-section synonym"),
-        (k(KeyCode::Right), Action::SectionNext, "→ moves to the next section"),
-        (k(KeyCode::Left), Action::SectionPrev, "← moves to the previous section"),
-        (ch('['), Action::GroupPrev, "[ jumps to the previous group header"),
-        (ch(']'), Action::GroupNext, "] jumps to the next group header"),
-        (k(KeyCode::Enter), Action::Activate, "Enter performs the focused row's primary action"),
-        (ch(' '), Action::ToggleInspector, "Space opens the inspector on the focused row"),
-        (ch('i'), Action::ToggleInspector, "i is the inspector synonym"),
+        (
+            ch('k'),
+            Action::CursorUp,
+            "k is the cursor-up synonym (full hjkl)",
+        ),
+        (
+            k(KeyCode::Down),
+            Action::CursorDown,
+            "↓ moves the list cursor",
+        ),
+        (
+            ch('j'),
+            Action::CursorDown,
+            "j is the cursor-down synonym (full hjkl)",
+        ),
+        (
+            k(KeyCode::Tab),
+            Action::SectionNext,
+            "Tab moves to the next section",
+        ),
+        (
+            k(KeyCode::BackTab),
+            Action::SectionPrev,
+            "BackTab moves to the previous section",
+        ),
+        (
+            ch('l'),
+            Action::SectionNext,
+            "l is the next-section synonym",
+        ),
+        (
+            ch('h'),
+            Action::SectionPrev,
+            "h is the previous-section synonym",
+        ),
+        (
+            k(KeyCode::Right),
+            Action::SectionNext,
+            "→ moves to the next section",
+        ),
+        (
+            k(KeyCode::Left),
+            Action::SectionPrev,
+            "← moves to the previous section",
+        ),
+        (
+            ch('['),
+            Action::GroupPrev,
+            "[ jumps to the previous group header",
+        ),
+        (
+            ch(']'),
+            Action::GroupNext,
+            "] jumps to the next group header",
+        ),
+        (
+            k(KeyCode::Enter),
+            Action::Activate,
+            "Enter performs the focused row's primary action",
+        ),
+        (
+            ch(' '),
+            Action::ToggleInspector,
+            "Space opens the inspector on the focused row",
+        ),
+        (
+            ch('i'),
+            Action::ToggleInspector,
+            "i is the inspector synonym",
+        ),
         (ch('x'), Action::CountPrompt, "x opens the count prompt"),
-        (ch('X'), Action::MaxAffordable, "X acts to the maximum affordable"),
+        (
+            ch('X'),
+            Action::MaxAffordable,
+            "X acts to the maximum affordable",
+        ),
         (ch('+'), Action::Increment, "+ assigns one on a count row"),
-        (ch('='), Action::Increment, "= is the unshifted increment synonym"),
+        (
+            ch('='),
+            Action::Increment,
+            "= is the unshifted increment synonym",
+        ),
         (ch('-'), Action::Decrement, "- unassigns one on a count row"),
-        (k(KeyCode::Backspace), Action::Decrement, "Backspace is the decrement synonym"),
-        (ch('/'), Action::OpenPalette, "/ opens the find-anything palette"),
+        (
+            k(KeyCode::Backspace),
+            Action::Decrement,
+            "Backspace is the decrement synonym",
+        ),
+        (
+            ch('/'),
+            Action::OpenPalette,
+            "/ opens the find-anything palette",
+        ),
         (ch('e'), Action::OpenJournal, "e opens the Journal"),
         (ch('o'), Action::ObserveSky, "o observes the sky"),
         (ch('<'), Action::SpeedDown, "< steps the speed ladder down"),
         (ch('>'), Action::SpeedUp, "> steps the speed ladder up"),
         (ch('?'), Action::OpenHelp, "? opens the help overlay"),
-        (ch('q'), Action::Quit, "q quits immediately; the shell saves first"),
+        (
+            ch('q'),
+            Action::Quit,
+            "q quits immediately; the shell saves first",
+        ),
         (ctrl_c(), Action::Quit, "Ctrl-C is the emergency quit"),
         (
             ch('n'),
@@ -410,7 +489,10 @@ fn nothing_outside_the_safe_set_resolves_to_anything() {
 #[test]
 fn the_safe_set_is_exactly_the_designs_enumeration() {
     for c in printables() {
-        assert!(is_tmux_safe(ch(c)), "the printable character {c:?} is admissible");
+        assert!(
+            is_tmux_safe(ch(c)),
+            "the printable character {c:?} is admissible"
+        );
         assert!(
             is_tmux_safe(shifted(c)),
             "{c:?} reported with SHIFT is still a plain printable character — Shift is the \
@@ -428,7 +510,10 @@ fn the_safe_set_is_exactly_the_designs_enumeration() {
         KeyCode::Left,
         KeyCode::Right,
     ] {
-        assert!(is_tmux_safe(k(code)), "{code:?} is named in the admissible set");
+        assert!(
+            is_tmux_safe(k(code)),
+            "{code:?} is named in the admissible set"
+        );
     }
     assert!(
         is_tmux_safe(with(KeyCode::BackTab, KeyModifiers::SHIFT)),
@@ -639,17 +724,29 @@ fn sections_cursor_and_groups_are_three_distinct_axes() {
         );
     }
     for key in [k(KeyCode::Down), ch('j')] {
-        assert_eq!(resolve(key, &view), Action::CursorDown, "{key:?} moves within the list");
+        assert_eq!(
+            resolve(key, &view),
+            Action::CursorDown,
+            "{key:?} moves within the list"
+        );
     }
     for key in [k(KeyCode::Up), ch('k')] {
-        assert_eq!(resolve(key, &view), Action::CursorUp, "{key:?} moves within the list");
+        assert_eq!(
+            resolve(key, &view),
+            Action::CursorUp,
+            "{key:?} moves within the list"
+        );
     }
     assert_eq!(
         resolve(ch('['), &view),
         Action::GroupPrev,
         "[ jumps to the previous group header — a long list needs a coarse axis too"
     );
-    assert_eq!(resolve(ch(']'), &view), Action::GroupNext, "] jumps to the next group header");
+    assert_eq!(
+        resolve(ch(']'), &view),
+        Action::GroupNext,
+        "] jumps to the next group header"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -692,7 +789,11 @@ fn every_digit_jumps_to_the_section_it_was_assigned() {
             other => panic!("the digit {c:?} resolves to {other:?} rather than a section jump"),
         }
     }
-    assert_eq!(jumped.len(), Section::ALL.len(), "all ten sections are addressable by digit");
+    assert_eq!(
+        jumped.len(),
+        Section::ALL.len(),
+        "all ten sections are addressable by digit"
+    );
 }
 
 /// A section that unlocks late slots into its reserved digit, so the key map a
@@ -709,7 +810,14 @@ fn a_late_unlocking_sections_digit_never_changes_meaning() {
     visited.seen[Section::Legacy.index()].visited = true;
     visited.seen[Section::Legacy.index()].revealed_at_last_visit = 4;
 
-    let contexts = [bare(), screen(Section::Legacy), screen(Section::Sky), visited, armed(), banner()];
+    let contexts = [
+        bare(),
+        screen(Section::Legacy),
+        screen(Section::Sky),
+        visited,
+        armed(),
+        banner(),
+    ];
 
     for section in Section::ALL {
         for view in &contexts {
@@ -967,8 +1075,7 @@ fn a_field_suspends_every_global_single_key_binding() {
         for (c, global) in printable_globals() {
             let got = resolve(ch(c), &view);
             assert_ne!(
-                got,
-                global,
+                got, global,
                 "with {label} open, {c:?} still resolves to its global meaning {global:?}; every \
                  global single-key binding is suspended while a field has the keyboard"
             );
@@ -1047,7 +1154,11 @@ fn arrows_tab_and_backtab_resolve_to_nothing_inside_a_field() {
             );
         }
         let got = resolve(with(KeyCode::BackTab, KeyModifiers::SHIFT), &view);
-        assert_eq!(got, Action::Ignored, "with {label} open, Shift-BackTab resolves to {got:?}");
+        assert_eq!(
+            got,
+            Action::Ignored,
+            "with {label} open, Shift-BackTab resolves to {got:?}"
+        );
     }
 }
 
@@ -1166,14 +1277,22 @@ fn the_journal_takes_the_cursor_and_group_keys_for_its_own_navigation() {
         );
     }
     for key in [k(KeyCode::Up), ch('k')] {
-        assert_eq!(resolve(key, &view), Action::CursorUp, "{key:?} must still move upward");
+        assert_eq!(
+            resolve(key, &view),
+            Action::CursorUp,
+            "{key:?} must still move upward"
+        );
     }
     assert_eq!(
         resolve(ch('['), &view),
         Action::GroupPrev,
         "[ moves the Journal back by day — the same coarse axis it has in a list"
     );
-    assert_eq!(resolve(ch(']'), &view), Action::GroupNext, "] moves the Journal on by day");
+    assert_eq!(
+        resolve(ch(']'), &view),
+        Action::GroupNext,
+        "] moves the Journal on by day"
+    );
 }
 
 /// The palette is an overlay *and* a field, and the field wins. The design says
@@ -1326,7 +1445,10 @@ fn a_key_fused_with_a_preceding_esc_is_ignored_whole_in_every_context() {
                 );
             }
         }
-        let fused_ctrl_c = with(KeyCode::Char('c'), KeyModifiers::CONTROL | KeyModifiers::ALT);
+        let fused_ctrl_c = with(
+            KeyCode::Char('c'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT,
+        );
         assert_eq!(
             resolve(fused_ctrl_c, &view),
             Action::Ignored,
@@ -1352,10 +1474,16 @@ fn the_swap_changes_what_no_key_resolves_to() {
     let contexts: Vec<(&str, ViewState)> = Section::ALL
         .into_iter()
         .map(|s| ("a focused screen", screen(s)))
-        .chain([("a heavy row armed", armed()), ("an unread report banner", banner())])
+        .chain([
+            ("a heavy row armed", armed()),
+            ("an unread report banner", banner()),
+        ])
         .collect();
     for (label, listing) in contexts {
-        let swapped = ViewState { inspector_wanted: true, ..listing.clone() };
+        let swapped = ViewState {
+            inspector_wanted: true,
+            ..listing.clone()
+        };
         for key in key_corpus() {
             assert_eq!(
                 resolve(key, &swapped),

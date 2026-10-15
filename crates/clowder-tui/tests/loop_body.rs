@@ -32,8 +32,7 @@ use std::time::{Duration, Instant};
 fn scratch(name: &str) -> PathBuf {
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir =
-        std::env::temp_dir().join(format!("clowder-loop-{}-{name}-{n}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("clowder-loop-{}-{name}-{n}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir.join("save.json")
@@ -55,7 +54,10 @@ fn app(save_path: PathBuf) -> App {
 
 fn elapsed(secs: f64) -> Reading {
     let d = Duration::from_secs_f64(secs);
-    Reading { monotonic: d, wall: d }
+    Reading {
+        monotonic: d,
+        wall: d,
+    }
 }
 
 /// The property most likely to be quietly broken later, and the one the design
@@ -70,7 +72,8 @@ fn the_simulation_advances_even_when_the_terminal_is_too_small_to_draw() {
     let mut a = app(scratch("toosmall"));
     let before = a.state.ticks;
 
-    a.step(&mut term, elapsed(5.0), &[]).expect("a step below the floor must not fail");
+    a.step(&mut term, elapsed(5.0), &[])
+        .expect("a step below the floor must not fail");
 
     assert!(
         a.state.ticks > before,
@@ -92,7 +95,10 @@ fn how_far_the_sim_advances_does_not_depend_on_the_terminal_size() {
     a.step(&mut tiny, elapsed(3.0), &[]).unwrap();
     b.step(&mut big, elapsed(3.0), &[]).unwrap();
 
-    assert_eq!(a.state.ticks, b.state.ticks, "the window size is not a speed control");
+    assert_eq!(
+        a.state.ticks, b.state.ticks,
+        "the window size is not a speed control"
+    );
 }
 
 /// A frame draws. Weak on its own, but it pins that render is reached at all —
@@ -105,8 +111,16 @@ fn a_step_draws_a_frame() {
     let mut a = app(scratch("draws"));
     a.step(&mut term, elapsed(0.5), &[]).unwrap();
 
-    let painted = term.backend().buffer().content().iter().any(|c| c.symbol() != " ");
-    assert!(painted, "a step left the terminal blank — render was never reached");
+    let painted = term
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .any(|c| c.symbol() != " ");
+    assert!(
+        painted,
+        "a step left the terminal blank — render was never reached"
+    );
 }
 
 /// The layout must survive to the next frame, or the breakpoints' dead-band has
@@ -137,12 +151,18 @@ fn autosave_waits_for_its_cadence_and_then_writes() {
     let mut a = app(path.clone());
 
     a.step(&mut term, elapsed(0.5), &[]).unwrap();
-    assert!(!path.exists(), "a step moments after the last save must not write again");
+    assert!(
+        !path.exists(),
+        "a step moments after the last save must not write again"
+    );
 
     // Pretend the cadence has elapsed.
     a.last_save = Instant::now() - Duration::from_secs(60 * 60);
     a.step(&mut term, elapsed(0.5), &[]).unwrap();
-    assert!(path.exists(), "once the cadence has passed, the step must save");
+    assert!(
+        path.exists(),
+        "once the cadence has passed, the step must save"
+    );
 }
 
 /// A save that cannot be written ends nothing: the session survives, and the
@@ -163,9 +183,16 @@ fn a_failed_autosave_does_not_end_the_session() {
     a.last_save = Instant::now() - Duration::from_secs(60 * 60);
 
     let before = a.state.ticks;
-    a.step(&mut term, elapsed(2.0), &[]).expect("a failed save must not fail the step");
-    assert!(a.state.ticks > before, "the sim kept running through a failed save");
-    assert!(a.save_failed, "the failure was noticed, so it can be said once and not again");
+    a.step(&mut term, elapsed(2.0), &[])
+        .expect("a failed save must not fail the step");
+    assert!(
+        a.state.ticks > before,
+        "the sim kept running through a failed save"
+    );
+    assert!(
+        a.save_failed,
+        "the failure was noticed, so it can be said once and not again"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -220,14 +247,22 @@ fn a_frames_commands_are_applied_before_that_frames_ticks() {
     // what puts a stamped entry in the journal.
     let target = clowder_tui::nav::rows::rows(&a.state, section)
         .into_iter()
-        .find(|r| matches!(r.key, clowder_tui::nav::RowKey::Content(
-            clowder_core::ContentId::Structure(_), _)))
+        .find(|r| {
+            matches!(
+                r.key,
+                clowder_tui::nav::RowKey::Content(clowder_core::ContentId::Structure(_), _)
+            )
+        })
         .expect("a meadow with every structure revealed offers at least one to build");
     a.view.focus[section.index()] = Some(target.key);
 
     let opened_at = a.state.ticks;
-    a.step(&mut term, elapsed(5.0), &[key(crossterm::event::KeyCode::Enter)])
-        .expect("a step carrying one keypress must not fail");
+    a.step(
+        &mut term,
+        elapsed(5.0),
+        &[key(crossterm::event::KeyCode::Enter)],
+    )
+    .expect("a step carrying one keypress must not fail");
 
     assert!(
         a.state.ticks > opened_at,
@@ -272,12 +307,16 @@ fn a_flood_of_input_is_bounded_within_one_frame() {
     // narrow layout on screen before the flood is the one that must bound it.
     let mut term = Terminal::new(TestBackend::new(80, 24)).unwrap();
     let mut a = app(scratch("flood"));
-    a.step(&mut term, still(), &[]).expect("the priming step must not fail");
+    a.step(&mut term, still(), &[])
+        .expect("the priming step must not fail");
     let initial = a.view.inspector_wanted;
 
     // One past the bound, so an unbounded drain ends on the opposite state.
-    let flood: Vec<_> = (0..65).map(|_| key(crossterm::event::KeyCode::Char(' '))).collect();
-    a.step(&mut term, elapsed(0.5), &flood).expect("a flooded step must not fail");
+    let flood: Vec<_> = (0..65)
+        .map(|_| key(crossterm::event::KeyCode::Char(' ')))
+        .collect();
+    a.step(&mut term, elapsed(0.5), &flood)
+        .expect("a flooded step must not fail");
 
     assert_eq!(
         a.view.inspector_wanted, initial,
@@ -302,7 +341,10 @@ fn an_open_field_outlasts_every_timer_while_the_sim_runs_beneath_it() {
             "a count prompt",
             ViewState {
                 section: Some(Section::Meadow),
-                prompt: Some(CountPrompt { digits: "12".to_string(), ..Default::default() }),
+                prompt: Some(CountPrompt {
+                    digits: "12".to_string(),
+                    ..Default::default()
+                }),
                 ..ViewState::default()
             },
         ),
@@ -310,7 +352,10 @@ fn an_open_field_outlasts_every_timer_while_the_sim_runs_beneath_it() {
             "the palette",
             ViewState {
                 section: Some(Section::Meadow),
-                overlay: Some(Overlay::Palette { query: "ab c".to_string(), selected: 0 }),
+                overlay: Some(Overlay::Palette {
+                    query: "ab c".to_string(),
+                    selected: 0,
+                }),
                 ..ViewState::default()
             },
         ),
@@ -330,7 +375,8 @@ fn an_open_field_outlasts_every_timer_while_the_sim_runs_beneath_it() {
     let start = Instant::now();
     while start.elapsed() < Duration::from_millis(9_000) {
         for (_, a, term) in apps.iter_mut() {
-            a.step(term, elapsed(600.0), &[]).expect("a step with a field open must not fail");
+            a.step(term, elapsed(600.0), &[])
+                .expect("a step with a field open must not fail");
         }
         std::thread::sleep(Duration::from_millis(250));
     }
@@ -378,14 +424,23 @@ fn nap_key(state: &GameState) -> clowder_tui::nav::RowKey {
     rows(state, Section::Dreams)
         .into_iter()
         .find(|r| {
-            matches!(r.kind, RowKind::Act { command: clowder_core::Command::DeepNap(_), .. })
+            matches!(
+                r.kind,
+                RowKind::Act {
+                    command: clowder_core::Command::DeepNap(_),
+                    ..
+                }
+            )
         })
         .map(|r| r.key)
         .expect("fixture: the nap row is listed")
 }
 
 fn still() -> Reading {
-    Reading { monotonic: Duration::ZERO, wall: Duration::ZERO }
+    Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::ZERO,
+    }
 }
 
 /// In play, the keys scroll an open Journal within the frame the loop drew:
@@ -401,15 +456,22 @@ fn the_keys_scroll_an_open_journal_in_play() {
     let mut a = app(scratch("journal-keys"));
     for i in 0..90u64 {
         let id = StructureId::ALL[i as usize % StructureId::ALL.len()];
-        a.state.journal.record(2_000 + i, &Event::StructureBuilt { id, count: 2 });
+        a.state
+            .journal
+            .record(2_000 + i, &Event::StructureBuilt { id, count: 2 });
     }
     let anchor = |a: &App| match a.view.overlay {
         Some(Overlay::Journal { anchor }) => anchor,
         ref other => panic!("the Journal is not open: {other:?}"),
     };
-    a.step(&mut term, still(), &[key(KeyCode::Char('e'))]).unwrap();
+    a.step(&mut term, still(), &[key(KeyCode::Char('e'))])
+        .unwrap();
     assert_eq!(anchor(&a), 0, "the Journal opens at its top");
-    let max = a.pointer_record.as_ref().and_then(|r| r.journal_max_scroll()).expect("fixture: the Journal overflows");
+    let max = a
+        .pointer_record
+        .as_ref()
+        .and_then(|r| r.journal_max_scroll())
+        .expect("fixture: the Journal overflows");
     assert!(max >= 2, "fixture: the Journal scrolls a few lines");
 
     for (press, want) in [
@@ -423,7 +485,12 @@ fn the_keys_scroll_an_open_journal_in_play() {
         (KeyCode::Char('k'), 0),
     ] {
         a.step(&mut term, still(), &[key(press)]).unwrap();
-        assert_eq!(anchor(&a), want, "{press:?} left the Journal at {} rather than {want}", anchor(&a));
+        assert_eq!(
+            anchor(&a),
+            want,
+            "{press:?} left the Journal at {} rather than {want}",
+            anchor(&a)
+        );
     }
 }
 
@@ -435,8 +502,12 @@ fn armed_on_the_nap(name: &str) -> (App, Terminal<TestBackend>) {
     a.view.section = Some(Section::Dreams);
     a.view.focus[Section::Dreams.index()] = Some(nap_key(&a.state));
     let mut term = Terminal::new(TestBackend::new(120, 40)).unwrap();
-    a.step(&mut term, still(), &[key(crossterm::event::KeyCode::Enter)]).unwrap();
-    assert!(a.view.armed.is_some(), "fixture: Enter on the nap row armed it");
+    a.step(&mut term, still(), &[key(crossterm::event::KeyCode::Enter)])
+        .unwrap();
+    assert!(
+        a.view.armed.is_some(),
+        "fixture: Enter on the nap row armed it"
+    );
     (a, term)
 }
 
@@ -453,7 +524,10 @@ fn the_simulation_advancing_leaves_an_arming_running() {
 
     a.step(&mut term, elapsed(5.0), &[]).unwrap();
 
-    assert!(a.state.ticks > ticks, "the simulation stood still while a row was armed");
+    assert!(
+        a.state.ticks > ticks,
+        "the simulation stood still while a row was armed"
+    );
     assert_eq!(
         a.view.armed, before,
         "the simulation advancing changed or ended the arming; only the endings may"
@@ -472,7 +546,10 @@ fn a_change_of_layout_leaves_an_arming_running() {
 
     for (w, h) in [(80u16, 24u16), (99, 24), (150, 50), (100, 30)] {
         a.step(&mut term, still(), &[Event::Resize(w, h)]).unwrap();
-        assert_eq!(a.view.armed, before, "a resize to {w}×{h} changed or ended the arming");
+        assert_eq!(
+            a.view.armed, before,
+            "a resize to {w}×{h} changed or ended the arming"
+        );
     }
 }
 
@@ -496,7 +573,10 @@ fn an_armed_row_that_stops_being_listed_ends_its_arming_for_good() {
     a.state.ideas.insert(clowder_core::IdeaId::DeepNapTheory);
     a.view.focus[clowder_tui::nav::Section::Dreams.index()] = Some(before.key.clone());
     std::thread::sleep(Duration::from_millis(300));
-    assert!(Instant::now() < before.expires_at, "fixture: the old arming has not expired");
+    assert!(
+        Instant::now() < before.expires_at,
+        "fixture: the old arming has not expired"
+    );
 
     a.step(&mut term, still(), &[key(KeyCode::Enter)]).unwrap();
 
@@ -506,7 +586,11 @@ fn an_armed_row_that_stops_being_listed_ends_its_arming_for_good() {
         "the first Enter after the armed row left its list and came back committed the nap; \
          the row leaving ended that arming"
     );
-    let now = a.view.armed.as_ref().expect("that Enter did not arm the row afresh");
+    let now = a
+        .view
+        .armed
+        .as_ref()
+        .expect("that Enter did not arm the row afresh");
     assert!(
         now.expires_at > before.expires_at,
         "the row came back still carrying the arming it had before it left its list"
@@ -552,7 +636,10 @@ fn n_through_the_loop_appoints_each_kitten_and_leaves_the_narrow_swap_standing()
     use crossterm::event::KeyCode;
 
     let mut state = GameState::new(4242);
-    state.kittens = ["Biscuit", "Clover", "Dumpling"].iter().map(|n| roster_kitten(n)).collect();
+    state.kittens = ["Biscuit", "Clover", "Dumpling"]
+        .iter()
+        .map(|n| roster_kitten(n))
+        .collect();
     state.roster_high_water = state.kittens.len();
     state.elder = None;
     let kittens: Vec<(usize, RowKey)> = rows(&state, Section::Clowder)
@@ -571,15 +658,20 @@ fn n_through_the_loop_appoints_each_kitten_and_leaves_the_narrow_swap_standing()
         a.view.section = Some(Section::Clowder);
         a.view.focus[Section::Clowder.index()] = Some(row_key.clone());
         a.view.inspector_wanted = true;
-        a.view.reports = vec![PendingReport { entry: 0, dismissed: false }];
-        a.step(&mut term, elapsed(0.0), &[]).expect("a first frame draws");
+        a.view.reports = vec![PendingReport {
+            entry: 0,
+            dismissed: false,
+        }];
+        a.step(&mut term, elapsed(0.0), &[])
+            .expect("a first frame draws");
         assert!(
             matches!(a.prev_layout.map(|l| l.body), Some(Body::Narrow { .. })),
             "fixture: 80 columns lays out the narrow body, where the inspector call is a swap"
         );
         let before = a.view.clone();
 
-        a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))]).expect("a step with `n` does not fail");
+        a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))])
+            .expect("a step with `n` does not fail");
 
         let whr = format!("with the kitten row {row_key:?} focused in the narrow swap");
         assert_eq!(
@@ -591,11 +683,23 @@ fn n_through_the_loop_appoints_each_kitten_and_leaves_the_narrow_swap_standing()
         // An accepted appointment leaves no footer note (TUI-NAV-107) —
         // swept on its own below; here only that no note, a refusal's least
         // of all, stands after the press.
-        assert_eq!(a.view.footer, None, "{whr}, the accepted appointment left a footer note");
-        assert_eq!(a.view.section, before.section, "{whr}, `n` changed the focused section");
+        assert_eq!(
+            a.view.footer, None,
+            "{whr}, the accepted appointment left a footer note"
+        );
+        assert_eq!(
+            a.view.section, before.section,
+            "{whr}, `n` changed the focused section"
+        );
         assert_eq!(a.view.focus, before.focus, "{whr}, `n` moved the cursor");
-        assert_eq!(a.view.reports, before.reports, "{whr}, `n` dismissed the report banner");
-        assert!(a.view.inspector_wanted, "{whr}, `n` ended the narrow-mode inspector swap");
+        assert_eq!(
+            a.view.reports, before.reports,
+            "{whr}, `n` dismissed the report banner"
+        );
+        assert!(
+            a.view.inspector_wanted,
+            "{whr}, `n` ended the narrow-mode inspector swap"
+        );
         assert!(
             matches!(a.prev_layout.map(|l| l.body), Some(Body::Narrow { .. })),
             "{whr}, `n` changed the layout"
@@ -628,7 +732,9 @@ fn n_through_the_loop_appoints_each_kitten_and_leaves_the_narrow_swap_standing()
 /// The text of one row of the terminal, as the last frame drew it.
 fn screen_row(term: &Terminal<TestBackend>, rect: ratatui::layout::Rect) -> String {
     let buf = term.backend().buffer();
-    (rect.x..rect.right()).map(|x| buf.cell((x, rect.y)).map(|c| c.symbol()).unwrap_or(" ")).collect()
+    (rect.x..rect.right())
+        .map(|x| buf.cell((x, rect.y)).map(|c| c.symbol()).unwrap_or(" "))
+        .collect()
 }
 
 /// The whole screen, as the last frame drew it, one string per row.
@@ -636,7 +742,11 @@ fn screen_rows(term: &Terminal<TestBackend>) -> Vec<String> {
     let buf = term.backend().buffer();
     let area = buf.area;
     (area.y..area.bottom())
-        .map(|y| (area.x..area.right()).map(|x| buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" ")).collect::<String>())
+        .map(|y| {
+            (area.x..area.right())
+                .map(|x| buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+                .collect::<String>()
+        })
         .collect()
 }
 
@@ -644,15 +754,21 @@ fn screen_rows(term: &Terminal<TestBackend>) -> Vec<String> {
 /// in the permanent entries and in the rolling window.
 fn appointments_journalled(state: &GameState, name: &str) -> (usize, usize) {
     use clowder_core::{Event, JournalItem};
-    let is_it = |e: &&clowder_core::JournalEntry| {
-        matches!(&e.item, JournalItem::Happened(Event::ElderAppointed { name: n }) if n == name)
-    };
-    (state.journal.kept.iter().filter(is_it).count(), state.journal.recent.iter().filter(is_it).count())
+    let is_it = |e: &&clowder_core::JournalEntry| matches!(&e.item, JournalItem::Happened(Event::ElderAppointed { name: n }) if n == name);
+    (
+        state.journal.kept.iter().filter(is_it).count(),
+        state.journal.recent.iter().filter(is_it).count(),
+    )
 }
 
 /// A long name the roster's row must shorten in a narrow list, among short
 /// ones; no name here is part of another.
-const ROSTER_NAMES: [&str; 4] = ["Biscuit", "Clover", "Marmalade-of-the-Long-Whiskers", "Dumpling"];
+const ROSTER_NAMES: [&str; 4] = [
+    "Biscuit",
+    "Clover",
+    "Marmalade-of-the-Long-Whiskers",
+    "Dumpling",
+];
 
 fn small_roster() -> GameState {
     let mut state = GameState::new(4242);
@@ -697,7 +813,8 @@ fn session_on(
     a.view.section = Some(Section::Clowder);
     a.view.focus[Section::Clowder.index()] = Some(row_key.clone());
     a.view.inspector_wanted = swap;
-    a.step(&mut term, elapsed(0.0), &[]).expect("a first frame draws");
+    a.step(&mut term, elapsed(0.0), &[])
+        .expect("a first frame draws");
     (a, term)
 }
 
@@ -709,8 +826,16 @@ fn footer_line_without_a_note(a: &App, (w, h): (u16, u16)) -> String {
     control.state = a.state.clone();
     control.view = a.view.clone();
     control.view.footer = None;
-    control.step(&mut term, elapsed(0.0), &[]).expect("a control frame draws");
-    screen_row(&term, control.prev_layout.expect("a control frame was drawn").hints)
+    control
+        .step(&mut term, elapsed(0.0), &[])
+        .expect("a control frame draws");
+    screen_row(
+        &term,
+        control
+            .prev_layout
+            .expect("a control frame was drawn")
+            .hints,
+    )
 }
 
 /// A press of `n` that appoints — on every kitten's row, with nobody or
@@ -730,7 +855,11 @@ fn an_n_that_appoints_is_announced_once_by_the_ticker_and_leaves_no_footer_note(
 
     let base = small_roster();
     let kittens = kitten_row_keys(&base);
-    assert_eq!(kittens.len(), ROSTER_NAMES.len(), "fixture: every kitten's row is listed");
+    assert_eq!(
+        kittens.len(),
+        ROSTER_NAMES.len(),
+        "fixture: every kitten's row is listed"
+    );
 
     let mut checked = 0u32;
     for (layout_name, w, h, swap) in LAYOUTS {
@@ -738,7 +867,10 @@ fn an_n_that_appoints_is_announced_once_by_the_ticker_and_leaves_no_footer_note(
             let ix = *ix;
             let name = base.kittens[ix].name.clone();
             let other = (ix + 1) % base.kittens.len();
-            for (standing, elder_before) in [("nobody the Elder", None), ("another kitten the Elder", Some(other))] {
+            for (standing, elder_before) in [
+                ("nobody the Elder", None),
+                ("another kitten the Elder", Some(other)),
+            ] {
                 for refusal_standing in [false, true] {
                     let whr = format!(
                         "in {layout_name}, with `n` pressed on kitten {ix}'s row, {standing} before the press{}",
@@ -746,23 +878,38 @@ fn an_n_that_appoints_is_announced_once_by_the_ticker_and_leaves_no_footer_note(
                     );
                     let mut state = base.clone();
                     state.elder = elder_before;
-                    let tag = format!("appoint-once-{w}-{swap}-{ix}-{}-{refusal_standing}", elder_before.map_or(99, |e| e));
+                    let tag = format!(
+                        "appoint-once-{w}-{swap}-{ix}-{}-{refusal_standing}",
+                        elder_before.map_or(99, |e| e)
+                    );
                     let (mut a, mut term) = session_on(&state, row_key, (w, h, swap), &tag);
 
                     if refusal_standing {
                         // This row's `Enter` is refused, and leaves its note.
-                        a.step(&mut term, elapsed(0.0), &[key(KeyCode::Enter)]).expect("a step with Enter does not fail");
-                        assert!(a.view.footer.is_some(), "fixture: {whr}, the row's Enter was refused with a note");
+                        a.step(&mut term, elapsed(0.0), &[key(KeyCode::Enter)])
+                            .expect("a step with Enter does not fail");
+                        assert!(
+                            a.view.footer.is_some(),
+                            "fixture: {whr}, the row's Enter was refused with a note"
+                        );
                         a.view.last_repeat = None;
                     } else {
-                        assert_eq!(a.view.footer, None, "fixture: {whr}, the footer line carries no note");
+                        assert_eq!(
+                            a.view.footer, None,
+                            "fixture: {whr}, the footer line carries no note"
+                        );
                     }
                     let footer_before = a.view.footer.clone();
                     let kept_before = a.state.journal.kept.clone();
 
-                    a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))]).expect("a step with `n` does not fail");
+                    a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))])
+                        .expect("a step with `n` does not fail");
 
-                    assert_eq!(a.state.elder, Some(ix), "fixture: {whr}, the core accepted the appointment");
+                    assert_eq!(
+                        a.state.elder,
+                        Some(ix),
+                        "fixture: {whr}, the core accepted the appointment"
+                    );
                     assert_eq!(
                         a.view.footer, footer_before,
                         "{whr}, the press changed the footer line's note; an accepted press leaves the \
@@ -800,7 +947,10 @@ fn an_n_that_appoints_is_announced_once_by_the_ticker_and_leaves_no_footer_note(
                         );
                     }
 
-                    assert_eq!(a.state.journal.kept, kept_before, "{whr}, the appointment was kept permanently");
+                    assert_eq!(
+                        a.state.journal.kept, kept_before,
+                        "{whr}, the appointment was kept permanently"
+                    );
                     assert_eq!(
                         appointments_journalled(&a.state, &name),
                         (0, 1),
@@ -811,7 +961,11 @@ fn an_n_that_appoints_is_announced_once_by_the_ticker_and_leaves_no_footer_note(
             }
         }
     }
-    assert_eq!(checked, (LAYOUTS.len() * ROSTER_NAMES.len() * 4) as u32, "fixture: every case was checked");
+    assert_eq!(
+        checked,
+        (LAYOUTS.len() * ROSTER_NAMES.len() * 4) as u32,
+        "fixture: every case was checked"
+    );
 }
 
 /// A press of `n` on the Elder's own row — every kitten's in turn as the
@@ -832,16 +986,26 @@ fn n_on_the_elders_own_row_adds_nothing_to_the_screen() {
         for (ix, row_key) in &kittens {
             let ix = *ix;
             for refusal_standing in [false, true] {
-                let whr = format!(
+                let whr =
+                    format!(
                     "in {layout_name}, with `n` pressed on the Elder's own row, kitten {ix}'s{}",
                     if refusal_standing { ", a refusal's note on the footer line" } else { "" }
                 );
                 let mut state = base.clone();
                 state.elder = Some(ix);
-                let (mut a, mut term) = session_on(&state, row_key, (w, h, swap), &format!("appoint-own-{w}-{swap}-{ix}-{refusal_standing}"));
+                let (mut a, mut term) = session_on(
+                    &state,
+                    row_key,
+                    (w, h, swap),
+                    &format!("appoint-own-{w}-{swap}-{ix}-{refusal_standing}"),
+                );
                 if refusal_standing {
-                    a.step(&mut term, elapsed(0.0), &[key(KeyCode::Enter)]).expect("a step with Enter does not fail");
-                    assert!(a.view.footer.is_some(), "fixture: {whr}, the row's Enter was refused with a note");
+                    a.step(&mut term, elapsed(0.0), &[key(KeyCode::Enter)])
+                        .expect("a step with Enter does not fail");
+                    assert!(
+                        a.view.footer.is_some(),
+                        "fixture: {whr}, the row's Enter was refused with a note"
+                    );
                 }
                 // The frame before the press, drawn with nothing pressed.
                 a.view.last_repeat = None;
@@ -854,16 +1018,25 @@ fn n_on_the_elders_own_row_adds_nothing_to_the_screen() {
                     if press > 1 {
                         std::thread::sleep(Duration::from_millis(120));
                     }
-                    a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))]).expect("a step with `n` does not fail");
-                    assert_eq!(a.state.elder, Some(ix), "{whr}, press {press} moved the Elder");
-                    assert_eq!(a.state.journal, journal_before, "{whr}, press {press} wrote to the Journal");
+                    a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))])
+                        .expect("a step with `n` does not fail");
+                    assert_eq!(
+                        a.state.elder,
+                        Some(ix),
+                        "{whr}, press {press} moved the Elder"
+                    );
+                    assert_eq!(
+                        a.state.journal, journal_before,
+                        "{whr}, press {press} wrote to the Journal"
+                    );
                     assert_eq!(
                         a.view.footer, footer_before,
                         "{whr}, press {press} changed the footer line's note; a press that changes \
                          nothing adds nothing to the screen (TUI-NAV-107)"
                     );
                     let screen_after = screen_rows(&term);
-                    for (y, (before, after)) in screen_before.iter().zip(&screen_after).enumerate() {
+                    for (y, (before, after)) in screen_before.iter().zip(&screen_after).enumerate()
+                    {
                         assert_eq!(
                             after, before,
                             "{whr}, press {press} changed screen row {y}; a press on the Elder's own \
@@ -875,7 +1048,11 @@ fn n_on_the_elders_own_row_adds_nothing_to_the_screen() {
             }
         }
     }
-    assert_eq!(checked, (LAYOUTS.len() * ROSTER_NAMES.len() * 2) as u32, "fixture: every case was checked");
+    assert_eq!(
+        checked,
+        (LAYOUTS.len() * ROSTER_NAMES.len() * 2) as u32,
+        "fixture: every case was checked"
+    );
 }
 
 /// A held `n` appoints at most once, on its first press, and an `n`
@@ -900,9 +1077,17 @@ fn a_held_or_alternated_n_leaves_no_note_and_never_grows_the_permanent_journal()
     // Held on one row: each press let through by the repeat gate.
     for press in 1..=5usize {
         std::thread::sleep(Duration::from_millis(120));
-        a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))]).expect("a step with `n` does not fail");
-        assert_eq!(a.state.elder, Some(first), "fixture: press {press} left kitten {first} the Elder");
-        assert_eq!(a.view.footer, None, "held press {press} of `n` left a footer note (TUI-NAV-107)");
+        a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))])
+            .expect("a step with `n` does not fail");
+        assert_eq!(
+            a.state.elder,
+            Some(first),
+            "fixture: press {press} left kitten {first} the Elder"
+        );
+        assert_eq!(
+            a.view.footer, None,
+            "held press {press} of `n` left a footer note (TUI-NAV-107)"
+        );
         assert_eq!(
             appointments_journalled(&a.state, &name_of(first)),
             (0, 1),
@@ -912,25 +1097,50 @@ fn a_held_or_alternated_n_leaves_no_note_and_never_grows_the_permanent_journal()
 
     // Alternated between two rows: every press appoints.
     for press in 1..=10usize {
-        let (target, row_key) = if press % 2 == 1 { (second, &second_key) } else { (first, &first_key) };
+        let (target, row_key) = if press % 2 == 1 {
+            (second, &second_key)
+        } else {
+            (first, &first_key)
+        };
         a.view.focus[Section::Clowder.index()] = Some(row_key.clone());
         std::thread::sleep(Duration::from_millis(120));
-        a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))]).expect("a step with `n` does not fail");
-        assert_eq!(a.state.elder, Some(target), "fixture: alternating press {press} appointed kitten {target}");
-        assert_eq!(a.view.footer, None, "alternating press {press} of `n` left a footer note (TUI-NAV-107)");
-        assert_eq!(a.state.journal.kept, kept, "alternating press {press} grew the Journal's permanent entries");
+        a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))])
+            .expect("a step with `n` does not fail");
+        assert_eq!(
+            a.state.elder,
+            Some(target),
+            "fixture: alternating press {press} appointed kitten {target}"
+        );
+        assert_eq!(
+            a.view.footer, None,
+            "alternating press {press} of `n` left a footer note (TUI-NAV-107)"
+        );
+        assert_eq!(
+            a.state.journal.kept, kept,
+            "alternating press {press} grew the Journal's permanent entries"
+        );
     }
     let (kept_first, rolling_first) = appointments_journalled(&a.state, &name_of(first));
     let (kept_second, rolling_second) = appointments_journalled(&a.state, &name_of(second));
-    assert_eq!((kept_first, kept_second), (0, 0), "an appointment was kept permanently");
-    assert_eq!(rolling_first + rolling_second, 11, "the rolling window does not hold one entry per appointment made");
+    assert_eq!(
+        (kept_first, kept_second),
+        (0, 0),
+        "an appointment was kept permanently"
+    );
+    assert_eq!(
+        rolling_first + rolling_second,
+        11,
+        "the rolling window does not hold one entry per appointment made"
+    );
 }
 
 /// Every section's surfaces open, everything affordable, a long roster with
 /// kittens at work and at rest: a meadow where the core accepts a command
 /// from rows of every section.
 fn everything_open() -> GameState {
-    use clowder_core::{ArchId, ColonyId, ContentId, CraftId, IdeaId, JobId, ResourceId, RiteId, StructureId};
+    use clowder_core::{
+        ArchId, ColonyId, ContentId, CraftId, IdeaId, JobId, ResourceId, RiteId, StructureId,
+    };
 
     let mut s = GameState::new(7);
     for r in ResourceId::ALL {
@@ -964,7 +1174,9 @@ fn everything_open() -> GameState {
     s.peak_devotion = 1.0e12;
     s.devotion = 1.0e6;
     s.serenity = 1.0e12;
-    s.rites = [RiteId::TheReverie, RiteId::Enlightenment].into_iter().collect();
+    s.rites = [RiteId::TheReverie, RiteId::Enlightenment]
+        .into_iter()
+        .collect();
     s.arches_bought = [ArchId::EverdreamArch].into_iter().collect();
     s.discovered = ColonyId::ALL.iter().copied().collect();
     s.whale_visit_years = 5;
@@ -994,9 +1206,19 @@ fn n_on_every_kittens_row_of_a_full_meadow_leaves_no_footer_note() {
         if base.elder == Some(ix) {
             own_row = true;
         }
-        let (mut a, mut term) = session_on(&base, row_key, (100, 30, false), &format!("appoint-full-{ix}"));
-        a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))]).expect("a step with `n` does not fail");
-        assert_eq!(a.state.elder, Some(ix), "fixture: the core accepted the appointment of kitten {ix}");
+        let (mut a, mut term) = session_on(
+            &base,
+            row_key,
+            (100, 30, false),
+            &format!("appoint-full-{ix}"),
+        );
+        a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))])
+            .expect("a step with `n` does not fail");
+        assert_eq!(
+            a.state.elder,
+            Some(ix),
+            "fixture: the core accepted the appointment of kitten {ix}"
+        );
         assert_eq!(
             a.view.footer, None,
             "`n` on kitten {ix}'s row was accepted and left a footer note; an accepted press leaves \
@@ -1039,7 +1261,8 @@ fn opened_lively(name: &str) -> App {
 fn drawn_lively(name: &str) -> (App, Terminal<TestBackend>) {
     let mut a = opened_lively(name);
     let mut term = Terminal::new(TestBackend::new(DRAWN.0, DRAWN.1)).unwrap();
-    a.step(&mut term, still(), &[]).expect("the first frame draws");
+    a.step(&mut term, still(), &[])
+        .expect("the first frame draws");
     (a, term)
 }
 
@@ -1048,8 +1271,15 @@ fn drawn_lively(name: &str) -> (App, Terminal<TestBackend>) {
 fn record_of(a: &App) -> PointerRecord {
     let mut term = Terminal::new(TestBackend::new(DRAWN.0, DRAWN.1)).unwrap();
     let mut out = None;
-    term.draw(|f| out = Some(clowder_tui::render::frame_recorded(f, &a.state, &a.view, a.prev_layout.as_ref())))
-        .unwrap();
+    term.draw(|f| {
+        out = Some(clowder_tui::render::frame_recorded(
+            f,
+            &a.state,
+            &a.view,
+            a.prev_layout.as_ref(),
+        ))
+    })
+    .unwrap();
     out.unwrap().1
 }
 
@@ -1079,11 +1309,21 @@ fn selectable(a: &App) -> Vec<RowKey> {
 }
 
 fn pointer(kind: MouseEventKind, x: u16, y: u16, modifiers: KeyModifiers) -> Event {
-    Event::Mouse(MouseEvent { kind, column: x, row: y, modifiers })
+    Event::Mouse(MouseEvent {
+        kind,
+        column: x,
+        row: y,
+        modifiers,
+    })
 }
 
 fn click_at(x: u16, y: u16) -> Event {
-    pointer(MouseEventKind::Down(MouseButton::Left), x, y, KeyModifiers::NONE)
+    pointer(
+        MouseEventKind::Down(MouseButton::Left),
+        x,
+        y,
+        KeyModifiers::NONE,
+    )
 }
 
 fn wheel_down_at(x: u16, y: u16) -> Event {
@@ -1102,7 +1342,10 @@ fn wheel_up_at(x: u16, y: u16) -> Event {
 fn a_click_is_resolved_against_the_frame_last_drawn_though_keys_before_it_moved_the_list() {
     let (mut a, mut term) = drawn_lively("pointer-last-frame");
     let lines = row_lines(&record_of(&a));
-    assert!(lines.len() > 6, "fixture: the list fills the screen with rows");
+    assert!(
+        lines.len() > 6,
+        "fixture: the list fills the screen with rows"
+    );
     let (y, x, target) = lines[3].clone();
 
     let downs: Vec<Event> = (0..60).map(|_| key(KeyCode::Down)).collect();
@@ -1138,7 +1381,8 @@ fn pointer_events_and_keys_are_handed_on_in_the_order_they_arrived() {
 
     // A click, then ↓: one past the clicked row.
     let (mut a, mut term) = drawn_lively("pointer-order-click-key");
-    a.step(&mut term, still(), &[click_at(x, y), key(KeyCode::Down)]).unwrap();
+    a.step(&mut term, still(), &[click_at(x, y), key(KeyCode::Down)])
+        .unwrap();
     let mut by_hand = a.view.clone();
     by_hand.focus[Section::Meadow.index()] = Some(target.clone());
     navigation::update(Action::CursorDown, &mut by_hand, &a.state);
@@ -1147,14 +1391,22 @@ fn pointer_events_and_keys_are_handed_on_in_the_order_they_arrived() {
         by_hand.focus[Section::Meadow.index()].clone(),
         "a key after a click should act where the click left the cursor"
     );
-    assert_ne!(cursor(&a), Some(target.clone()), "fixture: ↓ moves on from the clicked row");
+    assert_ne!(
+        cursor(&a),
+        Some(target.clone()),
+        "fixture: ↓ moves on from the clicked row"
+    );
 
     // ↓ ×8, then a click: the clicked row.
     let (mut a, mut term) = drawn_lively("pointer-order-key-click");
     let mut events: Vec<Event> = (0..8).map(|_| key(KeyCode::Down)).collect();
     events.push(click_at(x, y));
     a.step(&mut term, still(), &events).unwrap();
-    assert_eq!(cursor(&a), Some(target.clone()), "a click after keys should land where it was aimed");
+    assert_eq!(
+        cursor(&a),
+        Some(target.clone()),
+        "a click after keys should land where it was aimed"
+    );
 
     // Three steps down, then ↑: the third row.
     let (mut a, mut term) = drawn_lively("pointer-order-wheel-key");
@@ -1162,14 +1414,22 @@ fn pointer_events_and_keys_are_handed_on_in_the_order_they_arrived() {
     let mut events: Vec<Event> = (0..3).map(|_| wheel_down_at(wx, wy)).collect();
     events.push(key(KeyCode::Up));
     a.step(&mut term, still(), &events).unwrap();
-    assert_eq!(cursor(&a), Some(order[2].clone()), "↑ after three steps down should leave the cursor on the third row");
+    assert_eq!(
+        cursor(&a),
+        Some(order[2].clone()),
+        "↑ after three steps down should leave the cursor on the third row"
+    );
 
     // ↑, then three steps down: the fourth row.
     let (mut a, mut term) = drawn_lively("pointer-order-key-wheel");
     let mut events = vec![key(KeyCode::Up)];
     events.extend((0..3).map(|_| wheel_down_at(wx, wy)));
     a.step(&mut term, still(), &events).unwrap();
-    assert_eq!(cursor(&a), Some(order[3].clone()), "three steps down after ↑ at the top should reach the fourth row");
+    assert_eq!(
+        cursor(&a),
+        Some(order[3].clone()),
+        "three steps down after ↑ at the top should reach the fourth row"
+    );
 }
 
 /// A pointer event is judged at the terminal's size as of it among its
@@ -1188,17 +1448,42 @@ fn a_pointer_event_is_judged_at_the_terminal_size_as_of_it_among_its_frames_even
     let same = Event::Resize(DRAWN.0, DRAWN.1);
 
     let cases: [(&str, Vec<Event>, bool); 5] = [
-        ("a click after a resize to another size", vec![other.clone(), click_at(x, y)], false),
-        ("a click after a resize to another size and back", vec![other.clone(), same.clone(), click_at(x, y)], true),
-        ("a click after a resize reporting the size drawn at", vec![same.clone(), click_at(x, y)], true),
-        ("a click before a resize to another size", vec![click_at(x, y), other.clone()], true),
+        (
+            "a click after a resize to another size",
+            vec![other.clone(), click_at(x, y)],
+            false,
+        ),
+        (
+            "a click after a resize to another size and back",
+            vec![other.clone(), same.clone(), click_at(x, y)],
+            true,
+        ),
+        (
+            "a click after a resize reporting the size drawn at",
+            vec![same.clone(), click_at(x, y)],
+            true,
+        ),
+        (
+            "a click before a resize to another size",
+            vec![click_at(x, y), other.clone()],
+            true,
+        ),
         ("a click with no resize", vec![click_at(x, y)], true),
     ];
     for (what, events, lands) in cases {
         let (mut a, mut term) = drawn_lively("pointer-size");
         a.step(&mut term, still(), &events).unwrap();
-        let want = if lands { Some(target.clone()) } else { opening.clone() };
-        assert_eq!(cursor(&a), want, "{what}: the click should {}", if lands { "land" } else { "do nothing" });
+        let want = if lands {
+            Some(target.clone())
+        } else {
+            opening.clone()
+        };
+        assert_eq!(
+            cursor(&a),
+            want,
+            "{what}: the click should {}",
+            if lands { "land" } else { "do nothing" }
+        );
     }
 }
 
@@ -1211,7 +1496,10 @@ fn a_pointer_event_before_the_first_frame_of_play_does_nothing_and_is_not_held()
     let mut a = opened_lively("pointer-before-first");
     let mut b = opened_lively("pointer-before-first-twin");
     let lines = row_lines(&record_of(&a));
-    assert!(lines.len() > 6, "fixture: the first frame will fill the screen with rows");
+    assert!(
+        lines.len() > 6,
+        "fixture: the first frame will fill the screen with rows"
+    );
     let mut events = Vec::new();
     for (y, x, _) in &lines[1..] {
         events.push(click_at(*x, *y));
@@ -1225,13 +1513,25 @@ fn a_pointer_event_before_the_first_frame_of_play_does_nothing_and_is_not_held()
     let mut tb = Terminal::new(TestBackend::new(DRAWN.0, DRAWN.1)).unwrap();
     a.step(&mut ta, still(), &events).unwrap();
     b.step(&mut tb, still(), &[]).unwrap();
-    assert_eq!(format!("{:?}", a.view), format!("{:?}", b.view), "a pointer event before the first frame did something");
+    assert_eq!(
+        format!("{:?}", a.view),
+        format!("{:?}", b.view),
+        "a pointer event before the first frame did something"
+    );
     for _ in 0..2 {
         a.step(&mut ta, still(), &[]).unwrap();
         b.step(&mut tb, still(), &[]).unwrap();
     }
-    assert_eq!(format!("{:?}", a.view), format!("{:?}", b.view), "a pointer event before the first frame was held for a later one");
-    assert_eq!(ta.backend().buffer(), tb.backend().buffer(), "and the screens drawn after it differ");
+    assert_eq!(
+        format!("{:?}", a.view),
+        format!("{:?}", b.view),
+        "a pointer event before the first frame was held for a later one"
+    );
+    assert_eq!(
+        ta.backend().buffer(),
+        tb.backend().buffer(),
+        "and the screens drawn after it differ"
+    );
 }
 
 /// No pointer event applies a core command: every kind of mouse event, with
@@ -1244,7 +1544,11 @@ fn no_pointer_event_applies_a_core_command() {
     let before = clowder_core::save_string(&a.state, 0);
     let mut kinds = Vec::new();
     for b in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
-        kinds.extend([MouseEventKind::Down(b), MouseEventKind::Up(b), MouseEventKind::Drag(b)]);
+        kinds.extend([
+            MouseEventKind::Down(b),
+            MouseEventKind::Up(b),
+            MouseEventKind::Drag(b),
+        ]);
     }
     kinds.extend([
         MouseEventKind::Moved,
@@ -1284,7 +1588,10 @@ fn no_pointer_event_applies_a_core_command() {
         );
         assert!(!a.quitting, "a pointer event ended the session");
     }
-    assert!(moved, "fixture: the pointer events reached navigation and moved the cursor");
+    assert!(
+        moved,
+        "fixture: the pointer events reached navigation and moved the cursor"
+    );
 }
 
 /// Every wheel step a frame takes is handed on, past the bound on keys: forty
@@ -1297,16 +1604,29 @@ fn every_wheel_step_a_frame_takes_is_handed_to_navigation() {
     let (probe, _) = drawn_lively("pointer-every-step-probe");
     let (y, x, _) = row_lines(&record_of(&probe))[0].clone();
     let order = selectable(&probe);
-    assert!(order.len() > 91, "fixture: the list is longer than ninety rows");
+    assert!(
+        order.len() > 91,
+        "fixture: the list is longer than ninety rows"
+    );
 
     let (mut a, mut term) = drawn_lively("pointer-every-step-pairs");
-    let mut events: Vec<Event> = (0..40).flat_map(|_| [wheel_down_at(x, y), wheel_up_at(x, y)]).collect();
+    let mut events: Vec<Event> = (0..40)
+        .flat_map(|_| [wheel_down_at(x, y), wheel_up_at(x, y)])
+        .collect();
     events.push(wheel_down_at(x, y));
     a.step(&mut term, still(), &events).unwrap();
-    assert_eq!(cursor(&a), Some(order[1].clone()), "81 wheel steps netting one down should leave the cursor one row down");
+    assert_eq!(
+        cursor(&a),
+        Some(order[1].clone()),
+        "81 wheel steps netting one down should leave the cursor one row down"
+    );
 
     let (mut a, mut term) = drawn_lively("pointer-every-step-ninety");
     let events: Vec<Event> = (0..90).map(|_| wheel_down_at(x, y)).collect();
     a.step(&mut term, still(), &events).unwrap();
-    assert_eq!(cursor(&a), Some(order[90].clone()), "90 wheel steps down should leave the cursor 90 rows down");
+    assert_eq!(
+        cursor(&a),
+        Some(order[90].clone()),
+        "90 wheel steps down should leave the cursor 90 rows down"
+    );
 }

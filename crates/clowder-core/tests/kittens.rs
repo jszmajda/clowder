@@ -10,7 +10,11 @@ fn the_roster_only_ever_grows() {
     adopt(&mut s, 3);
     give(&mut s, ResourceId::Catnip, 0.0);
     run_days(&mut s, 30); // deep famine
-    assert_eq!(s.kittens.len(), 3, "hard times relocate kittens, never delete them");
+    assert_eq!(
+        s.kittens.len(),
+        3,
+        "hard times relocate kittens, never delete them"
+    );
     give(&mut s, ResourceId::Catnip, 0.0);
     run_days(&mut s, 300); // absurdly deep famine
     assert_eq!(s.kittens.len(), 3);
@@ -25,10 +29,18 @@ fn names_are_unique_pool_first_then_numbered() {
     let unique: std::collections::BTreeSet<&&str> = names.iter().collect();
     assert_eq!(unique.len(), 45, "all names unique");
     for k in &s.kittens[..40] {
-        assert!(content::NAME_POOL.contains(&k.name.as_str()), "first cycle from pool: {}", k.name);
+        assert!(
+            content::NAME_POOL.contains(&k.name.as_str()),
+            "first cycle from pool: {}",
+            k.name
+        );
     }
     for k in &s.kittens[40..] {
-        assert!(k.name.ends_with(" II"), "second cycle is numbered: {}", k.name);
+        assert!(
+            k.name.ends_with(" II"),
+            "second cycle is numbered: {}",
+            k.name
+        );
         let base = k.name.trim_end_matches(" II");
         assert!(content::NAME_POOL.contains(&base));
     }
@@ -72,7 +84,10 @@ fn arrival_chance_scales_with_stock_and_caps() {
     give(&mut s, ResourceId::Catnip, 2000.0);
     assert!((s.arrival_chance() - 0.60).abs() < 1e-9, "capped at 60%");
     s.ideas.insert(IdeaId::NeighborhoodWatch);
-    assert!((s.arrival_chance() - 0.75).abs() < 1e-9, "watch bonus lands on top of the cap");
+    assert!(
+        (s.arrival_chance() - 0.75).abs() < 1e-9,
+        "watch bonus lands on top of the cap"
+    );
 }
 
 // @spec SIM-KIT-005
@@ -138,7 +153,10 @@ fn assignment_picks_the_keenest_newcomer_and_names_it() {
     adopt(&mut s, 2);
     let newest = s.kittens[1].name.clone();
     let events = s.apply(Command::AssignJob(JobId::Gardener)).unwrap();
-    assert!(events.contains(&Event::JobAssigned { name: newest.clone(), job: JobId::Gardener }));
+    assert!(events.contains(&Event::JobAssigned {
+        name: newest.clone(),
+        job: JobId::Gardener
+    }));
     assert_eq!(s.kittens[1].job, Some(JobId::Gardener));
     assert!(s.kittens[1].job_seq.is_some());
     assert_eq!(s.kittens[0].job, None);
@@ -159,7 +177,10 @@ fn unassignment_is_lifo_among_home_kittens() {
     s.apply(Command::AssignJob(JobId::Gardener)).unwrap(); // then the elder
     let last_assigned = s.kittens[0].name.clone(); // elder assigned second
     let events = s.apply(Command::UnassignJob(JobId::Gardener)).unwrap();
-    assert!(events.contains(&Event::JobUnassigned { name: last_assigned, job: JobId::Gardener }));
+    assert!(events.contains(&Event::JobUnassigned {
+        name: last_assigned,
+        job: JobId::Gardener
+    }));
     assert_eq!(s.kittens[0].job, None);
     assert_eq!(s.kittens[1].job, Some(JobId::Gardener));
 
@@ -182,7 +203,11 @@ fn effective_workers_counts_only_home_kittens() {
     assert_eq!(s.effective_workers(JobId::Gardener), 2);
     s.kittens[1].location = Location::NeighborsYard;
     s.kittens[1].away_seq = Some(1);
-    assert_eq!(s.effective_workers(JobId::Gardener), 1, "absent workers keep the title, not the shift");
+    assert_eq!(
+        s.effective_workers(JobId::Gardener),
+        1,
+        "absent workers keep the title, not the shift"
+    );
 }
 
 // @spec SIM-KIT-011
@@ -270,7 +295,11 @@ fn day_clocks_are_mutually_exclusive_and_read_the_shortfall_flag() {
     assert_eq!((s.famine_days, s.recovery_days), (2, 0));
     give(&mut s, ResourceId::Catnip, 100.0);
     run_days(&mut s, 1);
-    assert_eq!((s.famine_days, s.recovery_days), (0, 1), "a fed day resets famine");
+    assert_eq!(
+        (s.famine_days, s.recovery_days),
+        (0, 1),
+        "a fed day resets famine"
+    );
 
     // The clocks read the persisted shortfall flag, not a fresh stock reading:
     // a state that closes its day grumpy with a full pantry still counts famine.
@@ -286,7 +315,10 @@ fn day_clocks_are_mutually_exclusive_and_read_the_shortfall_flag() {
         (1, 0),
         "day close consumed the flag, not the stock"
     );
-    assert!(odd.stock(ResourceId::Catnip) < saved_stock, "the pantry was open the whole time");
+    assert!(
+        odd.stock(ResourceId::Catnip) < saved_stock,
+        "the pantry was open the whole time"
+    );
 }
 
 // @spec SIM-KIT-016
@@ -301,19 +333,27 @@ fn famine_wanders_newest_first_but_never_the_last_kitten() {
     );
     give(&mut s, ResourceId::Catnip, 0.0);
     let events = run_days(&mut s, 2);
-    assert!(!events.iter().any(|e| matches!(e, Event::KittenWanderedOff { .. })));
+    assert!(!events
+        .iter()
+        .any(|e| matches!(e, Event::KittenWanderedOff { .. })));
 
     let events = run_days(&mut s, 1); // famine day 3
-    assert!(events.contains(&Event::KittenWanderedOff { name: newest.clone() }));
+    assert!(events.contains(&Event::KittenWanderedOff {
+        name: newest.clone()
+    }));
     assert_eq!(s.kittens[2].location, Location::NeighborsYard);
     assert!(s.kittens[2].away_seq.is_some());
 
     let events = run_days(&mut s, 1); // famine day 4
-    assert!(events.contains(&Event::KittenWanderedOff { name: middle.clone() }));
+    assert!(events.contains(&Event::KittenWanderedOff {
+        name: middle.clone()
+    }));
 
     let events = run_days(&mut s, 10); // deep famine
     assert!(
-        !events.iter().any(|e| matches!(e, Event::KittenWanderedOff { .. })),
+        !events
+            .iter()
+            .any(|e| matches!(e, Event::KittenWanderedOff { .. })),
         "the last Home kitten never wanders"
     );
     assert_eq!(s.kittens[0].location, Location::Home);
@@ -328,16 +368,29 @@ fn returns_are_first_out_first_back_and_need_food_in_the_bowl() {
     let (middle, newest) = (s.kittens[1].name.clone(), s.kittens[2].name.clone());
     give(&mut s, ResourceId::Catnip, 0.0);
     run_days(&mut s, 4);
-    assert_eq!(s.kittens.iter().filter(|k| k.location == Location::NeighborsYard).count(), 2);
+    assert_eq!(
+        s.kittens
+            .iter()
+            .filter(|k| k.location == Location::NeighborsYard)
+            .count(),
+        2
+    );
 
     // Feed generously: first out (newest) comes back first, one per day.
     give(&mut s, ResourceId::Catnip, 150.0);
     let events = run_days(&mut s, 1);
-    assert!(events.contains(&Event::KittenReturned { name: newest.clone() }));
+    assert!(events.contains(&Event::KittenReturned {
+        name: newest.clone()
+    }));
     let events = run_days(&mut s, 1);
-    assert!(events.contains(&Event::KittenReturned { name: middle.clone() }));
+    assert!(events.contains(&Event::KittenReturned {
+        name: middle.clone()
+    }));
     assert!(s.kittens.iter().all(|k| k.location == Location::Home));
-    assert!(s.kittens.iter().all(|k| k.away_seq.is_none()), "stamps clear on return");
+    assert!(
+        s.kittens.iter().all(|k| k.away_seq.is_none()),
+        "stamps clear on return"
+    );
 
     // The food gate: a recovery day close with an empty bowl returns nobody.
     let mut gated = GameState::new(24);
@@ -351,7 +404,9 @@ fn returns_are_first_out_first_back_and_need_food_in_the_bowl() {
     // (false) flag from the pre-day tick, but the bowl is empty → no return.
     let events = run_ticks(&mut gated, 10);
     assert!(
-        !events.iter().any(|e| matches!(e, Event::KittenReturned { .. })),
+        !events
+            .iter()
+            .any(|e| matches!(e, Event::KittenReturned { .. })),
         "kittens come back when the pantry has actually refilled"
     );
     assert_eq!(gated.kittens[1].location, Location::NeighborsYard);

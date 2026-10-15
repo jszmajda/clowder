@@ -78,7 +78,10 @@ fn meadow() -> GameState {
     for r in ResourceId::ALL {
         s.resources[r.ix()] = 1.0e9;
     }
-    s.revealed = StructureId::ALL.iter().map(|b| clowder_core::ContentId::Structure(*b)).collect();
+    s.revealed = StructureId::ALL
+        .iter()
+        .map(|b| clowder_core::ContentId::Structure(*b))
+        .collect();
     s.ideas.insert(IdeaId::DeepNapTheory);
     s.resources[ResourceId::Starshards.ix()] = 1.0e12;
     s.ticks = 5_000;
@@ -90,7 +93,10 @@ const LOAD_ARRIVAL: &str = "Quenby";
 
 /// A report a load's catch-up would fold over three days away.
 fn load_report() -> OfflineReport {
-    let mut r = OfflineReport { elapsed_seconds: 3 * 86_400, ..OfflineReport::default() };
+    let mut r = OfflineReport {
+        elapsed_seconds: 3 * 86_400,
+        ..OfflineReport::default()
+    };
     r.resource_deltas[ResourceId::Feathers.ix()] = 4_800.0;
     r.arrived = vec![(LOAD_ARRIVAL.to_string(), 1)];
     r
@@ -121,18 +127,27 @@ fn app(state: GameState, view: ViewState, name: &str) -> App {
 /// The view a session opens in, already on the Meadow, with the load's report
 /// queued.
 fn opened(loaded: &LoadedGame) -> ViewState {
-    let mut view = ViewState { section: Some(Section::Meadow), ..ViewState::default() };
+    let mut view = ViewState {
+        section: Some(Section::Meadow),
+        ..ViewState::default()
+    };
     queue_load(&mut view, loaded);
     view
 }
 
 fn still() -> Reading {
-    Reading { monotonic: Duration::ZERO, wall: Duration::ZERO }
+    Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::ZERO,
+    }
 }
 
 fn elapsed(secs: f64) -> Reading {
     let d = Duration::from_secs_f64(secs);
-    Reading { monotonic: d, wall: d }
+    Reading {
+        monotonic: d,
+        wall: d,
+    }
 }
 
 fn press(code: KeyCode) -> TermEvent {
@@ -140,7 +155,11 @@ fn press(code: KeyCode) -> TermEvent {
 }
 
 fn press_char(c: char) -> TermEvent {
-    let modifiers = if c.is_ascii_uppercase() { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
+    let modifiers = if c.is_ascii_uppercase() {
+        KeyModifiers::SHIFT
+    } else {
+        KeyModifiers::NONE
+    };
     TermEvent::Key(KeyEvent::new(KeyCode::Char(c), modifiers))
 }
 
@@ -150,13 +169,22 @@ fn term(w: u16, h: u16) -> Terminal<TestBackend> {
 
 /// Step once with these keys.
 fn keys(a: &mut App, t: &mut Terminal<TestBackend>, input: &[TermEvent]) {
-    a.step(t, still(), input).expect("a step against a TestBackend does not fail");
+    a.step(t, still(), input)
+        .expect("a step against a TestBackend does not fail");
 }
 
 fn nap_key(state: &GameState) -> RowKey {
     rows(state, Section::Dreams)
         .into_iter()
-        .find(|r| matches!(r.kind, RowKind::Act { command: Command::DeepNap(_), .. }))
+        .find(|r| {
+            matches!(
+                r.kind,
+                RowKind::Act {
+                    command: Command::DeepNap(_),
+                    ..
+                }
+            )
+        })
         .map(|r| r.key)
         .expect("fixture: the nap row is listed")
 }
@@ -181,7 +209,12 @@ fn nap(a: &mut App, t: &mut Terminal<TestBackend>, years: u32) {
 }
 
 fn away_entries(state: &GameState) -> usize {
-    state.journal.kept.iter().filter(|e| matches!(e.item, JournalItem::Away(_))).count()
+    state
+        .journal
+        .kept
+        .iter()
+        .filter(|e| matches!(e.item, JournalItem::Away(_)))
+        .count()
 }
 
 // ---------------------------------------------------------------------------
@@ -193,11 +226,13 @@ fn away_entries(state: &GameState) -> usize {
 fn banner_of(state: &GameState, view: &ViewState) -> Option<String> {
     let mut t = term(200, 40);
     let mut layout = None;
-    t.draw(|f| layout = Some(render::frame(f, state, view, None))).expect("TestBackend is infallible");
+    t.draw(|f| layout = Some(render::frame(f, state, view, None)))
+        .expect("TestBackend is infallible");
     let rect = layout.expect("the frame reports its layout").banner?;
     let buf = t.backend().buffer();
-    let line: String =
-        (rect.x..rect.right()).map(|x| buf.cell((x, rect.y)).map(|c| c.symbol()).unwrap_or(" ")).collect();
+    let line: String = (rect.x..rect.right())
+        .map(|x| buf.cell((x, rect.y)).map(|c| c.symbol()).unwrap_or(" "))
+        .collect();
     Some(line.trim_end().to_string())
 }
 
@@ -210,10 +245,15 @@ fn showing(a: &App) -> Option<String> {
 fn journal_lines(a: &App) -> Vec<String> {
     let rect = Rect::new(0, 0, 300, 200);
     let mut t = term(300, 200);
-    t.draw(|f| overlays::journal(f, rect, &a.state, &a.view)).expect("TestBackend is infallible");
+    t.draw(|f| overlays::journal(f, rect, &a.state, &a.view))
+        .expect("TestBackend is infallible");
     let buf = t.backend().buffer();
     (0..rect.height)
-        .map(|y| (0..rect.width).map(|x| buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" ")).collect::<String>())
+        .map(|y| {
+            (0..rect.width)
+                .map(|x| buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+                .collect::<String>()
+        })
         .map(|l| l.trim_end().to_string())
         .filter(|l| !l.trim().is_empty())
         .collect()
@@ -228,16 +268,31 @@ fn first_line_with(lines: &[String], needle: &str) -> Option<usize> {
 fn own_lines(report: &OfflineReport) -> Vec<String> {
     let mut s = GameState::new(11);
     s.journal.record_away(100, report);
-    let a = app(s, ViewState { overlay: Some(clowder_tui::nav::Overlay::Journal { anchor: 0 }), ..Default::default() }, "own");
-    journal_lines(&a).into_iter().map(|l| l.trim().to_string()).filter(|l| l.chars().count() >= 8).collect()
+    let a = app(
+        s,
+        ViewState {
+            overlay: Some(clowder_tui::nav::Overlay::Journal { anchor: 0 }),
+            ..Default::default()
+        },
+        "own",
+    );
+    journal_lines(&a)
+        .into_iter()
+        .map(|l| l.trim().to_string())
+        .filter(|l| l.chars().count() >= 8)
+        .collect()
 }
 
 fn first_line_of_entry(lines: &[String], own: &[String]) -> Option<usize> {
-    lines.iter().position(|l| own.iter().any(|o| l.contains(o.as_str())))
+    lines
+        .iter()
+        .position(|l| own.iter().any(|o| l.contains(o.as_str())))
 }
 
 fn arrived(name: &str) -> Event {
-    Event::KittenArrived { name: name.to_string() }
+    Event::KittenArrived {
+        name: name.to_string(),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -261,14 +316,23 @@ fn two_unread() -> TwoUnread {
     let mut t = term(160, 40);
     let before = away_entries(&a.state);
     nap(&mut a, &mut t, 1);
-    assert_eq!(away_entries(&a.state), before + 1, "fixture: the nap was accepted and retained");
+    assert_eq!(
+        away_entries(&a.state),
+        before + 1,
+        "fixture: the nap was accepted and retained"
+    );
     let nap_banner = showing(&a).expect("the accepted nap left no banner at all");
     assert_ne!(
         nap_banner, load_banner,
         "the load's banner is still the one showing after a nap was accepted; the nap's report, \
          the newest unread, shows first"
     );
-    TwoUnread { state: a.state, view: a.view, load_banner, nap_banner }
+    TwoUnread {
+        state: a.state,
+        view: a.view,
+        load_banner,
+        nap_banner,
+    }
 }
 
 /// A case's session: the two-unread state and view, focused where `focus`
@@ -286,12 +350,21 @@ fn case(two: &TwoUnread, focus: Option<RowKey>, name: &str) -> App {
 fn structure_row(state: &GameState) -> RowKey {
     meadow_rows(state)
         .into_iter()
-        .find(|k| matches!(k, RowKey::Content(clowder_core::ContentId::Structure(_), "")))
+        .find(|k| {
+            matches!(
+                k,
+                RowKey::Content(clowder_core::ContentId::Structure(_), "")
+            )
+        })
         .expect("fixture: a structure row is listed on the Meadow")
 }
 
 fn meadow_rows(state: &GameState) -> Vec<RowKey> {
-    rows(state, Section::Meadow).into_iter().filter(|r| r.selectable()).map(|r| r.key).collect()
+    rows(state, Section::Meadow)
+        .into_iter()
+        .filter(|r| r.selectable())
+        .map(|r| r.key)
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +379,11 @@ fn meadow_rows(state: &GameState) -> Vec<RowKey> {
 fn a_loads_report_gets_a_banner_exactly_where_the_core_kept_it() {
     let saved_at = 1_000_000;
     let text = save_string(&GameState::new(7), saved_at);
-    for gap in [MIN_REPORTABLE_ABSENCE_SECONDS - 1, MIN_REPORTABLE_ABSENCE_SECONDS, 10 * MIN_REPORTABLE_ABSENCE_SECONDS] {
+    for gap in [
+        MIN_REPORTABLE_ABSENCE_SECONDS - 1,
+        MIN_REPORTABLE_ABSENCE_SECONDS,
+        10 * MIN_REPORTABLE_ABSENCE_SECONDS,
+    ] {
         let l = load_string(&text, saved_at + gap).expect("fixture: the save loads");
         let kept = away_entries(&l.state) > 0;
         let mut view = ViewState::default();
@@ -330,7 +407,10 @@ fn a_loads_report_gets_a_banner_exactly_where_the_core_kept_it() {
 fn whether_a_loads_report_gets_a_banner_is_judged_from_the_journal() {
     // Long enough by any span rule, but the journal did not keep it.
     let report = load_report();
-    let unkept = LoadedGame { state: meadow(), report: report.clone() };
+    let unkept = LoadedGame {
+        state: meadow(),
+        report: report.clone(),
+    };
     let mut view = ViewState::default();
     queue_load(&mut view, &unkept);
     assert_eq!(
@@ -344,8 +424,14 @@ fn whether_a_loads_report_gets_a_banner_is_judged_from_the_journal() {
     let mut short = load_report();
     short.elapsed_seconds = MIN_REPORTABLE_ABSENCE_SECONDS / 2;
     let mut state = meadow();
-    state.journal.kept.push(clowder_core::JournalEntry { tick: state.ticks, item: JournalItem::Away(short.clone()) });
-    let kept = LoadedGame { state, report: short };
+    state.journal.kept.push(clowder_core::JournalEntry {
+        tick: state.ticks,
+        item: JournalItem::Away(short.clone()),
+    });
+    let kept = LoadedGame {
+        state,
+        report: short,
+    };
     let mut view = ViewState::default();
     queue_load(&mut view, &kept);
     assert!(
@@ -359,7 +445,10 @@ fn whether_a_loads_report_gets_a_banner_is_judged_from_the_journal() {
     state.journal.record_away(100, &load_report());
     let mut quick = load_report();
     quick.elapsed_seconds = 1;
-    let old_only = LoadedGame { state, report: quick };
+    let old_only = LoadedGame {
+        state,
+        report: quick,
+    };
     let mut view = ViewState::default();
     queue_load(&mut view, &old_only);
     assert_eq!(
@@ -375,14 +464,29 @@ fn whether_a_loads_report_gets_a_banner_is_judged_from_the_journal() {
 /// @spec TUI-NAV-027
 #[test]
 fn every_accepted_retaining_command_queues_a_banner_and_a_refused_one_does_not() {
-    let mut a = app(meadow(), ViewState { section: Some(Section::Meadow), ..Default::default() }, "naps");
+    let mut a = app(
+        meadow(),
+        ViewState {
+            section: Some(Section::Meadow),
+            ..Default::default()
+        },
+        "naps",
+    );
     let mut t = term(160, 40);
-    assert_eq!(showing(&a), None, "fixture: nothing is queued before the first nap");
+    assert_eq!(
+        showing(&a),
+        None,
+        "fixture: nothing is queued before the first nap"
+    );
 
     for years in [1, 2, 5] {
         let before = away_entries(&a.state);
         nap(&mut a, &mut t, years);
-        assert_eq!(away_entries(&a.state), before + 1, "fixture: a {years}-year nap was accepted");
+        assert_eq!(
+            away_entries(&a.state),
+            before + 1,
+            "fixture: a {years}-year nap was accepted"
+        );
         assert!(
             showing(&a).is_some(),
             "an accepted {years}-year nap brought up no banner; the core keeps every nap, so \
@@ -390,14 +494,26 @@ fn every_accepted_retaining_command_queues_a_banner_and_a_refused_one_does_not()
         );
         // Read it, so the next nap's banner is its own.
         keys(&mut a, &mut t, &[press(KeyCode::Esc)]);
-        assert_eq!(showing(&a), None, "the nap's banner did not retire on Esc from a bare screen");
+        assert_eq!(
+            showing(&a),
+            None,
+            "the nap's banner did not retire on Esc from a bare screen"
+        );
     }
 
     a.state.resources[ResourceId::Starshards.ix()] = 0.0;
     let before = away_entries(&a.state);
     nap(&mut a, &mut t, 1);
-    assert_eq!(away_entries(&a.state), before, "fixture: a nap with no starshards is refused");
-    assert_eq!(showing(&a), None, "a refused nap brought up a banner; it retained no report");
+    assert_eq!(
+        away_entries(&a.state),
+        before,
+        "fixture: a nap with no starshards is refused"
+    );
+    assert_eq!(
+        showing(&a),
+        None,
+        "a refused nap brought up a banner; it retained no report"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -410,7 +526,14 @@ fn every_accepted_retaining_command_queues_a_banner_and_a_refused_one_does_not()
 #[test]
 fn a_command_retained_reports_banner_states_its_length_in_years() {
     for years in [3u32, 7] {
-        let mut a = app(meadow(), ViewState { section: Some(Section::Meadow), ..Default::default() }, "years");
+        let mut a = app(
+            meadow(),
+            ViewState {
+                section: Some(Section::Meadow),
+                ..Default::default()
+            },
+            "years",
+        );
         let mut t = term(160, 40);
         nap(&mut a, &mut t, years);
         let line = showing(&a).expect("an accepted nap brought up no banner");
@@ -444,7 +567,11 @@ fn reports_queue_newest_first_and_show_one_at_a_time() {
     let mut a = case(&two, None, "queue");
     let mut t = term(160, 40);
 
-    assert_eq!(showing(&a).as_deref(), Some(two.nap_banner.as_str()), "the newest unread report is not the one showing");
+    assert_eq!(
+        showing(&a).as_deref(),
+        Some(two.nap_banner.as_str()),
+        "the newest unread report is not the one showing"
+    );
     keys(&mut a, &mut t, &[press(KeyCode::Esc)]);
     assert_eq!(
         showing(&a).as_deref(),
@@ -453,8 +580,20 @@ fn reports_queue_newest_first_and_show_one_at_a_time() {
          displaced unseen"
     );
     keys(&mut a, &mut t, &[press(KeyCode::Esc)]);
-    assert_eq!(showing(&a), None, "a banner is still up after every report was read");
-    keys(&mut a, &mut t, &[press(KeyCode::Esc), press(KeyCode::Down), press(KeyCode::Tab)]);
+    assert_eq!(
+        showing(&a),
+        None,
+        "a banner is still up after every report was read"
+    );
+    keys(
+        &mut a,
+        &mut t,
+        &[
+            press(KeyCode::Esc),
+            press(KeyCode::Down),
+            press(KeyCode::Tab),
+        ],
+    );
     assert_eq!(showing(&a), None, "a read report came back to the queue");
 }
 
@@ -483,10 +622,17 @@ fn opening_the_journal_reads_every_unread_report_at_once() {
 #[test]
 fn a_report_unread_when_the_session_ends_is_not_queued_again() {
     let saved_at = 1_000_000;
-    let first = load_string(&save_string(&GameState::new(7), saved_at), saved_at + 20 * 60).expect("loads");
+    let first = load_string(
+        &save_string(&GameState::new(7), saved_at),
+        saved_at + 20 * 60,
+    )
+    .expect("loads");
     let mut view = ViewState::default();
     queue_load(&mut view, &first);
-    assert!(banner_of(&first.state, &view).is_some(), "fixture: the first load's report is queued");
+    assert!(
+        banner_of(&first.state, &view).is_some(),
+        "fixture: the first load's report is queued"
+    );
 
     // The session ends with it unread.
     let resaved_at = saved_at + 20 * 60;
@@ -502,11 +648,17 @@ fn a_report_unread_when_the_session_ends_is_not_queued_again() {
     );
 
     let long = load_string(&text, resaved_at + 40 * 60).expect("loads");
-    let mut view = ViewState { section: Some(Section::Meadow), ..ViewState::default() };
+    let mut view = ViewState {
+        section: Some(Section::Meadow),
+        ..ViewState::default()
+    };
     queue_load(&mut view, &long);
     let mut a = app(long.state, view, "unread-later");
     let mut t = term(160, 40);
-    assert!(showing(&a).is_some(), "fixture: the later load's own report is queued");
+    assert!(
+        showing(&a).is_some(),
+        "fixture: the later load's own report is queued"
+    );
     keys(&mut a, &mut t, &[press(KeyCode::Esc)]);
     assert_eq!(
         showing(&a),
@@ -555,7 +707,14 @@ fn unread_reports_are_pinned_at_the_journals_top_newest_first() {
     let mut a = app(l.state.clone(), opened(&l), "pinned");
     let mut t = term(160, 40);
     nap(&mut a, &mut t, 1);
-    let nap_report = match &a.state.journal.kept.last().expect("the nap was retained").item {
+    let nap_report = match &a
+        .state
+        .journal
+        .kept
+        .last()
+        .expect("the nap was retained")
+        .item
+    {
         JournalItem::Away(r) => r.clone(),
         other => panic!("fixture: the last kept entry is the nap's report, not {other:?}"),
     };
@@ -563,12 +722,22 @@ fn unread_reports_are_pinned_at_the_journals_top_newest_first() {
 
     keys(&mut a, &mut t, &[press_char('e')]);
     let lines = journal_lines(&a);
-    let nap_at = first_line_of_entry(&lines, &own_lines(&nap_report))
-        .unwrap_or_else(|| panic!("the nap's entry is not in the Journal:\n{}", lines.join("\n")));
-    let load_at = first_line_with(&lines, LOAD_ARRIVAL)
-        .unwrap_or_else(|| panic!("the load's entry is not in the Journal:\n{}", lines.join("\n")));
-    let later_at = first_line_with(&lines, LATER).expect("fixture: the later arrival is in the Journal");
-    let earlier_at = first_line_with(&lines, EARLIER).expect("fixture: the earlier arrival is in the Journal");
+    let nap_at = first_line_of_entry(&lines, &own_lines(&nap_report)).unwrap_or_else(|| {
+        panic!(
+            "the nap's entry is not in the Journal:\n{}",
+            lines.join("\n")
+        )
+    });
+    let load_at = first_line_with(&lines, LOAD_ARRIVAL).unwrap_or_else(|| {
+        panic!(
+            "the load's entry is not in the Journal:\n{}",
+            lines.join("\n")
+        )
+    });
+    let later_at =
+        first_line_with(&lines, LATER).expect("fixture: the later arrival is in the Journal");
+    let earlier_at =
+        first_line_with(&lines, EARLIER).expect("fixture: the earlier arrival is in the Journal");
 
     assert!(
         nap_at < load_at,
@@ -582,7 +751,12 @@ fn unread_reports_are_pinned_at_the_journals_top_newest_first() {
          above it. It read as:\n{}",
         lines.join("\n")
     );
-    assert_eq!(nap_at, 0, "the Journal did not open at the top, onto the newest pinned entry:\n{}", lines.join("\n"));
+    assert_eq!(
+        nap_at,
+        0,
+        "the Journal did not open at the top, onto the newest pinned entry:\n{}",
+        lines.join("\n")
+    );
 }
 
 /// The opening that reads a report does not move its entry: it stays pinned
@@ -604,7 +778,11 @@ fn a_report_the_journal_read_stays_pinned_until_that_journal_closes() {
         })
     };
     let lines = journal_lines(&a);
-    assert!(pinned(&lines), "the unread report is not pinned at the top on opening:\n{}", lines.join("\n"));
+    assert!(
+        pinned(&lines),
+        "the unread report is not pinned at the top on opening:\n{}",
+        lines.join("\n")
+    );
 
     a.step(&mut t, elapsed(2.0), &[]).expect("steps");
     let lines = journal_lines(&a);
@@ -636,7 +814,11 @@ fn a_report_read_by_its_banner_takes_its_place_in_the_scrollback_at_once() {
     let mut t = term(160, 40);
 
     keys(&mut a, &mut t, &[press(KeyCode::Esc)]);
-    assert_eq!(showing(&a), None, "Esc from a bare screen did not retire the only banner");
+    assert_eq!(
+        showing(&a),
+        None,
+        "Esc from a bare screen did not retire the only banner"
+    );
     keys(&mut a, &mut t, &[press_char('e')]);
     let lines = journal_lines(&a);
     assert!(
@@ -713,7 +895,10 @@ fn esc_closes_what_sits_above_the_banner_before_it_retires_the_banner() {
             "fixture: {what} opened"
         );
         keys(&mut a, &mut t, &[press(KeyCode::Esc)]);
-        assert!(a.view.prompt.is_none() && a.view.overlay.is_none(), "Esc did not close {what}");
+        assert!(
+            a.view.prompt.is_none() && a.view.overlay.is_none(),
+            "Esc did not close {what}"
+        );
         assert_still_showing(&a, &two, &format!("Esc closing {what}"));
         keys(&mut a, &mut t, &[press(KeyCode::Esc)]);
         assert_retired_one(&a, &two, &format!("the Esc after {what} closed"));
@@ -744,7 +929,11 @@ fn with_the_narrow_swap_in_esc_returns_the_list_before_retiring_the_banner() {
     a.view.inspector_wanted = true;
     let mut t = term(80, 24);
     keys(&mut a, &mut t, &[]);
-    assert_eq!(placement(80, a.view.inspector_wanted), Placement::Swapped, "fixture: the swap is in");
+    assert_eq!(
+        placement(80, a.view.inspector_wanted),
+        Placement::Swapped,
+        "fixture: the swap is in"
+    );
 
     keys(&mut a, &mut t, &[press(KeyCode::Esc)]);
     assert_eq!(
@@ -774,14 +963,22 @@ fn every_navigation_key_retires_only_the_showing_banner_whether_or_not_it_moves(
     ]
     .into_iter()
     .map(|k| (format!("{k:?}"), press(k)))
-    .chain(['k', 'j', 'h', 'l', '[', ']'].into_iter().map(|c| (format!("{c:?}"), press_char(c))))
+    .chain(
+        ['k', 'j', 'h', 'l', '[', ']']
+            .into_iter()
+            .map(|c| (format!("{c:?}"), press_char(c))),
+    )
     .chain(('0'..='9').map(|c| (format!("digit {c}"), press_char(c))))
     .collect();
 
     // At the top of the list (Up moves nothing), in the middle, and at the
     // bottom (Down moves nothing). A digit for a section with nothing in it
     // moves nothing wherever the cursor is.
-    let spots = [list.first().cloned(), list.get(list.len() / 2).cloned(), list.last().cloned()];
+    let spots = [
+        list.first().cloned(),
+        list.get(list.len() / 2).cloned(),
+        list.last().cloned(),
+    ];
     for focus in spots {
         for (what, key) in &navigation {
             let mut a = case(&two, focus.clone(), "nav");
@@ -805,7 +1002,10 @@ fn the_palettes_jump_retires_only_the_showing_banner() {
     keys(&mut a, &mut t, &typed);
     assert_still_showing(&a, &two, "typing into the palette");
     keys(&mut a, &mut t, &[press(KeyCode::Enter)]);
-    assert!(a.view.overlay.is_none(), "fixture: the palette's Enter jumped");
+    assert!(
+        a.view.overlay.is_none(),
+        "fixture: the palette's Enter jumped"
+    );
     assert_retired_one(&a, &two, "the palette's jump");
 }
 

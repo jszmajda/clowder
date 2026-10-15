@@ -126,8 +126,16 @@ fn uncapped_resources_never_clamp() {
     run_ticks(&mut s, 2);
     assert_eq!(s.stock(ResourceId::Feathers), 1e12, "luxuries are uncapped");
     assert_eq!(s.stock(ResourceId::Rainbows), 5e11, "mystics are uncapped");
-    assert_eq!(s.stock(ResourceId::Wands), 7e11, "crafted goods are uncapped");
-    assert_eq!(s.stock(ResourceId::Cleverness), 1e10, "cleverness has no ceiling");
+    assert_eq!(
+        s.stock(ResourceId::Wands),
+        7e11,
+        "crafted goods are uncapped"
+    );
+    assert_eq!(
+        s.stock(ResourceId::Cleverness),
+        1e10,
+        "cleverness has no ceiling"
+    );
     assert!(s.cap(ResourceId::Feathers).is_infinite());
 }
 
@@ -138,11 +146,21 @@ fn cap_zero_resources_hold_nothing_until_their_extender_exists() {
     // trimmed away by the clamp phase until an extender structure exists.
     let mut s = GameState::new(103);
     s.ticks = 3;
-    for r in [ResourceId::Dew, ResourceId::Warmth, ResourceId::Skymaps, ResourceId::Stardust] {
+    for r in [
+        ResourceId::Dew,
+        ResourceId::Warmth,
+        ResourceId::Skymaps,
+        ResourceId::Stardust,
+    ] {
         give(&mut s, r, 5.0);
     }
     run_ticks(&mut s, 1);
-    for r in [ResourceId::Dew, ResourceId::Warmth, ResourceId::Skymaps, ResourceId::Stardust] {
+    for r in [
+        ResourceId::Dew,
+        ResourceId::Warmth,
+        ResourceId::Skymaps,
+        ResourceId::Stardust,
+    ] {
         assert_eq!(s.stock(r), 0.0, "{r:?} accrues nothing at cap 0");
     }
 
@@ -152,14 +170,20 @@ fn cap_zero_resources_hold_nothing_until_their_extender_exists() {
     grant(&mut s, StructureId::DewCollector, 1);
     give(&mut s, ResourceId::Dew, 5.0);
     run_ticks(&mut s, 1);
-    assert!((s.stock(ResourceId::Dew) - 5.02).abs() < 1e-9, "cap 1200 holds; +0.02/t trickles");
+    assert!(
+        (s.stock(ResourceId::Dew) - 5.02).abs() < 1e-9,
+        "cap 1200 holds; +0.02/t trickles"
+    );
 
     let mut s = GameState::new(105);
     s.ticks = 3;
     grant(&mut s, StructureId::StarBasin, 1);
     give(&mut s, ResourceId::Stardust, 5.0);
     run_ticks(&mut s, 1);
-    assert!((s.stock(ResourceId::Stardust) - 5.0003).abs() < 1e-9, "cap 60 holds; +0.0003/t");
+    assert!(
+        (s.stock(ResourceId::Stardust) - 5.0003).abs() < 1e-9,
+        "cap 60 holds; +0.0003/t"
+    );
 }
 
 // =====================================================================
@@ -201,7 +225,11 @@ fn new_structures_extend_caps_including_multi_resource_extenders() {
 // @spec SIM-ECO-028
 #[test]
 fn structure_table_spot_anchors_across_bands() {
-    assert_eq!(StructureId::ALL.len(), 53, "exactly the BLD table, no staged rebuilds");
+    assert_eq!(
+        StructureId::ALL.len(),
+        53,
+        "exactly the BLD table, no staged rebuilds"
+    );
     assert_eq!(GameState::new(107).structures, [0u32; 53]);
     assert_eq!(StructureId::CatnipPatch.ix(), 0);
     assert_eq!(StructureId::WindowPerch.ix(), 7);
@@ -215,7 +243,10 @@ fn structure_table_spot_anchors_across_bands() {
     assert_eq!(d.gate, StructureGate::Idea(IdeaId::Horticulture));
 
     let d = content::structure_def(StructureId::Hearth);
-    assert_eq!(d.base_costs, &[(ResourceId::Pebbles, 45.0), (ResourceId::Twigs, 25.0)]);
+    assert_eq!(
+        d.base_costs,
+        &[(ResourceId::Pebbles, 45.0), (ResourceId::Twigs, 25.0)]
+    );
     assert_eq!(d.ratio, 1.15);
     assert_eq!(d.gate, StructureGate::Idea(IdeaId::Emberkeeping));
 
@@ -236,7 +267,11 @@ fn structure_table_spot_anchors_across_bands() {
     let d = content::structure_def(StructureId::Porch);
     assert_eq!(
         d.base_costs,
-        &[(ResourceId::Tiles, 40.0), (ResourceId::Badges, 60.0), (ResourceId::Lattices, 4.0)]
+        &[
+            (ResourceId::Tiles, 40.0),
+            (ResourceId::Badges, 60.0),
+            (ResourceId::Lattices, 4.0)
+        ]
     );
     assert_eq!(d.ratio, 1.15);
     assert_eq!(d.gate, StructureGate::Idea(IdeaId::PorchLogistics));
@@ -258,7 +293,11 @@ fn structure_table_spot_anchors_across_bands() {
     let d = content::structure_def(StructureId::Kiln);
     assert_eq!(
         d.base_costs,
-        &[(ResourceId::Moonstone, 4.0), (ResourceId::Dew, 150.0), (ResourceId::Brass, 30.0)]
+        &[
+            (ResourceId::Moonstone, 4.0),
+            (ResourceId::Dew, 150.0),
+            (ResourceId::Brass, 30.0)
+        ]
     );
     assert_eq!(d.ratio, 1.15);
     assert_eq!(d.gate, StructureGate::Idea(IdeaId::CeramicArts));
@@ -267,13 +306,23 @@ fn structure_table_spot_anchors_across_bands() {
     let d = content::structure_def(StructureId::DynamoWheel);
     assert_eq!(
         d.base_costs,
-        &[(ResourceId::Cogs, 4.0), (ResourceId::Moonsteel, 8.0), (ResourceId::Schemes, 1.0)]
+        &[
+            (ResourceId::Cogs, 4.0),
+            (ResourceId::Moonsteel, 8.0),
+            (ResourceId::Schemes, 1.0)
+        ]
     );
     assert_eq!(d.ratio, 1.25);
     assert_eq!(d.gate, StructureGate::Idea(IdeaId::Dynamos));
 
     let d = content::structure_def(StructureId::YarnComputer);
-    assert_eq!(d.base_costs, &[(ResourceId::Stardust, 30.0), (ResourceId::Curiosity, 60000.0)]);
+    assert_eq!(
+        d.base_costs,
+        &[
+            (ResourceId::Stardust, 30.0),
+            (ResourceId::Curiosity, 60000.0)
+        ]
+    );
     assert_eq!(d.ratio, 1.15);
     assert_eq!(d.gate, StructureGate::Idea(IdeaId::YarnComputing));
 
@@ -403,7 +452,10 @@ fn rummage_is_idea_gated_pebble_foraging() {
     assert!((s.stock(ResourceId::Pebbles) - 0.5).abs() < 1e-9);
 
     give(&mut s, ResourceId::Pebbles, 60.0); // base pebble cap
-    assert_eq!(s.apply(Command::Rummage).unwrap_err(), CommandError::StorageFull);
+    assert_eq!(
+        s.apply(Command::Rummage).unwrap_err(),
+        CommandError::StorageFull
+    );
     assert_eq!(s.stock(ResourceId::Pebbles), 60.0);
 }
 
@@ -488,7 +540,10 @@ fn porch_caps_ratchet_on_the_kite_high_water_and_never_shrink() {
     let mut s = GameState::new(117);
     s.ticks = 3;
     grant(&mut s, StructureId::Porch, 1);
-    assert!((s.cap(ResourceId::Catnip) - 1200.0).abs() < 1e-9, "no kites yet: ×1");
+    assert!(
+        (s.cap(ResourceId::Catnip) - 1200.0).abs() < 1e-9,
+        "no kites yet: ×1"
+    );
 
     // Holding 100 kites: multiplier = 1 + limited_dr(0.01×100, 2.25) = 2.
     give(&mut s, ResourceId::Kites, 100.0);
@@ -502,8 +557,14 @@ fn porch_caps_ratchet_on_the_kite_high_water_and_never_shrink() {
     // the high-water is a ratchet.
     give(&mut s, ResourceId::Kites, 0.0);
     run_ticks(&mut s, 1);
-    assert!((s.kites_high_water - 100.0).abs() < 1e-9, "high-water persists");
-    assert!((s.cap(ResourceId::Catnip) - 2200.0).abs() < 1e-9, "caps never shrink");
+    assert!(
+        (s.kites_high_water - 100.0).abs() < 1e-9,
+        "high-water persists"
+    );
+    assert!(
+        (s.cap(ResourceId::Catnip) - 2200.0).abs() < 1e-9,
+        "caps never shrink"
+    );
 
     // A lower later stock doesn't lower it either.
     give(&mut s, ResourceId::Kites, 50.0);
@@ -587,7 +648,10 @@ fn global_layers_never_touch_transient_or_mystic_income() {
     run_ticks(&mut boosted, 1);
 
     for r in [ResourceId::Curiosity, ResourceId::Pep, ResourceId::Unicorns] {
-        assert!(plain.stock(r) > 0.0, "{r:?} income must exist for the test to bite");
+        assert!(
+            plain.stock(r) > 0.0,
+            "{r:?} income must exist for the test to bite"
+        );
         assert_eq!(
             plain.stock(r),
             boosted.stock(r),
@@ -606,7 +670,10 @@ fn craft_command_is_gated_all_or_nothing_and_ratio_boosted() {
     // Locked until the granting idea, even with inputs in paw.
     let mut s = GameState::new(120);
     give(&mut s, ResourceId::Twigs, 15.0);
-    assert_eq!(s.apply(Command::Craft(CraftId::Wands)).unwrap_err(), CommandError::Locked);
+    assert_eq!(
+        s.apply(Command::Craft(CraftId::Wands)).unwrap_err(),
+        CommandError::Locked
+    );
     assert_eq!(s.stock(ResourceId::Twigs), 15.0);
 
     // Unlocked: one batch spends the recipe and yields 1 × (1 + craft ratio).
@@ -634,7 +701,10 @@ fn craft_command_is_gated_all_or_nothing_and_ratio_boosted() {
     s.apply(Command::Craft(CraftId::Brass)).unwrap();
     assert!((s.stock(ResourceId::Brass) - 1.0).abs() < 1e-9);
     assert_eq!(s.stock(ResourceId::Buttons), 0.0);
-    assert!(s.stock(ResourceId::Embers) >= 0.0, "deduction floors at zero");
+    assert!(
+        s.stock(ResourceId::Embers) >= 0.0,
+        "deduction floors at zero"
+    );
 
     // Craft ratio: 2 Craft Corners (+6% each) + 1 Toy Workshop (+5%) = +17%.
     let mut s = GameState::new(121);
@@ -659,11 +729,17 @@ fn craft_recipe_table_spot_anchors() {
     assert_eq!(d.gate, Some(IdeaId::Tinkering));
 
     let d = content::craft_def(CraftId::Brass);
-    assert_eq!(d.inputs, &[(ResourceId::Buttons, 10.0), (ResourceId::Embers, 10.0)]);
+    assert_eq!(
+        d.inputs,
+        &[(ResourceId::Buttons, 10.0), (ResourceId::Embers, 10.0)]
+    );
     assert_eq!(d.gate, Some(IdeaId::Excavation));
 
     let d = content::craft_def(CraftId::Pavers);
-    assert_eq!(d.inputs, &[(ResourceId::Tiles, 250.0), (ResourceId::Brass, 3.0)]);
+    assert_eq!(
+        d.inputs,
+        &[(ResourceId::Tiles, 250.0), (ResourceId::Brass, 3.0)]
+    );
     assert_eq!(d.gate, Some(IdeaId::Moonmetallurgy));
 
     let d = content::craft_def(CraftId::Quills);
@@ -673,20 +749,39 @@ fn craft_recipe_table_spot_anchors() {
     let d = content::craft_def(CraftId::Kites);
     assert_eq!(
         d.inputs,
-        &[(ResourceId::Skymaps, 3.0), (ResourceId::Badges, 15.0), (ResourceId::Lattices, 10.0)]
+        &[
+            (ResourceId::Skymaps, 3.0),
+            (ResourceId::Badges, 15.0),
+            (ResourceId::Lattices, 10.0)
+        ]
     );
     assert_eq!(d.gate, Some(IdeaId::PorchLogistics));
 
     let d = content::craft_def(CraftId::Anthologies);
-    assert_eq!(d.inputs, &[(ResourceId::Curiosity, 1000.0), (ResourceId::Stories, 5.0)]);
+    assert_eq!(
+        d.inputs,
+        &[(ResourceId::Curiosity, 1000.0), (ResourceId::Stories, 5.0)]
+    );
     assert_eq!(d.gate, Some(IdeaId::AnthologyBinding));
 
     let d = content::craft_def(CraftId::Schemes);
-    assert_eq!(d.inputs, &[(ResourceId::Curiosity, 2500.0), (ResourceId::Anthologies, 3.0)]);
+    assert_eq!(
+        d.inputs,
+        &[
+            (ResourceId::Curiosity, 2500.0),
+            (ResourceId::Anthologies, 3.0)
+        ]
+    );
     assert_eq!(d.gate, Some(IdeaId::GrandSchemes));
 
     let d = content::craft_def(CraftId::Dreamweave);
-    assert_eq!(d.inputs, &[(ResourceId::Hushfelt, 100.0), (ResourceId::Moonsteel, 250.0)]);
+    assert_eq!(
+        d.inputs,
+        &[
+            (ResourceId::Hushfelt, 100.0),
+            (ResourceId::Moonsteel, 250.0)
+        ]
+    );
     assert_eq!(d.gate, Some(IdeaId::Dreamweaving));
 }
 
@@ -739,7 +834,9 @@ fn no_recipe_is_dead_every_input_is_producible_by_its_band() {
             // Crafted inputs: producible at their own recipe's gate band.
             let producer = match CraftId::ALL.into_iter().find(|k| craft_output(*k) == *r) {
                 Some(input_craft) => Some(idea_band(
-                    content::craft_def(input_craft).gate.expect("crafts are idea-gated"),
+                    content::craft_def(input_craft)
+                        .gate
+                        .expect("crafts are idea-gated"),
                 )),
                 None => raw_producer_band(*r),
             };
@@ -865,7 +962,11 @@ fn moonlight_stage_charm_rides_the_surplus_and_darkens_off_grid() {
     grant(&mut dark, StructureId::MoonlightStage, 1);
     assert_eq!(dark.energy_surplus_ratio(), 0.0);
     run_ticks(&mut dark, 1);
-    assert_eq!(dark.stock(ResourceId::Charm), 0.0, "an unpowered stage is dark");
+    assert_eq!(
+        dark.stock(ResourceId::Charm),
+        0.0,
+        "an unpowered stage is dark"
+    );
 
     // Surplus clamps at 1.75: production 10, consumption 0.
     let mut bright = GameState::new(130);
@@ -899,7 +1000,10 @@ fn mess_accrues_from_dirty_structures_and_dissipates_toward_equilibrium() {
     s.ticks = 3;
     s.mess = 10_000.0;
     run_ticks(&mut s, 1);
-    assert!((s.mess - 9_999.0).abs() < 1e-9, "dissipation is 1e-4 × mess per tick");
+    assert!(
+        (s.mess - 9_999.0).abs() < 1e-9,
+        "dissipation is 1e-4 × mess per tick"
+    );
 
     // Accrual: 2 Gravel Pits (0.25 each) + 1 fed Kiln (1.0) = 1.5/tick.
     let mut s = GameState::new(133);
@@ -961,17 +1065,32 @@ fn mess_levels_slow_catnip_arrivals_and_cheer_but_never_confiscate() {
     };
     assert!((patch_gain(0.0) - 0.125).abs() < 1e-9);
     assert!((patch_gain(1e4) - 0.125 * 0.8).abs() < 1e-9, "level 0");
-    assert!((patch_gain(1e5) - 0.125 * 0.8 * 0.8).abs() < 1e-9, "level 1");
-    assert!((patch_gain(1e6) - 0.125 * 0.8 * 0.8 * 0.8).abs() < 1e-9, "level 2");
-    assert!((patch_gain(1e15) - 0.125 * 0.25).abs() < 1e-9, "deep mess floors at ×0.25");
+    assert!(
+        (patch_gain(1e5) - 0.125 * 0.8 * 0.8).abs() < 1e-9,
+        "level 1"
+    );
+    assert!(
+        (patch_gain(1e6) - 0.125 * 0.8 * 0.8 * 0.8).abs() < 1e-9,
+        "level 2"
+    );
+    assert!(
+        (patch_gain(1e15) - 0.125 * 0.25).abs() < 1e-9,
+        "deep mess floors at ×0.25"
+    );
 
     // Arrivals get shy at level 1+ (chance ×0.75); level 0 leaves them alone.
     let mut s = GameState::new(137);
     give(&mut s, ResourceId::Catnip, 50.0); // base 15% chance
     s.mess = 1e4;
-    assert!((s.arrival_chance() - 0.15).abs() < 1e-9, "level 0 never deters arrivals");
+    assert!(
+        (s.arrival_chance() - 0.15).abs() < 1e-9,
+        "level 0 never deters arrivals"
+    );
     s.mess = 1e5;
-    assert!((s.arrival_chance() - 0.15 * 0.75).abs() < 1e-9, "level 1 makes arrivals shy");
+    assert!(
+        (s.arrival_chance() - 0.15 * 0.75).abs() < 1e-9,
+        "level 1 makes arrivals shy"
+    );
 
     // Happiness: −5 points per level above 1, starting at level 2.
     let mut s = GameState::new(138);
@@ -1007,7 +1126,10 @@ fn rummager_is_idea_gated_and_yields_pebbles() {
     assert_eq!(JobId::ALL.len(), 8, "the extended roster");
     let mut s = GameState::new(140);
     adopt(&mut s, 1);
-    assert_eq!(s.apply(Command::AssignJob(JobId::Rummager)).unwrap_err(), CommandError::Locked);
+    assert_eq!(
+        s.apply(Command::AssignJob(JobId::Rummager)).unwrap_err(),
+        CommandError::Locked
+    );
     s.ideas.insert(IdeaId::CouchSpelunking);
     s.apply(Command::AssignJob(JobId::Rummager)).unwrap();
     off_boundary(&mut s);
@@ -1021,7 +1143,10 @@ fn rummager_is_idea_gated_and_yields_pebbles() {
 fn pouncer_is_idea_gated_and_yields_pep() {
     let mut s = GameState::new(141);
     adopt(&mut s, 1);
-    assert_eq!(s.apply(Command::AssignJob(JobId::Pouncer)).unwrap_err(), CommandError::Locked);
+    assert_eq!(
+        s.apply(Command::AssignJob(JobId::Pouncer)).unwrap_err(),
+        CommandError::Locked
+    );
     s.ideas.insert(IdeaId::PouncingPractice);
     s.apply(Command::AssignJob(JobId::Pouncer)).unwrap();
     off_boundary(&mut s);
@@ -1035,7 +1160,10 @@ fn pouncer_is_idea_gated_and_yields_pep() {
 fn sunwarden_is_idea_gated_and_yields_warmth() {
     let mut s = GameState::new(142);
     adopt(&mut s, 1);
-    assert_eq!(s.apply(Command::AssignJob(JobId::Sunwarden)).unwrap_err(), CommandError::Locked);
+    assert_eq!(
+        s.apply(Command::AssignJob(JobId::Sunwarden)).unwrap_err(),
+        CommandError::Locked
+    );
     s.ideas.insert(IdeaId::SolarDevotion);
     s.apply(Command::AssignJob(JobId::Sunwarden)).unwrap();
     grant(&mut s, StructureId::SunRoom, 1); // warmth cap 75, plus its own 0.004/t
@@ -1068,11 +1196,18 @@ fn the_tree_has_57_ideas_with_append_only_ids() {
     assert_eq!(IdeaId::YarnComputing as usize, 43);
     assert_eq!(IdeaId::ParadeRoutes as usize, 44);
     assert_eq!(IdeaId::DeepNapTheory as usize, 55);
-    assert_eq!(IdeaId::PouncingPractice as usize, 56, "appended late; ids never reorder");
+    assert_eq!(
+        IdeaId::PouncingPractice as usize,
+        56,
+        "appended late; ids never reorder"
+    );
     // Whimsy with clarity: every idea names itself and explains its effect.
     for i in IdeaId::ALL {
         assert!(!content::idea_def(i).name.is_empty());
-        assert!(!content::idea_def(i).blurb.is_empty(), "{i:?} must explain itself");
+        assert!(
+            !content::idea_def(i).blurb.is_empty(),
+            "{i:?} must explain itself"
+        );
     }
 }
 
@@ -1096,7 +1231,11 @@ fn research_spends_exactly(
     assert!(events.contains(&Event::IdeaResearched { id: idea }));
     assert!(s.ideas.contains(&idea));
     for (r, spent) in spends {
-        let held = stocks.iter().find(|(sr, _)| sr == r).map(|(_, v)| *v).unwrap_or(0.0);
+        let held = stocks
+            .iter()
+            .find(|(sr, _)| sr == r)
+            .map(|(_, v)| *v)
+            .unwrap_or(0.0);
         assert!(
             (s.stock(*r) - (held - spent)).abs() < 1e-9,
             "{idea:?} must spend exactly {spent} {r:?} (held {held}, left {})",
@@ -1181,14 +1320,21 @@ fn gate_craft_spend_is_all_or_nothing() {
     s.ideas.insert(IdeaId::Storycraft);
     give(&mut s, ResourceId::Curiosity, 1500.0);
     give(&mut s, ResourceId::Stories, 4.9); // one story short, beyond epsilon
-    let err = s.apply(Command::ResearchIdea(IdeaId::SunSalutations)).unwrap_err();
+    let err = s
+        .apply(Command::ResearchIdea(IdeaId::SunSalutations))
+        .unwrap_err();
     assert!(matches!(err, CommandError::InsufficientResources { .. }));
-    assert_eq!(s.stock(ResourceId::Curiosity), 1500.0, "nothing spent on a refusal");
+    assert_eq!(
+        s.stock(ResourceId::Curiosity),
+        1500.0,
+        "nothing spent on a refusal"
+    );
     assert_eq!(s.stock(ResourceId::Stories), 4.9);
 
     // Epsilon-tolerant affordability, and the deduction floors at zero.
     give(&mut s, ResourceId::Stories, 5.0 - 1e-10);
-    s.apply(Command::ResearchIdea(IdeaId::SunSalutations)).unwrap();
+    s.apply(Command::ResearchIdea(IdeaId::SunSalutations))
+        .unwrap();
     assert_eq!(s.stock(ResourceId::Curiosity), 0.0);
     assert_eq!(s.stock(ResourceId::Stories), 0.0);
     assert!(s.ideas.contains(&IdeaId::SunSalutations));
@@ -1218,7 +1364,10 @@ fn the_idea_graph_is_acyclic_and_fully_reachable() {
         s.ideas.len(),
         59,
         "unreachable or cyclic ideas: {:?}",
-        IdeaId::ALL.iter().filter(|i| !s.ideas.contains(i)).collect::<Vec<_>>()
+        IdeaId::ALL
+            .iter()
+            .filter(|i| !s.ideas.contains(i))
+            .collect::<Vec<_>>()
     );
 }
 
@@ -1232,22 +1381,36 @@ fn multi_prerequisite_ideas_require_all_of_them() {
     give(&mut s, ResourceId::Schemes, 20.0);
 
     s.ideas.insert(IdeaId::UnicornLore);
-    assert!(!s.idea_unlocked(IdeaId::ParadeRoutes), "one prerequisite is not enough");
+    assert!(
+        !s.idea_unlocked(IdeaId::ParadeRoutes),
+        "one prerequisite is not enough"
+    );
     assert_eq!(
-        s.apply(Command::ResearchIdea(IdeaId::ParadeRoutes)).unwrap_err(),
+        s.apply(Command::ResearchIdea(IdeaId::ParadeRoutes))
+            .unwrap_err(),
         CommandError::Locked
     );
 
     let mut t = GameState::new(154);
     grant(&mut t, StructureId::CardboardBox, 1);
     t.ideas.insert(IdeaId::GrandSchemes);
-    assert!(!t.idea_unlocked(IdeaId::ParadeRoutes), "the other alone is not enough either");
+    assert!(
+        !t.idea_unlocked(IdeaId::ParadeRoutes),
+        "the other alone is not enough either"
+    );
 
     s.ideas.insert(IdeaId::GrandSchemes);
     assert!(s.idea_unlocked(IdeaId::ParadeRoutes));
-    s.apply(Command::ResearchIdea(IdeaId::ParadeRoutes)).unwrap();
-    assert!((s.stock(ResourceId::Curiosity) - 20_000.0).abs() < 1e-9, "30000 spent");
-    assert!((s.stock(ResourceId::Schemes) - 5.0).abs() < 1e-9, "15 schemes spent");
+    s.apply(Command::ResearchIdea(IdeaId::ParadeRoutes))
+        .unwrap();
+    assert!(
+        (s.stock(ResourceId::Curiosity) - 20_000.0).abs() < 1e-9,
+        "30000 spent"
+    );
+    assert!(
+        (s.stock(ResourceId::Schemes) - 5.0).abs() < 1e-9,
+        "15 schemes spent"
+    );
 }
 
 // @spec SIM-CUR-009
@@ -1264,7 +1427,10 @@ fn ideas_grant_their_tabled_unlocks_as_pure_lookups() {
     assert!(!s.job_unlocked(JobId::Rummager));
     assert!(!s.job_unlocked(JobId::Sunwarden));
     give(&mut s, ResourceId::Twigs, 15.0);
-    assert_eq!(s.apply(Command::Craft(CraftId::Wands)).unwrap_err(), CommandError::Locked);
+    assert_eq!(
+        s.apply(Command::Craft(CraftId::Wands)).unwrap_err(),
+        CommandError::Locked
+    );
     assert_eq!(s.apply(Command::Rummage).unwrap_err(), CommandError::Locked);
 
     // Each idea opens exactly its tabled doors.
@@ -1304,7 +1470,10 @@ fn sky_events_roll_daily_per_ledge_and_sometimes_self_observe() {
     let mut s = GameState::new(156);
     grant(&mut s, StructureId::StargazingLedge, 10);
     let events = run_days(&mut s, 6000);
-    let visible = events.iter().filter(|e| matches!(e, Event::SkyEventVisible)).count();
+    let visible = events
+        .iter()
+        .filter(|e| matches!(e, Event::SkyEventVisible))
+        .count();
     assert!(
         (50..=170).contains(&visible),
         "visible sky events over 6000 days: {visible}"
@@ -1328,7 +1497,10 @@ fn observe_sky_works_in_the_window_and_expired_events_fade() {
     // No event pending: nothing to observe, and the refusal is a perfect no-op.
     let mut fresh = GameState::new(157);
     let snapshot = fresh.clone();
-    assert_eq!(fresh.apply(Command::ObserveSky).unwrap_err(), CommandError::Locked);
+    assert_eq!(
+        fresh.apply(Command::ObserveSky).unwrap_err(),
+        CommandError::Locked
+    );
     assert_eq!(fresh, snapshot);
 
     // Hunt a visible (not auto-observed) sky event.
@@ -1343,7 +1515,10 @@ fn observe_sky_works_in_the_window_and_expired_events_fade() {
         }
     }
     assert!(found, "a 2%-per-day event must fire within 20000 days");
-    assert!(s.pending_sky_event.is_some(), "the visible event is pending");
+    assert!(
+        s.pending_sky_event.is_some(),
+        "the visible event is pending"
+    );
 
     // Observing within the window: 25 curiosity × (1 + 2.5 from ten Ledges),
     // plus one skymap; the pending event is consumed.
@@ -1353,8 +1528,14 @@ fn observe_sky_works_in_the_window_and_expired_events_fade() {
     observed.apply(Command::ObserveSky).unwrap();
     assert!((observed.stock(ResourceId::Curiosity) - curiosity_before - 87.5).abs() < 1e-9);
     assert!((observed.stock(ResourceId::Skymaps) - skymaps_before - 1.0).abs() < 1e-9);
-    assert_eq!(observed.pending_sky_event, None, "observing consumes the event");
-    assert_eq!(observed.apply(Command::ObserveSky).unwrap_err(), CommandError::Locked);
+    assert_eq!(
+        observed.pending_sky_event, None,
+        "observing consumes the event"
+    );
+    assert_eq!(
+        observed.apply(Command::ObserveSky).unwrap_err(),
+        CommandError::Locked
+    );
 
     // Left alone past the end of the next day, the event simply fades. Run
     // forward until a 30-day stretch passes with no fresh visible event, so

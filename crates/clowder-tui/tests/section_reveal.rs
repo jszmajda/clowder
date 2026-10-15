@@ -141,7 +141,12 @@ fn sky_both() -> GameState {
     let keys: Vec<RowKey> = rows(&s, Section::Sky).into_iter().map(|r| r.key).collect();
     assert_eq!(
         keys,
-        vec![RowKey::Fixed("sites"), RowKey::Site(SiteId::ALL[0]), RowKey::Fixed("things to do"), whale_key()],
+        vec![
+            RowKey::Fixed("sites"),
+            RowKey::Site(SiteId::ALL[0]),
+            RowKey::Fixed("things to do"),
+            whale_key()
+        ],
         "fixture: the site's row sits above the summoning row"
     );
     s
@@ -171,7 +176,10 @@ fn every_section_revealed() -> GameState {
     s.discovered = ColonyId::ALL.iter().copied().collect::<BTreeSet<_>>();
     s.generation = 1;
     s.kittens = (0..6)
-        .map(|i| Kitten { job: Some(JobId::ALL[0]), ..kitten(&format!("resident-{i}")) })
+        .map(|i| Kitten {
+            job: Some(JobId::ALL[0]),
+            ..kitten(&format!("resident-{i}"))
+        })
         .collect();
     s.roster_high_water = 100;
     for section in Section::ALL {
@@ -195,7 +203,10 @@ fn really_loaded(state: &GameState) -> LoadedGame {
 /// long absence — the report kept in the journal at the tick the catch-up
 /// ended on, and handed back beside the state.
 fn loaded_with_report(mut state: GameState) -> LoadedGame {
-    let mut report = OfflineReport { elapsed_seconds: 3 * 86_400, ..OfflineReport::default() };
+    let mut report = OfflineReport {
+        elapsed_seconds: 3 * 86_400,
+        ..OfflineReport::default()
+    };
     report.resource_deltas[ResourceId::ALL[0].ix()] = 480.0;
     state.journal.record_away(state.ticks, &report);
     LoadedGame { state, report }
@@ -206,7 +217,9 @@ fn loaded_with_report(mut state: GameState) -> LoadedGame {
 // ---------------------------------------------------------------------------
 
 fn save_path(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("clowder-reveal-{}-{name}", std::process::id())).join("save.json")
+    std::env::temp_dir()
+        .join(format!("clowder-reveal-{}-{name}", std::process::id()))
+        .join("save.json")
 }
 
 /// A sitting opened on `state` exactly as start-up opens one.
@@ -231,12 +244,16 @@ fn terminal(w: u16, h: u16) -> Terminal<TestBackend> {
 }
 
 fn still() -> Reading {
-    Reading { monotonic: Duration::ZERO, wall: Duration::ZERO }
+    Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::ZERO,
+    }
 }
 
 /// One frame with the clock held still: whatever changed, the test changed.
 fn frame(app: &mut App, term: &mut Terminal<TestBackend>, input: &[TermEvent]) {
-    app.step(term, still(), input).expect("a step against a TestBackend does not fail");
+    app.step(term, still(), input)
+        .expect("a step against a TestBackend does not fail");
 }
 
 fn press(code: KeyCode) -> TermEvent {
@@ -244,7 +261,11 @@ fn press(code: KeyCode) -> TermEvent {
 }
 
 fn press_char(c: char) -> TermEvent {
-    let modifiers = if c.is_ascii_uppercase() { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
+    let modifiers = if c.is_ascii_uppercase() {
+        KeyModifiers::SHIFT
+    } else {
+        KeyModifiers::NONE
+    };
     TermEvent::Key(KeyEvent::new(KeyCode::Char(c), modifiers))
 }
 
@@ -257,7 +278,9 @@ fn digit(section: Section) -> TermEvent {
 // ---------------------------------------------------------------------------
 
 fn region_line(buf: &Buffer, w: u16) -> String {
-    (0..w).map(|x| buf.cell((x, 0)).map(|c| c.symbol()).unwrap_or(" ")).collect()
+    (0..w)
+        .map(|x| buf.cell((x, 0)).map(|c| c.symbol()).unwrap_or(" "))
+        .collect()
 }
 
 fn tab_line(state: &GameState, view: &ViewState) -> String {
@@ -280,8 +303,9 @@ fn tab_bar(state: &GameState, view: &ViewState) -> Vec<(Section, bool)> {
         let digit = token.chars().find(|c| c.is_ascii_digit());
         match digit {
             Some(d) => {
-                let section = Section::from_digit(d)
-                    .unwrap_or_else(|| panic!("the tab bar drew {d:?}, which is no section's digit"));
+                let section = Section::from_digit(d).unwrap_or_else(|| {
+                    panic!("the tab bar drew {d:?}, which is no section's digit")
+                });
                 out.push((section, starred || pending_star));
                 pending_star = false;
             }
@@ -302,13 +326,20 @@ fn tabs_shown(state: &GameState, view: &ViewState) -> Vec<Section> {
 }
 
 fn badged(state: &GameState, view: &ViewState) -> Vec<Section> {
-    tab_bar(state, view).into_iter().filter(|(_, b)| *b).map(|(s, _)| s).collect()
+    tab_bar(state, view)
+        .into_iter()
+        .filter(|(_, b)| *b)
+        .map(|(s, _)| s)
+        .collect()
 }
 
 /// The sections that list a selectable row, in digit order — what the bar
 /// shows for them before focus adds its one tab.
 fn listing(state: &GameState) -> Vec<Section> {
-    Section::ALL.into_iter().filter(|s| rows(state, *s).iter().any(|r| r.selectable())).collect()
+    Section::ALL
+        .into_iter()
+        .filter(|s| rows(state, *s).iter().any(|r| r.selectable()))
+        .collect()
 }
 
 fn header_line(state: &GameState, view: &ViewState) -> String {
@@ -339,9 +370,18 @@ fn new_chip_shown(header: &str) -> bool {
 fn every_sitting_opens_on_the_meadow_with_the_cursor_on_the_gather_row() {
     let sittings: Vec<(&str, GameState)> = vec![
         ("a new game", GameState::new(3)),
-        ("a load of a young meadow", really_loaded(&sky_site_only()).state),
-        ("a load of a meadow far along", really_loaded(&every_section_revealed()).state),
-        ("a load whose catch-up kept a report", loaded_with_report(every_section_revealed()).state),
+        (
+            "a load of a young meadow",
+            really_loaded(&sky_site_only()).state,
+        ),
+        (
+            "a load of a meadow far along",
+            really_loaded(&every_section_revealed()).state,
+        ),
+        (
+            "a load whose catch-up kept a report",
+            loaded_with_report(every_section_revealed()).state,
+        ),
     ];
     for (what, state) in sittings {
         let mut view = ViewState::default();
@@ -378,9 +418,18 @@ fn every_sitting_opens_on_the_meadow_with_the_cursor_on_the_gather_row() {
 fn the_opening_badges_no_tab_and_counts_nothing_it_finds_as_new() {
     let sittings: Vec<(&str, GameState)> = vec![
         ("a new game", GameState::new(3)),
-        ("a load of a young meadow", really_loaded(&sky_site_only()).state),
-        ("a load of a meadow far along", really_loaded(&every_section_revealed()).state),
-        ("a load whose catch-up kept a report", loaded_with_report(every_section_revealed()).state),
+        (
+            "a load of a young meadow",
+            really_loaded(&sky_site_only()).state,
+        ),
+        (
+            "a load of a meadow far along",
+            really_loaded(&every_section_revealed()).state,
+        ),
+        (
+            "a load whose catch-up kept a report",
+            loaded_with_report(every_section_revealed()).state,
+        ),
     ];
     for (what, state) in sittings {
         let mut app = opened(state, "opening-known");
@@ -512,7 +561,11 @@ fn a_tab_that_appears_during_play_is_badged_until_any_entry_into_its_section() {
         let mut term = terminal(WIDE_W, WIDE_H);
         frame(&mut app, &mut term, &[]);
         let before = tabs_shown(&app.state, &app.view);
-        assert_eq!(before, vec![Section::Meadow], "fixture: a new game shows the Meadow's tab alone");
+        assert_eq!(
+            before,
+            vec![Section::Meadow],
+            "fixture: a new game shows the Meadow's tab alone"
+        );
 
         // A kitten arrives: the Clowder lists its rows, and its tab appears.
         app.state.kittens.push(kitten(PROBE));
@@ -557,7 +610,11 @@ fn a_tab_that_appears_during_play_is_badged_until_any_entry_into_its_section() {
         );
 
         // Visited stays visited: leaving and further frames do not re-badge.
-        frame(&mut app, &mut term, &[press(KeyCode::Esc), digit(Section::Meadow)]);
+        frame(
+            &mut app,
+            &mut term,
+            &[press(KeyCode::Esc), digit(Section::Meadow)],
+        );
         frame(&mut app, &mut term, &[]);
         assert!(
             badged(&app.state, &app.view).is_empty(),
@@ -582,7 +639,10 @@ fn every_tab_that_appears_is_badged_and_each_clears_on_its_own_visit_alone() {
     app.state = every_section_revealed();
     frame(&mut app, &mut term, &[]);
 
-    let arrived: Vec<Section> = Section::ALL.into_iter().filter(|s| *s != Section::Meadow).collect();
+    let arrived: Vec<Section> = Section::ALL
+        .into_iter()
+        .filter(|s| *s != Section::Meadow)
+        .collect();
     assert_eq!(
         tabs_shown(&app.state, &app.view),
         Section::ALL.to_vec(),
@@ -598,7 +658,12 @@ fn every_tab_that_appears_is_badged_and_each_clears_on_its_own_visit_alone() {
 
     for (i, section) in arrived.iter().enumerate() {
         frame(&mut app, &mut term, &[digit(*section)]);
-        assert_eq!(app.view.section, Some(*section), "fixture: the digit enters {}", section.title());
+        assert_eq!(
+            app.view.section,
+            Some(*section),
+            "fixture: the digit enters {}",
+            section.title()
+        );
         let still_badged: Vec<Section> = arrived[i + 1..].to_vec();
         assert_eq!(
             badged(&app.state, &app.view),
@@ -621,7 +686,10 @@ fn a_tab_that_leaves_and_returns_is_badged_again() {
     let mut app = opened(sky_quiet(), "badge-return");
     let mut term = terminal(WIDE_W, WIDE_H);
     frame(&mut app, &mut term, &[]);
-    assert!(!tabs_shown(&app.state, &app.view).contains(&Section::Sky), "fixture: no sky tab at the opening");
+    assert!(
+        !tabs_shown(&app.state, &app.view).contains(&Section::Sky),
+        "fixture: no sky tab at the opening"
+    );
 
     app.state = sky_site_only();
     frame(&mut app, &mut term, &[]);
@@ -633,7 +701,10 @@ fn a_tab_that_leaves_and_returns_is_badged_again() {
     );
     frame(&mut app, &mut term, &[digit(Section::Sky)]);
     frame(&mut app, &mut term, &[digit(Section::Meadow)]);
-    assert!(badged(&app.state, &app.view).is_empty(), "fixture: the visit cleared the Sky's badge");
+    assert!(
+        badged(&app.state, &app.view).is_empty(),
+        "fixture: the visit cleared the Sky's badge"
+    );
 
     // Its row leaves while the player is elsewhere: the tab leaves with it.
     app.state = sky_quiet();
@@ -677,7 +748,10 @@ fn the_same_state_and_focus_show_the_same_tabs_live_and_loaded() {
     let mut term2 = terminal(WIDE_W, WIDE_H);
     frame(&mut loaded, &mut term2, &[]);
 
-    assert_eq!(live.view.section, loaded.view.section, "fixture: both focus the Meadow");
+    assert_eq!(
+        live.view.section, loaded.view.section,
+        "fixture: both focus the Meadow"
+    );
     assert_eq!(
         tabs_shown(&live.state, &live.view),
         tabs_shown(&loaded.state, &loaded.view),
@@ -696,11 +770,20 @@ fn the_same_state_and_focus_show_the_same_tabs_live_and_loaded() {
 // ===========================================================================
 
 /// The player's view, opened on a sky that lists `start`, standing in the Sky.
-fn standing_in_the_sky(start: GameState, name: &str, w: u16, h: u16) -> (App, Terminal<TestBackend>) {
+fn standing_in_the_sky(
+    start: GameState,
+    name: &str,
+    w: u16,
+    h: u16,
+) -> (App, Terminal<TestBackend>) {
     let mut app = opened(start, name);
     let mut term = terminal(w, h);
     frame(&mut app, &mut term, &[digit(Section::Sky)]);
-    assert_eq!(app.view.section, Some(Section::Sky), "fixture: the digit enters the Sky");
+    assert_eq!(
+        app.view.section,
+        Some(Section::Sky),
+        "fixture: the digit enters the Sky"
+    );
     (app, term)
 }
 
@@ -708,7 +791,12 @@ fn standing_in_the_sky(start: GameState, name: &str, w: u16, h: u16) -> (App, Te
 fn standing(view: &ViewState) -> String {
     format!(
         "section={:?} reports={:?} overlay={:?} prompt={:?} inspector={:?} journal_pinned={:?}",
-        view.section, view.reports, view.overlay, view.prompt, view.inspector_wanted, view.journal_pinned
+        view.section,
+        view.reports,
+        view.overlay,
+        view.prompt,
+        view.inspector_wanted,
+        view.journal_pinned
     )
 }
 
@@ -724,14 +812,27 @@ fn a_focused_section_that_empties_keeps_focus_and_its_tab_and_everything_else_st
     type Setup = fn(&mut ViewState);
     let contexts: Vec<(&str, Setup)> = vec![
         ("a bare screen", |_| {}),
-        ("a report banner showing", |v| v.reports = vec![PendingReport { entry: 0, dismissed: false }]),
+        ("a report banner showing", |v| {
+            v.reports = vec![PendingReport {
+                entry: 0,
+                dismissed: false,
+            }]
+        }),
         ("the help overlay open", |v| v.overlay = Some(Overlay::Help)),
-        ("the Journal open", |v| v.overlay = Some(Overlay::Journal { anchor: 0 })),
+        ("the Journal open", |v| {
+            v.overlay = Some(Overlay::Journal { anchor: 0 })
+        }),
         ("the palette open", |v| {
-            v.overlay = Some(Overlay::Palette { query: "zz".to_string(), selected: 0 })
+            v.overlay = Some(Overlay::Palette {
+                query: "zz".to_string(),
+                selected: 0,
+            })
         }),
         ("a count prompt open on the sky's row", |v| {
-            v.prompt = Some(CountPrompt { digits: "3".to_string(), row: Some(RowKey::Site(SiteId::ALL[0])) })
+            v.prompt = Some(CountPrompt {
+                digits: "3".to_string(),
+                row: Some(RowKey::Site(SiteId::ALL[0])),
+            })
         }),
         ("the inspector called for", |v| v.inspector_wanted = true),
     ];
@@ -782,13 +883,17 @@ fn a_focused_section_that_empties_keeps_focus_and_its_tab_and_everything_else_st
 /// @spec TUI-NAV-085, TUI-NAV-006
 #[test]
 fn an_empty_section_out_of_focus_loses_its_tab_until_a_row_returns() {
-    let (mut app, mut term) = standing_in_the_sky(sky_site_only(), "empties-leaves", WIDE_W, WIDE_H);
+    let (mut app, mut term) =
+        standing_in_the_sky(sky_site_only(), "empties-leaves", WIDE_W, WIDE_H);
     app.state = sky_quiet();
     frame(&mut app, &mut term, &[]);
     frame(&mut app, &mut term, &[digit(Section::Meadow)]);
 
     let ring = listing(&app.state);
-    assert!(!ring.contains(&Section::Sky), "fixture: the quiet sky lists nothing");
+    assert!(
+        !ring.contains(&Section::Sky),
+        "fixture: the quiet sky lists nothing"
+    );
     assert_eq!(
         tabs_shown(&app.state, &app.view),
         ring,
@@ -808,19 +913,33 @@ fn an_empty_section_out_of_focus_loses_its_tab_until_a_row_returns() {
             "{key:?} cycled into the Sky, which has no tab: {landed:?}"
         );
         for s in &ring {
-            assert!(landed.contains(s), "fixture: {key:?} reaches the {} tab", s.title());
+            assert!(
+                landed.contains(s),
+                "fixture: {key:?} reaches the {} tab",
+                s.title()
+            );
         }
     }
     frame(&mut app, &mut term, &[digit(Section::Meadow)]);
 
     // Its digit answers as the digit of a section that never had a tab.
     let never = Section::Legacy;
-    assert!(!ring.contains(&never), "fixture: the Legacy section lists nothing here");
+    assert!(
+        !ring.contains(&never),
+        "fixture: the Legacy section lists nothing here"
+    );
     app.view.footer = None;
     frame(&mut app, &mut term, &[digit(never)]);
     let never_note = app.view.footer.clone().map(|(m, _)| m);
-    assert!(never_note.is_some(), "fixture: a section without a tab answers its digit with a note");
-    assert_eq!(app.view.section, Some(Section::Meadow), "fixture: the no-tab digit moves nothing");
+    assert!(
+        never_note.is_some(),
+        "fixture: a section without a tab answers its digit with a note"
+    );
+    assert_eq!(
+        app.view.section,
+        Some(Section::Meadow),
+        "fixture: the no-tab digit moves nothing"
+    );
 
     app.view.footer = None;
     frame(&mut app, &mut term, &[digit(Section::Sky)]);
@@ -845,7 +964,11 @@ fn an_empty_section_out_of_focus_loses_its_tab_until_a_row_returns() {
         tab_line(&app.state, &app.view)
     );
     frame(&mut app, &mut term, &[digit(Section::Sky)]);
-    assert_eq!(app.view.section, Some(Section::Sky), "the returned tab's digit does not enter it");
+    assert_eq!(
+        app.view.section,
+        Some(Section::Sky),
+        "the returned tab's digit does not enter it"
+    );
 }
 
 /// The emptied section in focus is on the ring while it holds focus, so a
@@ -865,9 +988,16 @@ fn a_section_cycle_leaves_the_emptied_focused_section_for_its_neighbours_by_digi
         let mut ring = listing(&app.state);
         ring.push(Section::Sky);
         ring.sort();
-        let at = ring.iter().position(|s| *s == Section::Sky).expect("pushed above");
+        let at = ring
+            .iter()
+            .position(|s| *s == Section::Sky)
+            .expect("pushed above");
         let n = ring.len();
-        let expected = if forward { ring[(at + 1) % n] } else { ring[(at + n - 1) % n] };
+        let expected = if forward {
+            ring[(at + 1) % n]
+        } else {
+            ring[(at + n - 1) % n]
+        };
 
         frame(&mut app, &mut term, &[press(key)]);
         assert_eq!(
@@ -889,13 +1019,22 @@ fn a_section_cycle_leaves_the_emptied_focused_section_for_its_neighbours_by_digi
 #[test]
 fn a_row_returning_to_the_focused_section_takes_the_cursor_as_entering_would() {
     // The remembered row returns, a row inserted above it.
-    let (mut app, mut term) = standing_in_the_sky(sky_whale_only(), "returns-remembered", WIDE_W, WIDE_H);
-    assert_eq!(app.view.focus[Section::Sky.index()], Some(whale_key()), "fixture: the cursor is on the summoning row");
+    let (mut app, mut term) =
+        standing_in_the_sky(sky_whale_only(), "returns-remembered", WIDE_W, WIDE_H);
+    assert_eq!(
+        app.view.focus[Section::Sky.index()],
+        Some(whale_key()),
+        "fixture: the cursor is on the summoning row"
+    );
     app.state = sky_quiet();
     frame(&mut app, &mut term, &[]);
     app.state = sky_both();
     frame(&mut app, &mut term, &[]);
-    assert_eq!(app.view.section, Some(Section::Sky), "fixture: the Sky held focus throughout");
+    assert_eq!(
+        app.view.section,
+        Some(Section::Sky),
+        "fixture: the Sky held focus throughout"
+    );
     assert_eq!(
         app.view.focus[Section::Sky.index()],
         Some(whale_key()),
@@ -914,7 +1053,8 @@ fn a_row_returning_to_the_focused_section_takes_the_cursor_as_entering_would() {
     );
 
     // A different row returns: the landing rule places the cursor.
-    let (mut app, mut term) = standing_in_the_sky(sky_whale_only(), "returns-other", WIDE_W, WIDE_H);
+    let (mut app, mut term) =
+        standing_in_the_sky(sky_whale_only(), "returns-other", WIDE_W, WIDE_H);
     app.state = sky_quiet();
     frame(&mut app, &mut term, &[]);
     app.state = sky_site_only();

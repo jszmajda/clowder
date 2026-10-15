@@ -897,7 +897,12 @@ pub enum Season {
 }
 
 impl Season {
-    pub const ALL: [Season; 4] = [Season::Spring, Season::Summer, Season::Autumn, Season::Winter];
+    pub const ALL: [Season; 4] = [
+        Season::Spring,
+        Season::Summer,
+        Season::Autumn,
+        Season::Winter,
+    ];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1033,10 +1038,16 @@ pub struct GameState {
     pub ticks: u64,
     pub rng: Pcg32,
     /// Indexed by `ResourceId::ix()`. Older saves zero-fill forward.
-    #[serde(serialize_with = "serialize_array", deserialize_with = "zero_filled_array")]
+    #[serde(
+        serialize_with = "serialize_array",
+        deserialize_with = "zero_filled_array"
+    )]
     pub resources: [f64; RESOURCE_COUNT],
     /// Indexed by `StructureId::ix()`. Older saves zero-fill forward.
-    #[serde(serialize_with = "serialize_array", deserialize_with = "zero_filled_array")]
+    #[serde(
+        serialize_with = "serialize_array",
+        deserialize_with = "zero_filled_array"
+    )]
     pub structures: [u32; STRUCTURE_COUNT],
     pub kittens: Vec<Kitten>,
     pub ideas: BTreeSet<IdeaId>,
@@ -1339,7 +1350,11 @@ impl GameState {
     /// The revealed resources, in the order the core lists resources.
     /// @spec SIM-ENG-053
     pub fn resources_revealed(&self) -> Vec<ResourceId> {
-        ResourceId::ALL.iter().copied().filter(|r| self.resource_revealed(*r)).collect()
+        ResourceId::ALL
+            .iter()
+            .copied()
+            .filter(|r| self.resource_revealed(*r))
+            .collect()
     }
 
     /// Record every resource the meadow holds (stock above zero, no dust
@@ -1389,7 +1404,11 @@ impl GameState {
             }
         }
         let mut priced = vec![crate::command::Command::Pounce(1)];
-        priced.extend(ColonyId::ALL.iter().map(|c| crate::command::Command::Trade(*c, 1)));
+        priced.extend(
+            ColonyId::ALL
+                .iter()
+                .map(|c| crate::command::Command::Trade(*c, 1)),
+        );
         for cmd in &priced {
             if let Some(price) = self.unit_price(cmd) {
                 for (r, _) in price {
@@ -1526,8 +1545,11 @@ impl GameState {
         use crate::effects::Effect;
         // MaxCapRatio arrives only from Rites, so the rite-free hot path (the
         // per-tick clamp) skips that scan entirely.
-        let max_cap_ratio =
-            if self.rites.is_empty() { 0.0 } else { self.effect(Effect::MaxCapRatio(r)) };
+        let max_cap_ratio = if self.rites.is_empty() {
+            0.0
+        } else {
+            self.effect(Effect::MaxCapRatio(r))
+        };
         // Elder Wisdom (+0.1%/pt) and Passed-Down Wisdom (+0.05%/pt) fold into
         // the storage ratio term. @spec SIM-MOVE-007, SIM-MOVE-009
         let ratio = 1.0
@@ -1566,7 +1588,8 @@ impl GameState {
         }
         let sunstones = self.structures[StructureId::Sunstone.ix()] as f64;
         // Aurora Lanterns extend the Long Sun cap (+2 each). @spec SIM-SKY-005
-        let cap = 10.0 + 0.05 * self.enlightenment_tier as f64 * sunstones
+        let cap = 10.0
+            + 0.05 * self.enlightenment_tier as f64 * sunstones
             + self.effect(crate::effects::Effect::LongSunCapBonus);
         crate::effects::limited_dr(
             crate::effects::unlimited_dr(self.devotion, 1000.0) / 100.0,
@@ -1700,7 +1723,10 @@ impl GameState {
     /// The prerequisite half of `idea_unlocked`, for callers that have
     /// already checked the curiosity gate once (the per-tick reveal scan).
     pub(crate) fn idea_prereqs_met(&self, i: IdeaId) -> bool {
-        content::idea_def(i).prereqs.iter().all(|p| self.ideas.contains(p))
+        content::idea_def(i)
+            .prereqs
+            .iter()
+            .all(|p| self.ideas.contains(p))
     }
 
     /// A recipe rides the idea tree: Locked until its granting idea.
@@ -1725,7 +1751,8 @@ impl GameState {
     /// Capacity minus the whole roster — every kitten holds a slot, Home or Away.
     // @spec SIM-KIT-006
     pub fn free_slots(&self) -> u32 {
-        self.housing_capacity().saturating_sub(self.kittens.len() as u32)
+        self.housing_capacity()
+            .saturating_sub(self.kittens.len() as u32)
     }
 
     /// Home kittens holding this job.
@@ -1738,7 +1765,10 @@ impl GameState {
     }
 
     fn home_count(&self) -> u32 {
-        self.kittens.iter().filter(|k| k.location == Location::Home).count() as u32
+        self.kittens
+            .iter()
+            .filter(|k| k.location == Location::Home)
+            .count() as u32
     }
 
     /// Happiness in percentage points (floored at 25, no ceiling).
@@ -1874,8 +1904,10 @@ impl GameState {
             .converter
             .expect("the Dynamo Wheel draws fuel")
             .inputs;
-        let demands: Vec<(ResourceId, f64)> =
-            inputs.iter().map(|(r, d)| (*r, d * wheels as f64)).collect();
+        let demands: Vec<(ResourceId, f64)> = inputs
+            .iter()
+            .map(|(r, d)| (*r, d * wheels as f64))
+            .collect();
         self.throttle_fraction(&demands)
     }
 
@@ -2182,23 +2214,63 @@ mod move_classification {
     fn every_field_of_the_meadow_is_classified_by_the_move() {
         let GameState {
             // ---- reset to new-game defaults ----
-            ticks: _, resources: _, structures: _, kittens: _, ideas: _, pity: _,
-            famine_days: _, recovery_days: _, grumpy: _, next_seq: _,
-            zoomies_until: _, revealed: _, kites_high_water: _, mess: _,
-            pending_sky_event: _, elder: _, jamboree_until: _, refinements: _,
-            rules: _, devotion: _, peak_devotion: _, rites: _, rite_counts: _,
-            arches_bought: _, dream_drift: _, promises: _, penpal: _,
-            discovered: _, stirred_dreams: _, whale_visit_years: _,
-            whale_contentment: _, deja_vu_until: _, tidy_progress: _,
-            unrevealed_structs: _, unrevealed_ideas: _, revealed_resources: _,
+            ticks: _,
+            resources: _,
+            structures: _,
+            kittens: _,
+            ideas: _,
+            pity: _,
+            famine_days: _,
+            recovery_days: _,
+            grumpy: _,
+            next_seq: _,
+            zoomies_until: _,
+            revealed: _,
+            kites_high_water: _,
+            mess: _,
+            pending_sky_event: _,
+            elder: _,
+            jamboree_until: _,
+            refinements: _,
+            rules: _,
+            devotion: _,
+            peak_devotion: _,
+            rites: _,
+            rite_counts: _,
+            arches_bought: _,
+            dream_drift: _,
+            promises: _,
+            penpal: _,
+            discovered: _,
+            stirred_dreams: _,
+            whale_visit_years: _,
+            whale_contentment: _,
+            deja_vu_until: _,
+            tidy_progress: _,
+            unrevealed_structs: _,
+            unrevealed_ideas: _,
+            revealed_resources: _,
             unrevealed_resources: _,
 
             // ---- preserved, and named as legacies by the spec ----
-            rng: _, speed: _, serenity: _, enlightenment_tier: _,
-            elder_wisdom: _, warm_memories: _, passed_down_wisdom: _,
-            generation: _, traditions: _, family_album: _, armed_adventure: _,
-            active_adventure: _, adventure_completions: _, adventure_rewards: _,
-            adventure_done: _, sites_reached: _, dream_looms: _, distant_dawn: _,
+            rng: _,
+            speed: _,
+            serenity: _,
+            enlightenment_tier: _,
+            elder_wisdom: _,
+            warm_memories: _,
+            passed_down_wisdom: _,
+            generation: _,
+            traditions: _,
+            family_album: _,
+            armed_adventure: _,
+            active_adventure: _,
+            adventure_completions: _,
+            adventure_rewards: _,
+            adventure_done: _,
+            sites_reached: _,
+            dream_looms: _,
+            distant_dawn: _,
 
             // ---- preserved, and NOT named by the spec ----
             roster_high_water: _,

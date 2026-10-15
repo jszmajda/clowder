@@ -31,7 +31,7 @@ use std::time::{Duration, Instant};
 use clowder_core::content::MEADOW_MOVE_MIN_KITTENS;
 use clowder_core::{
     ArchId, ColonyId, Command, CommandError, ContentId, CraftId, GameState, IdeaId, JobId, Kitten,
-    KittenTrait, LockReason, Location, ResourceId, RiteId, StructureId,
+    KittenTrait, Location, LockReason, ResourceId, RiteId, StructureId,
 };
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::backend::TestBackend;
@@ -41,7 +41,9 @@ use ratatui::Terminal;
 
 use clowder_tui::nav::rows::{rows, Row, RowKind};
 use clowder_tui::nav::update::MAX_AFFORDABLE_CAP;
-use clowder_tui::nav::{plain_error, update, Action, CountSemantics, Outcome, RowKey, Section, ViewState};
+use clowder_tui::nav::{
+    plain_error, update, Action, CountSemantics, Outcome, RowKey, Section, ViewState,
+};
 use clowder_tui::render::fmt;
 use clowder_tui::render::layout::{compute, Body};
 use clowder_tui::render::widgets::inspector;
@@ -102,7 +104,9 @@ fn rich() -> GameState {
     s.peak_devotion = 1.0e12;
     s.devotion = 1.0e6;
     s.serenity = 1.0e12;
-    s.rites = [RiteId::TheReverie, RiteId::Enlightenment].into_iter().collect::<BTreeSet<_>>();
+    s.rites = [RiteId::TheReverie, RiteId::Enlightenment]
+        .into_iter()
+        .collect::<BTreeSet<_>>();
     s.arches_bought = [ArchId::EverdreamArch].into_iter().collect::<BTreeSet<_>>();
     s.discovered = ColonyId::ALL.iter().copied().collect::<BTreeSet<_>>();
     s.whale_visit_years = 5;
@@ -119,7 +123,10 @@ fn fresh() -> GameState {
 }
 
 fn focused(section: Section, key: RowKey) -> ViewState {
-    let mut v = ViewState { section: Some(section), ..Default::default() };
+    let mut v = ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     v.focus[section.index()] = Some(key);
     v
 }
@@ -148,7 +155,10 @@ fn opens_prompt(state: &GameState, row: &Row) -> bool {
     !owned(state, row)
         && match &row.kind {
             RowKind::Act { semantics, .. } => {
-                matches!(semantics, CountSemantics::CountTaking | CountSemantics::RepeatN)
+                matches!(
+                    semantics,
+                    CountSemantics::CountTaking | CountSemantics::RepeatN
+                )
             }
             RowKind::Count { .. } => true,
             RowKind::Display | RowKind::Group => false,
@@ -156,7 +166,10 @@ fn opens_prompt(state: &GameState, row: &Row) -> bool {
 }
 
 fn prompt_rows(state: &GameState) -> Vec<(Section, Row)> {
-    every_row(state).into_iter().filter(|(_, r)| opens_prompt(state, r)).collect()
+    every_row(state)
+        .into_iter()
+        .filter(|(_, r)| opens_prompt(state, r))
+        .collect()
 }
 
 fn with_count(command: Command, n: u32) -> Command {
@@ -172,12 +185,19 @@ fn with_count(command: Command, n: u32) -> Command {
 /// does not arm. @spec TUI-NAV-070
 fn accepted(row: &Row, n: u32) -> Outcome {
     match &row.kind {
-        RowKind::Act { command, semantics: CountSemantics::CountTaking } => {
-            Outcome::Apply(with_count(*command, n))
-        }
-        RowKind::Act { command, semantics: CountSemantics::RepeatN } => Outcome::Repeat(*command, n),
+        RowKind::Act {
+            command,
+            semantics: CountSemantics::CountTaking,
+        } => Outcome::Apply(with_count(*command, n)),
+        RowKind::Act {
+            command,
+            semantics: CountSemantics::RepeatN,
+        } => Outcome::Repeat(*command, n),
         RowKind::Count { increment, .. } => Outcome::Repeat(*increment, n),
-        other => panic!("fixture: {:?} is not a row the count prompt opens on ({other:?})", row.key),
+        other => panic!(
+            "fixture: {:?} is not a row the count prompt opens on ({other:?})",
+            row.key
+        ),
     }
 }
 
@@ -185,7 +205,11 @@ fn accepted(row: &Row, n: u32) -> Outcome {
 fn prompt_on(section: Section, row: &Row, digits: &str, state: &GameState) -> ViewState {
     let mut view = focused(section, row.key.clone());
     update(Action::CountPrompt, &mut view, state);
-    assert!(view.prompt.is_some(), "fixture: x on {:?} opened no count prompt", row.key);
+    assert!(
+        view.prompt.is_some(),
+        "fixture: x on {:?} opened no count prompt",
+        row.key
+    );
     for c in digits.chars() {
         update(Action::Type(c), &mut view, state);
     }
@@ -197,7 +221,10 @@ fn assert_footer_says_something_plain(view: &ViewState, context: &str) {
         .footer
         .as_ref()
         .unwrap_or_else(|| panic!("{context} left no footer note"));
-    assert!(!message.trim().is_empty(), "{context} left an empty footer note");
+    assert!(
+        !message.trim().is_empty(),
+        "{context} left an empty footer note"
+    );
     assert!(
         message.contains(' '),
         "{context} left the footer note {message:?}; it is shown to a player, in words"
@@ -265,7 +292,12 @@ fn numbers(s: &str) -> BTreeSet<String> {
 /// are what `numbers` reads, the magnitude letter aside).
 fn renderings(amount: f64) -> [String; 2] {
     let compact = fmt::compact(amount);
-    [fmt::exact(amount), compact.trim_end_matches(|c: char| c.is_alphabetic()).to_string()]
+    [
+        fmt::exact(amount),
+        compact
+            .trim_end_matches(|c: char| c.is_alphabetic())
+            .to_string(),
+    ]
 }
 
 fn shows_amount(on_screen: &BTreeSet<String>, amount: f64) -> bool {
@@ -279,7 +311,12 @@ fn shows_amount(on_screen: &BTreeSet<String>, amount: f64) -> bool {
 /// inspector always carries the preview whole — since a component
 /// TUI-RENDER-021 cuts from the list's own row for room is still one
 /// keypress away in the swap, never off screen everywhere at once.
-fn typed_numbers(state: &GameState, section: Section, row: &Row, digits: &str) -> (BTreeSet<String>, BTreeSet<String>, String) {
+fn typed_numbers(
+    state: &GameState,
+    section: Section,
+    row: &Row,
+    digits: &str,
+) -> (BTreeSet<String>, BTreeSet<String>, String) {
     let empty = format!(
         "{}\n{}",
         frame_text(state, &prompt_on(section, row, "", state)),
@@ -342,12 +379,21 @@ fn a_repeat_n_count_previews_the_cores_total_for_taking_it() {
     let state = rich();
     let mut seen = 0;
     for (section, row) in prompt_rows(&state) {
-        if !matches!(row.kind, RowKind::Act { semantics: CountSemantics::RepeatN, .. }) {
+        if !matches!(
+            row.kind,
+            RowKind::Act {
+                semantics: CountSemantics::RepeatN,
+                ..
+            }
+        ) {
             continue;
         }
         seen += 1;
         let RowKey::Content(id, _) = row.key else {
-            panic!("fixture: the repeat-N row {:?} is not a content item", row.key);
+            panic!(
+                "fixture: the repeat-N row {:?} is not a content item",
+                row.key
+            );
         };
         let total = state.cost_of_next(id, 7);
         if total.is_empty() {
@@ -365,7 +411,9 @@ fn a_repeat_n_count_previews_the_cores_total_for_taking_it() {
             );
         }
         assert!(
-            total.iter().any(|(_, a)| renderings(*a).iter().any(|t| added.contains(t))),
+            total
+                .iter()
+                .any(|(_, a)| renderings(*a).iter().any(|t| added.contains(t))),
             "with 7 typed into the prompt on {:?}, nothing of the core's total for seven appeared \
              that was not already on screen.\n{frame}",
             row.key
@@ -384,7 +432,11 @@ fn a_per_unit_priced_count_previews_n_times_the_cores_unit_price() {
     let state = rich();
     let mut seen = 0;
     for (section, row) in prompt_rows(&state) {
-        let RowKind::Act { command, semantics: CountSemantics::CountTaking } = row.kind else {
+        let RowKind::Act {
+            command,
+            semantics: CountSemantics::CountTaking,
+        } = row.kind
+        else {
             continue;
         };
         if row.heavy {
@@ -392,7 +444,12 @@ fn a_per_unit_priced_count_previews_n_times_the_cores_unit_price() {
         }
         seen += 1;
         let Some(unit) = state.unit_price(&command) else {
-            assert_count_alone(&state, section, &row, "the count-taking row the core prices not");
+            assert_count_alone(
+                &state,
+                section,
+                &row,
+                "the count-taking row the core prices not",
+            );
             continue;
         };
         let (after, added, frame) = typed_numbers(&state, section, &row, "7");
@@ -431,7 +488,10 @@ fn the_heavy_count_taking_and_count_rows_preview_the_count_alone() {
                 counts += 1;
                 "the count row"
             }
-            RowKind::Act { command: Command::DeepNap(_), .. } => {
+            RowKind::Act {
+                command: Command::DeepNap(_),
+                ..
+            } => {
                 nap += 1;
                 "the nap row"
             }
@@ -472,8 +532,11 @@ fn an_empty_or_zero_count_or_an_unlisted_row_previews_nothing() {
         vanished += 1;
         let empty = frame_text(&gone, &prompt_on(section, &row, "", &state));
         let typed = frame_text(&gone, &prompt_on(section, &row, "7", &state));
-        let added: Vec<String> =
-            numbers(&typed).difference(&numbers(&empty)).filter(|t| t.as_str() != "7").cloned().collect();
+        let added: Vec<String> = numbers(&typed)
+            .difference(&numbers(&empty))
+            .filter(|t| t.as_str() != "7")
+            .cloned()
+            .collect();
         assert!(
             added.is_empty(),
             "a prompt opened on {:?} and drawn once that row had left its list brought {added:?} \
@@ -481,7 +544,10 @@ fn an_empty_or_zero_count_or_an_unlisted_row_previews_nothing() {
             row.key
         );
     }
-    assert!(vanished > 0, "fixture: no prompt row leaves its list in a fresh meadow");
+    assert!(
+        vanished > 0,
+        "fixture: no prompt row leaves its list in a fresh meadow"
+    );
 }
 
 // ===========================================================================
@@ -501,7 +567,8 @@ fn swapped_text(state: &GameState, view: &ViewState) -> String {
     let Body::Narrow { main, .. } = compute(area, None, false).body else {
         panic!("fixture: {SWAP_W} columns should lay out narrow");
     };
-    let mut term = Terminal::new(TestBackend::new(SWAP_W, SWAP_H)).expect("TestBackend is infallible");
+    let mut term =
+        Terminal::new(TestBackend::new(SWAP_W, SWAP_H)).expect("TestBackend is infallible");
     term.draw(|f| {
         clowder_tui::render::frame(f, state, view, None);
     })
@@ -516,7 +583,11 @@ fn swapped_prompt_on(section: Section, row: &Row, digits: &str, state: &GameStat
     let mut view = focused(section, row.key.clone());
     view.inspector_wanted = true;
     update(Action::CountPrompt, &mut view, state);
-    assert!(view.prompt.is_some(), "fixture: x on {:?} in the swap opened no count prompt", row.key);
+    assert!(
+        view.prompt.is_some(),
+        "fixture: x on {:?} in the swap opened no count prompt",
+        row.key
+    );
     for c in [' ', 'i'].into_iter().chain(digits.chars()) {
         update(Action::Type(c), &mut view, state);
     }
@@ -573,13 +644,21 @@ fn the_swapped_inspector_shows_an_open_prompts_count_and_preview() {
         );
 
         let priced: Option<Vec<(ResourceId, f64)>> = match &row.kind {
-            RowKind::Act { semantics: CountSemantics::RepeatN, .. } => match row.key {
+            RowKind::Act {
+                semantics: CountSemantics::RepeatN,
+                ..
+            } => match row.key {
                 RowKey::Content(id, _) => Some(state.cost_of_next(id, COUNT)),
                 _ => None,
             },
-            RowKind::Act { command, semantics: CountSemantics::CountTaking } if !row.heavy => state
-                .unit_price(command)
-                .map(|unit| unit.into_iter().map(|(r, each)| (r, each * COUNT as f64)).collect()),
+            RowKind::Act {
+                command,
+                semantics: CountSemantics::CountTaking,
+            } if !row.heavy => state.unit_price(command).map(|unit| {
+                unit.into_iter()
+                    .map(|(r, each)| (r, each * COUNT as f64))
+                    .collect()
+            }),
             _ => None,
         };
         match priced.filter(|p| !p.is_empty()) {
@@ -645,7 +724,11 @@ fn the_count_prompt_takes_no_digit_past_the_cap_that_bounds_x() {
                 "typing the cap ({cap}) into the prompt on {:?}, digit {c:?} was not taken",
                 row.key
             );
-            assert!(view.footer.is_none(), "a digit within the cap left a footer note on {:?}", row.key);
+            assert!(
+                view.footer.is_none(),
+                "a digit within the cap left a footer note on {:?}",
+                row.key
+            );
         }
 
         // Past the cap, no digit is taken, and each refusal says so.
@@ -692,13 +775,30 @@ fn the_count_prompt_takes_no_digit_past_the_cap_that_bounds_x() {
             let mut view = prompt_on(section, &row, &prefix, &state);
             let would_be: u64 = format!("{prefix}{d}").parse().expect("digits");
             update(Action::Type(d), &mut view, &state);
-            let now = view.prompt.as_ref().map(|p| p.digits.clone()).unwrap_or_default();
+            let now = view
+                .prompt
+                .as_ref()
+                .map(|p| p.digits.clone())
+                .unwrap_or_default();
             if would_be <= cap as u64 {
-                assert_eq!(now, format!("{prefix}{d}"), "{would_be} is within the cap ({cap}) and was refused");
-                assert!(view.footer.is_none(), "{would_be} is within the cap and left a footer note");
+                assert_eq!(
+                    now,
+                    format!("{prefix}{d}"),
+                    "{would_be} is within the cap ({cap}) and was refused"
+                );
+                assert!(
+                    view.footer.is_none(),
+                    "{would_be} is within the cap and left a footer note"
+                );
             } else {
-                assert_eq!(now, prefix, "{would_be} is past the cap ({cap}) and was taken");
-                assert_footer_says_something_plain(&view, &format!("typing {would_be} on {:?}", row.key));
+                assert_eq!(
+                    now, prefix,
+                    "{would_be} is past the cap ({cap}) and was taken"
+                );
+                assert_footer_says_something_plain(
+                    &view,
+                    &format!("typing {would_be} on {:?}", row.key),
+                );
             }
         }
     }
@@ -712,8 +812,7 @@ fn the_count_prompt_takes_no_digit_past_the_cap_that_bounds_x() {
 fn scratch(name: &str) -> PathBuf {
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir =
-        std::env::temp_dir().join(format!("clowder-count-{}-{name}-{n}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("clowder-count-{}-{name}-{n}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir.join("save.json")
@@ -752,8 +851,12 @@ fn times(n: u32) -> Vec<Event> {
 /// One frame with these keys and no time passing: every change is the keys'.
 fn step(app: &mut App, input: &[Event]) {
     let mut term = Terminal::new(TestBackend::new(120, 40)).expect("TestBackend is infallible");
-    let still = Reading { monotonic: Duration::ZERO, wall: Duration::ZERO };
-    app.step(&mut term, still, input).expect("an in-memory step does not fail");
+    let still = Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::ZERO,
+    };
+    app.step(&mut term, still, input)
+        .expect("an in-memory step does not fail");
 }
 
 fn footer(app: &App) -> Option<String> {
@@ -769,7 +872,10 @@ fn build_row(state: &GameState) -> (RowKey, StructureId) {
     rows(state, Section::Meadow)
         .into_iter()
         .find_map(|r| match r.kind {
-            RowKind::Act { command: Command::Build(s), .. } => Some((r.key.clone(), s)),
+            RowKind::Act {
+                command: Command::Build(s),
+                ..
+            } => Some((r.key.clone(), s)),
             _ => None,
         })
         .expect("fixture: a Build row is listed")
@@ -815,7 +921,15 @@ fn with_idle(k: usize) -> GameState {
 fn pounce_row(state: &GameState) -> RowKey {
     rows(state, Section::Clowder)
         .into_iter()
-        .find(|r| matches!(r.kind, RowKind::Act { command: Command::Pounce(_), .. }))
+        .find(|r| {
+            matches!(
+                r.kind,
+                RowKind::Act {
+                    command: Command::Pounce(_),
+                    ..
+                }
+            )
+        })
         .map(|r| r.key)
         .expect("fixture: the Pounce row is listed")
 }
@@ -824,7 +938,9 @@ fn pounce_row(state: &GameState) -> RowKey {
 /// reports one squad's price.
 fn stocked_for_squads(k: u32) -> GameState {
     let mut state = rich();
-    let unit = state.unit_price(&Command::Pounce(1)).expect("fixture: a pounce is priced here");
+    let unit = state
+        .unit_price(&Command::Pounce(1))
+        .expect("fixture: a pounce is priced here");
     for (r, each) in unit {
         state.resources[r.ix()] = each * k as f64;
     }
@@ -835,9 +951,12 @@ fn stocked_for_squads(k: u32) -> GameState {
 fn rejection_after(state: &GameState, command: Command, done: u32) -> CommandError {
     let mut s = state.clone();
     for i in 0..done {
-        s.apply(command).unwrap_or_else(|e| panic!("fixture: call {} of {command:?} was refused: {e:?}", i + 1));
+        s.apply(command).unwrap_or_else(|e| {
+            panic!("fixture: call {} of {command:?} was refused: {e:?}", i + 1)
+        });
     }
-    s.apply(command).expect_err("fixture: the call after the last affordable one is refused")
+    s.apply(command)
+        .expect_err("fixture: the call after the last affordable one is refused")
 }
 
 /// The footer a single Enter on the same row, in the same meadow, leaves.
@@ -860,9 +979,16 @@ fn a_repeat_n_count_stopped_partway_says_why_and_how_many_of_how_many() {
     let mut app = app_on(state, Section::Meadow, key, "repeat-partial");
     step(&mut app, &times(10));
 
-    assert_eq!(app.state.structures[s.ix()], before + 3, "fixture: the core took three of ten");
+    assert_eq!(
+        app.state.structures[s.ix()],
+        before + 3,
+        "fixture: the core took three of ten"
+    );
     let said = footer(&app).expect("a ×10 run the core stopped after three left no footer");
-    assert!(said.contains(&why), "the run's footer {said:?} does not state the core's rejection {why:?}");
+    assert!(
+        said.contains(&why),
+        "the run's footer {said:?} does not state the core's rejection {why:?}"
+    );
     let on = numbers(&said);
     assert!(
         on.contains("3") && on.contains("10"),
@@ -884,9 +1010,15 @@ fn a_count_row_count_stopped_partway_says_why_and_how_many_of_how_many() {
     step(&mut app, &times(5));
 
     let said = footer(&app).expect("a ×5 run the core stopped after two left no footer");
-    assert!(said.contains(&why), "the run's footer {said:?} does not state the core's rejection {why:?}");
+    assert!(
+        said.contains(&why),
+        "the run's footer {said:?} does not state the core's rejection {why:?}"
+    );
     let on = numbers(&said);
-    assert!(on.contains("2") && on.contains("5"), "the footer {said:?} does not say that 2 of 5 were done");
+    assert!(
+        on.contains("2") && on.contains("5"),
+        "the footer {said:?} does not say that 2 of 5 were done"
+    );
 }
 
 /// `X` stopped by the core states the rejection and how many were done — and
@@ -906,17 +1038,32 @@ fn x_max_stopped_by_the_core_says_why_and_how_many() {
     let before = state.structures[s.ix()];
     let mut app = app_on(state, Section::Meadow, key, "max-build");
     step(&mut app, &[press('X')]);
-    assert_eq!(app.state.structures[s.ix()], before + 4, "fixture: X built the four the stock covered");
+    assert_eq!(
+        app.state.structures[s.ix()],
+        before + 4,
+        "fixture: X built the four the stock covered"
+    );
     let said = footer(&app).expect("X stopped by the core on a repeat-N row left no footer");
-    assert!(said.contains(&why), "X's footer {said:?} does not state the core's rejection {why:?}");
-    assert!(numbers(&said).contains("4"), "X's footer {said:?} does not say 4 were done");
-    assert!(!numbers(&said).contains(&cap), "X's footer {said:?} states its cap as if it were a count");
+    assert!(
+        said.contains(&why),
+        "X's footer {said:?} does not state the core's rejection {why:?}"
+    );
+    assert!(
+        numbers(&said).contains("4"),
+        "X's footer {said:?} does not say 4 were done"
+    );
+    assert!(
+        !numbers(&said).contains(&cap),
+        "X's footer {said:?} states its cap as if it were a count"
+    );
 
     // A count-taking row: one squad per call.
     let state = stocked_for_squads(3);
     let key = pounce_row(&state);
     let why = plain_error(&rejection_after(&state, Command::Pounce(1), 3));
-    let unit = state.unit_price(&Command::Pounce(1)).expect("fixture: priced");
+    let unit = state
+        .unit_price(&Command::Pounce(1))
+        .expect("fixture: priced");
     let mut app = app_on(state, Section::Clowder, key, "max-pounce");
     step(&mut app, &[press('X')]);
     for (r, _) in &unit {
@@ -928,9 +1075,18 @@ fn x_max_stopped_by_the_core_says_why_and_how_many() {
         );
     }
     let said = footer(&app).expect("X stopped by the core on a count-taking row left no footer");
-    assert!(said.contains(&why), "X's footer {said:?} does not state the core's rejection {why:?}");
-    assert!(numbers(&said).contains("3"), "X's footer {said:?} does not say 3 were done");
-    assert!(!numbers(&said).contains(&cap), "X's footer {said:?} states its cap as if it were a count");
+    assert!(
+        said.contains(&why),
+        "X's footer {said:?} does not state the core's rejection {why:?}"
+    );
+    assert!(
+        numbers(&said).contains("3"),
+        "X's footer {said:?} does not say 3 were done"
+    );
+    assert!(
+        !numbers(&said).contains(&cap),
+        "X's footer {said:?} states its cap as if it were a count"
+    );
 
     // A count row.
     let state = with_idle(3);
@@ -939,9 +1095,18 @@ fn x_max_stopped_by_the_core_says_why_and_how_many() {
     let mut app = app_on(state, Section::Clowder, key, "max-count");
     step(&mut app, &[press('X')]);
     let said = footer(&app).expect("X stopped by the core on a count row left no footer");
-    assert!(said.contains(&why), "X's footer {said:?} does not state the core's rejection {why:?}");
-    assert!(numbers(&said).contains("3"), "X's footer {said:?} does not say 3 were done");
-    assert!(!numbers(&said).contains(&cap), "X's footer {said:?} states its cap as if it were a count");
+    assert!(
+        said.contains(&why),
+        "X's footer {said:?} does not state the core's rejection {why:?}"
+    );
+    assert!(
+        numbers(&said).contains("3"),
+        "X's footer {said:?} does not say 3 were done"
+    );
+    assert!(
+        !numbers(&said).contains(&cap),
+        "X's footer {said:?} states its cap as if it were a count"
+    );
 }
 
 /// A run refused on its very first call reads exactly as Enter's refusal on
@@ -958,11 +1123,41 @@ fn a_run_refused_on_its_first_call_reads_as_enters_refusal() {
     let pounce_key = pounce_row(&pounce_state);
 
     let cases: Vec<(&str, &GameState, Section, RowKey, Vec<Event>)> = vec![
-        ("×10 on a repeat-N row", &build_state, Section::Meadow, build_key.clone(), times(10)),
-        ("×5 on a count row", &idle_state, Section::Clowder, job_key.clone(), times(5)),
-        ("X on a repeat-N row", &build_state, Section::Meadow, build_key, vec![press('X')]),
-        ("X on a count-taking row", &pounce_state, Section::Clowder, pounce_key, vec![press('X')]),
-        ("X on a count row", &idle_state, Section::Clowder, job_key, vec![press('X')]),
+        (
+            "×10 on a repeat-N row",
+            &build_state,
+            Section::Meadow,
+            build_key.clone(),
+            times(10),
+        ),
+        (
+            "×5 on a count row",
+            &idle_state,
+            Section::Clowder,
+            job_key.clone(),
+            times(5),
+        ),
+        (
+            "X on a repeat-N row",
+            &build_state,
+            Section::Meadow,
+            build_key,
+            vec![press('X')],
+        ),
+        (
+            "X on a count-taking row",
+            &pounce_state,
+            Section::Clowder,
+            pounce_key,
+            vec![press('X')],
+        ),
+        (
+            "X on a count row",
+            &idle_state,
+            Section::Clowder,
+            job_key,
+            vec![press('X')],
+        ),
     ];
 
     for (what, state, section, key, keys) in cases {
@@ -989,22 +1184,40 @@ fn a_run_that_reaches_its_count_or_the_cap_unrefused_leaves_no_footer() {
     let before = state.structures[s.ix()];
     let mut app = app_on(state, Section::Meadow, key, "full-build");
     step(&mut app, &times(3));
-    assert_eq!(app.state.structures[s.ix()], before + 3, "fixture: ×3 built three");
-    assert_eq!(footer(&app), None, "a ×3 run that built all three left a footer");
+    assert_eq!(
+        app.state.structures[s.ix()],
+        before + 3,
+        "fixture: ×3 built three"
+    );
+    assert_eq!(
+        footer(&app),
+        None,
+        "a ×3 run that built all three left a footer"
+    );
 
     let state = with_idle(8);
     let (key, _) = job_row(&state);
     let mut app = app_on(state, Section::Clowder, key, "full-count");
     step(&mut app, &times(4));
-    assert_eq!(footer(&app), None, "a ×4 run that assigned all four left a footer");
+    assert_eq!(
+        footer(&app),
+        None,
+        "a ×4 run that assigned all four left a footer"
+    );
 
     let state = rich();
     let key = pounce_row(&state);
-    let unit = state.unit_price(&Command::Pounce(1)).expect("fixture: priced");
+    let unit = state
+        .unit_price(&Command::Pounce(1))
+        .expect("fixture: priced");
     let had: Vec<f64> = unit.iter().map(|(r, _)| state.stock(*r)).collect();
     let mut app = app_on(state, Section::Clowder, key, "full-max");
     step(&mut app, &[press('X')]);
-    assert_eq!(footer(&app), None, "an X run that reached its cap unrefused left a footer");
+    assert_eq!(
+        footer(&app),
+        None,
+        "an X run that reached its cap unrefused left a footer"
+    );
     for ((r, each), had) in unit.iter().zip(had) {
         let spent = had - app.state.stock(*r);
         let expected = each * MAX_AFFORDABLE_CAP as f64;
@@ -1024,8 +1237,15 @@ fn big_x() -> Event {
 fn step_after(app: &mut App, secs: f64, input: &[Event]) {
     let mut term = Terminal::new(TestBackend::new(120, 40)).expect("TestBackend is infallible");
     let d = Duration::from_secs_f64(secs);
-    app.step(&mut term, Reading { monotonic: d, wall: d }, input)
-        .expect("an in-memory step does not fail");
+    app.step(
+        &mut term,
+        Reading {
+            monotonic: d,
+            wall: d,
+        },
+        input,
+    )
+    .expect("an in-memory step does not fail");
 }
 
 /// `state` after a run of `command` made the way the spec has it: every call
@@ -1047,7 +1267,13 @@ fn run_at_the_press(state: &GameState, command: Command, n: u32) -> (GameState, 
 /// does after the frame's input.
 fn tick_frame(state: &mut GameState, clock: &mut TickAccumulator, secs: f64) {
     let d = Duration::from_secs_f64(secs);
-    clock.observe(Reading { monotonic: d, wall: d }, state.speed);
+    clock.observe(
+        Reading {
+            monotonic: d,
+            wall: d,
+        },
+        state.speed,
+    );
     for _ in 0..clock.take(2_000) {
         state.tick();
     }
@@ -1072,13 +1298,61 @@ fn every_run_is_made_whole_at_the_press_with_no_tick_between_its_calls() {
     let squads = stocked_for_squads(3);
     let squad_key = pounce_row(&squads);
 
-    type Case = (&'static str, GameState, Section, RowKey, Vec<Event>, Command, u32);
+    type Case = (
+        &'static str,
+        GameState,
+        Section,
+        RowKey,
+        Vec<Event>,
+        Command,
+        u32,
+    );
     let cases: Vec<Case> = vec![
-        ("×5 on a repeat-N row", builds, Section::Meadow, build_key, times(5), Command::Build(s), 5),
-        ("×4 on a count row", idle, Section::Clowder, job_key.clone(), times(4), assign, 4),
-        ("X on a repeat-N row", builds_x, Section::Meadow, build_key_x, vec![big_x()], Command::Build(s), MAX_AFFORDABLE_CAP),
-        ("X on a count-taking row", squads, Section::Clowder, squad_key, vec![big_x()], Command::Pounce(1), MAX_AFFORDABLE_CAP),
-        ("X on a count row", idle_x, Section::Clowder, job_key, vec![big_x()], assign, MAX_AFFORDABLE_CAP),
+        (
+            "×5 on a repeat-N row",
+            builds,
+            Section::Meadow,
+            build_key,
+            times(5),
+            Command::Build(s),
+            5,
+        ),
+        (
+            "×4 on a count row",
+            idle,
+            Section::Clowder,
+            job_key.clone(),
+            times(4),
+            assign,
+            4,
+        ),
+        (
+            "X on a repeat-N row",
+            builds_x,
+            Section::Meadow,
+            build_key_x,
+            vec![big_x()],
+            Command::Build(s),
+            MAX_AFFORDABLE_CAP,
+        ),
+        (
+            "X on a count-taking row",
+            squads,
+            Section::Clowder,
+            squad_key,
+            vec![big_x()],
+            Command::Pounce(1),
+            MAX_AFFORDABLE_CAP,
+        ),
+        (
+            "X on a count row",
+            idle_x,
+            Section::Clowder,
+            job_key,
+            vec![big_x()],
+            assign,
+            MAX_AFFORDABLE_CAP,
+        ),
     ];
 
     for (what, state, section, key, keys, command, n) in cases {
@@ -1090,7 +1364,10 @@ fn every_run_is_made_whole_at_the_press_with_no_tick_between_its_calls() {
         let mut app = app_on(state, section, key, "at-the-press");
         step_after(&mut app, 3.0, &keys);
         tick_frame(&mut expected, &mut clock, 3.0);
-        assert!(app.state.ticks > opened_at, "fixture: the frame for {what} ran no ticks");
+        assert!(
+            app.state.ticks > opened_at,
+            "fixture: the frame for {what} ran no ticks"
+        );
         assert!(
             app.state == expected,
             "{what}: the meadow after the frame is not the whole run made at the press and then \
@@ -1124,8 +1401,20 @@ fn a_held_x_within_one_frame_makes_one_run_and_leaves_its_footer_standing() {
     let (job_key, assign) = job_row(&idle);
 
     let cases: Vec<(&str, GameState, Section, RowKey, Command)> = vec![
-        ("a repeat-N row", builds, Section::Meadow, build_key, Command::Build(s)),
-        ("a count-taking row", squads, Section::Clowder, squad_key, Command::Pounce(1)),
+        (
+            "a repeat-N row",
+            builds,
+            Section::Meadow,
+            build_key,
+            Command::Build(s),
+        ),
+        (
+            "a count-taking row",
+            squads,
+            Section::Clowder,
+            squad_key,
+            Command::Pounce(1),
+        ),
         ("a count row", idle, Section::Clowder, job_key, assign),
     ];
 
@@ -1138,7 +1427,10 @@ fn a_held_x_within_one_frame_makes_one_run_and_leaves_its_footer_standing() {
 
         let mut held = app_on(state, section, key, "held-many");
         step(&mut held, &[big_x(), big_x(), big_x(), big_x()]);
-        assert!(held.state == expected, "a held X on {what} did not make exactly one whole run");
+        assert!(
+            held.state == expected,
+            "a held X on {what} did not make exactly one whole run"
+        );
         assert_eq!(
             footer(&held).as_deref(),
             Some(single.as_str()),
@@ -1161,7 +1453,9 @@ fn how_many_copies_a_buy_takes_is_the_cores_per_item_refusal() {
     let mut took_any = 0;
 
     for (section, row) in every_row(&base) {
-        let RowKind::Act { command, .. } = row.kind else { continue };
+        let RowKind::Act { command, .. } = row.kind else {
+            continue;
+        };
         let kind = match command {
             Command::BuyRefinement(_) => "refinement",
             Command::BuyRite(_) => "rite",
@@ -1197,7 +1491,10 @@ fn how_many_copies_a_buy_takes_is_the_cores_per_item_refusal() {
         BTreeSet::from(["arch", "dream loom", "refinement", "rite", "tradition"]),
         "fixture: an unowned row of every buy command must be listed"
     );
-    assert!(took_any > 0, "fixture: some buy the core accepts at least once");
+    assert!(
+        took_any > 0,
+        "fixture: some buy the core accepts at least once"
+    );
 }
 
 // ===========================================================================
@@ -1210,10 +1507,13 @@ const WIDE: u16 = 200;
 fn pane_text(state: &GameState, view: &ViewState) -> String {
     let rect = match compute(Rect::new(0, 0, WIDE, TALL), None, false).body {
         Body::Wide { inspector, .. } => inspector,
-        other => panic!("fixture: {WIDE}x{TALL} should lay out three columns, but laid out {other:?}"),
+        other => {
+            panic!("fixture: {WIDE}x{TALL} should lay out three columns, but laid out {other:?}")
+        }
     };
     let mut term = Terminal::new(TestBackend::new(WIDE, TALL)).expect("TestBackend is infallible");
-    term.draw(|f| inspector::draw(f, rect, state, view)).expect("TestBackend is infallible");
+    term.draw(|f| inspector::draw(f, rect, state, view))
+        .expect("TestBackend is infallible");
     buffer_text(term.backend().buffer(), rect)
 }
 
@@ -1231,7 +1531,9 @@ fn a_per_unit_priced_rows_next_cost_is_the_cores_price_of_one_unit() {
     let mut seen = 0;
 
     for (section, row) in every_row(&base) {
-        let RowKind::Act { command, .. } = row.kind else { continue };
+        let RowKind::Act { command, .. } = row.kind else {
+            continue;
+        };
         if !matches!(command, Command::Pounce(_) | Command::Trade(..)) {
             continue;
         }
@@ -1243,7 +1545,11 @@ fn a_per_unit_priced_rows_next_cost_is_the_cores_price_of_one_unit() {
         for (i, (r, _)) in unit.iter().enumerate() {
             state.resources[r.ix()] = STOCKS[i % STOCKS.len()];
         }
-        assert_eq!(state.unit_price(&command), Some(unit.clone()), "fixture: stock does not move the price");
+        assert_eq!(
+            state.unit_price(&command),
+            Some(unit.clone()),
+            "fixture: stock does not move the price"
+        );
 
         let shown = pane_text(&state, &focused(section, row.key.clone()));
         let on_screen = numbers(&shown);
@@ -1264,7 +1570,10 @@ fn a_per_unit_priced_rows_next_cost_is_the_cores_price_of_one_unit() {
             );
         }
     }
-    assert!(seen > 1, "fixture: the Pounce row and the trade rows should be listed");
+    assert!(
+        seen > 1,
+        "fixture: the Pounce row and the trade rows should be listed"
+    );
 }
 
 /// A drawing with every number replaced by one placeholder and whitespace
@@ -1301,7 +1610,9 @@ fn a_per_unit_priced_rows_components_stand_unmarked_with_no_wait() {
     let mut seen = 0;
     let mut growing = 0;
     for (section, row) in every_row(&base) {
-        let RowKind::Act { command, .. } = row.kind else { continue };
+        let RowKind::Act { command, .. } = row.kind else {
+            continue;
+        };
         if !matches!(command, Command::Pounce(_) | Command::Trade(..)) {
             continue;
         }
@@ -1339,7 +1650,10 @@ fn a_per_unit_priced_rows_components_stand_unmarked_with_no_wait() {
             row.key
         );
     }
-    assert!(seen > 1, "fixture: the Pounce row and the trade rows should be listed");
+    assert!(
+        seen > 1,
+        "fixture: the Pounce row and the trade rows should be listed"
+    );
     assert!(
         growing > 0,
         "fixture: on some of these rows a component is growing, so a wait would have something to say"
@@ -1372,7 +1686,11 @@ fn list_cells(state: &GameState, view: &ViewState, (w, h): (u16, u16)) -> Vec<Ve
     (space.y..space.bottom())
         .map(|y| {
             (space.x..space.right())
-                .map(|x| buf.cell((x, y)).map(|c| c.symbol().to_string()).unwrap_or_else(|| " ".into()))
+                .map(|x| {
+                    buf.cell((x, y))
+                        .map(|c| c.symbol().to_string())
+                        .unwrap_or_else(|| " ".into())
+                })
                 .collect()
         })
         .collect()
@@ -1394,7 +1712,11 @@ fn later_row_label(state: &GameState, section: Section, key: &RowKey) -> Option<
         (RowKey::Colony(a, _), RowKey::Colony(b, _)) => a == b,
         _ => false,
     };
-    rows(state, section).iter().find(|r| same_item(&r.key)).filter(|first| &first.key != key).map(|_| label)
+    rows(state, section)
+        .iter()
+        .find(|r| same_item(&r.key))
+        .filter(|first| &first.key != key)
+        .map(|_| label)
 }
 
 /// What a row draws in its name's place, in full: on a later row of an item
@@ -1408,7 +1730,12 @@ fn full_row_name(state: &GameState, section: Section, key: &RowKey) -> String {
     let mut term = Terminal::new(TestBackend::new(180, 6)).expect("TestBackend is infallible");
     term.draw(|f| inspector::draw(f, rect, state, &focused(section, key.clone())))
         .expect("TestBackend is infallible");
-    buffer_text(term.backend().buffer(), rect).lines().next().unwrap_or("").trim().to_string()
+    buffer_text(term.backend().buffer(), rect)
+        .lines()
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string()
 }
 
 /// Every resource's stores-row spelling.
@@ -1426,7 +1753,10 @@ fn stores_row_names() -> HashMap<ResourceId, String> {
 /// Whether a section's list gives an owned-count field (TUI-RENDER-020),
 /// judged by the section alone.
 fn section_counts(section: Section) -> bool {
-    matches!(section, Section::Meadow | Section::Clowder | Section::Crafts | Section::Sunbeams)
+    matches!(
+        section,
+        Section::Meadow | Section::Clowder | Section::Crafts | Section::Sunbeams
+    )
 }
 
 /// The owned count the inspector states for a row, if it states one.
@@ -1438,8 +1768,11 @@ fn owned_stated(state: &GameState, row: &Row) -> Option<u64> {
             Some(state.effective_workers(*j) as u64)
         }
         RowKey::Content(ContentId::Craft(c), "tinker") => Some(
-            state.kittens.iter().filter(|k| k.tinkering == Some(*c) && k.location == Location::Home).count()
-                as u64,
+            state
+                .kittens
+                .iter()
+                .filter(|k| k.tinkering == Some(*c) && k.location == Location::Home)
+                .count() as u64,
         ),
         _ => None,
     }
@@ -1453,13 +1786,23 @@ fn preview_components(state: &GameState, row: &Row, digits: &str) -> Vec<(Resour
         return Vec::new();
     }
     match &row.kind {
-        RowKind::Act { semantics: CountSemantics::RepeatN, .. } => match row.key {
+        RowKind::Act {
+            semantics: CountSemantics::RepeatN,
+            ..
+        } => match row.key {
             RowKey::Content(id, _) => state.cost_of_next(id, n),
             _ => Vec::new(),
         },
-        RowKind::Act { command, semantics: CountSemantics::CountTaking } if !row.heavy => state
+        RowKind::Act {
+            command,
+            semantics: CountSemantics::CountTaking,
+        } if !row.heavy => state
             .unit_price(command)
-            .map(|unit| unit.into_iter().map(|(r, each)| (r, each * n as f64)).collect())
+            .map(|unit| {
+                unit.into_iter()
+                    .map(|(r, each)| (r, each * n as f64))
+                    .collect()
+            })
             .unwrap_or_default(),
         _ => Vec::new(),
     }
@@ -1511,7 +1854,14 @@ fn an_open_prompt_draws_its_count_and_exact_preview_in_the_cost_fields_place() {
     const SIZES: [(u16, u16); 2] = [(80, 24), (200, 60)];
     let state = rich();
     let names = stores_row_names();
-    let c = 6 + 1 + names.values().map(|n| n.chars().count()).max().expect("a vocabulary") + 3;
+    let c = 6
+        + 1
+        + names
+            .values()
+            .map(|n| n.chars().count())
+            .max()
+            .expect("a vocabulary")
+        + 3;
     let targets = prompt_rows(&state);
     assert!(!targets.is_empty(), "fixture: some row takes a count");
 
@@ -1525,10 +1875,9 @@ fn an_open_prompt_draws_its_count_and_exact_preview_in_the_cost_fields_place() {
             for digits in DIGITS {
                 let view = prompt_on(*section, row, digits, &state);
                 let open = list_cells(&state, &view, size);
-                let cy = open
-                    .iter()
-                    .position(|l| l[0] == "▸")
-                    .unwrap_or_else(|| panic!("fixture: the prompt's row is on screen for {:?}", row.key));
+                let cy = open.iter().position(|l| l[0] == "▸").unwrap_or_else(|| {
+                    panic!("fixture: the prompt's row is on screen for {:?}", row.key)
+                });
                 let at = format!("{:?} with {digits:?} typed, at {size:?}", row.key);
                 let drawn = open[cy].concat();
 
@@ -1542,11 +1891,17 @@ fn an_open_prompt_draws_its_count_and_exact_preview_in_the_cost_fields_place() {
                         );
                     }
                 }
-                assert_eq!(cells(&open[cy], 0, 4), cells(&closed[cy], 0, 4), "{at}: the cursor and marker stay");
+                assert_eq!(
+                    cells(&open[cy], 0, 4),
+                    cells(&closed[cy], 0, 4),
+                    "{at}: the cursor and marker stay"
+                );
 
                 let comps = preview_components(&state, row, digits);
-                let parts: Vec<String> =
-                    comps.iter().map(|(r, a)| format!("{} {}", fmt::exact(*a), names[r])).collect();
+                let parts: Vec<String> = comps
+                    .iter()
+                    .map(|(r, a)| format!("{} {}", fmt::exact(*a), names[r]))
+                    .collect();
                 if comps.iter().any(|(_, a)| !a.is_finite()) {
                     seen.3 += 1;
                 }
@@ -1562,7 +1917,11 @@ fn an_open_prompt_draws_its_count_and_exact_preview_in_the_cost_fields_place() {
                 } else {
                     seen.2 += 1;
                     let place = c + base_name - 2;
-                    (2, place, format!("{:<place$}", prompt_text_in(&parts, digits, place)))
+                    (
+                        2,
+                        place,
+                        format!("{:<place$}", prompt_text_in(&parts, digits, place)),
+                    )
                 };
 
                 assert_eq!(
@@ -1579,10 +1938,16 @@ fn an_open_prompt_draws_its_count_and_exact_preview_in_the_cost_fields_place() {
                     "{at}: the name takes what the prompt's text leaves, one character and its \
                      ellipsis at least (TUI-RENDER-021).\n{drawn:?}"
                 );
-                assert_eq!(cells(&open[cy], 4 + name_w, 5 + name_w), " ", "{at}: a blank column after the name.\n{drawn:?}");
+                assert_eq!(
+                    cells(&open[cy], 4 + name_w, 5 + name_w),
+                    " ",
+                    "{at}: a blank column after the name.\n{drawn:?}"
+                );
                 if counted {
                     let count = match owned_stated(&state, row) {
-                        Some(n) if n > 0 => format!("{:>7}", format!("×{}", fmt::compact(n as f64))),
+                        Some(n) if n > 0 => {
+                            format!("{:>7}", format!("×{}", fmt::compact(n as f64)))
+                        }
                         _ => " ".repeat(7),
                     };
                     assert_eq!(
@@ -1591,7 +1956,11 @@ fn an_open_prompt_draws_its_count_and_exact_preview_in_the_cost_fields_place() {
                         "{at}: the count field keeps its figure and its seven columns, moved left by \
                          what the text needs (TUI-RENDER-021).\n{drawn:?}"
                     );
-                    assert_eq!(cells(&open[cy], 12 + name_w, 13 + name_w), " ", "{at}: a blank column before the text.\n{drawn:?}");
+                    assert_eq!(
+                        cells(&open[cy], 12 + name_w, 13 + name_w),
+                        " ",
+                        "{at}: a blank column before the text.\n{drawn:?}"
+                    );
                 }
             }
         }
@@ -1606,7 +1975,10 @@ fn an_open_prompt_draws_its_count_and_exact_preview_in_the_cost_fields_place() {
                 .collect::<Vec<_>>()
                 .join("\n");
             let comps = preview_components(&state, row, digits);
-            let parts: Vec<String> = comps.iter().map(|(r, a)| format!("{} {}", fmt::exact(*a), names[r])).collect();
+            let parts: Vec<String> = comps
+                .iter()
+                .map(|(r, a)| format!("{} {}", fmt::exact(*a), names[r]))
+                .collect();
             let text = prompt_text(&parts, digits);
             let inner = shown.lines().next().map(|l| l.chars().count()).unwrap_or(0);
             // A text longer than a line wraps, a long figure mid-digit, so the
@@ -1631,7 +2003,9 @@ fn an_open_prompt_draws_its_count_and_exact_preview_in_the_cost_fields_place() {
                 let lower = shown.to_lowercase();
                 assert!(
                     lower.contains("beyond reach")
-                        && !lower.split(|ch: char| !ch.is_alphabetic()).any(|w| w == "inf" || w == "nan"),
+                        && !lower
+                            .split(|ch: char| !ch.is_alphabetic())
+                            .any(|w| w == "inf" || w == "nan"),
                     "{:?} with {digits:?} typed: a preview figure that is not finite is stated in \
                      words as beyond reach, never printed (TUI-RENDER-018).\n{shown}",
                     row.key
@@ -1639,8 +2013,14 @@ fn an_open_prompt_draws_its_count_and_exact_preview_in_the_cost_fields_place() {
             }
         }
     }
-    assert!(seen.0 > 0 && seen.1 > 0 && seen.2 > 0, "fixture: text that fits, moves, and is cut: {seen:?}");
-    assert!(seen.3 > 0, "fixture: some preview figure past any real price is not finite");
+    assert!(
+        seen.0 > 0 && seen.1 > 0 && seen.2 > 0,
+        "fixture: text that fits, moves, and is cut: {seen:?}"
+    );
+    assert!(
+        seen.3 > 0,
+        "fixture: some preview figure past any real price is not finite"
+    );
 }
 
 fn cells(line: &[String], from: usize, to: usize) -> String {

@@ -15,11 +15,16 @@ use super::section::Section;
 pub enum Overlay {
     /// Scrollback over the retained journal. Holds its own scroll anchor.
     /// @spec TUI-NAV-026
-    Journal { anchor: usize },
+    Journal {
+        anchor: usize,
+    },
     Help,
     /// Find-anything over revealed content, narrowing by substring as
     /// characters arrive. @spec TUI-NAV-038
-    Palette { query: String, selected: usize },
+    Palette {
+        query: String,
+        selected: usize,
+    },
 }
 
 /// A count being typed. While open, all printable input goes to the field —

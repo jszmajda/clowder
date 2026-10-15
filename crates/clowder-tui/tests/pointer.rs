@@ -51,9 +51,9 @@ use clowder_tui::nav::{
     self, update, Action, ArmedRow, CountPrompt, Outcome, Overlay, PendingReport, RowKey, Section,
     ViewState,
 };
+use clowder_tui::render;
 use clowder_tui::render::layout::{Body, Layout};
 use clowder_tui::render::pointer::PointerRecord;
-use clowder_tui::render;
 use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
@@ -108,8 +108,9 @@ fn rich() -> GameState {
         .chain(IdeaId::ALL.iter().map(|i| ContentId::Idea(*i)))
         .collect::<BTreeSet<_>>();
     s.roster_high_water = MEADOW_MOVE_MIN_KITTENS + 9;
-    let mut roster: Vec<Kitten> =
-        (0..MEADOW_MOVE_MIN_KITTENS + 9).map(|i| kitten(&format!("kitten-{i}"), None)).collect();
+    let mut roster: Vec<Kitten> = (0..MEADOW_MOVE_MIN_KITTENS + 9)
+        .map(|i| kitten(&format!("kitten-{i}"), None))
+        .collect();
     for k in roster.iter_mut().take(4) {
         k.job = Some(JobId::Tinkerer);
     }
@@ -119,7 +120,9 @@ fn rich() -> GameState {
     s.peak_devotion = 1.0e12;
     s.devotion = 1.0e6;
     s.serenity = 1.0e12;
-    s.rites = [RiteId::TheReverie, RiteId::Enlightenment].into_iter().collect::<BTreeSet<_>>();
+    s.rites = [RiteId::TheReverie, RiteId::Enlightenment]
+        .into_iter()
+        .collect::<BTreeSet<_>>();
     s.arches_bought = [ArchId::EverdreamArch].into_iter().collect::<BTreeSet<_>>();
     s.discovered = ColonyId::ALL.iter().copied().collect::<BTreeSet<_>>();
     s.sites_reached = BTreeSet::new();
@@ -180,16 +183,28 @@ fn mid_game() -> GameState {
         }
         pair += 1;
     }
-    let mut report = OfflineReport { elapsed_seconds: 3 * 86_400, ..OfflineReport::default() };
+    let mut report = OfflineReport {
+        elapsed_seconds: 3 * 86_400,
+        ..OfflineReport::default()
+    };
     report.resource_deltas[ResourceId::ALL[0].ix()] = 4_800.0;
     s.journal.record_away(1_000, &report);
-    assert_eq!(s.journal.kept.len(), 1, "fixture: the core kept the away-report");
+    assert_eq!(
+        s.journal.kept.len(),
+        1,
+        "fixture: the core kept the away-report"
+    );
     for i in 0..90u64 {
         let id = StructureId::ALL[i as usize % StructureId::ALL.len()];
-        s.journal.record(2_000 + i, &Event::StructureBuilt { id, count: 2 });
+        s.journal
+            .record(2_000 + i, &Event::StructureBuilt { id, count: 2 });
     }
     assert!(
-        rows(&s, Section::Ideas).iter().filter(|r| r.selectable() && finished(&s, r)).count() >= 2,
+        rows(&s, Section::Ideas)
+            .iter()
+            .filter(|r| r.selectable() && finished(&s, r))
+            .count()
+            >= 2,
         "fixture: the Ideas section lists finished rows"
     );
     s
@@ -200,7 +215,10 @@ fn sky_emptied() -> GameState {
     let mut s = GameState::new(3);
     s.ideas.insert(IdeaId::SkywardLonging);
     s.sites_reached = SiteId::ALL.into_iter().collect();
-    assert!(rows(&s, Section::Sky).iter().all(|r| !r.selectable()), "fixture: the Sky lists no selectable row");
+    assert!(
+        rows(&s, Section::Sky).iter().all(|r| !r.selectable()),
+        "fixture: the Sky lists no selectable row"
+    );
     s
 }
 
@@ -215,7 +233,12 @@ fn opened(state: &GameState) -> ViewState {
 fn standing_in(state: &GameState, section: Section) -> ViewState {
     let mut v = opened(state);
     update(Action::SectionJump(section), &mut v, state);
-    assert_eq!(v.section, Some(section), "fixture: the digit entered the {} screen", section.title());
+    assert_eq!(
+        v.section,
+        Some(section),
+        "fixture: the digit entered the {} screen",
+        section.title()
+    );
     v
 }
 
@@ -223,15 +246,21 @@ fn standing_in(state: &GameState, section: Section) -> ViewState {
 fn deep(state: &GameState, view: &ViewState) -> ViewState {
     let section = view.section.expect("a section is in focus");
     let mut v = view.clone();
-    v.focus[section.index()] =
-        drawn_rows(state, section, view).into_iter().filter(|r| r.selectable()).map(|r| r.key).next_back();
+    v.focus[section.index()] = drawn_rows(state, section, view)
+        .into_iter()
+        .filter(|r| r.selectable())
+        .map(|r| r.key)
+        .next_back();
     v
 }
 
 /// The one unread report the mid-game journal kept, showing as the banner.
 fn with_banner(view: &ViewState) -> ViewState {
     let mut v = view.clone();
-    v.reports = vec![PendingReport { entry: 0, dismissed: false }];
+    v.reports = vec![PendingReport {
+        entry: 0,
+        dismissed: false,
+    }];
     v
 }
 
@@ -246,7 +275,10 @@ fn badge_two(view: &mut ViewState) {
 /// A footer note still on its clock.
 fn with_footer(view: &ViewState) -> ViewState {
     let mut v = view.clone();
-    v.footer = Some(("a note".to_string(), Instant::now() + Duration::from_secs(60)));
+    v.footer = Some((
+        "a note".to_string(),
+        Instant::now() + Duration::from_secs(60),
+    ));
     v
 }
 
@@ -261,7 +293,11 @@ fn find_row(state: &GameState, section: Section, pred: impl Fn(&Row) -> bool) ->
 /// Each of the four heavy rows, with its section.
 fn heavy_rows(state: &GameState) -> Vec<(Section, Row)> {
     let pick = |section: Section, f: fn(&Command) -> bool| {
-        let row = find_row(state, section, |r| matches!(&r.kind, RowKind::Act { command, .. } if f(command)));
+        let row = find_row(
+            state,
+            section,
+            |r| matches!(&r.kind, RowKind::Act { command, .. } if f(command)),
+        );
         assert!(row.heavy, "fixture: {:?} is heavy", row.key);
         (section, row)
     };
@@ -275,7 +311,9 @@ fn heavy_rows(state: &GameState) -> Vec<(Section, Row)> {
 
 /// `view` with `row` focused and armed, its clock running well past the test.
 fn armed_on(view: &ViewState, section: Section, row: &Row) -> ViewState {
-    let RowKind::Act { command, .. } = &row.kind else { panic!("fixture: a heavy row acts") };
+    let RowKind::Act { command, .. } = &row.kind else {
+        panic!("fixture: a heavy row acts")
+    };
     let mut v = view.clone();
     v.focus[section.index()] = Some(row.key.clone());
     v.armed = Some(ArmedRow {
@@ -304,13 +342,24 @@ fn terminal((w, h): (u16, u16)) -> Terminal<TestBackend> {
 }
 
 /// Draw one frame into `term`, as the loop does.
-fn shoot_on(term: &mut Terminal<TestBackend>, state: &GameState, view: &ViewState, prev: Option<&Layout>) -> Shot {
+fn shoot_on(
+    term: &mut Terminal<TestBackend>,
+    state: &GameState,
+    view: &ViewState,
+    prev: Option<&Layout>,
+) -> Shot {
     let mut out = None;
-    term.draw(|f| out = Some(render::frame_recorded(f, state, view, prev))).expect("TestBackend is infallible");
+    term.draw(|f| out = Some(render::frame_recorded(f, state, view, prev)))
+        .expect("TestBackend is infallible");
     let (layout, record) = out.expect("the frame was drawn");
     let buf = term.backend().buffer().clone();
     let size = (buf.area.width, buf.area.height);
-    Shot { buf, layout, record, size }
+    Shot {
+        buf,
+        layout,
+        record,
+        size,
+    }
 }
 
 /// Draw one frame into a terminal that has drawn nothing before.
@@ -319,7 +368,9 @@ fn shoot(state: &GameState, view: &ViewState, size: (u16, u16)) -> Shot {
 }
 
 fn cell(buf: &Buffer, x: u16, y: u16) -> String {
-    buf.cell((x, y)).map(|c| c.symbol().to_string()).unwrap_or_else(|| " ".into())
+    buf.cell((x, y))
+        .map(|c| c.symbol().to_string())
+        .unwrap_or_else(|| " ".into())
 }
 
 fn text(buf: &Buffer, y: u16, x0: u16, x1: u16) -> String {
@@ -339,14 +390,18 @@ fn list_space(l: &Layout) -> Rect {
 fn body_rect(l: &Layout) -> Rect {
     match l.body {
         Body::Narrow { sidebar, main } => sidebar.union(main),
-        Body::Wide { sidebar, inspector, .. } => sidebar.union(inspector),
+        Body::Wide {
+            sidebar, inspector, ..
+        } => sidebar.union(inspector),
         Body::TooSmall(r) => r,
     }
 }
 
 /// Every cell of a rectangle.
 fn cells_of(r: Rect) -> Vec<(u16, u16)> {
-    (r.y..r.bottom()).flat_map(|y| (r.x..r.right()).map(move |x| (x, y))).collect()
+    (r.y..r.bottom())
+        .flat_map(|y| (r.x..r.right()).map(move |x| (x, y)))
+        .collect()
 }
 
 /// Every cell of the frame.
@@ -386,8 +441,11 @@ struct ListLine {
 fn list_map(state: &GameState, view: &ViewState, shot: &Shot) -> Vec<ListLine> {
     let section = view.section.expect("a section is in focus");
     let space = list_space(&shot.layout);
-    let order: Vec<RowKey> =
-        drawn_rows(state, section, view).into_iter().filter(|r| r.selectable()).map(|r| r.key).collect();
+    let order: Vec<RowKey> = drawn_rows(state, section, view)
+        .into_iter()
+        .filter(|r| r.selectable())
+        .map(|r| r.key)
+        .collect();
     let mut own: Vec<(RowKey, String)> = Vec::new();
     for key in &order {
         // An arming's summary lines can push a cursor below it out of view,
@@ -406,18 +464,31 @@ fn list_map(state: &GameState, view: &ViewState, shot: &Shot) -> Vec<ListLine> {
     let mut lines: Vec<ListLine> = (space.y..space.bottom())
         .map(|y| {
             let t = uncursored(&text(&shot.buf, y, space.x, space.right()));
-            let rows = own.iter().filter(|(_, o)| *o == t).map(|(k, _)| k.clone()).collect();
+            let rows = own
+                .iter()
+                .filter(|(_, o)| *o == t)
+                .map(|(k, _)| k.clone())
+                .collect();
             ListLine { y, text: t, rows }
         })
         .collect();
-    let at: Vec<usize> = (0..lines.len()).filter(|i| !lines[*i].rows.is_empty()).collect();
+    let at: Vec<usize> = (0..lines.len())
+        .filter(|i| !lines[*i].rows.is_empty())
+        .collect();
     if at.is_empty() {
         return lines;
     }
     let placements: Vec<usize> = (0..=order.len().saturating_sub(at.len()))
-        .filter(|s| at.iter().enumerate().all(|(n, i)| lines[*i].rows.contains(&order[s + n])))
+        .filter(|s| {
+            at.iter()
+                .enumerate()
+                .all(|(n, i)| lines[*i].rows.contains(&order[s + n]))
+        })
         .collect();
-    assert!(!placements.is_empty(), "fixture: the rows on screen read as an unbroken run of the list");
+    assert!(
+        !placements.is_empty(),
+        "fixture: the rows on screen read as an unbroken run of the list"
+    );
     for (n, i) in at.iter().enumerate() {
         let mut keys: Vec<RowKey> = Vec::new();
         for s in &placements {
@@ -444,16 +515,35 @@ fn cursor_line(shot: &Shot) -> Option<(u16, String)> {
 /// name where drawn.
 fn tab_labels(shot: &Shot) -> Vec<(Section, u16, u16)> {
     let bar = shot.layout.tabs;
-    let cells: Vec<String> = (bar.x..bar.right()).map(|x| cell(&shot.buf, x, bar.y)).collect();
+    let cells: Vec<String> = (bar.x..bar.right())
+        .map(|x| cell(&shot.buf, x, bar.y))
+        .collect();
     let mut out = Vec::new();
     for (i, c) in cells.iter().enumerate() {
         let mut chars = c.chars();
-        let (Some(d), None) = (chars.next(), chars.next()) else { continue };
-        let Some(section) = Section::from_digit(d) else { continue };
-        let from = if i > 0 && cells[i - 1] == "\u{2605}" { i - 1 } else { i };
+        let (Some(d), None) = (chars.next(), chars.next()) else {
+            continue;
+        };
+        let Some(section) = Section::from_digit(d) else {
+            continue;
+        };
+        let from = if i > 0 && cells[i - 1] == "\u{2605}" {
+            i - 1
+        } else {
+            i
+        };
         let name = format!(" {}", section.title());
-        let after: String = cells.iter().skip(i + 1).take(name.chars().count()).cloned().collect();
-        let to = if after == name { i + 1 + name.chars().count() } else { i + 1 };
+        let after: String = cells
+            .iter()
+            .skip(i + 1)
+            .take(name.chars().count())
+            .cloned()
+            .collect();
+        let to = if after == name {
+            i + 1 + name.chars().count()
+        } else {
+            i + 1
+        };
         out.push((section, bar.x + from as u16, bar.x + to as u16));
     }
     out
@@ -464,11 +554,21 @@ fn tab_labels(shot: &Shot) -> Vec<(Section, u16, u16)> {
 // ---------------------------------------------------------------------------
 
 fn mouse(kind: MouseEventKind, x: u16, y: u16, modifiers: KeyModifiers) -> MouseEvent {
-    MouseEvent { kind, column: x, row: y, modifiers }
+    MouseEvent {
+        kind,
+        column: x,
+        row: y,
+        modifiers,
+    }
 }
 
 fn click(x: u16, y: u16) -> MouseEvent {
-    mouse(MouseEventKind::Down(MouseButton::Left), x, y, KeyModifiers::NONE)
+    mouse(
+        MouseEventKind::Down(MouseButton::Left),
+        x,
+        y,
+        KeyModifiers::NONE,
+    )
 }
 
 fn wheel_down(x: u16, y: u16) -> MouseEvent {
@@ -548,16 +648,28 @@ fn record_contexts(state: &GameState) -> Vec<(String, ViewState)> {
     let mut out = Vec::new();
     for section in tab_sections(state, Some(Section::Meadow)) {
         let v = standing_in(state, section);
-        out.push((format!("the {} screen, cursor on its landing", section.title()), v.clone()));
-        out.push((format!("the {} screen, cursor on its last row", section.title()), deep(state, &v)));
+        out.push((
+            format!("the {} screen, cursor on its landing", section.title()),
+            v.clone(),
+        ));
+        out.push((
+            format!("the {} screen, cursor on its last row", section.title()),
+            deep(state, &v),
+        ));
     }
     let mut open = standing_in(state, Section::Ideas);
     open.done_open = true;
     out.push(("the Ideas screen, done group open".into(), open.clone()));
-    out.push(("the Ideas screen, done group open, cursor on its last row".into(), deep(state, &open)));
+    out.push((
+        "the Ideas screen, done group open, cursor on its last row".into(),
+        deep(state, &open),
+    ));
     for (section, row) in heavy_rows(state) {
         let v = standing_in(state, section);
-        out.push((format!("the {} screen with {:?} armed", section.title(), row.key), armed_on(&v, section, &row)));
+        out.push((
+            format!("the {} screen with {:?} armed", section.title(), row.key),
+            armed_on(&v, section, &row),
+        ));
     }
     out
 }
@@ -582,7 +694,12 @@ fn swept() -> &'static [Swept] {
             for (what, view) in record_contexts(&state) {
                 let view = with_banner(&view);
                 let lines = list_map(&state, &view, &shoot(&state, &view, size));
-                out.push(Swept { what, view, size, lines });
+                out.push(Swept {
+                    what,
+                    view,
+                    size,
+                    lines,
+                });
             }
         }
         out
@@ -607,10 +724,18 @@ fn every_tab_is_recorded_over_its_label_as_drawn_and_no_column_between_labels_is
                     badge_two(&mut v);
                 }
                 let shot = shoot(&state, &v, size);
-                assert_eq!(shot.record.size(), size, "the record does not hold the size its frame was drawn at");
+                assert_eq!(
+                    shot.record.size(),
+                    size,
+                    "the record does not hold the size its frame was drawn at"
+                );
                 let labels = tab_labels(&shot);
                 let drawn: Vec<Section> = labels.iter().map(|(s, _, _)| *s).collect();
-                assert_eq!(drawn, tab_sections(&state, Some(focus)), "fixture: every tab is read off the bar at {size:?}");
+                assert_eq!(
+                    drawn,
+                    tab_sections(&state, Some(focus)),
+                    "fixture: every tab is read off the bar at {size:?}"
+                );
                 for (section, from, to) in &labels {
                     forms.insert((size, badged, to - from > 2));
                     for x in *from..*to {
@@ -634,7 +759,11 @@ fn every_tab_is_recorded_over_its_label_as_drawn_and_no_column_between_labels_is
                 }
                 for (x, y) in every_cell(&shot) {
                     if y != bar.y {
-                        assert_eq!(shot.record.tab_at(x, y), None, "at {size:?} ({x},{y}) is off the tab bar but recorded as a tab");
+                        assert_eq!(
+                            shot.record.tab_at(x, y),
+                            None,
+                            "at {size:?} ({x},{y}) is off the tab bar but recorded as a tab"
+                        );
                     }
                 }
             }
@@ -658,14 +787,22 @@ fn every_tab_is_recorded_over_its_label_as_drawn_and_no_column_between_labels_is
 fn every_row_in_view_is_recorded_across_its_whole_line_by_its_identity() {
     let state = mid_game();
     let mut rows_checked = 0usize;
-    for Swept { what, view, size, lines } in swept() {
+    for Swept {
+        what,
+        view,
+        size,
+        lines,
+    } in swept()
+    {
         let size = *size;
         {
             let section = view.section.expect("in a section");
             let shot = shoot(&state, view, size);
             let space = list_space(&shot.layout);
             for line in lines {
-                let Some(first) = line.rows.first() else { continue };
+                let Some(first) = line.rows.first() else {
+                    continue;
+                };
                 for x in space.x..space.right() {
                     let got = shot.record.row_at(x, line.y);
                     assert!(
@@ -678,7 +815,8 @@ fn every_row_in_view_is_recorded_across_its_whole_line_by_its_identity() {
             }
             let on_screen: Vec<&RowKey> = lines.iter().flat_map(|l| l.rows.iter()).collect();
             for (x, y) in every_cell(&shot) {
-                let inside = space.x <= x && x < space.right() && space.y <= y && y < space.bottom();
+                let inside =
+                    space.x <= x && x < space.right() && space.y <= y && y < space.bottom();
                 assert_eq!(
                     shot.record.list_at(x, y),
                     inside.then_some(section),
@@ -686,14 +824,21 @@ fn every_row_in_view_is_recorded_across_its_whole_line_by_its_identity() {
                     if inside { "in" } else { "outside" }
                 );
                 if !inside {
-                    assert_eq!(shot.record.row_at(x, y), None, "{what} at {size:?}: ({x},{y}) is outside the list but recorded as a row");
+                    assert_eq!(
+                        shot.record.row_at(x, y),
+                        None,
+                        "{what} at {size:?}: ({x},{y}) is outside the list but recorded as a row"
+                    );
                 } else if let Some((_, k)) = shot.record.row_at(x, y) {
                     assert!(on_screen.contains(&&k), "{what} at {size:?}: {k:?} is recorded at ({x},{y}) but was not drawn there");
                 }
             }
         }
     }
-    assert!(rows_checked > 400, "fixture: too few rows swept ({rows_checked})");
+    assert!(
+        rows_checked > 400,
+        "fixture: too few rows swept ({rows_checked})"
+    );
 }
 
 /// While the Journal is drawn, its region is recorded, and no cell outside it;
@@ -703,7 +848,8 @@ fn every_row_in_view_is_recorded_across_its_whole_line_by_its_identity() {
 ///
 /// @spec TUI-RENDER-025
 #[test]
-fn the_journal_is_recorded_over_its_region_with_the_scroll_at_which_its_last_line_stands_at_the_foot() {
+fn the_journal_is_recorded_over_its_region_with_the_scroll_at_which_its_last_line_stands_at_the_foot(
+) {
     let long = mid_game();
     let short = GameState::new(5);
     for size in SIZES {
@@ -712,31 +858,45 @@ fn the_journal_is_recorded_over_its_region_with_the_scroll_at_which_its_last_lin
         let shot = shoot(&long, &view, size);
         let region = body_rect(&shot.layout);
         for (x, y) in every_cell(&shot) {
-            let inside = region.x <= x && x < region.right() && region.y <= y && y < region.bottom();
-            assert_eq!(shot.record.journal_at(x, y), inside, "at {size:?} ({x},{y}) is {} the Journal's region but recorded otherwise", if inside { "in" } else { "outside" });
+            let inside =
+                region.x <= x && x < region.right() && region.y <= y && y < region.bottom();
+            assert_eq!(
+                shot.record.journal_at(x, y),
+                inside,
+                "at {size:?} ({x},{y}) is {} the Journal's region but recorded otherwise",
+                if inside { "in" } else { "outside" }
+            );
         }
-        let max = shot
-            .record
-            .journal_max_scroll()
-            .unwrap_or_else(|| panic!("at {size:?} a Journal far longer than its region records no scroll"));
+        let max = shot.record.journal_max_scroll().unwrap_or_else(|| {
+            panic!("at {size:?} a Journal far longer than its region records no scroll")
+        });
         let foot = |anchor: usize| {
             let mut v = view.clone();
             v.overlay = Some(Overlay::Journal { anchor });
             let s = shoot(&long, &v, size);
             text(&s.buf, region.bottom() - 1, region.x, region.right())
         };
-        assert!(!foot(max).trim().is_empty(), "at {size:?} the recorded scroll {max} does not put a line at the region's foot");
+        assert!(
+            !foot(max).trim().is_empty(),
+            "at {size:?} the recorded scroll {max} does not put a line at the region's foot"
+        );
         assert!(foot(max + 1).trim().is_empty(), "at {size:?} the Journal's last line stands above the foot at the recorded scroll {max}");
 
         let mut view = opened(&short);
         view.overlay = Some(Overlay::Journal { anchor: 0 });
         let shot = shoot(&short, &view, size);
-        assert_eq!(shot.record.journal_max_scroll(), None, "at {size:?} a Journal whose every line fits records a scroll");
+        assert_eq!(
+            shot.record.journal_max_scroll(),
+            None,
+            "at {size:?} a Journal whose every line fits records a scroll"
+        );
         let mut bare = opened(&long);
         bare.overlay = None;
         let shot = shoot(&long, &bare, size);
         assert!(
-            every_cell(&shot).iter().all(|(x, y)| !shot.record.journal_at(*x, *y)),
+            every_cell(&shot)
+                .iter()
+                .all(|(x, y)| !shot.record.journal_at(*x, *y)),
             "at {size:?} a frame with no Journal drawn records one"
         );
     }
@@ -752,13 +912,22 @@ fn the_journal_is_recorded_over_its_region_with_the_scroll_at_which_its_last_lin
 fn a_line_of_the_list_that_is_not_a_row_and_a_row_not_drawn_name_no_row() {
     let state = mid_game();
     let mut kinds = BTreeSet::new();
-    for Swept { what, view, size, lines } in swept() {
+    for Swept {
+        what,
+        view,
+        size,
+        lines,
+    } in swept()
+    {
         let size = *size;
         {
             let section = view.section.expect("in a section");
             let shot = shoot(&state, view, size);
             let space = list_space(&shot.layout);
-            let armed_line = view.armed.as_ref().and_then(|a| lines.iter().position(|l| l.rows.contains(&a.key)));
+            let armed_line = view
+                .armed
+                .as_ref()
+                .and_then(|a| lines.iter().position(|l| l.rows.contains(&a.key)));
             for (i, line) in lines.iter().enumerate() {
                 if !line.rows.is_empty() {
                     continue;
@@ -774,7 +943,10 @@ fn a_line_of_the_list_that_is_not_a_row_and_a_row_not_drawn_name_no_row() {
                 } else if armed_line.is_some_and(|a| i > a) {
                     "summary"
                 } else {
-                    panic!("{what} at {size:?}: line {} reads as no row and no known line: {:?}", line.y, line.text)
+                    panic!(
+                        "{what} at {size:?}: line {} reads as no row and no known line: {:?}",
+                        line.y, line.text
+                    )
                 };
                 kinds.insert(kind);
                 for x in space.x..space.right() {
@@ -787,9 +959,16 @@ fn a_line_of_the_list_that_is_not_a_row_and_a_row_not_drawn_name_no_row() {
                 }
             }
             let drawn: Vec<RowKey> = lines.iter().flat_map(|l| l.rows.clone()).collect();
-            for row in rows(&state, section).into_iter().filter(|r| r.selectable() && !drawn.contains(&r.key)) {
+            for row in rows(&state, section)
+                .into_iter()
+                .filter(|r| r.selectable() && !drawn.contains(&r.key))
+            {
                 assert!(
-                    every_cell(&shot).iter().all(|(x, y)| shot.record.row_at(*x, *y).map(|(_, k)| k) != Some(row.key.clone())),
+                    every_cell(&shot).iter().all(|(x, y)| shot
+                        .record
+                        .row_at(*x, *y)
+                        .map(|(_, k)| k)
+                        != Some(row.key.clone())),
                     "{what} at {size:?}: {:?} was not drawn but the record names it",
                     row.key
                 );
@@ -797,7 +976,10 @@ fn a_line_of_the_list_that_is_not_a_row_and_a_row_not_drawn_name_no_row() {
         }
     }
     for kind in ["blank", "note", "done header", "header", "summary"] {
-        assert!(kinds.contains(kind), "fixture: the sweep met no {kind} line; met {kinds:?}");
+        assert!(
+            kinds.contains(kind),
+            "fixture: the sweep met no {kind} line; met {kinds:?}"
+        );
     }
 }
 
@@ -808,7 +990,8 @@ fn a_line_of_the_list_that_is_not_a_row_and_a_row_not_drawn_name_no_row() {
 ///
 /// @spec TUI-RENDER-026
 #[test]
-fn where_something_else_holds_the_lists_space_no_row_or_list_is_recorded_and_the_card_and_waking_screen_record_nothing() {
+fn where_something_else_holds_the_lists_space_no_row_or_list_is_recorded_and_the_card_and_waking_screen_record_nothing(
+) {
     let state = mid_game();
     let base = standing_in(&state, Section::Clowder);
     let mut holders: Vec<(&str, ViewState, (u16, u16))> = Vec::new();
@@ -817,7 +1000,13 @@ fn where_something_else_holds_the_lists_space_no_row_or_list_is_recorded_and_the
     holders.push(("the narrow-mode swap", swap, SMALL));
     for size in SIZES {
         for (what, overlay) in [
-            ("the palette", Overlay::Palette { query: "kit".into(), selected: 0 }),
+            (
+                "the palette",
+                Overlay::Palette {
+                    query: "kit".into(),
+                    selected: 0,
+                },
+            ),
             ("the Journal", Overlay::Journal { anchor: 0 }),
             ("help", Overlay::Help),
         ] {
@@ -833,20 +1022,41 @@ fn where_something_else_holds_the_lists_space_no_row_or_list_is_recorded_and_the
             "fixture: {what} at {size:?} draws a body"
         );
         for (x, y) in every_cell(&shot) {
-            assert_eq!(shot.record.row_at(x, y), None, "with {what} at {size:?}, ({x},{y}) is recorded as a row");
-            assert_eq!(shot.record.list_at(x, y), None, "with {what} at {size:?}, ({x},{y}) is recorded as the list");
+            assert_eq!(
+                shot.record.row_at(x, y),
+                None,
+                "with {what} at {size:?}, ({x},{y}) is recorded as a row"
+            );
+            assert_eq!(
+                shot.record.list_at(x, y),
+                None,
+                "with {what} at {size:?}, ({x},{y}) is recorded as the list"
+            );
         }
         let labels = tab_labels(&shot);
-        assert!(!labels.is_empty(), "fixture: the tab bar is drawn beside {what}");
+        assert!(
+            !labels.is_empty(),
+            "fixture: the tab bar is drawn beside {what}"
+        );
         for (section, from, _) in labels {
-            assert_eq!(shot.record.tab_at(from, shot.layout.tabs.y), Some(section), "with {what} at {size:?} the tab bar beside it is not recorded");
+            assert_eq!(
+                shot.record.tab_at(from, shot.layout.tabs.y),
+                Some(section),
+                "with {what} at {size:?} the tab bar beside it is not recorded"
+            );
         }
     }
 
     for size in [(79, 30), (100, 23), (40, 10)] {
         let shot = shoot(&state, &base, size);
-        assert!(matches!(shot.layout.body, Body::TooSmall(_)), "fixture: {size:?} draws the too-small card");
-        assert!(shot.record.is_empty(), "the too-small card at {size:?} records a target");
+        assert!(
+            matches!(shot.layout.body, Body::TooSmall(_)),
+            "fixture: {size:?} draws the too-small card"
+        );
+        assert!(
+            shot.record.is_empty(),
+            "the too-small card at {size:?} records a target"
+        );
         for (x, y) in every_cell(&shot) {
             assert!(
                 shot.record.tab_at(x, y).is_none()
@@ -860,12 +1070,19 @@ fn where_something_else_holds_the_lists_space_no_row_or_list_is_recorded_and_the
     for size in [SMALL, WIDE, (60, 20)] {
         let mut term = terminal(size);
         let mut record = None;
-        term.draw(|f| record = Some(render::waking_recorded(f, 1_000, 400))).expect("TestBackend is infallible");
+        term.draw(|f| record = Some(render::waking_recorded(f, 1_000, 400)))
+            .expect("TestBackend is infallible");
         let record = record.expect("the waking screen was drawn");
-        assert!(record.is_empty(), "the waking screen at {size:?} records a target");
+        assert!(
+            record.is_empty(),
+            "the waking screen at {size:?} records a target"
+        );
         for (x, y) in cells_of(Rect::new(0, 0, size.0, size.1)) {
             assert!(
-                record.tab_at(x, y).is_none() && record.row_at(x, y).is_none() && record.list_at(x, y).is_none() && !record.journal_at(x, y),
+                record.tab_at(x, y).is_none()
+                    && record.row_at(x, y).is_none()
+                    && record.list_at(x, y).is_none()
+                    && !record.journal_at(x, y),
                 "the waking screen at {size:?} records a target at ({x},{y})"
             );
         }
@@ -893,7 +1110,10 @@ fn a_frame_and_its_record_depend_on_nothing_drawn_before_it() {
         assert_eq!(after.buf, cold.buf, "at {size:?} a frame drawn after others drew different cells from the same inputs drawn cold");
         assert_eq!(after.record, cold.record, "at {size:?} a frame drawn after others recorded differently from the same inputs drawn cold");
         let again = shoot(&state, &b, size);
-        assert_eq!(again.record, cold.record, "at {size:?} the same inputs recorded two different records");
+        assert_eq!(
+            again.record, cold.record,
+            "at {size:?} the same inputs recorded two different records"
+        );
     }
 }
 
@@ -930,10 +1150,15 @@ fn only_an_unmodified_left_press_or_vertical_wheel_step_answers() {
         let cursor = view.focus[Section::Clowder.index()].clone();
         let target = lines
             .iter()
-            .find(|l| !l.rows.is_empty() && !l.rows.contains(cursor.as_ref().expect("a row is focused")))
+            .find(|l| {
+                !l.rows.is_empty() && !l.rows.contains(cursor.as_ref().expect("a row is focused"))
+            })
             .expect("fixture: another row is drawn");
         let space = list_space(&shot.layout);
-        let (tab, tab_x, _) = *tab_labels(&shot).iter().find(|(s, _, _)| *s != Section::Clowder).expect("fixture: another tab");
+        let (tab, tab_x, _) = *tab_labels(&shot)
+            .iter()
+            .find(|(s, _, _)| *s != Section::Clowder)
+            .expect("fixture: another tab");
         let spots = [
             ("a row", space.x + 3, target.y),
             ("a tab", tab_x, shot.layout.tabs.y),
@@ -942,8 +1167,17 @@ fn only_an_unmodified_left_press_or_vertical_wheel_step_answers() {
         for (what, x, y) in spots {
             let mut silent: Vec<MouseEvent> = Vec::new();
             for kind in [
-                Up(Left), Up(Right), Up(Middle), Down(Right), Down(Middle), Drag(Left), Drag(Right), Drag(Middle),
-                Moved, ScrollLeft, ScrollRight,
+                Up(Left),
+                Up(Right),
+                Up(Middle),
+                Down(Right),
+                Down(Middle),
+                Drag(Left),
+                Drag(Right),
+                Drag(Middle),
+                Moved,
+                ScrollLeft,
+                ScrollRight,
             ] {
                 silent.push(mouse(kind, x, y, KeyModifiers::NONE));
                 for m in mods {
@@ -962,13 +1196,28 @@ fn only_an_unmodified_left_press_or_vertical_wheel_step_answers() {
 
         let mut v = view.clone();
         point(click(space.x + 3, target.y), &mut v, &state, &shot);
-        assert_ne!(v.focus, view.focus, "fixture: at {size:?} an unmodified left press on a row moves the cursor");
+        assert_ne!(
+            v.focus, view.focus,
+            "fixture: at {size:?} an unmodified left press on a row moves the cursor"
+        );
         let mut v = view.clone();
         point(click(tab_x, shot.layout.tabs.y), &mut v, &state, &shot);
-        assert_eq!(v.section, Some(tab), "fixture: at {size:?} an unmodified left press on a tab moves focus");
+        assert_eq!(
+            v.section,
+            Some(tab),
+            "fixture: at {size:?} an unmodified left press on a tab moves focus"
+        );
         let mut v = view.clone();
-        point(wheel_down(space.x + space.width / 2, target.y), &mut v, &state, &shot);
-        assert_ne!(v.focus, view.focus, "fixture: at {size:?} an unmodified wheel step over the list moves the cursor");
+        point(
+            wheel_down(space.x + space.width / 2, target.y),
+            &mut v,
+            &state,
+            &shot,
+        );
+        assert_ne!(
+            v.focus, view.focus,
+            "fixture: at {size:?} an unmodified wheel step over the list moves the cursor"
+        );
     }
 }
 
@@ -993,7 +1242,12 @@ fn a_click_after_keys_in_the_same_batch_lands_on_the_row_the_last_frame_drew_und
             let redrawn = shoot(&state, &after_keys, size);
             let aimed = lines
                 .iter()
-                .find(|l| !l.rows.is_empty() && !l.rows.contains(&after_keys.focus[section.index()].clone().expect("focused")))
+                .find(|l| {
+                    !l.rows.is_empty()
+                        && !l
+                            .rows
+                            .contains(&after_keys.focus[section.index()].clone().expect("focused"))
+                })
                 .expect("fixture: a row is drawn");
             assert_ne!(
                 uncursored(&text(&redrawn.buf, aimed.y, list_space(&redrawn.layout).x, list_space(&redrawn.layout).right())),
@@ -1002,9 +1256,16 @@ fn a_click_after_keys_in_the_same_batch_lands_on_the_row_the_last_frame_drew_und
                 section.title()
             );
             let mut v = after_keys.clone();
-            let out = point(click(list_space(&shot.layout).x + 2, aimed.y), &mut v, &state, &shot);
+            let out = point(
+                click(list_space(&shot.layout).x + 2, aimed.y),
+                &mut v,
+                &state,
+                &shot,
+            );
             assert_eq!(out, Outcome::Handled);
-            let landed = v.focus[section.index()].clone().expect("the cursor rests on a row");
+            let landed = v.focus[section.index()]
+                .clone()
+                .expect("the cursor rests on a row");
             assert!(
                 aimed.rows.contains(&landed),
                 "on the {} screen at {size:?} a click after keys in the same batch landed on {landed:?}, not the row {:?} the last frame drew under it",
@@ -1031,30 +1292,65 @@ fn a_click_resolves_against_the_layout_the_last_frame_drew_inside_the_dead_band(
     let mut term = terminal((97, 40));
     let held = shoot_on(&mut term, &state, &view, Some(&wide.layout));
     let Body::Wide { inspector, .. } = held.layout.body else {
-        panic!("fixture: at 97 columns a frame following three panes keeps three panes (TUI-NAV-047)")
+        panic!(
+            "fixture: at 97 columns a frame following three panes keeps three panes (TUI-NAV-047)"
+        )
     };
     let cold = shoot(&state, &view, (97, 40));
-    assert!(matches!(cold.layout.body, Body::Narrow { .. }), "fixture: at 97 columns a cold frame is narrow");
+    assert!(
+        matches!(cold.layout.body, Body::Narrow { .. }),
+        "fixture: at 97 columns a cold frame is narrow"
+    );
     let cold_lines = list_map(&state, &view, &cold);
     let cold_space = list_space(&cold.layout);
     let under_inspector = cold_lines
         .iter()
-        .find(|l| !l.rows.is_empty() && !l.rows.contains(view.focus[Section::Clowder.index()].as_ref().expect("focused")))
+        .find(|l| {
+            !l.rows.is_empty()
+                && !l.rows.contains(
+                    view.focus[Section::Clowder.index()]
+                        .as_ref()
+                        .expect("focused"),
+                )
+        })
         .expect("fixture: a row is drawn cold");
     let x = inspector.x + 1;
-    assert!(cold_space.x <= x && x < cold_space.right(), "fixture: the inspector column lies in a cold frame's list");
+    assert!(
+        cold_space.x <= x && x < cold_space.right(),
+        "fixture: the inspector column lies in a cold frame's list"
+    );
     for e in answering(x, under_inspector.y) {
-        assert_nothing(e, &view, &state, &held, "over the inspector a dead-band frame drew");
+        assert_nothing(
+            e,
+            &view,
+            &state,
+            &held,
+            "over the inspector a dead-band frame drew",
+        );
     }
     let lines = list_map(&state, &view, &held);
     let aimed = lines
         .iter()
-        .find(|l| !l.rows.is_empty() && !l.rows.contains(view.focus[Section::Clowder.index()].as_ref().expect("focused")))
+        .find(|l| {
+            !l.rows.is_empty()
+                && !l.rows.contains(
+                    view.focus[Section::Clowder.index()]
+                        .as_ref()
+                        .expect("focused"),
+                )
+        })
         .expect("fixture: a row is drawn");
     let mut v = view.clone();
-    point(click(list_space(&held.layout).x, aimed.y), &mut v, &state, &held);
+    point(
+        click(list_space(&held.layout).x, aimed.y),
+        &mut v,
+        &state,
+        &held,
+    );
     assert!(
-        aimed.rows.contains(v.focus[Section::Clowder.index()].as_ref().expect("focused")),
+        aimed
+            .rows
+            .contains(v.focus[Section::Clowder.index()].as_ref().expect("focused")),
         "a click on a row a dead-band frame drew did not land on it"
     );
 }
@@ -1067,10 +1363,18 @@ fn a_click_resolves_against_the_layout_the_last_frame_drew_inside_the_dead_band(
 #[test]
 fn a_pointer_event_after_a_resize_no_frame_was_drawn_for_does_nothing() {
     let state = mid_game();
-    for (drawn_at, now) in [(WIDE, SMALL), (SMALL, WIDE), (WIDE, (130, 41)), (WIDE, (131, 40))] {
+    for (drawn_at, now) in [
+        (WIDE, SMALL),
+        (SMALL, WIDE),
+        (WIDE, (130, 41)),
+        (WIDE, (131, 40)),
+    ] {
         let view = standing_in(&state, Section::Clowder);
         let shot = shoot(&state, &view, drawn_at);
-        let mut probes: Vec<(u16, u16)> = tab_labels(&shot).iter().map(|(_, x, _)| (*x, shot.layout.tabs.y)).collect();
+        let mut probes: Vec<(u16, u16)> = tab_labels(&shot)
+            .iter()
+            .map(|(_, x, _)| (*x, shot.layout.tabs.y))
+            .collect();
         let space = list_space(&shot.layout);
         probes.extend((space.y..space.bottom()).map(|y| (space.x + 1, y)));
         for (x, y) in probes {
@@ -1078,7 +1382,11 @@ fn a_pointer_event_after_a_resize_no_frame_was_drawn_for_does_nothing() {
                 let mut v = view.clone();
                 let out = nav::pointer_event(e, &mut v, &state, &shot.record, now);
                 assert_eq!(out, Outcome::Handled);
-                assert_eq!(whole(&v), whole(&view), "{e:?} drawn at {drawn_at:?} but arriving at {now:?} changed the view");
+                assert_eq!(
+                    whole(&v),
+                    whole(&view),
+                    "{e:?} drawn at {drawn_at:?} but arriving at {now:?} changed the view"
+                );
             }
         }
     }
@@ -1100,17 +1408,30 @@ fn a_pointer_event_where_the_record_names_no_target_does_nothing() {
             let shot = shoot(&state, &view, size);
             for (x, y) in every_cell(&shot) {
                 let r = &shot.record;
-                if r.tab_at(x, y).is_some() || r.row_at(x, y).is_some() || r.list_at(x, y).is_some() || r.journal_at(x, y) {
+                if r.tab_at(x, y).is_some()
+                    || r.row_at(x, y).is_some()
+                    || r.list_at(x, y).is_some()
+                    || r.journal_at(x, y)
+                {
                     continue;
                 }
                 for e in answering(x, y) {
-                    assert_nothing(e, &view, &state, &shot, &format!("on the {} screen at {size:?}", section.title()));
+                    assert_nothing(
+                        e,
+                        &view,
+                        &state,
+                        &shot,
+                        &format!("on the {} screen at {size:?}", section.title()),
+                    );
                 }
                 swept += 1;
             }
         }
     }
-    assert!(swept > 10_000, "fixture: too few untargeted cells swept ({swept})");
+    assert!(
+        swept > 10_000,
+        "fixture: too few untargeted cells swept ({swept})"
+    );
 }
 
 /// The views the never-acts sweep stands in, each a context a click could
@@ -1122,23 +1443,35 @@ fn every_context(state: &GameState) -> Vec<(String, ViewState)> {
     for section in tab_sections(state, Some(Section::Meadow)) {
         let v = standing_in(state, section);
         out.push((format!("{} bare", section.title()), v.clone()));
-        out.push((format!("{} with banner, footer, cursor deep", section.title()), with_footer(&with_banner(&deep(state, &v)))));
+        out.push((
+            format!("{} with banner, footer, cursor deep", section.title()),
+            with_footer(&with_banner(&deep(state, &v))),
+        ));
     }
     let mut open = with_banner(&standing_in(state, Section::Ideas));
     open.done_open = true;
     out.push(("Ideas with the done group open".into(), open));
     for (section, row) in heavy_rows(state) {
         let v = with_banner(&standing_in(state, section));
-        out.push((format!("{} with {:?} armed", section.title(), row.key), armed_on(&v, section, &row)));
+        out.push((
+            format!("{} with {:?} armed", section.title(), row.key),
+            armed_on(&v, section, &row),
+        ));
     }
     let mut swap = with_banner(&standing_in(state, Section::Clowder));
     swap.inspector_wanted = true;
     out.push(("Clowder with the inspector called".into(), swap));
     let mut prompt = with_banner(&standing_in(state, Section::Clowder));
-    prompt.prompt = Some(CountPrompt { digits: "3".into(), row: prompt.focus[Section::Clowder.index()].clone() });
+    prompt.prompt = Some(CountPrompt {
+        digits: "3".into(),
+        row: prompt.focus[Section::Clowder.index()].clone(),
+    });
     out.push(("Clowder with a count prompt open".into(), prompt));
     for overlay in [
-        Overlay::Palette { query: "e".into(), selected: 0 },
+        Overlay::Palette {
+            query: "e".into(),
+            selected: 0,
+        },
         Overlay::Journal { anchor: 2 },
         Overlay::Help,
     ] {
@@ -1175,13 +1508,21 @@ fn no_pointer_event_asks_the_core_for_anything_or_touches_anything_but_the_curso
                     probes.push((main.x + main.width / 2, y));
                 }
             }
-            probes.extend(every_cell(&shot).into_iter().filter(|(x, y)| x % 7 == 3 && y % 3 == 1));
+            probes.extend(
+                every_cell(&shot)
+                    .into_iter()
+                    .filter(|(x, y)| x % 7 == 3 && y % 3 == 1),
+            );
             for (x, y) in probes {
                 for e in answering(x, y) {
                     let mut v = view.clone();
                     let out = point(e, &mut v, &state, &shot);
                     calls += 1;
-                    assert_eq!(out, Outcome::Handled, "{what} at {size:?}: {e:?} asked the core for {out:?}");
+                    assert_eq!(
+                        out,
+                        Outcome::Handled,
+                        "{what} at {size:?}: {e:?} asked the core for {out:?}"
+                    );
                     assert_eq!(
                         untouchable(&v),
                         untouchable(&view),
@@ -1191,20 +1532,35 @@ fn no_pointer_event_asks_the_core_for_anything_or_touches_anything_but_the_curso
                     if moved_now {
                         moved += 1;
                     } else {
-                        assert_eq!(v.seen, view.seen, "{what} at {size:?}: {e:?} moved nothing but recorded a visit");
-                        assert_eq!(v.armed, view.armed, "{what} at {size:?}: {e:?} moved nothing but changed the arming");
+                        assert_eq!(
+                            v.seen, view.seen,
+                            "{what} at {size:?}: {e:?} moved nothing but recorded a visit"
+                        );
+                        assert_eq!(
+                            v.armed, view.armed,
+                            "{what} at {size:?}: {e:?} moved nothing but changed the arming"
+                        );
                     }
                     assert!(
                         v.armed.is_none() || v.armed == view.armed,
                         "{what} at {size:?}: {e:?} armed a row"
                     );
-                    assert_eq!(v.footer, view.footer, "{what} at {size:?}: {e:?} set or cleared a footer note");
-                    assert_eq!(v.reports, view.reports, "{what} at {size:?}: {e:?} retired or read a report");
+                    assert_eq!(
+                        v.footer, view.footer,
+                        "{what} at {size:?}: {e:?} set or cleared a footer note"
+                    );
+                    assert_eq!(
+                        v.reports, view.reports,
+                        "{what} at {size:?}: {e:?} retired or read a report"
+                    );
                 }
             }
         }
     }
-    assert!(moved > 500 && calls > 40_000, "fixture: the sweep moved the cursor {moved} times in {calls} events");
+    assert!(
+        moved > 500 && calls > 40_000,
+        "fixture: the sweep moved the cursor {moved} times in {calls} events"
+    );
 }
 
 /// A left press on a tab's label — on any cell of it, in the full form and the
@@ -1227,14 +1583,24 @@ fn a_left_press_on_a_tab_label_goes_to_its_section_as_its_digit_would() {
                 }
                 let mut remembered = view.clone();
                 remembered.focus[Section::Clowder.index()] =
-                    drawn_rows(&state, Section::Clowder, &view).into_iter().filter(|r| r.selectable()).map(|r| r.key).nth(5);
+                    drawn_rows(&state, Section::Clowder, &view)
+                        .into_iter()
+                        .filter(|r| r.selectable())
+                        .map(|r| r.key)
+                        .nth(5);
                 for view in [view, remembered] {
                     let shot = shoot(&state, &view, size);
                     for (section, from, to) in tab_labels(&shot) {
                         for x in from..to {
                             let e = click(x, shot.layout.tabs.y);
                             if section == focus {
-                                assert_nothing(e, &view, &state, &shot, "the focused section's own tab");
+                                assert_nothing(
+                                    e,
+                                    &view,
+                                    &state,
+                                    &shot,
+                                    "the focused section's own tab",
+                                );
                                 continue;
                             }
                             let mut v = view.clone();
@@ -1248,8 +1614,17 @@ fn a_left_press_on_a_tab_label_goes_to_its_section_as_its_digit_would() {
                                 "at {size:?} a press at column {x} on the {} tab did not go there as its digit does (banner aside)",
                                 section.title()
                             );
-                            assert!(v.seen[section.index()].visited, "a press on the {} tab was no visit", section.title());
-                            assert_eq!(v.reports, view.reports, "a press on the {} tab retired the banner", section.title());
+                            assert!(
+                                v.seen[section.index()].visited,
+                                "a press on the {} tab was no visit",
+                                section.title()
+                            );
+                            assert_eq!(
+                                v.reports,
+                                view.reports,
+                                "a press on the {} tab retired the banner",
+                                section.title()
+                            );
                             went += 1;
                         }
                     }
@@ -1270,15 +1645,32 @@ fn a_tab_press_under_the_narrow_swap_keeps_the_swap_in() {
     let mut view = standing_in(&state, Section::Meadow);
     view.inspector_wanted = true;
     let shot = shoot(&state, &view, SMALL);
-    assert!(matches!(shot.layout.body, Body::Narrow { .. }), "fixture: the floor is narrow");
-    for (section, from, _) in tab_labels(&shot).into_iter().filter(|(s, _, _)| *s != Section::Meadow) {
+    assert!(
+        matches!(shot.layout.body, Body::Narrow { .. }),
+        "fixture: the floor is narrow"
+    );
+    for (section, from, _) in tab_labels(&shot)
+        .into_iter()
+        .filter(|(s, _, _)| *s != Section::Meadow)
+    {
         let mut v = view.clone();
         point(click(from, shot.layout.tabs.y), &mut v, &state, &shot);
-        assert_eq!(v.section, Some(section), "a press on the {} tab under the swap did not go there", section.title());
-        assert!(v.inspector_wanted, "a press on the {} tab took the swap out", section.title());
+        assert_eq!(
+            v.section,
+            Some(section),
+            "a press on the {} tab under the swap did not go there",
+            section.title()
+        );
+        assert!(
+            v.inspector_wanted,
+            "a press on the {} tab took the swap out",
+            section.title()
+        );
         let after = shoot(&state, &v, SMALL);
         assert!(
-            every_cell(&after).iter().all(|(x, y)| after.record.list_at(*x, *y).is_none()),
+            every_cell(&after)
+                .iter()
+                .all(|(x, y)| after.record.list_at(*x, *y).is_none()),
             "after a press on the {} tab the list is drawn in the swap's place",
             section.title()
         );
@@ -1294,14 +1686,29 @@ fn a_press_on_a_tab_whose_section_has_since_lost_its_tab_does_nothing() {
     let now = sky_emptied();
     let mut drawn = now.clone();
     drawn.sites_reached = BTreeSet::new();
-    assert!(lists_selectable(&drawn, Section::Sky), "fixture: the Sky has a tab when the frame is drawn");
-    assert!(!lists_selectable(&now, Section::Sky), "fixture: the Sky has since lost its last row");
+    assert!(
+        lists_selectable(&drawn, Section::Sky),
+        "fixture: the Sky has a tab when the frame is drawn"
+    );
+    assert!(
+        !lists_selectable(&now, Section::Sky),
+        "fixture: the Sky has since lost its last row"
+    );
     for size in SIZES {
         let view = with_banner(&standing_in(&drawn, Section::Meadow));
         let shot = shoot(&drawn, &view, size);
-        let (_, from, to) = tab_labels(&shot).into_iter().find(|(s, _, _)| *s == Section::Sky).expect("fixture: the Sky's tab is drawn");
+        let (_, from, to) = tab_labels(&shot)
+            .into_iter()
+            .find(|(s, _, _)| *s == Section::Sky)
+            .expect("fixture: the Sky's tab is drawn");
         for x in from..to {
-            assert_nothing(click(x, shot.layout.tabs.y), &view, &now, &shot, "the Sky's tab after its section emptied");
+            assert_nothing(
+                click(x, shot.layout.tabs.y),
+                &view,
+                &now,
+                &shot,
+                "the Sky's tab after its section emptied",
+            );
         }
     }
 }
@@ -1321,7 +1728,13 @@ fn a_press_on_a_tab_whose_section_has_since_lost_its_tab_does_nothing() {
 fn a_left_press_on_a_rows_line_puts_the_cursor_on_it_and_does_nothing_else() {
     let state = mid_game();
     let mut kinds = BTreeSet::new();
-    for Swept { what, view, size, lines } in swept() {
+    for Swept {
+        what,
+        view,
+        size,
+        lines,
+    } in swept()
+    {
         let size = *size;
         {
             let section = view.section.expect("in a section");
@@ -1336,8 +1749,14 @@ fn a_left_press_on_a_rows_line_puts_the_cursor_on_it_and_does_nothing_else() {
                 for x in space.x..space.right() {
                     let mut v = view.clone();
                     let out = point(click(x, line.y), &mut v, &state, &shot);
-                    assert_eq!(out, Outcome::Handled, "{what} at {size:?}: a press on a row asked the core for {out:?}");
-                    let key = v.focus[section.index()].clone().expect("the cursor rests on a row");
+                    assert_eq!(
+                        out,
+                        Outcome::Handled,
+                        "{what} at {size:?}: a press on a row asked the core for {out:?}"
+                    );
+                    let key = v.focus[section.index()]
+                        .clone()
+                        .expect("the cursor rests on a row");
                     assert!(
                         line.rows.contains(&key),
                         "{what} at {size:?}: a press at ({x},{}) on {:?}'s line put the cursor on {key:?}",
@@ -1350,7 +1769,10 @@ fn a_left_press_on_a_rows_line_puts_the_cursor_on_it_and_does_nothing_else() {
                         "{what} at {size:?}: a press on {key:?} did something besides putting the cursor there"
                     );
                     if let Some(first) = &landed {
-                        assert_eq!(&key, first, "{what} at {size:?}: presses along one line landed on two rows");
+                        assert_eq!(
+                            &key, first,
+                            "{what} at {size:?}: presses along one line landed on two rows"
+                        );
                     } else {
                         let mut seen = v.clone();
                         seen.last_repeat = None;
@@ -1361,9 +1783,14 @@ fn a_left_press_on_a_rows_line_puts_the_cursor_on_it_and_does_nothing_else() {
                     }
                 }
                 let key = landed.expect("the line was pressed");
-                let row = rows(&state, section).into_iter().find(|r| r.key == key).expect("listed");
+                let row = rows(&state, section)
+                    .into_iter()
+                    .find(|r| r.key == key)
+                    .expect("listed");
                 kinds.insert(match (&row.key, &row.kind) {
-                    (RowKey::Kitten(..), _) if line.text.contains("(n: Elder)") => "kitten with hint",
+                    (RowKey::Kitten(..), _) if line.text.contains("(n: Elder)") => {
+                        "kitten with hint"
+                    }
                     (RowKey::Kitten(..), _) => "kitten",
                     (RowKey::Resource(_), _) => "stores",
                     (_, RowKind::Count { .. }) => "count",
@@ -1375,8 +1802,19 @@ fn a_left_press_on_a_rows_line_puts_the_cursor_on_it_and_does_nothing_else() {
             }
         }
     }
-    for kind in ["kitten with hint", "kitten", "stores", "count", "heavy", "done", "content"] {
-        assert!(kinds.contains(kind), "fixture: no {kind} row was pressed; pressed {kinds:?}");
+    for kind in [
+        "kitten with hint",
+        "kitten",
+        "stores",
+        "count",
+        "heavy",
+        "done",
+        "content",
+    ] {
+        assert!(
+            kinds.contains(kind),
+            "fixture: no {kind} row was pressed; pressed {kinds:?}"
+        );
     }
 }
 
@@ -1389,29 +1827,60 @@ fn a_left_press_on_a_rows_line_puts_the_cursor_on_it_and_does_nothing_else() {
 fn a_press_on_the_cursors_own_row_does_nothing_and_a_double_click_never_acts() {
     let state = mid_game();
     let mut pressed = 0usize;
-    for Swept { what, view, size, lines } in swept() {
+    for Swept {
+        what,
+        view,
+        size,
+        lines,
+    } in swept()
+    {
         let size = *size;
         {
             let section = view.section.expect("in a section");
             let shot = shoot(&state, view, size);
             let space = list_space(&shot.layout);
-            let cursor = view.focus[section.index()].clone().expect("a row is focused");
-            let own = lines.iter().find(|l| l.rows.contains(&cursor)).expect("the cursor's row is drawn");
+            let cursor = view.focus[section.index()]
+                .clone()
+                .expect("a row is focused");
+            let own = lines
+                .iter()
+                .find(|l| l.rows.contains(&cursor))
+                .expect("the cursor's row is drawn");
             for x in space.x..space.right() {
-                assert_nothing(click(x, own.y), view, &state, &shot, &format!("{what} at {size:?}, the cursor's own row"));
+                assert_nothing(
+                    click(x, own.y),
+                    view,
+                    &state,
+                    &shot,
+                    &format!("{what} at {size:?}, the cursor's own row"),
+                );
                 pressed += 1;
             }
-            if let Some(other) = lines.iter().find(|l| !l.rows.is_empty() && !l.rows.contains(&cursor)) {
+            if let Some(other) = lines
+                .iter()
+                .find(|l| !l.rows.is_empty() && !l.rows.contains(&cursor))
+            {
                 let mut v = view.clone();
                 point(click(space.x + 4, other.y), &mut v, &state, &shot);
                 let after_one = v.clone();
                 let out = point(click(space.x + 4, other.y), &mut v, &state, &shot);
-                assert_eq!(out, Outcome::Handled, "{what} at {size:?}: a double click asked the core for {out:?}");
-                assert_eq!(whole(&v), whole(&after_one), "{what} at {size:?}: the second press of a double click did something");
+                assert_eq!(
+                    out,
+                    Outcome::Handled,
+                    "{what} at {size:?}: a double click asked the core for {out:?}"
+                );
+                assert_eq!(
+                    whole(&v),
+                    whole(&after_one),
+                    "{what} at {size:?}: the second press of a double click did something"
+                );
             }
         }
     }
-    assert!(pressed > 1_000, "fixture: too few presses on the cursor's own row ({pressed})");
+    assert!(
+        pressed > 1_000,
+        "fixture: too few presses on the cursor's own row ({pressed})"
+    );
 }
 
 /// A press on a row the frame drew that is no longer drawn does nothing: a row
@@ -1428,8 +1897,17 @@ fn a_press_on_a_row_no_longer_drawn_does_nothing() {
         let shot = shoot(&state, &view, size);
         let mut left = view.clone();
         update(Action::SectionJump(Section::Clowder), &mut left, &state);
-        for line in list_map(&state, &view, &shot).iter().filter(|l| !l.rows.is_empty()) {
-            assert_nothing(click(list_space(&shot.layout).x + 2, line.y), &left, &state, &shot, "a row of a section since left");
+        for line in list_map(&state, &view, &shot)
+            .iter()
+            .filter(|l| !l.rows.is_empty())
+        {
+            assert_nothing(
+                click(list_space(&shot.layout).x + 2, line.y),
+                &left,
+                &state,
+                &shot,
+                "a row of a section since left",
+            );
         }
 
         // A row folded away since.
@@ -1439,19 +1917,35 @@ fn a_press_on_a_row_no_longer_drawn_does_nothing() {
         let shot = shoot(&state, &open, size);
         let mut folded = open.clone();
         folded.done_open = false;
-        folded.focus[Section::Ideas.index()] =
-            drawn_rows(&state, Section::Ideas, &folded).into_iter().find(|r| r.selectable()).map(|r| r.key);
+        folded.focus[Section::Ideas.index()] = drawn_rows(&state, Section::Ideas, &folded)
+            .into_iter()
+            .find(|r| r.selectable())
+            .map(|r| r.key);
         let mut met = 0;
         for line in list_map(&state, &open, &shot) {
-            let Some(key) = line.rows.first() else { continue };
-            let row = rows(&state, Section::Ideas).into_iter().find(|r| &r.key == key).expect("listed");
+            let Some(key) = line.rows.first() else {
+                continue;
+            };
+            let row = rows(&state, Section::Ideas)
+                .into_iter()
+                .find(|r| &r.key == key)
+                .expect("listed");
             if !finished(&state, &row) {
                 continue;
             }
-            assert_nothing(click(list_space(&shot.layout).x + 2, line.y), &folded, &state, &shot, "a row folded away since");
+            assert_nothing(
+                click(list_space(&shot.layout).x + 2, line.y),
+                &folded,
+                &state,
+                &shot,
+                "a row folded away since",
+            );
             met += 1;
         }
-        assert!(met > 0, "fixture: at {size:?} a finished row is drawn in the open done group");
+        assert!(
+            met > 0,
+            "fixture: at {size:?} a finished row is drawn in the open done group"
+        );
 
         // A row that has left its list.
         let view = standing_in(&state, Section::Meadow);
@@ -1459,16 +1953,34 @@ fn a_press_on_a_row_no_longer_drawn_does_nothing() {
         let lines = list_map(&state, &view, &shot);
         let gone = lines
             .iter()
-            .find(|l| l.rows.iter().any(|k| matches!(k, RowKey::Content(ContentId::Structure(_), _))) && !l.rows.contains(view.focus[0].as_ref().expect("focused")))
+            .find(|l| {
+                l.rows
+                    .iter()
+                    .any(|k| matches!(k, RowKey::Content(ContentId::Structure(_), _)))
+                    && !l.rows.contains(view.focus[0].as_ref().expect("focused"))
+            })
             .expect("fixture: a structure's row is drawn");
-        let Some(RowKey::Content(id, _)) = gone.rows.first().cloned() else { unreachable!() };
+        let Some(RowKey::Content(id, _)) = gone.rows.first().cloned() else {
+            unreachable!()
+        };
         let mut now = state.clone();
         now.revealed.remove(&id);
         if let ContentId::Structure(b) = id {
             now.structures[b.ix()] = 0;
         }
-        assert!(!rows(&now, Section::Meadow).iter().any(|r| gone.rows.contains(&r.key)), "fixture: the row has left its list");
-        assert_nothing(click(list_space(&shot.layout).x + 2, gone.y), &view, &now, &shot, "a row that has left its list");
+        assert!(
+            !rows(&now, Section::Meadow)
+                .iter()
+                .any(|r| gone.rows.contains(&r.key)),
+            "fixture: the row has left its list"
+        );
+        assert_nothing(
+            click(list_space(&shot.layout).x + 2, gone.y),
+            &view,
+            &now,
+            &shot,
+            "a row that has left its list",
+        );
     }
 }
 
@@ -1487,17 +1999,38 @@ fn each_wheel_step_over_the_list_moves_the_cursor_one_row_as_the_arrows_do() {
     for size in SIZES {
         for section in [Section::Meadow, Section::Clowder, Section::Ideas] {
             let mut view = with_banner(&standing_in(&state, section));
-            let first = drawn_rows(&state, section, &view).into_iter().find(|r| r.selectable()).map(|r| r.key);
+            let first = drawn_rows(&state, section, &view)
+                .into_iter()
+                .find(|r| r.selectable())
+                .map(|r| r.key);
             view.focus[section.index()] = first;
-            let total = drawn_rows(&state, section, &view).iter().filter(|r| r.selectable()).count();
+            let total = drawn_rows(&state, section, &view)
+                .iter()
+                .filter(|r| r.selectable())
+                .count();
             for (down, steps) in [(true, total + 2), (false, total + 2)] {
                 for i in 0..steps {
                     let shot = shoot(&state, &view, size);
                     let space = list_space(&shot.layout);
-                    let (x, y) = (space.x + (i as u16 * 7) % space.width, space.y + (i as u16 * 5) % space.height);
-                    let e = if down { wheel_down(x, y) } else { wheel_up(x, y) };
+                    let (x, y) = (
+                        space.x + (i as u16 * 7) % space.width,
+                        space.y + (i as u16 * 5) % space.height,
+                    );
+                    let e = if down {
+                        wheel_down(x, y)
+                    } else {
+                        wheel_up(x, y)
+                    };
                     let mut by_key = view.clone();
-                    update(if down { Action::CursorDown } else { Action::CursorUp }, &mut by_key, &state);
+                    update(
+                        if down {
+                            Action::CursorDown
+                        } else {
+                            Action::CursorUp
+                        },
+                        &mut by_key,
+                        &state,
+                    );
                     by_key.reports = view.reports.clone();
                     let mut v = view.clone();
                     assert_eq!(point(e, &mut v, &state, &shot), Outcome::Handled);
@@ -1516,12 +2049,18 @@ fn each_wheel_step_over_the_list_moves_the_cursor_one_row_as_the_arrows_do() {
                     view = v;
                     view.last_repeat = None;
                     view.field_guard = false;
-                    assert!(cursor_line(&shoot(&state, &view, size)).is_some(), "the view did not follow the cursor at {size:?}");
+                    assert!(
+                        cursor_line(&shoot(&state, &view, size)).is_some(),
+                        "the view did not follow the cursor at {size:?}"
+                    );
                 }
             }
         }
     }
-    assert!(stepped > 200, "fixture: too few wheel steps moved the cursor ({stepped})");
+    assert!(
+        stepped > 200,
+        "fixture: too few wheel steps moved the cursor ({stepped})"
+    );
 }
 
 /// Each step the terminal reports is one row: several steps delivered in one
@@ -1542,7 +2081,10 @@ fn several_reported_steps_move_the_cursor_as_many_rows() {
                 point(wheel_down(space.x + 1, space.y + 1), &mut v, &state, &shot);
                 update(Action::CursorDown, &mut by_keys, &state);
             }
-            assert_eq!(v.focus, by_keys.focus, "at {size:?} {n} reported steps did not move the cursor {n} rows");
+            assert_eq!(
+                v.focus, by_keys.focus,
+                "at {size:?} {n} reported steps did not move the cursor {n} rows"
+            );
         }
     }
 }
@@ -1555,7 +2097,10 @@ fn a_wheel_step_over_a_list_with_no_row_to_rest_on_does_nothing() {
     let state = sky_emptied();
     for size in SIZES {
         for memory in [Some(RowKey::Site(SiteId::ALL[0])), None] {
-            let mut view = ViewState { section: Some(Section::Sky), ..Default::default() };
+            let mut view = ViewState {
+                section: Some(Section::Sky),
+                ..Default::default()
+            };
             view.focus[Section::Sky.index()] = memory.clone();
             let shot = shoot(&state, &view, size);
             for (x, y) in cells_of(list_space(&shot.layout)) {
@@ -1583,7 +2128,11 @@ fn a_press_or_step_over_the_chrome_the_dividers_or_the_inspector_does_nothing() 
             view.inspector_wanted = swap;
             let shot = shoot(&state, &view, size);
             let l = shot.layout;
-            let mut inert: Vec<(&str, Rect)> = vec![("header", l.header), ("ticker", l.ticker), ("hint bar", l.hints)];
+            let mut inert: Vec<(&str, Rect)> = vec![
+                ("header", l.header),
+                ("ticker", l.ticker),
+                ("hint bar", l.hints),
+            ];
             inert.push(("banner", l.banner.expect("fixture: the banner shows")));
             match l.body {
                 Body::Narrow { sidebar, main } => {
@@ -1593,10 +2142,17 @@ fn a_press_or_step_over_the_chrome_the_dividers_or_the_inspector_does_nothing() 
                         inert.push(("swap", main));
                     }
                 }
-                Body::Wide { sidebar, list, inspector } => {
+                Body::Wide {
+                    sidebar,
+                    list,
+                    inspector,
+                } => {
                     inert.push(("sidebar", sidebar));
                     inert.push(("divider", Rect::new(list.x, list.y, 1, list.height)));
-                    inert.push(("divider", Rect::new(list.right() - 1, list.y, 1, list.height)));
+                    inert.push((
+                        "divider",
+                        Rect::new(list.right() - 1, list.y, 1, list.height),
+                    ));
                     inert.push(("inspector", inspector));
                 }
                 Body::TooSmall(_) => unreachable!("above the floor"),
@@ -1626,12 +2182,21 @@ fn under_a_count_prompt_or_the_palette_every_pointer_event_does_nothing() {
     let mut views = Vec::new();
     for section in [Section::Meadow, Section::Clowder] {
         let mut v = with_banner(&standing_in(&state, section));
-        v.prompt = Some(CountPrompt { digits: "12".into(), row: v.focus[section.index()].clone() });
-        views.push((format!("a count prompt on the {} screen", section.title()), v));
+        v.prompt = Some(CountPrompt {
+            digits: "12".into(),
+            row: v.focus[section.index()].clone(),
+        });
+        views.push((
+            format!("a count prompt on the {} screen", section.title()),
+            v,
+        ));
     }
     for query in ["", "kit", "e"] {
         let mut v = with_banner(&standing_in(&state, Section::Meadow));
-        v.overlay = Some(Overlay::Palette { query: query.into(), selected: 0 });
+        v.overlay = Some(Overlay::Palette {
+            query: query.into(),
+            selected: 0,
+        });
         views.push((format!("the palette with {query:?}"), v));
     }
     for size in SIZES {
@@ -1660,7 +2225,10 @@ fn each_wheel_step_over_the_journal_scrolls_it_one_line_within_its_bounds() {
         let mut view = armed_on(&with_banner(&standing_in(&state, section)), section, &heavy);
         view.overlay = Some(Overlay::Journal { anchor: 0 });
         let armed = view.armed.clone();
-        let max = shoot(&state, &view, size).record.journal_max_scroll().expect("fixture: the Journal overflows");
+        let max = shoot(&state, &view, size)
+            .record
+            .journal_max_scroll()
+            .expect("fixture: the Journal overflows");
         assert!(max >= 3, "fixture: the Journal scrolls a few lines");
         let anchor = |v: &ViewState| match v.overlay {
             Some(Overlay::Journal { anchor }) => anchor,
@@ -1670,24 +2238,64 @@ fn each_wheel_step_over_the_journal_scrolls_it_one_line_within_its_bounds() {
             for i in 0..steps {
                 let shot = shoot(&state, &view, size);
                 let region = body_rect(&shot.layout);
-                let (x, y) = (region.x + (i as u16 * 11) % region.width, region.y + (i as u16 * 3) % region.height);
+                let (x, y) = (
+                    region.x + (i as u16 * 11) % region.width,
+                    region.y + (i as u16 * 3) % region.height,
+                );
                 let before = anchor(&view);
                 let mut v = view.clone();
-                let out = point(if down { wheel_down(x, y) } else { wheel_up(x, y) }, &mut v, &state, &shot);
+                let out = point(
+                    if down {
+                        wheel_down(x, y)
+                    } else {
+                        wheel_up(x, y)
+                    },
+                    &mut v,
+                    &state,
+                    &shot,
+                );
                 assert_eq!(out, Outcome::Handled);
-                let want = if down { (before + 1).min(max) } else { before.saturating_sub(1) };
-                assert_eq!(anchor(&v), want, "at {size:?} a step {} over the Journal from {before} scrolled to {}", if down { "down" } else { "up" }, anchor(&v));
+                let want = if down {
+                    (before + 1).min(max)
+                } else {
+                    before.saturating_sub(1)
+                };
+                assert_eq!(
+                    anchor(&v),
+                    want,
+                    "at {size:?} a step {} over the Journal from {before} scrolled to {}",
+                    if down { "down" } else { "up" },
+                    anchor(&v)
+                );
                 if want == before {
-                    assert_eq!(whole(&v), whole(&view), "at {size:?} a step at the Journal's bound did something");
+                    assert_eq!(
+                        whole(&v),
+                        whole(&view),
+                        "at {size:?} a step at the Journal's bound did something"
+                    );
                 }
                 let mut expect = view.clone();
                 expect.overlay = Some(Overlay::Journal { anchor: want });
-                assert_eq!(settled(&v), settled(&expect), "at {size:?} a step over the Journal did something besides scrolling it");
-                assert_eq!(v.armed, armed, "at {size:?} a wheel step over the Journal ended the arming beneath");
-                assert_eq!(v.reports, view.reports, "at {size:?} a wheel step over the Journal retired the banner");
+                assert_eq!(
+                    settled(&v),
+                    settled(&expect),
+                    "at {size:?} a step over the Journal did something besides scrolling it"
+                );
+                assert_eq!(
+                    v.armed, armed,
+                    "at {size:?} a wheel step over the Journal ended the arming beneath"
+                );
+                assert_eq!(
+                    v.reports, view.reports,
+                    "at {size:?} a wheel step over the Journal retired the banner"
+                );
                 view = v;
             }
-            assert_eq!(anchor(&view), if down { max } else { 0 }, "at {size:?} the wheel did not reach the Journal's bound");
+            assert_eq!(
+                anchor(&view),
+                if down { max } else { 0 },
+                "at {size:?} the wheel did not reach the Journal's bound"
+            );
         }
     }
 }
@@ -1707,7 +2315,10 @@ fn each_journal_key_scrolls_it_as_the_wheel_does() {
         let mut base = armed_on(&with_banner(&standing_in(&state, section)), section, &heavy);
         base.overlay = Some(Overlay::Journal { anchor: 0 });
         let shot = shoot(&state, &base, size);
-        let max = shot.record.journal_max_scroll().expect("fixture: the Journal overflows");
+        let max = shot
+            .record
+            .journal_max_scroll()
+            .expect("fixture: the Journal overflows");
         let region = body_rect(&shot.layout);
         let anchor = |v: &ViewState| match v.overlay {
             Some(Overlay::Journal { anchor }) => anchor,
@@ -1719,18 +2330,45 @@ fn each_journal_key_scrolls_it_as_the_wheel_does() {
             let shot = shoot(&state, &view, size);
             for (action, wheel) in [(Action::CursorDown, true), (Action::CursorUp, false)] {
                 let mut by_key = view.clone();
-                assert!(journal_key(&action, &mut by_key, Some(&shot.record)), "{action:?} was not the Journal's");
+                assert!(
+                    journal_key(&action, &mut by_key, Some(&shot.record)),
+                    "{action:?} was not the Journal's"
+                );
                 let mut by_wheel = view.clone();
                 let (x, y) = (region.x, region.y);
-                point(if wheel { wheel_down(x, y) } else { wheel_up(x, y) }, &mut by_wheel, &state, &shot);
-                assert_eq!(anchor(&by_key), anchor(&by_wheel), "at {size:?} from {at}, {action:?} and the wheel disagree");
-                assert_eq!(by_key.armed, view.armed, "at {size:?} {action:?} in the Journal ended the arming");
-                assert_eq!(by_key.reports, view.reports, "at {size:?} {action:?} in the Journal retired the banner");
+                point(
+                    if wheel {
+                        wheel_down(x, y)
+                    } else {
+                        wheel_up(x, y)
+                    },
+                    &mut by_wheel,
+                    &state,
+                    &shot,
+                );
+                assert_eq!(
+                    anchor(&by_key),
+                    anchor(&by_wheel),
+                    "at {size:?} from {at}, {action:?} and the wheel disagree"
+                );
+                assert_eq!(
+                    by_key.armed, view.armed,
+                    "at {size:?} {action:?} in the Journal ended the arming"
+                );
+                assert_eq!(
+                    by_key.reports, view.reports,
+                    "at {size:?} {action:?} in the Journal retired the banner"
+                );
             }
             for (action, want) in [(Action::GroupPrev, 0), (Action::GroupNext, max)] {
                 let mut v = view.clone();
                 assert!(journal_key(&action, &mut v, Some(&shot.record)));
-                assert_eq!(anchor(&v), want, "at {size:?} from {at}, {action:?} went to {} rather than {want}", anchor(&v));
+                assert_eq!(
+                    anchor(&v),
+                    want,
+                    "at {size:?} from {at}, {action:?} went to {} rather than {want}",
+                    anchor(&v)
+                );
                 assert_eq!(v.armed, view.armed);
                 assert_eq!(v.reports, view.reports);
             }
@@ -1750,10 +2388,22 @@ fn journal_keys_are_not_taken_without_an_open_journal() {
         let mut view = with_banner(&standing_in(&state, Section::Meadow));
         view.overlay = overlay.clone();
         let shot = shoot(&state, &view, (100, 30));
-        for action in [Action::CursorDown, Action::CursorUp, Action::GroupPrev, Action::GroupNext] {
+        for action in [
+            Action::CursorDown,
+            Action::CursorUp,
+            Action::GroupPrev,
+            Action::GroupNext,
+        ] {
             let mut v = view.clone();
-            assert!(!journal_key(&action, &mut v, Some(&shot.record)), "{action:?} was taken under {overlay:?}");
-            assert_eq!(whole(&v), whole(&view), "{action:?} changed the view under {overlay:?}");
+            assert!(
+                !journal_key(&action, &mut v, Some(&shot.record)),
+                "{action:?} was taken under {overlay:?}"
+            );
+            assert_eq!(
+                whole(&v),
+                whole(&view),
+                "{action:?} changed the view under {overlay:?}"
+            );
         }
     }
 }
@@ -1773,13 +2423,32 @@ fn under_the_journal_or_help_every_press_and_every_other_step_does_nothing() {
             let shot = shoot(&state, &view, size);
             let region = body_rect(&shot.layout);
             for (x, y) in every_cell(&shot) {
-                assert_nothing(click(x, y), &view, &state, &shot, &format!("a press under {overlay:?} at {size:?}"));
-                let over = region.x <= x && x < region.right() && region.y <= y && y < region.bottom();
+                assert_nothing(
+                    click(x, y),
+                    &view,
+                    &state,
+                    &shot,
+                    &format!("a press under {overlay:?} at {size:?}"),
+                );
+                let over =
+                    region.x <= x && x < region.right() && region.y <= y && y < region.bottom();
                 if over && matches!(overlay, Overlay::Journal { .. }) {
                     continue;
                 }
-                assert_nothing(wheel_down(x, y), &view, &state, &shot, &format!("a step under {overlay:?} at {size:?}"));
-                assert_nothing(wheel_up(x, y), &view, &state, &shot, &format!("a step under {overlay:?} at {size:?}"));
+                assert_nothing(
+                    wheel_down(x, y),
+                    &view,
+                    &state,
+                    &shot,
+                    &format!("a step under {overlay:?} at {size:?}"),
+                );
+                assert_nothing(
+                    wheel_up(x, y),
+                    &view,
+                    &state,
+                    &shot,
+                    &format!("a step under {overlay:?} at {size:?}"),
+                );
             }
         }
     }
@@ -1805,53 +2474,123 @@ fn a_pointer_move_ends_an_arming_and_an_event_that_moves_nothing_leaves_it() {
             let lines = list_map(&state, &view, &shot);
             let what = format!("{:?} armed at {size:?}", row.key);
 
-            let other = lines.iter().find(|l| !l.rows.is_empty() && !l.rows.contains(&row.key)).expect("fixture: another row");
+            let other = lines
+                .iter()
+                .find(|l| !l.rows.is_empty() && !l.rows.contains(&row.key))
+                .expect("fixture: another row");
             let mut v = view.clone();
             point(click(space.x + 3, other.y), &mut v, &state, &shot);
-            assert!(v.armed.is_none(), "{what}: a press on another row left it armed");
+            assert!(
+                v.armed.is_none(),
+                "{what}: a press on another row left it armed"
+            );
 
-            let (_, tab_x, _) = *tab_labels(&shot).iter().find(|(s, _, _)| *s != section).expect("another tab");
+            let (_, tab_x, _) = *tab_labels(&shot)
+                .iter()
+                .find(|(s, _, _)| *s != section)
+                .expect("another tab");
             let mut v = view.clone();
             point(click(tab_x, shot.layout.tabs.y), &mut v, &state, &shot);
-            assert!(v.armed.is_none(), "{what}: a press on another tab left it armed");
+            assert!(
+                v.armed.is_none(),
+                "{what}: a press on another tab left it armed"
+            );
 
-            let selectable: Vec<RowKey> =
-                drawn_rows(&state, section, &view).into_iter().filter(|r| r.selectable()).map(|r| r.key).collect();
-            let at = selectable.iter().position(|k| *k == row.key).expect("drawn");
-            let moving = if at + 1 < selectable.len() { wheel_down(space.x, space.y) } else { wheel_up(space.x, space.y) };
+            let selectable: Vec<RowKey> = drawn_rows(&state, section, &view)
+                .into_iter()
+                .filter(|r| r.selectable())
+                .map(|r| r.key)
+                .collect();
+            let at = selectable
+                .iter()
+                .position(|k| *k == row.key)
+                .expect("drawn");
+            let moving = if at + 1 < selectable.len() {
+                wheel_down(space.x, space.y)
+            } else {
+                wheel_up(space.x, space.y)
+            };
             let mut v = view.clone();
             point(moving, &mut v, &state, &shot);
-            assert!(v.armed.is_none() && v.focus != view.focus, "{what}: a wheel step that moved the cursor left it armed");
+            assert!(
+                v.armed.is_none() && v.focus != view.focus,
+                "{what}: a wheel step that moved the cursor left it armed"
+            );
 
-            let own = lines.iter().position(|l| l.rows.contains(&row.key)).expect("the armed row is drawn");
-            let mut still: Vec<(u16, u16)> = (space.x..space.right()).map(|x| (x, lines[own].y)).collect();
-            still.extend(lines.iter().filter(|l| l.rows.is_empty()).map(|l| (space.x + 2, l.y)));
+            let own = lines
+                .iter()
+                .position(|l| l.rows.contains(&row.key))
+                .expect("the armed row is drawn");
+            let mut still: Vec<(u16, u16)> = (space.x..space.right())
+                .map(|x| (x, lines[own].y))
+                .collect();
+            still.extend(
+                lines
+                    .iter()
+                    .filter(|l| l.rows.is_empty())
+                    .map(|l| (space.x + 2, l.y)),
+            );
             if let Body::Narrow { sidebar, .. } | Body::Wide { sidebar, .. } = shot.layout.body {
                 still.push((sidebar.x + 2, sidebar.y + 2));
             }
-            still.push((tab_labels(&shot).iter().find(|(s, _, _)| *s == section).expect("own tab").1, shot.layout.tabs.y));
-            assert!(lines[own + 1].rows.is_empty(), "fixture: the armed row's summary is drawn beneath it");
+            still.push((
+                tab_labels(&shot)
+                    .iter()
+                    .find(|(s, _, _)| *s == section)
+                    .expect("own tab")
+                    .1,
+                shot.layout.tabs.y,
+            ));
+            assert!(
+                lines[own + 1].rows.is_empty(),
+                "fixture: the armed row's summary is drawn beneath it"
+            );
             for (x, y) in still {
                 for e in [
                     click(x, y),
-                    mouse(MouseEventKind::Down(MouseButton::Right), x, y, KeyModifiers::NONE),
+                    mouse(
+                        MouseEventKind::Down(MouseButton::Right),
+                        x,
+                        y,
+                        KeyModifiers::NONE,
+                    ),
                     mouse(MouseEventKind::Moved, x, y, KeyModifiers::NONE),
-                    mouse(MouseEventKind::Down(MouseButton::Left), x, y, KeyModifiers::SHIFT),
+                    mouse(
+                        MouseEventKind::Down(MouseButton::Left),
+                        x,
+                        y,
+                        KeyModifiers::SHIFT,
+                    ),
                 ] {
-                    assert_nothing(e, &view, &state, &shot, &format!("{what}, an event that moves nothing"));
+                    assert_nothing(
+                        e,
+                        &view,
+                        &state,
+                        &shot,
+                        &format!("{what}, an event that moves nothing"),
+                    );
                 }
             }
 
             // The same row armed at the very end of its list, where a step
             // past the end moves nothing.
-            for (end, step) in [(0, wheel_up(space.x, space.y)), (selectable.len() - 1, wheel_down(space.x, space.y))] {
+            for (end, step) in [
+                (0, wheel_up(space.x, space.y)),
+                (selectable.len() - 1, wheel_down(space.x, space.y)),
+            ] {
                 let mut at_end = view.clone();
                 at_end.focus[section.index()] = Some(selectable[end].clone());
                 if let Some(a) = at_end.armed.as_mut() {
                     a.key = selectable[end].clone();
                 }
                 let end_shot = shoot(&state, &at_end, size);
-                assert_nothing(step, &at_end, &state, &end_shot, &format!("{what}, a step past the end of the list"));
+                assert_nothing(
+                    step,
+                    &at_end,
+                    &state,
+                    &end_shot,
+                    &format!("{what}, a step past the end of the list"),
+                );
             }
         }
     }
@@ -1871,19 +2610,49 @@ fn no_held_press_acts_on_the_row_a_pointer_moved_the_cursor_to() {
     let acts = |out: &Outcome| matches!(out, Outcome::Apply(_) | Outcome::Repeat(..));
 
     // (key, section, a row the key acts on, a row the click moves to)
-    let content = |r: &Row| matches!(r.kind, RowKind::Act { .. }) && !r.heavy && matches!(r.key, RowKey::Content(ContentId::Structure(_), _));
+    let content = |r: &Row| {
+        matches!(r.kind, RowKind::Act { .. })
+            && !r.heavy
+            && matches!(r.key, RowKey::Content(ContentId::Structure(_), _))
+    };
     let count = |r: &Row| matches!(r.kind, RowKind::Count { .. });
-    let idea = |r: &Row| matches!(r.key, RowKey::Content(ContentId::Idea(_) | ContentId::Refinement(_), _)) && !r.heavy && !finished(&state, r);
-    let rule = |r: &Row| r.heavy && matches!(r.key, RowKey::Content(ContentId::Rule(_), _)) && !finished(&state, r);
+    let idea = |r: &Row| {
+        matches!(
+            r.key,
+            RowKey::Content(ContentId::Idea(_) | ContentId::Refinement(_), _)
+        ) && !r.heavy
+            && !finished(&state, r)
+    };
+    let rule = |r: &Row| {
+        r.heavy && matches!(r.key, RowKey::Content(ContentId::Rule(_), _)) && !finished(&state, r)
+    };
     let other_kitten = |r: &Row| matches!(r.key, RowKey::Kitten(ix, _) if Some(ix) != state.elder);
     type Pick<'a> = &'a dyn Fn(&Row) -> bool;
     let cases: Vec<(&str, Action, Section, Pick, Pick)> = vec![
-        ("Enter", Action::Activate, Section::Meadow, &content, &content),
-        ("Enter onto a heavy row", Action::Activate, Section::Ideas, &idea, &rule),
+        (
+            "Enter",
+            Action::Activate,
+            Section::Meadow,
+            &content,
+            &content,
+        ),
+        (
+            "Enter onto a heavy row",
+            Action::Activate,
+            Section::Ideas,
+            &idea,
+            &rule,
+        ),
         ("X", Action::MaxAffordable, Section::Clowder, &count, &count),
         ("+", Action::Increment, Section::Clowder, &count, &count),
         ("-", Action::Decrement, Section::Clowder, &count, &count),
-        ("n", Action::AppointElder, Section::Clowder, &other_kitten, &other_kitten),
+        (
+            "n",
+            Action::AppointElder,
+            Section::Clowder,
+            &other_kitten,
+            &other_kitten,
+        ),
     ];
     for size in SIZES {
         for (name, action, section, first, second) in &cases {
@@ -1906,19 +2675,41 @@ fn no_held_press_acts_on_the_row_a_pointer_moved_the_cursor_to() {
             let mut v = v;
 
             let out = update(action.clone(), &mut v, &state);
-            assert!(acts(&out), "fixture: {name} at {size:?} acts on {:?}: {out:?}", a.key);
-            point(click(list_space(&shot.layout).x + 2, b_line), &mut v, &state, &shot);
-            assert_eq!(v.focus[section.index()].as_ref(), Some(&b.key), "fixture: the click moved the cursor to {:?}", b.key);
+            assert!(
+                acts(&out),
+                "fixture: {name} at {size:?} acts on {:?}: {out:?}",
+                a.key
+            );
+            point(
+                click(list_space(&shot.layout).x + 2, b_line),
+                &mut v,
+                &state,
+                &shot,
+            );
+            assert_eq!(
+                v.focus[section.index()].as_ref(),
+                Some(&b.key),
+                "fixture: the click moved the cursor to {:?}",
+                b.key
+            );
             for _ in 0..16 {
                 std::thread::sleep(Duration::from_millis(30));
                 let out = update(action.clone(), &mut v, &state);
                 assert!(!acts(&out), "at {size:?} a held {name} acted on {:?}, the row a click moved the cursor to: {out:?}", b.key);
-                assert!(v.armed.is_none(), "at {size:?} a held {name} armed {:?}, the row a click moved the cursor to", b.key);
+                assert!(
+                    v.armed.is_none(),
+                    "at {size:?} a held {name} armed {:?}, the row a click moved the cursor to",
+                    b.key
+                );
             }
             std::thread::sleep(Duration::from_millis(300));
             let out = update(action.clone(), &mut v, &state);
             let armed_b = v.armed.as_ref().is_some_and(|x| x.key == b.key);
-            assert!(acts(&out) || armed_b, "at {size:?} a distinct {name} after the hold did not act on {:?}: {out:?}", b.key);
+            assert!(
+                acts(&out) || armed_b,
+                "at {size:?} a distinct {name} after the hold did not act on {:?}: {out:?}",
+                b.key
+            );
         }
 
         // Onto another section's landing, by its tab.
@@ -1927,17 +2718,30 @@ fn no_held_press_acts_on_the_row_a_pointer_moved_the_cursor_to() {
         let shot = shoot(&state, &v, size);
         let out = update(Action::Activate, &mut v, &state);
         assert!(acts(&out), "fixture: Enter acts on a Meadow row");
-        let (_, x, _) = *tab_labels(&shot).iter().find(|(s, _, _)| *s == Section::Clowder).expect("the Clowder tab");
+        let (_, x, _) = *tab_labels(&shot)
+            .iter()
+            .find(|(s, _, _)| *s == Section::Clowder)
+            .expect("the Clowder tab");
         point(click(x, shot.layout.tabs.y), &mut v, &state, &shot);
-        assert_eq!(v.section, Some(Section::Clowder), "fixture: the tab press went to the Clowder");
+        assert_eq!(
+            v.section,
+            Some(Section::Clowder),
+            "fixture: the tab press went to the Clowder"
+        );
         for _ in 0..16 {
             std::thread::sleep(Duration::from_millis(30));
             let out = update(Action::Activate, &mut v, &state);
-            assert!(!acts(&out) && v.armed.is_none(), "at {size:?} a held Enter acted on the row a tab press landed on: {out:?}");
+            assert!(
+                !acts(&out) && v.armed.is_none(),
+                "at {size:?} a held Enter acted on the row a tab press landed on: {out:?}"
+            );
         }
         std::thread::sleep(Duration::from_millis(300));
         let out = update(Action::Activate, &mut v, &state);
-        assert!(acts(&out) || v.armed.is_some(), "at {size:?} a distinct Enter after the hold did not act on the landed row");
+        assert!(
+            acts(&out) || v.armed.is_some(),
+            "at {size:?} a distinct Enter after the hold did not act on the landed row"
+        );
     }
 }
 
@@ -1960,9 +2764,19 @@ fn players_eye_a_mid_game_meadow_driven_by_the_pointer_alone() {
         let mut shot = shoot_on(&mut term, &state, &view, None);
 
         // A tab.
-        let (_, x, _) = *tab_labels(&shot).iter().find(|(s, _, _)| *s == Section::Clowder).expect("the Clowder tab");
-        assert_eq!(point(click(x, shot.layout.tabs.y), &mut view, &state, &shot), Outcome::Handled);
-        assert_eq!(view.section, Some(Section::Clowder), "at {size:?} the tab press did not go to the Clowder");
+        let (_, x, _) = *tab_labels(&shot)
+            .iter()
+            .find(|(s, _, _)| *s == Section::Clowder)
+            .expect("the Clowder tab");
+        assert_eq!(
+            point(click(x, shot.layout.tabs.y), &mut view, &state, &shot),
+            Outcome::Handled
+        );
+        assert_eq!(
+            view.section,
+            Some(Section::Clowder),
+            "at {size:?} the tab press did not go to the Clowder"
+        );
         shot = shoot_on(&mut term, &state, &view, Some(&shot.layout));
 
         // The wheel, down until the list scrolls.
@@ -1970,9 +2784,17 @@ fn players_eye_a_mid_game_meadow_driven_by_the_pointer_alone() {
         let top_before = text(&shot.buf, space.y, space.x, space.right());
         let mut scrolled = false;
         for _ in 0..(space.height as usize * 2) {
-            point(wheel_down(space.x + space.width / 2, space.y + space.height / 2), &mut view, &state, &shot);
+            point(
+                wheel_down(space.x + space.width / 2, space.y + space.height / 2),
+                &mut view,
+                &state,
+                &shot,
+            );
             shot = shoot_on(&mut term, &state, &view, Some(&shot.layout));
-            assert!(cursor_line(&shot).is_some(), "at {size:?} the wheel left the cursor off screen");
+            assert!(
+                cursor_line(&shot).is_some(),
+                "at {size:?} the wheel left the cursor off screen"
+            );
             if text(&shot.buf, space.y, space.x, space.right()) != top_before {
                 scrolled = true;
             }
@@ -1982,13 +2804,31 @@ fn players_eye_a_mid_game_meadow_driven_by_the_pointer_alone() {
         // A row near the foot, then one near the top, of the scrolled list.
         for pick_last in [true, false] {
             let lines = list_map(&state, &view, &shot);
-            let cursor = view.focus[Section::Clowder.index()].clone().expect("focused");
-            let mut candidates = lines.iter().filter(|l| !l.rows.is_empty() && !l.rows.contains(&cursor));
-            let aimed = if pick_last { candidates.next_back() } else { candidates.next() }.expect("another row is drawn").clone();
-            point(click(space.x + space.width - 2, aimed.y), &mut view, &state, &shot);
+            let cursor = view.focus[Section::Clowder.index()]
+                .clone()
+                .expect("focused");
+            let mut candidates = lines
+                .iter()
+                .filter(|l| !l.rows.is_empty() && !l.rows.contains(&cursor));
+            let aimed = if pick_last {
+                candidates.next_back()
+            } else {
+                candidates.next()
+            }
+            .expect("another row is drawn")
+            .clone();
+            point(
+                click(space.x + space.width - 2, aimed.y),
+                &mut view,
+                &state,
+                &shot,
+            );
             shot = shoot_on(&mut term, &state, &view, Some(&shot.layout));
             let (_, now) = cursor_line(&shot).expect("the cursor is drawn");
-            assert_eq!(now, aimed.text, "at {size:?} the cursor does not stand on the line that was under the click");
+            assert_eq!(
+                now, aimed.text,
+                "at {size:?} the cursor does not stand on the line that was under the click"
+            );
         }
 
         // The inspector called; then a tab pressed beneath it.
@@ -1999,14 +2839,35 @@ fn players_eye_a_mid_game_meadow_driven_by_the_pointer_alone() {
             if size == SMALL {
                 let mut v = view.clone();
                 point(click(x, y), &mut v, &state, &shot);
-                assert_eq!(whole(&v), whole(&view), "at {size:?} a click on the inspector swap did something");
+                assert_eq!(
+                    whole(&v),
+                    whole(&view),
+                    "at {size:?} a click on the inspector swap did something"
+                );
             }
         }
-        let (_, x, _) = *tab_labels(&shot).iter().find(|(s, _, _)| *s == Section::Ideas).expect("the Ideas tab");
+        let (_, x, _) = *tab_labels(&shot)
+            .iter()
+            .find(|(s, _, _)| *s == Section::Ideas)
+            .expect("the Ideas tab");
         point(click(x, shot.layout.tabs.y), &mut view, &state, &shot);
-        assert_eq!(view.section, Some(Section::Ideas), "at {size:?} a tab press with the inspector called did not go there");
-        assert!(view.inspector_wanted, "at {size:?} a tab press took the inspector away");
-        assert_eq!(view.reports, before.reports, "at {size:?} the pointer retired the banner");
-        assert_eq!(clowder_core::save_string(&state, 0), saved, "at {size:?} the game changed");
+        assert_eq!(
+            view.section,
+            Some(Section::Ideas),
+            "at {size:?} a tab press with the inspector called did not go there"
+        );
+        assert!(
+            view.inspector_wanted,
+            "at {size:?} a tab press took the inspector away"
+        );
+        assert_eq!(
+            view.reports, before.reports,
+            "at {size:?} the pointer retired the banner"
+        );
+        assert_eq!(
+            clowder_core::save_string(&state, 0),
+            saved,
+            "at {size:?} the game changed"
+        );
     }
 }

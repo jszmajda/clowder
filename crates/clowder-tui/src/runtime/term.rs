@@ -37,7 +37,9 @@ impl TerminalGuard {
     pub fn enter() -> std::io::Result<Self> {
         TAKEN.store(true, Ordering::SeqCst);
         let entered = crossterm::terminal::enable_raw_mode()
-            .and_then(|()| crossterm::execute!(io::stdout(), crossterm::terminal::EnterAlternateScreen))
+            .and_then(|()| {
+                crossterm::execute!(io::stdout(), crossterm::terminal::EnterAlternateScreen)
+            })
             .and_then(|()| write_flushed(MOUSE_REPORTING_ON));
         if let Err(err) = entered {
             // Don't leave any of it on if entering failed partway through.

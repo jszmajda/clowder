@@ -40,17 +40,37 @@ fn vocabulary() -> Vec<Event> {
         Event::KittenArrived { name: "Pib".into() },
         Event::KittenWanderedOff { name: "Pib".into() },
         Event::KittenReturned { name: "Pib".into() },
-        Event::JobAssigned { name: "Pib".into(), job: JobId::Gardener },
-        Event::JobUnassigned { name: "Pib".into(), job: JobId::Gardener },
-        Event::SeasonChanged { season: Season::Summer },
+        Event::JobAssigned {
+            name: "Pib".into(),
+            job: JobId::Gardener,
+        },
+        Event::JobUnassigned {
+            name: "Pib".into(),
+            job: JobId::Gardener,
+        },
+        Event::SeasonChanged {
+            season: Season::Summer,
+        },
         Event::NewYear { year: 3 },
-        Event::StructureBuilt { id: StructureId::CatnipPatch, count: 2 },
-        Event::IdeaResearched { id: IdeaId::DeepNapTheory },
+        Event::StructureBuilt {
+            id: StructureId::CatnipPatch,
+            count: 2,
+        },
+        Event::IdeaResearched {
+            id: IdeaId::DeepNapTheory,
+        },
         Event::ZoomiesStarted { until_tick: 120 },
         Event::ZoomiesEnded,
-        Event::KittenMood { tier: MoodTier::Grumpy },
-        Event::Flavor { template: 0, kitten: None },
-        Event::Revealed { id: ContentId::Structure(StructureId::CatnipPatch) },
+        Event::KittenMood {
+            tier: MoodTier::Grumpy,
+        },
+        Event::Flavor {
+            template: 0,
+            kitten: None,
+        },
+        Event::Revealed {
+            id: ContentId::Structure(StructureId::CatnipPatch),
+        },
         Event::SkyEventVisible,
         Event::SpeedChanged { speed: 2.0 },
         Event::PounceReturned {
@@ -63,15 +83,26 @@ fn vocabulary() -> Vec<Event> {
         Event::JamboreeStarted { until_tick: 1000 },
         Event::JamboreeEnded,
         Event::ElderAppointed { name: "Pib".into() },
-        Event::KittenPromoted { name: "Pib".into(), rank: 1 },
-        Event::RefinementBought { id: RefinementId::PebbleCombs },
-        Event::RuleAdopted { id: RuleId::EarlyBirds },
+        Event::KittenPromoted {
+            name: "Pib".into(),
+            rank: 1,
+        },
+        Event::RefinementBought {
+            id: RefinementId::PebbleCombs,
+        },
+        Event::RuleAdopted {
+            id: RuleId::EarlyBirds,
+        },
         Event::Basked { devotion: 1.0 },
         Event::Reveried { serenity: 1.0 },
-        Event::RiteBought { id: RiteId::MorningStretch },
+        Event::RiteBought {
+            id: RiteId::MorningStretch,
+        },
         Event::Enlightened { tier: 1 },
         Event::ParadeHeld { rainbows: 1.0 },
-        Event::ArchBought { id: ArchId::RibbonArch },
+        Event::ArchBought {
+            id: ArchId::RibbonArch,
+        },
         Event::StarshardRefined,
         Event::EchoRefined,
         Event::JarCondensed,
@@ -79,19 +110,42 @@ fn vocabulary() -> Vec<Event> {
         Event::PromiseQuieted { index: 0 },
         Event::PromiseResumed { index: 0 },
         Event::PrismDescended,
-        Event::TradeReturned { colony: ColonyId::Otters, caravans: 1 },
-        Event::PenPalSent { colony: ColonyId::Otters, level: 1 },
-        Event::ColonyDiscovered { colony: ColonyId::Otters },
+        Event::TradeReturned {
+            colony: ColonyId::Otters,
+            caravans: 1,
+        },
+        Event::PenPalSent {
+            colony: ColonyId::Otters,
+            level: 1,
+        },
+        Event::ColonyDiscovered {
+            colony: ColonyId::Otters,
+        },
         Event::MeadowMoved { generation: 1 },
-        Event::Passed { passed_down_wisdom: 1.0 },
-        Event::TraditionBought { id: TraditionId::CarefulPacking },
-        Event::AdventureDeclared { id: Some(AdventureId::QuietRetreat) },
-        Event::AdventureCompleted { id: AdventureId::QuietRetreat },
-        Event::SiteReached { site: SiteId::FenceTop },
+        Event::Passed {
+            passed_down_wisdom: 1.0,
+        },
+        Event::TraditionBought {
+            id: TraditionId::CarefulPacking,
+        },
+        Event::AdventureDeclared {
+            id: Some(AdventureId::QuietRetreat),
+        },
+        Event::AdventureCompleted {
+            id: AdventureId::QuietRetreat,
+        },
+        Event::SiteReached {
+            site: SiteId::FenceTop,
+        },
         Event::WhaleSummoned,
         Event::WhaleFed { contentment: 1 },
-        Event::Napped { years: 2, report: Box::new(clowder_core::OfflineReport::default()) },
-        Event::DreamLoomBought { id: DreamLoomId::SoftPillow },
+        Event::Napped {
+            years: 2,
+            report: Box::new(clowder_core::OfflineReport::default()),
+        },
+        Event::DreamLoomBought {
+            id: DreamLoomId::SoftPillow,
+        },
         Event::DejaVuDay,
         Event::DistantDawn,
     ]
@@ -221,15 +275,27 @@ fn every_event_in_the_vocabulary_carries_a_classification() {
     // none silently skipped (`variant_name` is exhaustive, so the build breaks
     // when the vocabulary grows and this list does not).
     let names: BTreeSet<&'static str> = vocab.iter().map(variant_name).collect();
-    assert_eq!(names.len(), vocab.len(), "the sample holds each variant exactly once");
+    assert_eq!(
+        names.len(),
+        vocab.len(),
+        "the sample holds each variant exactly once"
+    );
 
     // Classification is a total query on the event: every variant answers, and
     // the answer is a property of the event alone — no state, no caller.
     for e in &vocab {
         let class = e.class();
-        assert_eq!(class, e.class(), "{} classifies the same way every time", variant_name(e));
+        assert_eq!(
+            class,
+            e.class(),
+            "{} classifies the same way every time",
+            variant_name(e)
+        );
         assert!(
-            matches!(class, EventClass::Flavor | EventClass::Mechanical | EventClass::Milestone),
+            matches!(
+                class,
+                EventClass::Flavor | EventClass::Mechanical | EventClass::Milestone
+            ),
             "{} must classify as flavor, mechanical or milestone",
             variant_name(e)
         );
@@ -239,12 +305,19 @@ fn every_event_in_the_vocabulary_carries_a_classification() {
     // whoever arrived. Prominence is about *what happened*, not its details.
     assert_eq!(
         Event::KittenArrived { name: "Pib".into() }.class(),
-        Event::KittenArrived { name: "Marmalade".into() }.class(),
+        Event::KittenArrived {
+            name: "Marmalade".into()
+        }
+        .class(),
     );
 
     // A vocabulary that used only one class could not rank anything, which is
     // the whole reason the query exists.
-    for class in [EventClass::Flavor, EventClass::Mechanical, EventClass::Milestone] {
+    for class in [
+        EventClass::Flavor,
+        EventClass::Mechanical,
+        EventClass::Milestone,
+    ] {
         assert!(
             vocab.iter().any(|e| e.class() == class),
             "no event is classified {class:?} — the ranking would be useless"
@@ -258,28 +331,47 @@ fn classification_ranks_prominence_the_way_the_game_rules_do() {
     // The design's own example of a rule a frontend must not be allowed to
     // decide: reaching a new site matters more than a job reassignment.
     assert_eq!(
-        Event::SiteReached { site: SiteId::FenceTop }.class(),
+        Event::SiteReached {
+            site: SiteId::FenceTop
+        }
+        .class(),
         EventClass::Milestone,
         "reaching a new site is a moment worth remembering"
     );
     assert_eq!(
-        Event::JobAssigned { name: "Pib".into(), job: JobId::Gardener }.class(),
+        Event::JobAssigned {
+            name: "Pib".into(),
+            job: JobId::Gardener
+        }
+        .class(),
         EventClass::Mechanical,
         "a job reassignment is an ordinary mechanical occurrence"
     );
     assert_eq!(
-        Event::JobUnassigned { name: "Pib".into(), job: JobId::Gardener }.class(),
+        Event::JobUnassigned {
+            name: "Pib".into(),
+            job: JobId::Gardener
+        }
+        .class(),
         EventClass::Mechanical,
     );
 
     // Flavor is defined by having no mechanical effect at all.
     assert_eq!(
-        Event::Flavor { template: 0, kitten: None }.class(),
+        Event::Flavor {
+            template: 0,
+            kitten: None
+        }
+        .class(),
         EventClass::Flavor,
         "flavor events are pure delight, ranked quietest"
     );
     assert_eq!(
-        Event::Flavor { template: 3, kitten: Some("Pib".into()) }.class(),
+        Event::Flavor {
+            template: 3,
+            kitten: Some("Pib".into())
+        }
+        .class(),
         EventClass::Flavor,
     );
 }
@@ -292,19 +384,28 @@ fn classification_ranks_prominence_the_way_the_game_rules_do() {
 #[test]
 fn live_play_records_what_happened_and_the_tick_it_happened_on() {
     let mut s = GameState::new(2_701);
-    assert!(happened(&s.journal).is_empty(), "a new meadow has lived through nothing");
+    assert!(
+        happened(&s.journal).is_empty(),
+        "a new meadow has lived through nothing"
+    );
 
     // Day 25 is a season boundary: the change happens on the tick that carries
     // the counter into day 25.
     run_days(&mut s, 25);
     let entries = happened(&s.journal);
-    assert!(!entries.is_empty(), "live ticks record what the player lived through");
+    assert!(
+        !entries.is_empty(),
+        "live ticks record what the player lived through"
+    );
 
     let ticks: Vec<u64> = entries.iter().map(|(t, _)| *t).collect();
     let mut sorted = ticks.clone();
     sorted.sort_unstable();
     assert_eq!(ticks, sorted, "entries are stamped in occurrence order");
-    assert!(ticks.iter().all(|t| *t <= s.ticks), "no entry claims a tick that has not happened");
+    assert!(
+        ticks.iter().all(|t| *t <= s.ticks),
+        "no entry claims a tick that has not happened"
+    );
 
     let (tick, _) = entries
         .iter()
@@ -327,7 +428,10 @@ fn the_journal_is_canonical_state_and_survives_closing_the_terminal() {
     // Same instant on load: nothing replays, so this is pure round-trip.
     let json = save_string(&s, 42_000);
     let loaded = load_string(&json, 42_000).expect("a saved game loads");
-    assert_eq!(loaded.state.journal, s.journal, "the journal is part of the save");
+    assert_eq!(
+        loaded.state.journal, s.journal,
+        "the journal is part of the save"
+    );
     assert_eq!(happened(&loaded.state.journal), lived);
     assert_eq!(
         save_string(&loaded.state, 42_000),
@@ -361,7 +465,11 @@ fn the_window_is_bounded_while_every_milestone_is_kept_forever() {
     }
     j.record(40_001, &milestone);
 
-    assert_eq!(j.recent.len(), settled, "a full window stops growing as events keep arriving");
+    assert_eq!(
+        j.recent.len(),
+        settled,
+        "a full window stops growing as events keep arriving"
+    );
     assert!(
         j.recent.front().expect("still not empty").tick > oldest,
         "the window rolled forward rather than freezing"
@@ -386,9 +494,17 @@ fn the_journal_reads_back_in_occurrence_order() {
     j.record(31, &plain);
 
     let merged = j.iter_chronological();
-    assert_eq!(merged.len(), 5, "kept entries and the window are both there, none twice");
+    assert_eq!(
+        merged.len(),
+        5,
+        "kept entries and the window are both there, none twice"
+    );
     let ticks: Vec<u64> = merged.iter().map(|e| e.tick).collect();
-    assert_eq!(ticks, vec![1, 2, 3, 30, 31], "merged in occurrence order, not kept-then-recent");
+    assert_eq!(
+        ticks,
+        vec![1, 2, 3, 30, 31],
+        "merged in occurrence order, not kept-then-recent"
+    );
 }
 
 // =====================================================================
@@ -409,7 +525,10 @@ fn a_full_window_evicts_its_oldest_non_milestone_entry() {
     // Oldest-first: the survivors are exactly the most recent window-full.
     let ticks: Vec<u64> = j.recent.iter().map(|e| e.tick).collect();
     let expected: Vec<u64> = (30_000 - cap + 1..=30_000).collect();
-    assert_eq!(ticks, expected, "eviction takes the oldest entry, never a newer one");
+    assert_eq!(
+        ticks, expected,
+        "eviction takes the oldest entry, never a newer one"
+    );
 }
 
 // @spec SIM-ENG-029
@@ -427,7 +546,11 @@ fn eviction_never_reaches_a_milestone() {
         j.record(t, &plain);
     }
 
-    assert_eq!(count_of(&j, &milestone), 1, "the oldest entry of all survived 50000 events");
+    assert_eq!(
+        count_of(&j, &milestone),
+        1,
+        "the oldest entry of all survived 50000 events"
+    );
     let survivors = happened(&j);
     assert!(
         !survivors.iter().any(|(t, _)| *t == 2),
@@ -449,20 +572,35 @@ fn an_applied_command_journals_and_a_rejected_one_journals_nothing() {
     let mut s = played_state(2_803);
     let before = happened(&s.journal).len();
 
-    let events = s.apply(Command::AssignJob(JobId::Gardener)).expect("an idle kitten takes a job");
+    let events = s
+        .apply(Command::AssignJob(JobId::Gardener))
+        .expect("an idle kitten takes a job");
     assert!(!events.is_empty(), "the command reported what happened");
     let after = happened(&s.journal);
-    assert_eq!(after.len(), before + events.len(), "exactly the command's events were appended");
+    assert_eq!(
+        after.len(),
+        before + events.len(),
+        "exactly the command's events were appended"
+    );
     assert!(
-        after.iter().any(|(t, e)| *t == s.ticks && matches!(e, Event::JobAssigned { .. })),
+        after
+            .iter()
+            .any(|(t, e)| *t == s.ticks && matches!(e, Event::JobAssigned { .. })),
         "the assignment is in the journal, stamped with the tick it was applied at"
     );
 
     // A rejected command produced no events and mutated nothing — the journal
     // is state, so it does not move either.
     let settled = happened(&s.journal);
-    assert!(s.apply(Command::DeepNap(1)).is_err(), "the nap is locked in this meadow");
-    assert_eq!(happened(&s.journal), settled, "a rejected command journals nothing");
+    assert!(
+        s.apply(Command::DeepNap(1)).is_err(),
+        "the nap is locked in this meadow"
+    );
+    assert_eq!(
+        happened(&s.journal),
+        settled,
+        "a rejected command journals nothing"
+    );
 }
 
 // @spec SIM-ENG-028
@@ -471,7 +609,10 @@ fn catch_up_replay_never_appends_its_constituent_events() {
     let mut s = played_state(2_804);
     run_days(&mut s, 30);
     let lived = happened(&s.journal);
-    assert!(!lived.is_empty(), "live play journals — this is the contrast the spec draws");
+    assert!(
+        !lived.is_empty(),
+        "live play journals — this is the contrast the spec draws"
+    );
     let kept_before = s.journal.kept.len();
 
     // An hour away is 14400 ticks — 1440 game days, dozens of seasons. If
@@ -527,8 +668,13 @@ fn the_core_decides_live_versus_replay_not_the_caller() {
     );
 
     let json = save_string(&base, 5_000);
-    let caught_up = load_string(&json, 5_000 + ticks_away / 4).expect("the save loads").state;
-    assert_eq!(caught_up.ticks, live.ticks, "both paths advanced the same number of ticks");
+    let caught_up = load_string(&json, 5_000 + ticks_away / 4)
+        .expect("the save loads")
+        .state;
+    assert_eq!(
+        caught_up.ticks, live.ticks,
+        "both paths advanced the same number of ticks"
+    );
     assert_eq!(
         happened(&caught_up.journal),
         happened(&base.journal),
@@ -564,8 +710,14 @@ fn a_replay_inside_a_command_does_not_stream_into_the_journal() {
     let years = 10u32;
     assert!(years <= s.max_nap_length());
     let ticks_before = s.ticks;
-    let events = s.apply(Command::DeepNap(years)).expect("the nap is affordable");
-    assert_eq!(s.ticks, ticks_before + years as u64 * 1_000, "years of ticks really replayed");
+    let events = s
+        .apply(Command::DeepNap(years))
+        .expect("the nap is affordable");
+    assert_eq!(
+        s.ticks,
+        ticks_before + years as u64 * 1_000,
+        "years of ticks really replayed"
+    );
 
     // The summary IS recorded — as the nap's away entry, which is the one
     // place a bulk-time span is read from (SIM-DREAM-008). Journaling the
@@ -576,7 +728,10 @@ fn a_replay_inside_a_command_does_not_stream_into_the_journal() {
         .into_iter()
         .filter(|e| matches!(&e.item, JournalItem::Away(_)))
         .count();
-    assert_eq!(aways, 1, "the nap left exactly one away entry — its summary");
+    assert_eq!(
+        aways, 1,
+        "the nap left exactly one away entry — its summary"
+    );
     assert!(
         events.iter().any(|e| matches!(e, Event::Napped { .. })),
         "and the caller still receives the summary event for the wake-up screen"
@@ -606,7 +761,10 @@ fn a_replay_inside_a_command_does_not_stream_into_the_journal() {
 /// @spec SIM-ENG-042
 #[test]
 fn only_the_first_of_a_structure_is_a_milestone() {
-    let first = Event::StructureBuilt { id: StructureId::CatnipPatch, count: 1 };
+    let first = Event::StructureBuilt {
+        id: StructureId::CatnipPatch,
+        count: 1,
+    };
     assert_eq!(
         first.class(),
         EventClass::Milestone,
@@ -614,7 +772,10 @@ fn only_the_first_of_a_structure_is_a_milestone() {
     );
 
     for count in [2u32, 3, 17, 1_000, u32::MAX] {
-        let later = Event::StructureBuilt { id: StructureId::CatnipPatch, count };
+        let later = Event::StructureBuilt {
+            id: StructureId::CatnipPatch,
+            count,
+        };
         assert_eq!(
             later.class(),
             EventClass::Mechanical,
@@ -631,12 +792,31 @@ fn only_the_first_of_a_structure_is_a_milestone() {
 #[test]
 fn nothing_that_recurs_on_a_timer_is_a_milestone() {
     let recurring: Vec<(&str, Event)> = vec![
-        ("a season turning", Event::SeasonChanged { season: Season::Spring }),
+        (
+            "a season turning",
+            Event::SeasonChanged {
+                season: Season::Spring,
+            },
+        ),
         ("a year turning", Event::NewYear { year: 3 }),
-        ("a burst of zoomies", Event::ZoomiesStarted { until_tick: 120 }),
+        (
+            "a burst of zoomies",
+            Event::ZoomiesStarted { until_tick: 120 },
+        ),
         ("that burst ending", Event::ZoomiesEnded),
-        ("a change of mood", Event::KittenMood { tier: MoodTier::Content }),
-        ("a moment of flavor", Event::Flavor { template: 0, kitten: None }),
+        (
+            "a change of mood",
+            Event::KittenMood {
+                tier: MoodTier::Content,
+            },
+        ),
+        (
+            "a moment of flavor",
+            Event::Flavor {
+                template: 0,
+                kitten: None,
+            },
+        ),
         ("a day that repeats itself", Event::DejaVuDay),
         ("a change of pace", Event::SpeedChanged { speed: 4.0 }),
     ];
@@ -695,8 +875,12 @@ fn appointing_meadow(seed: u64) -> GameState {
     assert_eq!(s.kittens.len(), 5, "fixture: five kittens in the roster");
     let first = s.kittens[0].name.clone();
     s.kittens[4].name = first;
-    s.apply(Command::AssignJob(JobId::Gardener)).expect("fixture: an idle kitten takes a job");
-    assert!(s.kittens.iter().any(|k| k.job.is_some()), "fixture: a kitten is at work");
+    s.apply(Command::AssignJob(JobId::Gardener))
+        .expect("fixture: an idle kitten takes a job");
+    assert!(
+        s.kittens.iter().any(|k| k.job.is_some()),
+        "fixture: a kitten is at work"
+    );
     assert_eq!(s.elder, None, "fixture: nobody has been appointed yet");
     s
 }
@@ -704,7 +888,9 @@ fn appointing_meadow(seed: u64) -> GameState {
 /// Every standing a roster can have before an appointment: no Elder, or each
 /// roster position the Elder.
 fn standings(s: &GameState) -> Vec<Option<usize>> {
-    std::iter::once(None).chain((0..s.kittens.len()).map(Some)).collect()
+    std::iter::once(None)
+        .chain((0..s.kittens.len()).map(Some))
+        .collect()
 }
 
 /// Every appointment that changes the Elder — any position while there is no
@@ -752,11 +938,22 @@ fn every_appointment_that_changes_the_elder_is_mechanical_and_joins_the_rolling_
                 s.journal.kept, kept,
                 "{whr}: the appointment's entry was kept permanently; it joins the rolling window"
             );
-            assert_eq!(s.journal.recent.len(), recent_len + 1, "{whr}: the rolling window gained one entry");
-            let last = s.journal.recent.back().expect("the window holds the appointment");
+            assert_eq!(
+                s.journal.recent.len(),
+                recent_len + 1,
+                "{whr}: the rolling window gained one entry"
+            );
+            let last = s
+                .journal
+                .recent
+                .back()
+                .expect("the window holds the appointment");
             assert_eq!(
                 *last,
-                JournalEntry { tick: s.ticks, item: JournalItem::Happened(Event::ElderAppointed { name: name.clone() }) },
+                JournalEntry {
+                    tick: s.ticks,
+                    item: JournalItem::Happened(Event::ElderAppointed { name: name.clone() })
+                },
                 "{whr}: the window's newest entry is not the appointment"
             );
             if let Some(e) = before {
@@ -768,8 +965,15 @@ fn every_appointment_that_changes_the_elder_is_mechanical_and_joins_the_rolling_
         }
     }
     let n = base.kittens.len() as u32;
-    assert_eq!(checked, n + n * (n - 1), "fixture: every changing appointment was checked");
-    assert!(namesake_checked, "fixture: a namesake of the Elder was appointed");
+    assert_eq!(
+        checked,
+        n + n * (n - 1),
+        "fixture: every changing appointment was checked"
+    );
+    assert!(
+        namesake_checked,
+        "fixture: a namesake of the Elder was appointed"
+    );
 
     // The class is the event's, whoever it names.
     for name in ["Pib", "Marmalade-of-the-Long-Whiskers", ""] {
@@ -789,9 +993,14 @@ fn every_appointment_that_changes_the_elder_is_mechanical_and_joins_the_rolling_
 fn an_appointment_entry_is_evicted_in_turn_like_any_rolling_entry() {
     let mut s = appointing_meadow(5_702);
     let name = s.kittens[1].name.clone();
-    s.apply(Command::AppointElder(1)).expect("the appointment is accepted");
+    s.apply(Command::AppointElder(1))
+        .expect("the appointment is accepted");
     let appointment = Event::ElderAppointed { name };
-    assert_eq!(count_of(&s.journal, &appointment), 1, "fixture: the appointment is journaled");
+    assert_eq!(
+        count_of(&s.journal, &appointment),
+        1,
+        "fixture: the appointment is journaled"
+    );
 
     let plain = a_non_milestone();
     let from = s.ticks + 1;
@@ -818,8 +1027,13 @@ fn appointing_the_kitten_already_the_elder_is_accepted_and_changes_nothing() {
     let base = appointing_meadow(5_801);
     for elder in 0..base.kittens.len() {
         let mut s = base.clone();
-        s.apply(Command::AppointElder(elder)).expect("fixture: the appointment is accepted");
-        assert_eq!(s.elder, Some(elder), "fixture: position {elder} is the Elder");
+        s.apply(Command::AppointElder(elder))
+            .expect("fixture: the appointment is accepted");
+        assert_eq!(
+            s.elder,
+            Some(elder),
+            "fixture: position {elder} is the Elder"
+        );
         let saved = save_string(&s, 58_000);
         let journal = s.journal.clone();
 
@@ -828,10 +1042,20 @@ fn appointing_the_kitten_already_the_elder_is_accepted_and_changes_nothing() {
             let events = s.apply(Command::AppointElder(elder)).unwrap_or_else(|e| {
                 panic!("{whr}: refused with {e:?}; the command is accepted, never a CommandError")
             });
-            assert!(events.is_empty(), "{whr}: emitted {events:?}; an appointment that changes nothing emits no event");
+            assert!(
+                events.is_empty(),
+                "{whr}: emitted {events:?}; an appointment that changes nothing emits no event"
+            );
             assert_eq!(s.elder, Some(elder), "{whr}: the Elder moved");
-            assert_eq!(s.journal, journal, "{whr}: the journal gained an entry for no change");
-            assert_eq!(save_string(&s, 58_000), saved, "{whr}: the game state changed");
+            assert_eq!(
+                s.journal, journal,
+                "{whr}: the journal gained an entry for no change"
+            );
+            assert_eq!(
+                save_string(&s, 58_000),
+                saved,
+                "{whr}: the game state changed"
+            );
         }
     }
 }
@@ -855,14 +1079,20 @@ fn appointing_the_sitting_elder_changes_nothing_but_the_reveal_record() {
             .apply(Command::AppointElder(elder))
             .unwrap_or_else(|e| panic!("appointing the sitting Elder {elder} was refused ({e:?})"));
 
-        assert!(events.is_empty(), "appointing the sitting Elder {elder} emitted {events:?}");
+        assert!(
+            events.is_empty(),
+            "appointing the sitting Elder {elder} emitted {events:?}"
+        );
         assert!(
             s.revealed_resources.is_superset(&before.revealed_resources),
             "the reveal record lost an entry"
         );
         let strip = |g: &GameState| {
             let mut v: serde_json::Value = serde_json::from_str(&save_string(g, 58_000)).unwrap();
-            v["state"].as_object_mut().unwrap().remove("revealed_resources");
+            v["state"]
+                .as_object_mut()
+                .unwrap()
+                .remove("revealed_resources");
             v
         };
         assert_eq!(
@@ -889,22 +1119,38 @@ fn appointments_held_or_alternated_never_grow_the_permanent_journal() {
     for _ in 0..50 {
         emitted += s.apply(Command::AppointElder(2)).expect("accepted").len();
     }
-    assert_eq!(emitted, 1, "fifty presses on one kitten emitted {emitted} events; only the first changes the Elder");
-    assert_eq!(s.journal.kept, kept, "a held appointment grew the permanent journal");
+    assert_eq!(
+        emitted, 1,
+        "fifty presses on one kitten emitted {emitted} events; only the first changes the Elder"
+    );
+    assert_eq!(
+        s.journal.kept, kept,
+        "a held appointment grew the permanent journal"
+    );
 
     // Alternated between two kittens: every press changes the Elder.
     for press in 0..3_000usize {
         let target = if press % 2 == 0 { 1 } else { 2 };
         let events = s.apply(Command::AppointElder(target)).expect("accepted");
-        assert_eq!(events.len(), 1, "alternating press {press} changed the Elder and emitted {events:?}");
+        assert_eq!(
+            events.len(),
+            1,
+            "alternating press {press} changed the Elder and emitted {events:?}"
+        );
         assert_eq!(
             s.journal.kept.len(),
             kept.len(),
             "alternating press {press} grew the permanent journal"
         );
     }
-    assert_eq!(s.journal.kept, kept, "alternating appointments left permanent entries behind");
-    assert!(s.journal.recent.len() <= 1_000, "the rolling window overran its bound");
+    assert_eq!(
+        s.journal.kept, kept,
+        "alternating appointments left permanent entries behind"
+    );
+    assert!(
+        s.journal.recent.len() <= 1_000,
+        "the rolling window overran its bound"
+    );
 }
 
 /// Where an entry is kept is settled by its event's class when it is
@@ -926,12 +1172,30 @@ fn where_an_entry_is_kept_is_settled_by_its_class_when_recorded() {
             );
             continue;
         }
-        let entry = JournalEntry { tick: 7, item: JournalItem::Happened(e.clone()) };
+        let entry = JournalEntry {
+            tick: 7,
+            item: JournalItem::Happened(e.clone()),
+        };
         if e.class() == EventClass::Milestone {
-            assert_eq!((j.kept, j.recent.len()), (vec![entry], 0), "{} is a milestone and was not kept", variant_name(&e));
+            assert_eq!(
+                (j.kept, j.recent.len()),
+                (vec![entry], 0),
+                "{} is a milestone and was not kept",
+                variant_name(&e)
+            );
         } else {
-            assert_eq!(j.kept, vec![], "{} is not a milestone and was kept permanently", variant_name(&e));
-            assert_eq!(j.recent.into_iter().collect::<Vec<_>>(), vec![entry], "{} did not join the window", variant_name(&e));
+            assert_eq!(
+                j.kept,
+                vec![],
+                "{} is not a milestone and was kept permanently",
+                variant_name(&e)
+            );
+            assert_eq!(
+                j.recent.into_iter().collect::<Vec<_>>(),
+                vec![entry],
+                "{} did not join the window",
+                variant_name(&e)
+            );
         }
         recorded += 1;
     }
@@ -948,7 +1212,9 @@ fn where_an_entry_is_kept_is_settled_by_its_class_when_recorded() {
 #[test]
 fn a_saved_journal_loads_with_every_entry_where_the_save_holds_it() {
     let mut s = appointing_meadow(5_901);
-    let legacy = Event::ElderAppointed { name: s.kittens[0].name.clone() };
+    let legacy = Event::ElderAppointed {
+        name: s.kittens[0].name.clone(),
+    };
     assert_ne!(
         legacy.class(),
         EventClass::Milestone,
@@ -956,10 +1222,19 @@ fn a_saved_journal_loads_with_every_entry_where_the_save_holds_it() {
     );
     let milestone = a_milestone();
     let plain = a_non_milestone();
-    let happened = |tick: u64, e: &Event| JournalEntry { tick, item: JournalItem::Happened(e.clone()) };
+    let happened = |tick: u64, e: &Event| JournalEntry {
+        tick,
+        item: JournalItem::Happened(e.clone()),
+    };
     let journal = Journal {
-        kept: vec![happened(3, &legacy), happened(4, &milestone), happened(5, &legacy)],
-        recent: (10..1_010u64).map(|t| happened(t, if t == 500 { &milestone } else { &plain })).collect(),
+        kept: vec![
+            happened(3, &legacy),
+            happened(4, &milestone),
+            happened(5, &legacy),
+        ],
+        recent: (10..1_010u64)
+            .map(|t| happened(t, if t == 500 { &milestone } else { &plain }))
+            .collect(),
     };
     s.journal = journal.clone();
 
@@ -967,17 +1242,27 @@ fn a_saved_journal_loads_with_every_entry_where_the_save_holds_it() {
     let json = save_string(&s, saved_at);
 
     let now = load_string(&json, saved_at).expect("the save loads").state;
-    assert_eq!(now.journal, journal, "a load with no absence moved, rewrote or dropped a journal entry");
+    assert_eq!(
+        now.journal, journal,
+        "a load with no absence moved, rewrote or dropped a journal entry"
+    );
 
-    let later = load_string(&json, saved_at + 3_600).expect("the save loads after an absence").state;
-    assert_eq!(later.journal.recent, journal.recent, "a catch-up load moved an entry of the rolling window");
+    let later = load_string(&json, saved_at + 3_600)
+        .expect("the save loads after an absence")
+        .state;
+    assert_eq!(
+        later.journal.recent, journal.recent,
+        "a catch-up load moved an entry of the rolling window"
+    );
     assert_eq!(
         &later.journal.kept[..journal.kept.len()],
         &journal.kept[..],
         "a catch-up load moved, rewrote or dropped a permanent entry"
     );
     assert!(
-        later.journal.kept[journal.kept.len()..].iter().all(|e| matches!(e.item, JournalItem::Away(_))),
+        later.journal.kept[journal.kept.len()..]
+            .iter()
+            .all(|e| matches!(e.item, JournalItem::Away(_))),
         "a catch-up load added something to the permanent entries besides its away report"
     );
 
@@ -987,7 +1272,12 @@ fn a_saved_journal_loads_with_every_entry_where_the_save_holds_it() {
         played.journal.record(2_000 + t, &plain);
     }
     assert_eq!(
-        played.journal.kept.iter().filter(|e| e.item == JournalItem::Happened(legacy.clone())).count(),
+        played
+            .journal
+            .kept
+            .iter()
+            .filter(|e| e.item == JournalItem::Happened(legacy.clone()))
+            .count(),
         2,
         "a permanent appointment entry from the save did not stay permanent"
     );
@@ -1000,23 +1290,34 @@ fn a_saved_journal_loads_with_every_entry_where_the_save_holds_it() {
 #[test]
 fn a_prior_version_save_keeps_its_permanent_appointment_entries_as_written() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/save_v5.json");
-    let mut save: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-    let kept = save["state"]["journal"]["kept"].as_array_mut().expect("fixture: the save has permanent entries");
+    let mut save: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let kept = save["state"]["journal"]["kept"]
+        .as_array_mut()
+        .expect("fixture: the save has permanent entries");
     for (i, name) in ["Pib", "Mopsy"].iter().enumerate() {
         kept.push(serde_json::json!({ "tick": 100 + i, "item": { "Happened": { "ElderAppointed": { "name": name } } } }));
     }
-    let written: Journal = serde_json::from_value(save["state"]["journal"].clone()).expect("fixture: a journal");
+    let written: Journal =
+        serde_json::from_value(save["state"]["journal"].clone()).expect("fixture: a journal");
     let saved_at = save["saved_at_unix"].as_u64().unwrap();
 
-    let state = load_string(&save.to_string(), saved_at).expect("the prior-version save loads").state;
-    assert_eq!(state.journal.recent, written.recent, "the load moved an entry of the rolling window");
+    let state = load_string(&save.to_string(), saved_at)
+        .expect("the prior-version save loads")
+        .state;
+    assert_eq!(
+        state.journal.recent, written.recent,
+        "the load moved an entry of the rolling window"
+    );
     assert_eq!(
         &state.journal.kept[..written.kept.len()],
         &written.kept[..],
         "the load moved, rewrote or dropped a permanent appointment entry the save wrote"
     );
     assert!(
-        state.journal.kept[written.kept.len()..].iter().all(|e| matches!(e.item, JournalItem::Away(_))),
+        state.journal.kept[written.kept.len()..]
+            .iter()
+            .all(|e| matches!(e.item, JournalItem::Away(_))),
         "the load added something to the permanent entries besides an away report"
     );
 }

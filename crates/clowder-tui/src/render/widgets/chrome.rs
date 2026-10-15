@@ -63,7 +63,10 @@ fn mood_word(tier: MoodTier) -> &'static str {
 /// bar stops counting the instant it does, with no key pressed and no frame
 /// of per-frame cleanup required first. @spec TUI-NAV-006, TUI-NAV-020
 fn badged_tabs(state: &GameState, view: &ViewState) -> Vec<Section> {
-    tab_sections(state, view.section).into_iter().filter(|s| !view.seen[s.index()].visited).collect()
+    tab_sections(state, view.section)
+        .into_iter()
+        .filter(|s| !view.seen[s.index()].visited)
+        .collect()
 }
 
 /// How many tabs in the bar wear ★ right now — what `★N new` counts.
@@ -76,14 +79,20 @@ fn new_content_count(state: &GameState, view: &ViewState) -> usize {
 /// the idle chip may ever count. A kitten visiting the neighbour's yard is
 /// just as jobless and not assignable by anybody. @spec TUI-NAV-054
 fn idle_here_count(state: &GameState) -> usize {
-    state.kittens.iter().filter(|k| k.job.is_none() && k.location == Location::Home).count()
+    state
+        .kittens
+        .iter()
+        .filter(|k| k.job.is_none() && k.location == Location::Home)
+        .count()
 }
 
 /// Whether the sky-observation window is open right now — the core's own
 /// notion of "live", not merely "was set": a faded window is `Locked`.
 /// @spec TUI-NAV-020
 fn sky_live(state: &GameState) -> bool {
-    state.pending_sky_event.is_some_and(|expiry| state.ticks < expiry)
+    state
+        .pending_sky_event
+        .is_some_and(|expiry| state.ticks < expiry)
 }
 
 /// The four attention opportunities, in the fixed order idle, sky, new, away,
@@ -110,18 +119,38 @@ fn chip_labels(state: &GameState, view: &ViewState, with_counts: bool) -> Vec<St
     let idle = idle_here_count(state);
     let new = new_content_count(state, view);
     let labels = if with_counts {
-        [format!("◦{idle} idle"), "!sky".to_string(), format!("★{new} new"), "~away".to_string()]
+        [
+            format!("◦{idle} idle"),
+            "!sky".to_string(),
+            format!("★{new} new"),
+            "~away".to_string(),
+        ]
     } else {
-        ["◦idle".to_string(), "!sky".to_string(), "★new".to_string(), "~away".to_string()]
+        [
+            "◦idle".to_string(),
+            "!sky".to_string(),
+            "★new".to_string(),
+            "~away".to_string(),
+        ]
     };
-    labels.into_iter().zip(live).filter(|(_, on)| *on).map(|(label, _)| label).collect()
+    labels
+        .into_iter()
+        .zip(live)
+        .filter(|(_, on)| *on)
+        .map(|(label, _)| label)
+        .collect()
 }
 
 /// The five glance facts in full wording, joined `·`. @spec TUI-NAV-086
 fn full_facts(state: &GameState) -> Vec<String> {
     vec![
         format!("Gen {}", state.generation),
-        format!("{:?} Day {} Year {}", state.season(), state.day(), state.year()),
+        format!(
+            "{:?} Day {} Year {}",
+            state.season(),
+            state.day(),
+            state.year()
+        ),
         format!("{} kittens", state.kittens.len()),
         mood_word(state.mood_tier()).to_string(),
         format!("×{}", state.speed),
@@ -189,12 +218,27 @@ pub fn header(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     let compact = compact_facts(state);
 
     let steps: [(Option<String>, &Vec<String>); 6] = [
-        (fit(&full_facts(state).join(" · "), &with_counts, width), &with_labels),
+        (
+            fit(&full_facts(state).join(" · "), &with_counts, width),
+            &with_labels,
+        ),
         (fit(&compact.join(" "), &with_counts, width), &with_labels),
-        (fit(&compact.join(" "), &without_counts, width), &without_labels),
-        (fit(&compact[1..].join(" "), &without_counts, width), &without_labels),
-        (fit(&compact[2..].join(" "), &without_counts, width), &without_labels),
-        (fit(&compact[3..].join(" "), &without_counts, width), &without_labels),
+        (
+            fit(&compact.join(" "), &without_counts, width),
+            &without_labels,
+        ),
+        (
+            fit(&compact[1..].join(" "), &without_counts, width),
+            &without_labels,
+        ),
+        (
+            fit(&compact[2..].join(" "), &without_counts, width),
+            &without_labels,
+        ),
+        (
+            fit(&compact[3..].join(" "), &without_counts, width),
+            &without_labels,
+        ),
     ];
     let (prefix, labels) = steps
         .into_iter()
@@ -212,14 +256,22 @@ pub fn header(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
 /// gaps and only a label's own span carries `Modifier::REVERSED`, never a
 /// palette colour, so the terminal's own pair still shows through
 /// (TUI-THEME-007). @spec TUI-NAV-092
-fn tab_spans(sections: &[Section], labels: &[String], focused: Option<Section>, sep: &str) -> Vec<Span<'static>> {
+fn tab_spans(
+    sections: &[Section],
+    labels: &[String],
+    focused: Option<Section>,
+    sep: &str,
+) -> Vec<Span<'static>> {
     let mut spans = Vec::with_capacity(sections.len() * 2);
     for (i, (section, label)) in sections.iter().zip(labels).enumerate() {
         if i > 0 {
             spans.push(Span::raw(sep.to_string()));
         }
         if focused == Some(*section) {
-            spans.push(Span::styled(label.clone(), Style::default().add_modifier(Modifier::REVERSED)));
+            spans.push(Span::styled(
+                label.clone(),
+                Style::default().add_modifier(Modifier::REVERSED),
+            ));
         } else {
             spans.push(Span::raw(label.clone()));
         }
@@ -242,15 +294,28 @@ pub fn tabs(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
 /// The tab bar as `tabs` draws it, answering where each tab's label stands:
 /// its section and the cells of its label — badge, digit and name as far as
 /// the bar draws them — clipped to the bar. @spec TUI-RENDER-025
-pub fn tabs_recorded(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) -> Vec<(Section, Rect)> {
+pub fn tabs_recorded(
+    f: &mut Frame,
+    area: Rect,
+    state: &GameState,
+    view: &ViewState,
+) -> Vec<(Section, Rect)> {
     let revealed: Vec<Section> = tab_sections(state, view.section);
     let focused = view.section;
 
-    let mark = |s: Section| if !view.seen[s.index()].visited { "★" } else { "" };
+    let mark = |s: Section| {
+        if !view.seen[s.index()].visited {
+            "★"
+        } else {
+            ""
+        }
+    };
 
     // Full form: every revealed tab named beside its digit.
-    let full: Vec<String> =
-        revealed.iter().map(|s| format!("{}{} {}", mark(*s), s.digit(), s.title())).collect();
+    let full: Vec<String> = revealed
+        .iter()
+        .map(|s| format!("{}{} {}", mark(*s), s.digit(), s.title()))
+        .collect();
     let full_line = full.join("  ");
 
     if full_line.chars().count() <= area.width as usize {
@@ -281,7 +346,12 @@ pub fn tabs_recorded(f: &mut Frame, area: Rect, state: &GameState, view: &ViewSt
 
 /// The cells each label covers on the bar, the labels laid left to right with
 /// `gap` blank columns between, the gaps belonging to no tab.
-fn label_cells(area: Rect, sections: &[Section], labels: &[String], gap: u16) -> Vec<(Section, Rect)> {
+fn label_cells(
+    area: Rect,
+    sections: &[Section],
+    labels: &[String],
+    gap: u16,
+) -> Vec<(Section, Rect)> {
     let mut x = area.x;
     let mut out = Vec::with_capacity(sections.len());
     for (section, label) in sections.iter().zip(labels) {
@@ -313,7 +383,11 @@ fn fill_bar(stock: f64, cap: f64) -> String {
     let ratio = (stock / cap).clamp(0.0, 1.0);
     let filled = (ratio * FILL_CELLS as f64).round() as usize;
     let filled = filled.min(FILL_CELLS);
-    format!("{}{}", FILL_FULL.to_string().repeat(filled), FILL_EMPTY.to_string().repeat(FILL_CELLS - filled))
+    format!(
+        "{}{}",
+        FILL_FULL.to_string().repeat(filled),
+        FILL_EMPTY.to_string().repeat(FILL_CELLS - filled)
+    )
 }
 
 /// Whether a store wears `full`: a cap above zero, reached. @spec TUI-NAV-022
@@ -342,11 +416,25 @@ fn listed_stores(state: &GameState) -> Vec<ResourceId> {
 /// chosen for room is still drawn where the group places it.
 /// @spec TUI-RENDER-022
 fn choose_stores(state: &GameState, listed: &[ResourceId], capacity: usize) -> Vec<ResourceId> {
-    let mut chosen: Vec<ResourceId> =
-        listed.iter().copied().filter(|r| wears_full(state, *r)).take(capacity).collect();
+    let mut chosen: Vec<ResourceId> = listed
+        .iter()
+        .copied()
+        .filter(|r| wears_full(state, *r))
+        .take(capacity)
+        .collect();
     let room = capacity - chosen.len();
-    chosen.extend(listed.iter().copied().filter(|r| !wears_full(state, *r)).take(room));
-    listed.iter().copied().filter(|r| chosen.contains(r)).collect()
+    chosen.extend(
+        listed
+            .iter()
+            .copied()
+            .filter(|r| !wears_full(state, *r))
+            .take(room),
+    );
+    listed
+        .iter()
+        .copied()
+        .filter(|r| chosen.contains(r))
+        .collect()
 }
 
 /// A store's two lines: its name, stock, `/`, and cap at the right edge; then
@@ -355,12 +443,21 @@ fn choose_stores(state: &GameState, listed: &[ResourceId], capacity: usize) -> V
 /// (TUI-THEME-015); everything else, including the fill bar, stays in the
 /// inherited foreground so colour never carries a meaning the glyphs do not.
 /// @spec TUI-RENDER-019, TUI-NAV-022, TUI-THEME-019
-fn store_lines(state: &GameState, r: ResourceId, name_col: usize, width: usize) -> [Line<'static>; 2] {
+fn store_lines(
+    state: &GameState,
+    r: ResourceId,
+    name_col: usize,
+    width: usize,
+) -> [Line<'static>; 2] {
     let stock = state.stock(r);
     let cap = state.cap(r);
     let label = humanize(&format!("{r:?}"));
     let name = fmt::fit(&label, name_col);
-    let cap_part = if cap.is_finite() { format!("/{:<6}", fmt::compact(cap)) } else { " ".repeat(7) };
+    let cap_part = if cap.is_finite() {
+        format!("/{:<6}", fmt::compact(cap))
+    } else {
+        " ".repeat(7)
+    };
     // The name wears its coat — a cut name keeping each character's colour by
     // its position in the whole — and the figures beside it wear none.
     // @spec TUI-THEME-019, TUI-THEME-021
@@ -368,7 +465,11 @@ fn store_lines(state: &GameState, r: ResourceId, name_col: usize, width: usize) 
     let first = crate::render::line_from_pieces(
         &[
             crate::render::Piece::name(r, name, label.chars().count()),
-            crate::render::Piece::plain(format!("{} {:>6}{cap_part}", " ".repeat(pad), fmt::compact(stock))),
+            crate::render::Piece::plain(format!(
+                "{} {:>6}{cap_part}",
+                " ".repeat(pad),
+                fmt::compact(stock)
+            )),
         ],
         ratatui::style::Style::default(),
         true,
@@ -478,7 +579,9 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
         let base: Vec<&str> = match focused_row(state, view) {
             Some(row) => {
                 let owned = match &row.key {
-                    RowKey::Content(id, _) => state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours),
+                    RowKey::Content(id, _) => {
+                        state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours)
+                    }
                     _ => false,
                 };
                 if owned {
@@ -490,21 +593,55 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
                             match semantics {
                                 CountSemantics::Single => plain,
                                 CountSemantics::RepeatN if row.heavy => {
-                                    vec!["Enter build", "x amount", "Space details", "↑↓ choose", "Tab next"]
+                                    vec![
+                                        "Enter build",
+                                        "x amount",
+                                        "Space details",
+                                        "↑↓ choose",
+                                        "Tab next",
+                                    ]
                                 }
                                 CountSemantics::RepeatN => {
-                                    vec!["Enter build", "x amount", "X max", "Space details", "↑↓ choose", "Tab next"]
+                                    vec![
+                                        "Enter build",
+                                        "x amount",
+                                        "X max",
+                                        "Space details",
+                                        "↑↓ choose",
+                                        "Tab next",
+                                    ]
                                 }
                                 CountSemantics::CountTaking if row.heavy => {
-                                    vec!["Enter do", "x amount", "Space details", "↑↓ choose", "Tab next"]
+                                    vec![
+                                        "Enter do",
+                                        "x amount",
+                                        "Space details",
+                                        "↑↓ choose",
+                                        "Tab next",
+                                    ]
                                 }
                                 CountSemantics::CountTaking => {
-                                    vec!["Enter do", "x amount", "X max", "Space details", "↑↓ choose", "Tab next"]
+                                    vec![
+                                        "Enter do",
+                                        "x amount",
+                                        "X max",
+                                        "Space details",
+                                        "↑↓ choose",
+                                        "Tab next",
+                                    ]
                                 }
                             }
                         }
                         RowKind::Count { .. } => {
-                            vec!["+ assign", "- unassign", "x amount", "X max", "↑↓ choose", "Space details", "Tab next"]
+                            vec![
+                                "+ assign",
+                                "- unassign",
+                                "x amount",
+                                "X max",
+                                "↑↓ choose",
+                                "Space details",
+                                "Tab next",
+                            ]
                         }
                         RowKind::Display | RowKind::Group => plain,
                     }
@@ -588,7 +725,9 @@ fn add_mnemonics(items: &mut Vec<String>, state: &GameState, view: &ViewState) {
     }
 
     if !focused_item.is_empty() {
-        let after_enter = items.iter().position(|i| i.split_whitespace().next() == Some("Enter"));
+        let after_enter = items
+            .iter()
+            .position(|i| i.split_whitespace().next() == Some("Enter"));
         match after_enter {
             Some(at) => {
                 for (offset, entry) in focused_item.into_iter().enumerate() {
@@ -622,7 +761,9 @@ fn add_appoint_elder(items: &mut Vec<String>, state: &GameState, view: &ViewStat
     }
 
     let entry = "n appoint Elder".to_string();
-    let after_enter = items.iter().position(|i| i.split_whitespace().next() == Some("Enter"));
+    let after_enter = items
+        .iter()
+        .position(|i| i.split_whitespace().next() == Some("Enter"));
     match after_enter {
         Some(at) => items.insert(at + 1, entry),
         None => items.push(entry),
@@ -640,5 +781,12 @@ fn add_done_key(items: &mut Vec<String>, state: &GameState, view: &ViewState) {
     if crate::nav::rows::done_count(state) == 0 {
         return;
     }
-    items.push(if view.done_open { "d fold done" } else { "d show done" }.to_string());
+    items.push(
+        if view.done_open {
+            "d fold done"
+        } else {
+            "d show done"
+        }
+        .to_string(),
+    );
 }

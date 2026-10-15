@@ -28,7 +28,7 @@ use std::collections::BTreeSet;
 use clowder_core::content as tables;
 use clowder_core::{
     ArchId, ContentId, CraftId, DreamLoomId, GameState, IdeaId, JobId, Kitten, KittenTrait,
-    LockReason, Location, RefinementId, ResourceId, RiteId, RuleId, SiteId, StructureGate,
+    Location, LockReason, RefinementId, ResourceId, RiteId, RuleId, SiteId, StructureGate,
     StructureId, TraditionId,
 };
 use ratatui::backend::TestBackend;
@@ -54,14 +54,21 @@ const TALL: u16 = 40;
 fn reachable(state: &GameState, view: &ViewState) -> ViewState {
     let mut v = view.clone();
     let Some(section) = v.section else { return v };
-    let Some(key) = v.focus[section.index()].clone() else { return v };
-    if clowder_tui::nav::rows::drawn_rows(state, section, &v).iter().any(|r| r.key == key)
+    let Some(key) = v.focus[section.index()].clone() else {
+        return v;
+    };
+    if clowder_tui::nav::rows::drawn_rows(state, section, &v)
+        .iter()
+        .any(|r| r.key == key)
         || !rows(state, section).iter().any(|r| r.key == key)
     {
         return v;
     }
     let d = clowder_tui::nav::keys::resolve(
-        crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Char('d'), crossterm::event::KeyModifiers::NONE),
+        crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Char('d'),
+            crossterm::event::KeyModifiers::NONE,
+        ),
         &v,
     );
     clowder_tui::nav::update(d, &mut v, state);
@@ -73,11 +80,14 @@ fn reachable(state: &GameState, view: &ViewState) -> ViewState {
 fn pane_text(state: &GameState, view: &ViewState) -> String {
     let rect = match compute(Rect::new(0, 0, WIDE, TALL), None, false).body {
         Body::Wide { inspector, .. } => inspector,
-        other => panic!("fixture: {WIDE}x{TALL} should lay out three columns, but laid out {other:?}"),
+        other => {
+            panic!("fixture: {WIDE}x{TALL} should lay out three columns, but laid out {other:?}")
+        }
     };
     let view = &reachable(state, view);
     let mut term = Terminal::new(TestBackend::new(WIDE, TALL)).expect("TestBackend is infallible");
-    term.draw(|f| inspector::draw(f, rect, state, view)).expect("TestBackend is infallible");
+    term.draw(|f| inspector::draw(f, rect, state, view))
+        .expect("TestBackend is infallible");
     let buf = term.backend().buffer().clone();
     (rect.y..rect.bottom())
         .map(|y| {
@@ -150,7 +160,9 @@ fn bare(x: f64) -> String {
 /// reason the core adds is a reason this list must name, so the set of wordings
 /// tested is always the core's whole set.
 fn every_reason() -> Vec<LockReason> {
-    let sample = LockReason::ShortBy { missing: vec![(ResourceId::ALL[0], 12.5)] };
+    let sample = LockReason::ShortBy {
+        missing: vec![(ResourceId::ALL[0], 12.5)],
+    };
     let all = vec![
         LockReason::NotYetReached,
         LockReason::Prerequisite,
@@ -181,7 +193,9 @@ fn fixed_wordings() -> Vec<String> {
         LockReason::AlreadyYours,
         LockReason::NoOneFree,
         LockReason::NoRoom,
-        LockReason::ShortBy { missing: Vec::new() },
+        LockReason::ShortBy {
+            missing: Vec::new(),
+        },
     ]
     .iter()
     .map(|r| flat(&lock_reason_text(r)))
@@ -261,13 +275,19 @@ fn every_row(state: &GameState) -> Vec<(Section, Row)> {
     Section::ALL
         .into_iter()
         .flat_map(|section| {
-            rows(state, section).into_iter().filter(|r| r.selectable()).map(move |r| (section, r))
+            rows(state, section)
+                .into_iter()
+                .filter(|r| r.selectable())
+                .map(move |r| (section, r))
         })
         .collect()
 }
 
 fn focused(section: Section, key: RowKey) -> ViewState {
-    let mut v = ViewState { section: Some(section), ..Default::default() };
+    let mut v = ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     v.focus[section.index()] = Some(key);
     v
 }
@@ -287,10 +307,18 @@ fn each_of_the_cores_six_reasons_reads_in_its_own_words() {
         .map(|r| (format!("{r:?}"), flat(&lock_reason_text(r))))
         .collect();
     for (reason, text) in &texts {
-        assert!(!text.is_empty(), "{reason} must be stated in words; it read nothing");
+        assert!(
+            !text.is_empty(),
+            "{reason} must be stated in words; it read nothing"
+        );
     }
-    let unnamed = flat(&lock_reason_text(&LockReason::ShortBy { missing: Vec::new() }));
-    assert!(!unnamed.is_empty(), "a shortfall naming no component must still be stated");
+    let unnamed = flat(&lock_reason_text(&LockReason::ShortBy {
+        missing: Vec::new(),
+    }));
+    assert!(
+        !unnamed.is_empty(),
+        "a shortfall naming no component must still be stated"
+    );
     for (reason, text) in texts.iter().filter(|(r, _)| !r.starts_with("ShortBy")) {
         assert_ne!(
             &unnamed, text,
@@ -313,9 +341,13 @@ fn each_of_the_cores_six_reasons_reads_in_its_own_words() {
 /// @spec TUI-NAV-079
 #[test]
 fn a_shortfall_names_every_short_component_and_the_amount_it_is_short_by() {
-    let missing: Vec<(ResourceId, f64)> =
-        ResourceId::ALL.into_iter().map(|r| (r, 0.5 + r.ix() as f64 * 1.25)).collect();
-    let text = lock_reason_text(&LockReason::ShortBy { missing: missing.clone() });
+    let missing: Vec<(ResourceId, f64)> = ResourceId::ALL
+        .into_iter()
+        .map(|r| (r, 0.5 + r.ix() as f64 * 1.25))
+        .collect();
+    let text = lock_reason_text(&LockReason::ShortBy {
+        missing: missing.clone(),
+    });
     let said_numbers = numbers(&text);
     let said_words = words(&text);
     for (r, amount) in missing {
@@ -325,7 +357,10 @@ fn a_shortfall_names_every_short_component_and_the_amount_it_is_short_by() {
             bare(amount)
         );
         for w in resource_words(r) {
-            assert!(said_words.contains(&w), "the shortfall must name {r:?}; it read {text:?}");
+            assert!(
+                said_words.contains(&w),
+                "the shortfall must name {r:?}; it read {text:?}"
+            );
         }
     }
 }
@@ -335,7 +370,9 @@ fn a_shortfall_names_every_short_component_and_the_amount_it_is_short_by() {
 /// @spec TUI-NAV-079
 #[test]
 fn a_shortfall_naming_no_component_says_the_price_is_unmet_and_names_no_amount() {
-    let text = lock_reason_text(&LockReason::ShortBy { missing: Vec::new() });
+    let text = lock_reason_text(&LockReason::ShortBy {
+        missing: Vec::new(),
+    });
     assert!(!flat(&text).is_empty(), "the unmet price must be stated");
     assert!(
         !text.chars().any(|c| c.is_ascii_digit()),
@@ -350,8 +387,10 @@ fn a_shortfall_naming_no_component_says_the_price_is_unmet_and_names_no_amount()
 /// @spec TUI-NAV-079
 #[test]
 fn not_yet_reached_and_a_prerequisite_name_nothing_further() {
-    let all_resource_words: BTreeSet<String> =
-        ResourceId::ALL.into_iter().flat_map(resource_words).collect();
+    let all_resource_words: BTreeSet<String> = ResourceId::ALL
+        .into_iter()
+        .flat_map(resource_words)
+        .collect();
     for reason in [LockReason::NotYetReached, LockReason::Prerequisite] {
         let text = lock_reason_text(&reason);
         assert!(
@@ -360,13 +399,20 @@ fn not_yet_reached_and_a_prerequisite_name_nothing_further() {
         );
         let said = words(&text);
         let named: Vec<&String> = said.intersection(&all_resource_words).collect();
-        assert!(named.is_empty(), "{reason:?} names no resource ({named:?}); it read {text:?}");
+        assert!(
+            named.is_empty(),
+            "{reason:?} names no resource ({named:?}); it read {text:?}"
+        );
     }
     let prereq = lock_reason_text(&LockReason::Prerequisite);
     let names = IdeaId::ALL
         .into_iter()
         .map(|i| tables::idea_def(i).name)
-        .chain(StructureId::ALL.into_iter().map(|s| tables::structure_def(s).name))
+        .chain(
+            StructureId::ALL
+                .into_iter()
+                .map(|s| tables::structure_def(s).name),
+        )
         .chain(CraftId::ALL.into_iter().map(|c| tables::craft_def(c).name))
         .chain(JobId::ALL.into_iter().map(|j| tables::job_def(j).name));
     for name in names {
@@ -411,7 +457,13 @@ fn the_reason_is_stated_exactly_where_the_core_reports_one_on_the_row_that_takes
                          {words:?}; it read:\n{shown}",
                         row.key
                     );
-                    stated.insert(format!("{reason:?}").split([' ', '{']).next().unwrap_or_default().to_string());
+                    stated.insert(
+                        format!("{reason:?}")
+                            .split([' ', '{'])
+                            .next()
+                            .unwrap_or_default()
+                            .to_string(),
+                    );
                 }
                 None => {
                     for w in &fixed {
@@ -439,9 +491,15 @@ fn the_reason_is_stated_exactly_where_the_core_reports_one_on_the_row_that_takes
         }
     }
     for reachable in ["NotYetReached", "AlreadyYours", "NoOneFree", "ShortBy"] {
-        assert!(stated.contains(reachable), "fixture: some listed row meets {reachable} ({stated:?})");
+        assert!(
+            stated.contains(reachable),
+            "fixture: some listed row meets {reachable} ({stated:?})"
+        );
     }
-    assert!(tinker_reasoned > 0, "fixture: some recipe the tinker rows bind is held back");
+    assert!(
+        tinker_reasoned > 0,
+        "fixture: some recipe the tinker rows bind is held back"
+    );
 
     // A hair under the need: the core's gate accepts it and reports nothing,
     // so nothing is stated — least of all a shortfall of that hair.
@@ -460,16 +518,24 @@ fn the_reason_is_stated_exactly_where_the_core_reports_one_on_the_row_that_takes
     }
     let (r0, need0) = cost[0];
     hair.resources[r0.ix()] = need0 - 1.0e-10;
-    assert_eq!(hair.lock_reason(ContentId::Structure(s)), None, "fixture: the gate accepts a hair under");
+    assert_eq!(
+        hair.lock_reason(ContentId::Structure(s)),
+        None,
+        "fixture: the gate accepts a hair under"
+    );
     let key = RowKey::Content(ContentId::Structure(s), "");
     let shown = flat(&pane_text(&hair, &focused(Section::Meadow, key)));
-    let shell_shortfall =
-        flat(&lock_reason_text(&LockReason::ShortBy { missing: vec![(r0, need0 - hair.stock(r0))] }));
+    let shell_shortfall = flat(&lock_reason_text(&LockReason::ShortBy {
+        missing: vec![(r0, need0 - hair.stock(r0))],
+    }));
     assert!(
         !shown.contains(&shell_shortfall),
         "the core reports no reason, so no shortfall is inferred from stock; it read:\n{shown}"
     );
     for w in &fixed {
-        assert!(!shown.contains(w.as_str()), "the core reports no reason; it read:\n{shown}");
+        assert!(
+            !shown.contains(w.as_str()),
+            "the core reports no reason; it read:\n{shown}"
+        );
     }
 }

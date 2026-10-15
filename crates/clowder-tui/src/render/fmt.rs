@@ -36,9 +36,15 @@ fn trim_decimal_noise(s: &str) -> String {
 /// does not carry.
 fn digits_and_exp(abs: f64) -> (Vec<u8>, i32) {
     let sci = format!("{abs:e}");
-    let (mantissa, exp_s) = sci.split_once('e').expect("scientific form always has an exponent");
+    let (mantissa, exp_s) = sci
+        .split_once('e')
+        .expect("scientific form always has an exponent");
     let exp: i32 = exp_s.parse().expect("a parseable exponent");
-    let digits: Vec<u8> = mantissa.bytes().filter(u8::is_ascii_digit).map(|b| b - b'0').collect();
+    let digits: Vec<u8> = mantissa
+        .bytes()
+        .filter(u8::is_ascii_digit)
+        .map(|b| b - b'0')
+        .collect();
     (digits, exp)
 }
 
@@ -142,15 +148,29 @@ pub fn exact(value: f64) -> String {
     }
 
     let (_, exp0) = digits_and_exp(abs);
-    let desired = if exp0 >= 0 { (exp0 + 4) as usize } else { 4usize };
+    let desired = if exp0 >= 0 {
+        (exp0 + 4) as usize
+    } else {
+        4usize
+    };
     let (digits, exp) = round_to_digits(abs, desired);
 
     let before = exp + 1;
     let (whole, frac) = if before <= 0 {
-        ("0".to_string(), format!("{}{}", "0".repeat((-before) as usize), digits_to_string(&digits)))
+        (
+            "0".to_string(),
+            format!(
+                "{}{}",
+                "0".repeat((-before) as usize),
+                digits_to_string(&digits)
+            ),
+        )
     } else {
         let before = before as usize;
-        (digits_to_string(&digits[..before]), digits_to_string(&digits[before..]))
+        (
+            digits_to_string(&digits[..before]),
+            digits_to_string(&digits[before..]),
+        )
     };
     let frac = frac.trim_end_matches('0');
 

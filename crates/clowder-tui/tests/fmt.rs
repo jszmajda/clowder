@@ -384,7 +384,11 @@ fn a_zero_rate_never_shows_a_minus_sign() {
 /// would cut a name that fits perfectly well. @spec TUI-RENDER-014
 #[test]
 fn a_name_that_fits_is_left_alone() {
-    assert_eq!(fit("Sunbeam", 12), "Sunbeam", "a short name needs no shortening");
+    assert_eq!(
+        fit("Sunbeam", 12),
+        "Sunbeam",
+        "a short name needs no shortening"
+    );
     assert_eq!(
         fit("Sunbeam", 7),
         "Sunbeam",
@@ -581,7 +585,9 @@ fn magnitude_sweep() -> Vec<f64> {
     let mut seed: u64 = 0x2545_f491_4f6c_dd1d;
     for decade in -12..=20 {
         for _ in 0..40 {
-            seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407);
+            seed = seed
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
             let mantissa = 1.0 + (seed >> 11) as f64 / (1u64 << 53) as f64 * 9.0;
             out.push(mantissa * 10f64.powi(decade));
         }
@@ -686,15 +692,24 @@ fn every_compact_figure_is_four_digits_at_most_rounded_to_the_nearest_and_six_co
             "compact({value:e}) = {rendered:?} shows more than four digits (TUI-RENDER-017)"
         );
         if value < floor {
-            assert_eq!(rendered, "0", "compact({value:e}) is below the display floor (TUI-RENDER-017)");
+            assert_eq!(
+                rendered, "0",
+                "compact({value:e}) is below the display floor (TUI-RENDER-017)"
+            );
             continue;
         }
         if value >= top {
-            assert_eq!(rendered, ">999Q", "compact({value:e}) reaches a thousand Q once rounded (TUI-RENDER-017)");
+            assert_eq!(
+                rendered, ">999Q",
+                "compact({value:e}) reaches a thousand Q once rounded (TUI-RENDER-017)"
+            );
             continue;
         }
         if value < 0.0005 {
-            assert_eq!(rendered, "<0.001", "compact({value:e}) rounds to nothing in three places (TUI-RENDER-017)");
+            assert_eq!(
+                rendered, "<0.001",
+                "compact({value:e}) rounds to nothing in three places (TUI-RENDER-017)"
+            );
             continue;
         }
         let figure = MARKERS
@@ -703,7 +718,9 @@ fn every_compact_figure_is_four_digits_at_most_rounded_to_the_nearest_and_six_co
             .map(|(m, _)| &rendered[..rendered.len() - m.len()])
             .unwrap_or(&rendered);
         let f: f64 = figure.parse().unwrap_or_else(|_| {
-            panic!("compact({value:e}) = {rendered:?} is not a figure and a marker (TUI-RENDER-017)")
+            panic!(
+                "compact({value:e}) = {rendered:?} is not a figure and a marker (TUI-RENDER-017)"
+            )
         });
         assert!(
             f < 1000.0,
@@ -711,9 +728,16 @@ fn every_compact_figure_is_four_digits_at_most_rounded_to_the_nearest_and_six_co
              next marker (TUI-RENDER-017)"
         );
         if figure.len() != rendered.len() {
-            assert!(f >= 1.0, "compact({value:e}) = {rendered:?} wears a marker it has not reached");
+            assert!(
+                f >= 1.0,
+                "compact({value:e}) = {rendered:?} wears a marker it has not reached"
+            );
         }
-        let unit = if value < 1.0 { 0.001 } else { 10f64.powi(value.log10().floor() as i32 - 3) };
+        let unit = if value < 1.0 {
+            0.001
+        } else {
+            10f64.powi(value.log10().floor() as i32 - 3)
+        };
         let back = read_compact(&rendered).expect("a figure reads back");
         assert!(
             (back - value).abs() <= unit * 0.5 * (1.0 + 1.0e-9),
@@ -785,12 +809,22 @@ fn the_exact_form_reads_as_the_spec_spells_it_at_every_edge() {
         (-1234.5, "-1234.5".into()),
         // A whole part longer than the float's precision.
         (1.0e25, format!("1{}", "0".repeat(25))),
-        (1.234_567_890_123_456_7e25, shortest_whole(1.234_567_890_123_456_7e25)),
-        (123_456_789_012_345_680.0, shortest_whole(123_456_789_012_345_680.0)),
+        (
+            1.234_567_890_123_456_7e25,
+            shortest_whole(1.234_567_890_123_456_7e25),
+        ),
+        (
+            123_456_789_012_345_680.0,
+            shortest_whole(123_456_789_012_345_680.0),
+        ),
         (-1.0e20, format!("-1{}", "0".repeat(20))),
     ];
     for (value, expected) in cases {
-        assert_eq!(exact(value), expected, "exact({value:e}) must read {expected:?} (TUI-RENDER-018)");
+        assert_eq!(
+            exact(value),
+            expected,
+            "exact({value:e}) must read {expected:?} (TUI-RENDER-018)"
+        );
     }
 }
 
@@ -802,7 +836,10 @@ fn the_exact_form_reads_as_the_spec_spells_it_at_every_edge() {
 /// @spec TUI-RENDER-018
 #[test]
 fn every_exact_figure_is_every_whole_digit_and_a_fraction_rounded_at_its_place() {
-    for magnitude in magnitude_sweep().into_iter().filter(|v| *v >= 1.0e-9 && *v < 1.0e15) {
+    for magnitude in magnitude_sweep()
+        .into_iter()
+        .filter(|v| *v >= 1.0e-9 && *v < 1.0e15)
+    {
         for value in [magnitude, -magnitude] {
             let rendered = exact(value);
             let body = rendered.strip_prefix('-').unwrap_or(&rendered);
@@ -853,11 +890,14 @@ fn the_exact_form_says_a_figure_that_is_not_finite_in_words() {
             "exact({value}) = {rendered:?} prints a figure that is not finite (TUI-RENDER-018)"
         );
         assert!(
-            !lower.split(|c: char| !c.is_alphabetic()).any(|w| w == "inf" || w == "infinity" || w == "nan"),
+            !lower
+                .split(|c: char| !c.is_alphabetic())
+                .any(|w| w == "inf" || w == "infinity" || w == "nan"),
             "exact({value}) = {rendered:?} prints the float's own spelling (TUI-RENDER-018)"
         );
         assert!(
-            rendered.split_whitespace().count() >= 2 && rendered.chars().all(|c| c.is_alphabetic() || c == ' '),
+            rendered.split_whitespace().count() >= 2
+                && rendered.chars().all(|c| c.is_alphabetic() || c == ' '),
             "exact({value}) = {rendered:?}: a figure that is not finite is stated in words \
              (TUI-RENDER-018)"
         );
@@ -893,7 +933,11 @@ fn the_sidebar_rate_is_the_compact_size_behind_its_sign_and_unsigned_when_still(
         (-0.9e-9, "0"),
     ];
     for (value, expected) in cases {
-        assert_eq!(rate(value), expected, "rate({value:e}) must read {expected:?} (TUI-RENDER-012)");
+        assert_eq!(
+            rate(value),
+            expected,
+            "rate({value:e}) must read {expected:?} (TUI-RENDER-012)"
+        );
     }
 }
 
@@ -915,7 +959,10 @@ fn every_sidebar_rate_is_its_sign_and_the_compact_form_of_its_size() {
                 format!("-{size}")
             };
             assert_eq!(rendered, expected, "rate({value:e}) (TUI-RENDER-012)");
-            assert!(width(&rendered) <= 7, "rate({value:e}) = {rendered:?} is wider than seven columns");
+            assert!(
+                width(&rendered) <= 7,
+                "rate({value:e}) = {rendered:?} is wider than seven columns"
+            );
         }
     }
 }

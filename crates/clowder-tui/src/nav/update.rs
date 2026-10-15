@@ -18,8 +18,8 @@ use super::action::{Action, CountSemantics};
 use super::mnemonics;
 use super::palette;
 use super::rows::{
-    done_count, drawn_rows, has_tab, ideas_place, lists_selectable, rows, tab_sections, Row, RowKey,
-    RowKind,
+    done_count, drawn_rows, has_tab, ideas_place, lists_selectable, rows, tab_sections, Row,
+    RowKey, RowKind,
 };
 use super::section::Section;
 use super::view::{ArmedRow, CountPrompt, Overlay, SeenMark, ViewState};
@@ -132,16 +132,25 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
         // Journal stays open. @spec TUI-NAV-026, TUI-NAV-025, TUI-NAV-038,
         // TUI-NAV-050
         Action::OpenJournal => {
-            view.journal_pinned = view.reports.iter().filter(|r| !r.dismissed).map(|r| r.entry).collect();
+            view.journal_pinned = view
+                .reports
+                .iter()
+                .filter(|r| !r.dismissed)
+                .map(|r| r.entry)
+                .collect();
             for r in &mut view.reports {
                 r.dismissed = true;
             }
             open_overlay(view, Overlay::Journal { anchor: 0 })
         }
         Action::OpenHelp => open_overlay(view, Overlay::Help),
-        Action::OpenPalette => {
-            open_overlay(view, Overlay::Palette { query: String::new(), selected: 0 })
-        }
+        Action::OpenPalette => open_overlay(
+            view,
+            Overlay::Palette {
+                query: String::new(),
+                selected: 0,
+            },
+        ),
         // @spec TUI-NAV-040
         Action::ObserveSky => {
             if state.pending_sky_event.is_some() {
@@ -181,7 +190,10 @@ pub fn opening(view: &mut ViewState, state: &GameState) {
     for section in Section::ALL {
         if lists_selectable(state, section) {
             let idx = section.index();
-            view.seen[idx] = SeenMark { visited: true, revealed_at_last_visit: rows(state, section).len() };
+            view.seen[idx] = SeenMark {
+                visited: true,
+                revealed_at_last_visit: rows(state, section).len(),
+            };
         }
     }
     view.done_open = false;
@@ -282,15 +294,30 @@ fn move_to_group(view: &mut ViewState, state: &GameState, delta: isize) {
         .iter()
         .enumerate()
         .filter(|(_, r)| matches!(r.kind, RowKind::Group))
-        .filter_map(|(i, _)| list.iter().enumerate().skip(i + 1).find(|(_, r)| r.selectable()).map(|(j, _)| j))
+        .filter_map(|(i, _)| {
+            list.iter()
+                .enumerate()
+                .skip(i + 1)
+                .find(|(_, r)| r.selectable())
+                .map(|(j, _)| j)
+        })
         .collect();
     if heads.is_empty() {
         return;
     }
     let target = if delta > 0 {
-        heads.iter().copied().find(|&h| h > here).or_else(|| heads.first().copied())
+        heads
+            .iter()
+            .copied()
+            .find(|&h| h > here)
+            .or_else(|| heads.first().copied())
     } else {
-        heads.iter().copied().rev().find(|&h| h < here).or_else(|| heads.last().copied())
+        heads
+            .iter()
+            .copied()
+            .rev()
+            .find(|&h| h < here)
+            .or_else(|| heads.last().copied())
     };
     if let Some(t) = target {
         view.focus[idx] = Some(list[t].key.clone());
@@ -318,7 +345,14 @@ fn nudge_speed(view: &mut ViewState, state: &GameState, up: bool) -> Outcome {
     match next {
         Some(v) => Outcome::Apply(Command::SetSpeed(v)),
         None => {
-            set_footer(view, if up { "already at the fastest" } else { "already at the slowest" });
+            set_footer(
+                view,
+                if up {
+                    "already at the fastest"
+                } else {
+                    "already at the slowest"
+                },
+            );
             Outcome::Handled
         }
     }
@@ -341,7 +375,10 @@ pub(super) fn enter_section(view: &mut ViewState, state: &GameState, section: Se
     let idx = section.index();
 
     // A visit marks the section seen and clears its new-content watermark.
-    view.seen[idx] = SeenMark { visited: true, revealed_at_last_visit: listed };
+    view.seen[idx] = SeenMark {
+        visited: true,
+        revealed_at_last_visit: listed,
+    };
     view.focus[idx] = landing_for(state, section, &list, view.focus[idx].as_ref());
 }
 
@@ -395,7 +432,10 @@ pub fn relist_focus(view: &mut ViewState, state: &GameState) {
     if remembered_still_present {
         return;
     }
-    if let Some(gone) = view.focus[idx].clone().filter(|k| folded_away(state, section, &list, k)) {
+    if let Some(gone) = view.focus[idx]
+        .clone()
+        .filter(|k| folded_away(state, section, &list, k))
+    {
         view.focus[idx] = closes_up(&list, &gone);
         // No held or auto-repeating continuation of the press that finished
         // the row may act on the row the cursor was handed to.
@@ -422,8 +462,11 @@ fn folded_away(state: &GameState, section: Section, drawn: &[Row], key: &RowKey)
 /// else none. @spec TUI-NAV-117
 fn closes_up(drawn: &[Row], gone: &RowKey) -> Option<RowKey> {
     let place = ideas_place(gone)?;
-    let placed: Vec<(&Row, (usize, usize))> =
-        drawn.iter().filter(|r| r.selectable()).filter_map(|r| Some((r, ideas_place(&r.key)?))).collect();
+    let placed: Vec<(&Row, (usize, usize))> = drawn
+        .iter()
+        .filter(|r| r.selectable())
+        .filter_map(|r| Some((r, ideas_place(&r.key)?)))
+        .collect();
     placed
         .iter()
         .find(|(_, p)| *p > place)
@@ -453,7 +496,9 @@ fn handle_toggle_done(view: &mut ViewState, state: &GameState) -> Outcome {
         return Outcome::Handled;
     }
     let now = Instant::now();
-    let distinct = view.last_repeat.is_none_or(|last| now.duration_since(last) >= REPEAT_GATE);
+    let distinct = view
+        .last_repeat
+        .is_none_or(|last| now.duration_since(last) >= REPEAT_GATE);
     view.last_repeat = Some(now);
     if !distinct {
         return Outcome::Handled;
@@ -469,7 +514,11 @@ fn handle_toggle_done(view: &mut ViewState, state: &GameState) -> Outcome {
         view.focus[idx] = if view.done_open {
             landing_for(state, Section::Ideas, &drawn, None)
         } else {
-            drawn.iter().rev().find(|r| r.selectable()).map(|r| r.key.clone())
+            drawn
+                .iter()
+                .rev()
+                .find(|r| r.selectable())
+                .map(|r| r.key.clone())
         };
     }
     Outcome::Handled
@@ -507,7 +556,9 @@ fn is_available(state: &GameState, section: Section, row: &Row) -> bool {
 fn current_row(view: &ViewState, state: &GameState) -> Option<Row> {
     let section = view.section?;
     let key = view.focus[section.index()].clone()?;
-    drawn_rows(state, section, view).into_iter().find(|r| r.key == key)
+    drawn_rows(state, section, view)
+        .into_iter()
+        .find(|r| r.key == key)
 }
 
 /// The row `key` names, if it is still listed in the current section — never
@@ -551,8 +602,9 @@ fn handle_activate(view: &mut ViewState, state: &GameState) -> Outcome {
     // @spec TUI-NAV-061
     if view.field_guard {
         let now = Instant::now();
-        let distinct =
-            view.last_repeat.is_none_or(|last| now.duration_since(last) >= REPEAT_GATE);
+        let distinct = view
+            .last_repeat
+            .is_none_or(|last| now.duration_since(last) >= REPEAT_GATE);
         if !distinct {
             view.last_repeat = Some(now);
             return Outcome::Handled;
@@ -700,7 +752,11 @@ fn activate_heavy(view: &mut ViewState, key: &RowKey, command: Command) -> Outco
 
     // First press on this row (or the previous arming expired, or a
     // different row was armed): arm this one, disarming any other.
-    view.armed = Some(ArmedRow { key: key.clone(), command, expires_at: now + ARM_DURATION });
+    view.armed = Some(ArmedRow {
+        key: key.clone(),
+        command,
+        expires_at: now + ARM_DURATION,
+    });
     view.last_repeat = Some(now);
     Outcome::Handled
 }
@@ -716,11 +772,7 @@ fn accept_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
     let prompt = view.prompt.take().expect("checked Some above");
     let n: u32 = prompt.digits.parse().unwrap_or(0);
 
-    let Some(row) = prompt
-        .row
-        .as_ref()
-        .and_then(|key| by_key(view, state, key))
-    else {
+    let Some(row) = prompt.row.as_ref().and_then(|key| by_key(view, state, key)) else {
         set_footer(view, "that row isn't here anymore.");
         return Outcome::Handled;
     };
@@ -788,7 +840,11 @@ fn accept_palette(view: &mut ViewState, state: &GameState) -> Outcome {
 
     // A jump to a row folded away in the done group opens the group, so the
     // row it focuses is drawn. @spec TUI-NAV-121
-    if section == Section::Ideas && !drawn_rows(state, section, view).iter().any(|r| r.key == key) {
+    if section == Section::Ideas
+        && !drawn_rows(state, section, view)
+            .iter()
+            .any(|r| r.key == key)
+    {
         view.done_open = true;
     }
 
@@ -840,7 +896,10 @@ fn handle_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
 
     let countable = match &row.kind {
         RowKind::Act { semantics, .. } => {
-            matches!(semantics, CountSemantics::CountTaking | CountSemantics::RepeatN)
+            matches!(
+                semantics,
+                CountSemantics::CountTaking | CountSemantics::RepeatN
+            )
         }
         RowKind::Count { .. } => true,
         RowKind::Display | RowKind::Group => false,
@@ -851,7 +910,10 @@ fn handle_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
         return Outcome::Handled;
     }
 
-    view.prompt = Some(CountPrompt { digits: String::new(), row: Some(row.key.clone()) });
+    view.prompt = Some(CountPrompt {
+        digits: String::new(),
+        row: Some(row.key.clone()),
+    });
     Outcome::Handled
 }
 
@@ -934,9 +996,10 @@ fn handle_increment_decrement(view: &mut ViewState, state: &GameState, up: bool)
         return no_row_to_act_on(view);
     };
     match &row.kind {
-        RowKind::Count { increment, decrement } => {
-            fire_once(view, if up { *increment } else { *decrement })
-        }
+        RowKind::Count {
+            increment,
+            decrement,
+        } => fire_once(view, if up { *increment } else { *decrement }),
         _ => Outcome::Handled,
     }
 }
@@ -957,7 +1020,10 @@ fn handle_type(view: &mut ViewState, c: char) -> Outcome {
             match candidate.parse::<u64>() {
                 Ok(n) if n <= MAX_AFFORDABLE_CAP as u64 => prompt.digits = candidate,
                 _ => {
-                    set_footer(view, format!("that count goes no higher than {MAX_AFFORDABLE_CAP}"));
+                    set_footer(
+                        view,
+                        format!("that count goes no higher than {MAX_AFFORDABLE_CAP}"),
+                    );
                 }
             }
         }
@@ -1066,7 +1132,11 @@ pub fn dismiss(view: &mut ViewState, narrow_on_screen: bool) -> Outcome {
 /// is drawn there is nothing on screen to answer at all, so the call is left
 /// as it stood and nothing else in the view changes — no note, either.
 /// @spec TUI-NAV-088
-pub fn toggle_inspector(view: &mut ViewState, narrow_on_screen: bool, pane_on_screen: bool) -> Outcome {
+pub fn toggle_inspector(
+    view: &mut ViewState,
+    narrow_on_screen: bool,
+    pane_on_screen: bool,
+) -> Outcome {
     if narrow_on_screen {
         view.inspector_wanted = !view.inspector_wanted;
     } else if pane_on_screen {

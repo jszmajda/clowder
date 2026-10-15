@@ -124,7 +124,9 @@ fn a_nap_reports_the_net_deltas_the_meadow_actually_moved_by() {
     assert!(years <= s.max_nap_length());
 
     let before = s.resources;
-    let events = s.apply(Command::DeepNap(years)).expect("the nap is affordable");
+    let events = s
+        .apply(Command::DeepNap(years))
+        .expect("the nap is affordable");
     let report = nap_summary(&events);
 
     let mut moved = 0;
@@ -145,7 +147,10 @@ fn a_nap_reports_the_net_deltas_the_meadow_actually_moved_by() {
             moved += 1;
         }
     }
-    assert!(moved > 0, "three game-years must move something, or the check above proves nothing");
+    assert!(
+        moved > 0,
+        "three game-years must move something, or the check above proves nothing"
+    );
 }
 
 /// The other half of the summary: how much time went by. A report of deltas
@@ -160,7 +165,10 @@ fn a_nap_reports_its_own_elapsed_span() {
     let short = nap_summary(&one.apply(Command::DeepNap(1)).expect("affordable"));
     let long = nap_summary(&two.apply(Command::DeepNap(2)).expect("affordable"));
 
-    assert!(short.elapsed_seconds > 0, "the summary reports how much time passed");
+    assert!(
+        short.elapsed_seconds > 0,
+        "the summary reports how much time passed"
+    );
     // Unit-agnostic (see the module header's open question 2): whatever the
     // span is carried in, twice the nap is twice the span.
     assert_eq!(
@@ -185,10 +193,15 @@ fn a_long_nap_comes_back_as_one_summary_not_a_per_tick_stream() {
     assert!(years <= s.max_nap_length());
     let entries_before = s.journal.iter_chronological().len();
 
-    let events = s.apply(Command::DeepNap(years)).expect("the nap is affordable");
+    let events = s
+        .apply(Command::DeepNap(years))
+        .expect("the nap is affordable");
 
     assert_eq!(
-        events.iter().filter(|e| matches!(e, Event::Napped { .. })).count(),
+        events
+            .iter()
+            .filter(|e| matches!(e, Event::Napped { .. }))
+            .count(),
         1,
         "one nap, one summary"
     );
@@ -200,12 +213,18 @@ fn a_long_nap_comes_back_as_one_summary_not_a_per_tick_stream() {
         events.len()
     );
     let added = s.journal.iter_chronological().len() - entries_before;
-    assert!(added < 50, "and the journal keeps the summary, not the {added} entries of a stream");
+    assert!(
+        added < 50,
+        "and the journal keeps the summary, not the {added} entries of a stream"
+    );
 
     // Summarized, not merely small: the one event standing in for twenty
     // thousand ticks has to carry the account of them.
     let report = nap_summary(&events);
-    assert!(report.elapsed_seconds > 0, "the one summary spans the whole nap");
+    assert!(
+        report.elapsed_seconds > 0,
+        "the one summary spans the whole nap"
+    );
 }
 
 // =====================================================================
@@ -223,13 +242,20 @@ fn the_summary_a_nap_returns_is_the_report_the_journal_retains() {
     let returned = nap_summary(&s.apply(Command::DeepNap(3)).expect("affordable"));
 
     let retained = away_reports(&s.journal);
-    assert_eq!(retained.len(), 1, "one bulk-time skip leaves one report in the journal");
+    assert_eq!(
+        retained.len(),
+        1,
+        "one bulk-time skip leaves one report in the journal"
+    );
     assert_eq!(
         retained[0], returned,
         "one mechanism, one place to read it — the retained report IS the returned one"
     );
     assert!(
-        s.journal.kept.iter().any(|e| matches!(e.item, JournalItem::Away(_))),
+        s.journal
+            .kept
+            .iter()
+            .any(|e| matches!(e.item, JournalItem::Away(_))),
         "retained means retained: a bulk-time report is never left in the evictable window"
     );
 }
@@ -258,11 +284,23 @@ fn a_nap_and_an_absence_of_the_same_length_fold_the_same_report() {
     let mut napper = base.clone();
     let napped = nap_summary(&napper.apply(Command::DeepNap(years)).expect("affordable"));
 
-    assert_eq!(napped.seasons_passed, away.seasons_passed, "the same seasons went by");
-    assert_eq!(napped.arrived, away.arrived, "the same kittens arrived, folded the same way");
-    assert_eq!(napped.wandered, away.wandered, "the same kittens wandered off");
+    assert_eq!(
+        napped.seasons_passed, away.seasons_passed,
+        "the same seasons went by"
+    );
+    assert_eq!(
+        napped.arrived, away.arrived,
+        "the same kittens arrived, folded the same way"
+    );
+    assert_eq!(
+        napped.wandered, away.wandered,
+        "the same kittens wandered off"
+    );
     assert_eq!(napped.returned, away.returned, "the same kittens came home");
-    assert!(!napped.truncated && !away.truncated, "neither run hit the catch-up cap");
+    assert!(
+        !napped.truncated && !away.truncated,
+        "neither run hit the catch-up cap"
+    );
     for r in ResourceId::ALL {
         // Starshards excluded: only the nap pays a fare. See the module header.
         if r == ResourceId::Starshards {
@@ -285,7 +323,9 @@ fn a_nap_and_an_absence_of_the_same_length_fold_the_same_report() {
 #[test]
 fn a_naps_report_survives_being_dismissed_unread() {
     let mut s = napping_meadow(705);
-    let _dismissed = s.apply(Command::DeepNap(1)).expect("the shortest nap is affordable");
+    let _dismissed = s
+        .apply(Command::DeepNap(1))
+        .expect("the shortest nap is affordable");
 
     assert_eq!(
         away_reports(&s.journal).len(),
@@ -293,7 +333,9 @@ fn a_naps_report_survives_being_dismissed_unread() {
         "even a one-year nap is a bulk-time skip worth remembering"
     );
 
-    let reloaded = load_string(&save_string(&s, 0), 0).expect("the save round-trips").state;
+    let reloaded = load_string(&save_string(&s, 0), 0)
+        .expect("the save round-trips")
+        .state;
     assert_eq!(
         away_reports(&reloaded.journal),
         away_reports(&s.journal),

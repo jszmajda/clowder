@@ -68,7 +68,9 @@ use ratatui::layout::Rect;
 use ratatui::{Frame, Terminal};
 
 use clowder_tui::nav::rows::rows;
-use clowder_tui::nav::{update, Action, Overlay, PendingReport, RowKey, Section, SeenMark, ViewState};
+use clowder_tui::nav::{
+    update, Action, Overlay, PendingReport, RowKey, Section, SeenMark, ViewState,
+};
 use clowder_tui::render;
 use clowder_tui::render::layout::{Body, Layout};
 use clowder_tui::render::widgets::inspector::Placement;
@@ -91,8 +93,13 @@ const NARROW_W: u16 = 99;
 /// Sizes every claim in this file is made at: the floor, the top of the narrow
 /// range, the first width with a pane, the width where the list caps, and one
 /// comfortably past both breakpoints.
-const SIZES: [(u16, u16); 5] =
-    [(FLOOR_W, FLOOR_H), (NARROW_W, FLOOR_H), (100, 30), (120, 40), (150, 50)];
+const SIZES: [(u16, u16); 5] = [
+    (FLOOR_W, FLOOR_H),
+    (NARROW_W, FLOOR_H),
+    (100, 30),
+    (120, 40),
+    (150, 50),
+];
 
 /// The sizes at or above the first breakpoint — where the inspector is a pane
 /// of its own rather than a swap.
@@ -122,8 +129,10 @@ fn kitten(job: Option<clowder_core::JobId>, location: Location) -> Kitten {
 /// someone who arrived — so the banner and the Journal both have something to
 /// say and neither draws blank.
 fn away_report() -> OfflineReport {
-    let mut report =
-        OfflineReport { elapsed_seconds: 2 * 86_400 + 4 * 3_600, ..OfflineReport::default() };
+    let mut report = OfflineReport {
+        elapsed_seconds: 2 * 86_400 + 4 * 3_600,
+        ..OfflineReport::default()
+    };
     report.resource_deltas[ResourceId::Catnip.ix()] = 12_400.0;
     report.arrived = vec![("Pebble".to_string(), 1)];
     report.wandered = vec![("Moss".to_string(), 1)];
@@ -141,7 +150,10 @@ fn settled() -> GameState {
     let mut s = GameState::new(11);
     s.ticks = 362 * content::TICKS_PER_DAY;
     s.speed = 2.0;
-    s.revealed = StructureId::ALL.iter().map(|b| ContentId::Structure(*b)).collect::<BTreeSet<_>>();
+    s.revealed = StructureId::ALL
+        .iter()
+        .map(|b| ContentId::Structure(*b))
+        .collect::<BTreeSet<_>>();
     for r in ResourceId::ALL {
         s.resources[r.ix()] = 1_234.0;
     }
@@ -155,7 +167,8 @@ fn settled() -> GameState {
     s.pending_sky_event = Some(s.ticks + 1_000);
 
     for (i, b) in StructureId::ALL.iter().take(4).enumerate() {
-        s.journal.record(100 + i as u64, &Event::StructureBuilt { id: *b, count: 2 });
+        s.journal
+            .record(100 + i as u64, &Event::StructureBuilt { id: *b, count: 2 });
     }
     s.journal.record_away(200, &away_report());
 
@@ -168,7 +181,10 @@ fn settled() -> GameState {
         "fixture: the journal must hold enough to scroll"
     );
     assert!(
-        s.journal.kept.iter().any(|e| matches!(e.item, JournalItem::Away(_))),
+        s.journal
+            .kept
+            .iter()
+            .any(|e| matches!(e.item, JournalItem::Away(_))),
         "fixture: the away-report must be long enough an absence for the core to pin it"
     );
     s
@@ -210,23 +226,34 @@ fn far_row() -> RowKey {
 /// No report is pending here: an unread one takes a row from the body
 /// (TUI-RENDER-003), and the banner has its own tests below.
 fn looking_at(state: &GameState, key: RowKey) -> ViewState {
-    let mut v = ViewState { section: Some(Section::Meadow), ..Default::default() };
+    let mut v = ViewState {
+        section: Some(Section::Meadow),
+        ..Default::default()
+    };
     v.focus[Section::Meadow.index()] = Some(key);
-    v.seen[Section::Meadow.index()] =
-        SeenMark { visited: true, revealed_at_last_visit: rows(state, Section::Meadow).len() };
+    v.seen[Section::Meadow.index()] = SeenMark {
+        visited: true,
+        revealed_at_last_visit: rows(state, Section::Meadow).len(),
+    };
     v
 }
 
 /// The same view, with the inspector asked for.
 fn inspecting(state: &GameState, key: RowKey) -> ViewState {
-    ViewState { inspector_wanted: true, ..looking_at(state, key) }
+    ViewState {
+        inspector_wanted: true,
+        ..looking_at(state, key)
+    }
 }
 
 /// The view a returning player lands in: one unread report, so the layout
 /// gives the frame a banner row.
 fn returning(state: &GameState) -> ViewState {
     ViewState {
-        reports: vec![PendingReport { entry: away_entry(state), dismissed: false }],
+        reports: vec![PendingReport {
+            entry: away_entry(state),
+            dismissed: false,
+        }],
         ..looking_at(state, near_row())
     }
 }
@@ -239,7 +266,10 @@ fn probe(b: StructureId) -> String {
         .into_iter()
         .filter(|o| *o != b && structure_def(*o).name.contains(&name))
         .count();
-    assert_eq!(clashes, 0, "fixture: {name:?} does not identify one structure");
+    assert_eq!(
+        clashes, 0,
+        "fixture: {name:?} does not identify one structure"
+    );
     name
 }
 
@@ -310,7 +340,9 @@ fn has_content(buf: &Buffer, rect: Rect) -> bool {
 }
 
 fn drawn_anywhere(d: &Drawn, text: &str) -> bool {
-    region_lines(&d.buffer, d.buffer.area).iter().any(|l| l.contains(text))
+    region_lines(&d.buffer, d.buffer.area)
+        .iter()
+        .any(|l| l.contains(text))
 }
 
 // ---------------------------------------------------------------------------
@@ -351,8 +383,14 @@ fn body_rect(l: &Layout, w: u16) -> Rect {
 /// Every region a full-screen overlay could plausibly have been handed. No
 /// spec chooses between them — see this file's header.
 fn overlay_candidates(l: &Layout, w: u16) -> Vec<(&'static str, Rect)> {
-    let mut out = vec![("the whole body", body_rect(l, w)), ("the list's space", main_rect(l))];
-    if let Body::Wide { list, inspector, .. } = l.body {
+    let mut out = vec![
+        ("the whole body", body_rect(l, w)),
+        ("the list's space", main_rect(l)),
+    ];
+    if let Body::Wide {
+        list, inspector, ..
+    } = l.body
+    {
         out.push((
             "the list and the inspector together",
             Rect::new(list.x, list.y, list.width + inspector.width, list.height),
@@ -453,9 +491,11 @@ fn assert_some_region_is(
 /// blanking it would not be.
 #[track_caller]
 fn assert_chrome_unchanged(a: &Drawn, b: &Drawn, what: &str) {
-    for (name, rect) in
-        [("header", a.layout.header), ("tab bar", a.layout.tabs), ("ticker", a.layout.ticker)]
-    {
+    for (name, rect) in [
+        ("header", a.layout.header),
+        ("tab bar", a.layout.tabs),
+        ("ticker", a.layout.ticker),
+    ] {
         assert_eq!(
             region_lines(&a.buffer, rect),
             region_lines(&b.buffer, rect),
@@ -521,12 +561,22 @@ fn every_piece_of_the_chrome_is_the_widget_that_owns_it() {
         assert_region_is(&d, l.tabs, size, "tab bar", "chrome::tabs", |f| {
             chrome::tabs(f, l.tabs, &state, &view)
         });
-        assert_region_is(&d, sidebar_rect(&l), size, "resource sidebar", "chrome::sidebar", |f| {
-            chrome::sidebar(f, sidebar_rect(&l), &state)
-        });
-        assert_region_is(&d, l.ticker, size, "event ticker", "overlays::ticker", |f| {
-            overlays::ticker(f, l.ticker, &state)
-        });
+        assert_region_is(
+            &d,
+            sidebar_rect(&l),
+            size,
+            "resource sidebar",
+            "chrome::sidebar",
+            |f| chrome::sidebar(f, sidebar_rect(&l), &state),
+        );
+        assert_region_is(
+            &d,
+            l.ticker,
+            size,
+            "event ticker",
+            "overlays::ticker",
+            |f| overlays::ticker(f, l.ticker, &state),
+        );
         assert_region_is(&d, l.hints, size, "hint bar", "chrome::hints", |f| {
             chrome::hints(f, l.hints, &state, &view)
         });
@@ -700,9 +750,14 @@ fn the_swapped_inspector_takes_the_lists_space_and_nothing_else() {
 
     // The swap draws into the space the pane divider (TUI-RENDER-016) leaves.
     let space = left_by_dividers(&swapped.layout);
-    assert_region_is(&swapped, space, size, "swapped inspector", "inspector::draw", |f| {
-        inspector::draw(f, space, &state, &view)
-    });
+    assert_region_is(
+        &swapped,
+        space,
+        size,
+        "swapped inspector",
+        "inspector::draw",
+        |f| inspector::draw(f, space, &state, &view),
+    );
 
     assert_ne!(
         region_text(&swapped.buffer, main),
@@ -749,12 +804,22 @@ fn the_swapped_inspector_follows_the_underlying_cursor() {
     // The swap draws into the space the pane divider (TUI-RENDER-016) leaves.
     let space = left_by_dividers(&near.layout);
 
-    assert_region_is(&near, space, size, "swapped inspector", "inspector::draw", |f| {
-        inspector::draw(f, space, &state, &near_view)
-    });
-    assert_region_is(&far, space, size, "swapped inspector", "inspector::draw", |f| {
-        inspector::draw(f, space, &state, &far_view)
-    });
+    assert_region_is(
+        &near,
+        space,
+        size,
+        "swapped inspector",
+        "inspector::draw",
+        |f| inspector::draw(f, space, &state, &near_view),
+    );
+    assert_region_is(
+        &far,
+        space,
+        size,
+        "swapped inspector",
+        "inspector::draw",
+        |f| inspector::draw(f, space, &state, &far_view),
+    );
     assert_ne!(
         region_text(&near.buffer, main),
         region_text(&far.buffer, main),
@@ -782,7 +847,10 @@ fn a_palette_jump_inside_the_narrow_swap_keeps_the_swap_on_the_landed_row() {
     }
     update(Action::Activate, &mut view, &state);
 
-    assert!(view.overlay.is_none(), "the palette's Enter did not jump (TUI-NAV-038)");
+    assert!(
+        view.overlay.is_none(),
+        "the palette's Enter did not jump (TUI-NAV-038)"
+    );
     assert_eq!(
         view.focus[Section::Meadow.index()],
         Some(far_row()),
@@ -833,11 +901,19 @@ fn returning_from_the_swap_shows_the_list_where_the_cursor_moved_to() {
     );
 
     // Space: the inspector takes the list's space.
-    let inspecting_near =
-        draw(&mut term, &state, &inspecting(&state, near_row()), Some(&opened.layout));
+    let inspecting_near = draw(
+        &mut term,
+        &state,
+        &inspecting(&state, near_row()),
+        Some(&opened.layout),
+    );
     // The cursor moves while the inspector is up.
-    let inspecting_far =
-        draw(&mut term, &state, &inspecting(&state, far_row()), Some(&inspecting_near.layout));
+    let inspecting_far = draw(
+        &mut term,
+        &state,
+        &inspecting(&state, far_row()),
+        Some(&inspecting_near.layout),
+    );
     assert_ne!(
         region_text(&inspecting_far.buffer, main_rect(&inspecting_far.layout)),
         region_text(&inspecting_near.buffer, main_rect(&inspecting_near.layout)),
@@ -845,8 +921,12 @@ fn returning_from_the_swap_shows_the_list_where_the_cursor_moved_to() {
     );
 
     // Space (or Esc) again: the list is back.
-    let returned =
-        draw(&mut term, &state, &looking_at(&state, far_row()), Some(&inspecting_far.layout));
+    let returned = draw(
+        &mut term,
+        &state,
+        &looking_at(&state, far_row()),
+        Some(&inspecting_far.layout),
+    );
 
     assert!(
         drawn_anywhere(&returned, &arrived),
@@ -881,8 +961,10 @@ fn an_open_journal_is_the_journal_widgets_drawing() {
     for size in SIZES {
         let (w, h) = size;
         let bare = cold(&state, &looking_at(&state, near_row()), w, h);
-        let view =
-            ViewState { overlay: Some(Overlay::Journal { anchor: 0 }), ..looking_at(&state, near_row()) };
+        let view = ViewState {
+            overlay: Some(Overlay::Journal { anchor: 0 }),
+            ..looking_at(&state, near_row())
+        };
         let d = cold(&state, &view, w, h);
 
         assert_ne!(
@@ -890,9 +972,13 @@ fn an_open_journal_is_the_journal_widgets_drawing() {
             region_lines(&bare.buffer, bare.buffer.area),
             "at {w}x{h} opening the Journal changed nothing on screen"
         );
-        assert_some_region_is(&d, size, "Journal overlay", "overlays::journal", |f, rect| {
-            overlays::journal(f, rect, &state, &view)
-        });
+        assert_some_region_is(
+            &d,
+            size,
+            "Journal overlay",
+            "overlays::journal",
+            |f, rect| overlays::journal(f, rect, &state, &view),
+        );
         assert_chrome_unchanged(&bare, &d, "the Journal opened");
     }
 }
@@ -931,7 +1017,10 @@ fn an_open_help_overlay_is_the_help_widgets_drawing() {
     for size in SIZES {
         let (w, h) = size;
         let bare = cold(&state, &looking_at(&state, near_row()), w, h);
-        let view = ViewState { overlay: Some(Overlay::Help), ..looking_at(&state, near_row()) };
+        let view = ViewState {
+            overlay: Some(Overlay::Help),
+            ..looking_at(&state, near_row())
+        };
         let d = cold(&state, &view, w, h);
 
         assert_ne!(
@@ -953,20 +1042,32 @@ fn an_open_help_overlay_is_the_help_widgets_drawing() {
 #[test]
 fn the_help_overlay_at_every_size_cuts_no_entry() {
     let state = settled();
-    let plain = ViewState { overlay: Some(Overlay::Help), ..looking_at(&state, near_row()) };
-    let banner = ViewState { overlay: Some(Overlay::Help), ..returning(&state) };
-    let cases = SIZES
-        .iter()
-        .map(|&(w, h)| (w, h, &plain, ""))
-        .chain([(FLOOR_W, FLOOR_H, &banner, " with a banner"), (NARROW_W, FLOOR_H, &banner, " with a banner")]);
+    let plain = ViewState {
+        overlay: Some(Overlay::Help),
+        ..looking_at(&state, near_row())
+    };
+    let banner = ViewState {
+        overlay: Some(Overlay::Help),
+        ..returning(&state)
+    };
+    let cases = SIZES.iter().map(|&(w, h)| (w, h, &plain, "")).chain([
+        (FLOOR_W, FLOOR_H, &banner, " with a banner"),
+        (NARROW_W, FLOOR_H, &banner, " with a banner"),
+    ]);
     for (w, h, view, how) in cases {
         let d = cold(&state, view, w, h);
         let lines = region_lines(&d.buffer, d.buffer.area);
         let text = lines.join("\n");
         for needle in HELP_ENTRIES {
-            assert!(text.contains(needle), "the {w}x{h}{how} help overlay does not show {needle:?}:\n{text}");
+            assert!(
+                text.contains(needle),
+                "the {w}x{h}{how} help overlay does not show {needle:?}:\n{text}"
+            );
         }
-        assert!(lines.iter().any(|l| shows_cursor_entry(l)), "the {w}x{h}{how} help overlay does not show the cursor glyph's entry:\n{text}");
+        assert!(
+            lines.iter().any(|l| shows_cursor_entry(l)),
+            "the {w}x{h}{how} help overlay does not show the cursor glyph's entry:\n{text}"
+        );
         let at = |needle: &str| lines.iter().position(|l| l.contains(needle)).unwrap();
         assert!(
             at("Emergency quit") < at("g gather") && at("d show or fold done") < at("affordable now"),
@@ -974,8 +1075,14 @@ fn the_help_overlay_at_every_size_cuts_no_entry() {
         );
         for screen in SCREEN_ENTRIES {
             let line = &lines[at(screen)];
-            let others = HELP_ENTRIES.iter().filter(|o| *o != screen && line.contains(*o)).count();
-            assert_eq!(others, 0, "at {w}x{h}{how} the screen keys {screen:?} share a line: {line:?}");
+            let others = HELP_ENTRIES
+                .iter()
+                .filter(|o| *o != screen && line.contains(*o))
+                .count();
+            assert_eq!(
+                others, 0,
+                "at {w}x{h}{how} the screen keys {screen:?} share a line: {line:?}"
+            );
         }
     }
 }
@@ -986,20 +1093,44 @@ fn the_help_overlay_at_every_size_cuts_no_entry() {
 #[test]
 fn the_help_overlay_with_room_draws_one_entry_to_a_line() {
     let state = settled();
-    let view = ViewState { overlay: Some(Overlay::Help), ..looking_at(&state, near_row()) };
+    let view = ViewState {
+        overlay: Some(Overlay::Help),
+        ..looking_at(&state, near_row())
+    };
     let d = cold(&state, &view, 120, 60);
     let lines = region_lines(&d.buffer, d.buffer.area);
     for needle in HELP_ENTRIES {
         let holding: Vec<&String> = lines.iter().filter(|l| l.contains(needle)).collect();
-        assert_eq!(holding.len(), 1, "at 120x60 {needle:?} should be on exactly one line");
-        let others = HELP_ENTRIES.iter().filter(|o| *o != needle && holding[0].contains(*o)).count();
-        assert_eq!(others, 0, "at 120x60 {needle:?} shares its line with another entry: {:?}", holding[0]);
-        assert!(!shows_cursor_entry(holding[0]), "at 120x60 {needle:?} shares its line with the cursor glyph's entry");
+        assert_eq!(
+            holding.len(),
+            1,
+            "at 120x60 {needle:?} should be on exactly one line"
+        );
+        let others = HELP_ENTRIES
+            .iter()
+            .filter(|o| *o != needle && holding[0].contains(*o))
+            .count();
+        assert_eq!(
+            others, 0,
+            "at 120x60 {needle:?} shares its line with another entry: {:?}",
+            holding[0]
+        );
+        assert!(
+            !shows_cursor_entry(holding[0]),
+            "at 120x60 {needle:?} shares its line with the cursor glyph's entry"
+        );
     }
-    assert_eq!(lines.iter().filter(|l| shows_cursor_entry(l)).count(), 1, "at 120x60 the cursor glyph's entry should have one line");
+    assert_eq!(
+        lines.iter().filter(|l| shows_cursor_entry(l)).count(),
+        1,
+        "at 120x60 the cursor glyph's entry should have one line"
+    );
     let at = |needle: &str| lines.iter().position(|l| l.contains(needle)).unwrap();
     for after in ["Emergency quit", "d show or fold done"] {
-        assert!(lines[at(after) + 1].trim().is_empty(), "at 120x60 no blank line follows the list ending {after:?}");
+        assert!(
+            lines[at(after) + 1].trim().is_empty(),
+            "at 120x60 no blank line follows the list ending {after:?}"
+        );
     }
 }
 
@@ -1009,19 +1140,38 @@ fn the_help_overlay_with_room_draws_one_entry_to_a_line() {
 #[test]
 fn the_help_overlay_packs_the_legend_before_the_key_map() {
     let state = settled();
-    let view = ViewState { overlay: Some(Overlay::Help), ..looking_at(&state, near_row()) };
+    let view = ViewState {
+        overlay: Some(Overlay::Help),
+        ..looking_at(&state, near_row())
+    };
     let d = cold(&state, &view, 100, 30);
     let lines = region_lines(&d.buffer, d.buffer.area);
     let line_of = |needle: &str| lines.iter().find(|l| l.contains(needle)).unwrap();
     for needle in &HELP_ENTRIES[..KEY_ENTRY_COUNT] {
         let line = line_of(needle);
-        let others = HELP_ENTRIES.iter().filter(|o| *o != needle && line.contains(*o)).count();
-        assert_eq!(others, 0, "at 100x30 the key map is packed although the legend alone would fit: {line:?}");
+        let others = HELP_ENTRIES
+            .iter()
+            .filter(|o| *o != needle && line.contains(*o))
+            .count();
+        assert_eq!(
+            others, 0,
+            "at 100x30 the key map is packed although the legend alone would fit: {line:?}"
+        );
     }
     let packed = HELP_ENTRIES[KEY_ENTRY_COUNT + SCREEN_ENTRIES.len()..]
         .iter()
-        .any(|needle| HELP_ENTRIES.iter().filter(|o| line_of(needle).contains(*o)).count() > 1);
-    assert!(packed, "at 100x30 the legend should be packed for the overlay to fit:\n{}", lines.join("\n"));
+        .any(|needle| {
+            HELP_ENTRIES
+                .iter()
+                .filter(|o| line_of(needle).contains(*o))
+                .count()
+                > 1
+        });
+    assert!(
+        packed,
+        "at 100x30 the legend should be packed for the overlay to fit:\n{}",
+        lines.join("\n")
+    );
 }
 
 /// The legend's entry for the cursor glyph, packed or one to a line.
@@ -1033,8 +1183,12 @@ fn shows_cursor_entry(line: &str) -> bool {
 const KEY_ENTRY_COUNT: usize = 17;
 
 /// The screens' keys among `HELP_ENTRIES`.
-const SCREEN_ENTRIES: &[&str] =
-    &["g gather / f forage / r rummage", "p promote (kitten)", "p send a pen-pal (colony)", "d show or fold done"];
+const SCREEN_ENTRIES: &[&str] = &[
+    "g gather / f forage / r rummage",
+    "p promote (kitten)",
+    "p send a pen-pal (colony)",
+    "d show or fold done",
+];
 
 /// One distinctive phrase from every entry of the key map, the screens' keys,
 /// and the glyph legend, none a substring of another. The legend's cursor entry
@@ -1087,7 +1241,10 @@ fn an_open_palette_is_the_palette_widgets_drawing() {
         let (w, h) = size;
         let bare = cold(&state, &looking_at(&state, near_row()), w, h);
         let view = ViewState {
-            overlay: Some(Overlay::Palette { query: query.clone(), selected: 0 }),
+            overlay: Some(Overlay::Palette {
+                query: query.clone(),
+                selected: 0,
+            }),
             ..looking_at(&state, near_row())
         };
         let d = cold(&state, &view, w, h);
@@ -1112,7 +1269,10 @@ fn the_palettes_live_query_reaches_the_widget() {
     let state = settled();
     let typed = probe(StructureId::ALL[7]);
     let with = |query: &str| ViewState {
-        overlay: Some(Overlay::Palette { query: query.to_string(), selected: 0 }),
+        overlay: Some(Overlay::Palette {
+            query: query.to_string(),
+            selected: 0,
+        }),
         ..looking_at(&state, near_row())
     };
 
@@ -1158,7 +1318,11 @@ fn an_unread_report_puts_the_banner_widget_under_the_tab_bar() {
             has_content(&d.buffer, banner),
             "at {w}x{h} the banner row is blank; it is the first thing a returning player sees"
         );
-        assert_eq!(banner.y, d.layout.tabs.y + 1, "the banner sits directly under the tab bar");
+        assert_eq!(
+            banner.y,
+            d.layout.tabs.y + 1,
+            "the banner sits directly under the tab bar"
+        );
     }
 }
 
@@ -1171,7 +1335,10 @@ fn a_dismissed_report_leaves_no_banner_behind() {
     let state = settled();
     let mut view = returning(&state);
     let showing = cold(&state, &view, FLOOR_W, FLOOR_H);
-    let banner = showing.layout.banner.expect("an unread report shows a banner");
+    let banner = showing
+        .layout
+        .banner
+        .expect("an unread report shows a banner");
     assert!(
         has_content(&showing.buffer, banner),
         "an unread report must put something in the banner row before its disappearance can \
@@ -1182,7 +1349,10 @@ fn a_dismissed_report_leaves_no_banner_behind() {
     view.reports[0].dismissed = true;
     let dismissed = cold(&state, &view, FLOOR_W, FLOOR_H);
 
-    assert_eq!(dismissed.layout.banner, None, "a dismissed report keeps no row of its own");
+    assert_eq!(
+        dismissed.layout.banner, None,
+        "a dismissed report keeps no row of its own"
+    );
     assert!(
         !drawn_anywhere(&dismissed, banner_text.trim()),
         "the banner is still on screen after its report was dismissed"
@@ -1212,7 +1382,10 @@ fn below_the_floor_the_frame_routes_nothing_but_the_card() {
             matches!(d.layout.body, Body::TooSmall(_)),
             "{w}x{h} is under the floor and must lay out as the too-small card"
         );
-        assert!(has_content(&d.buffer, d.buffer.area), "{w}x{h}: the card must say something");
+        assert!(
+            has_content(&d.buffer, d.buffer.area),
+            "{w}x{h}: the card must say something"
+        );
 
         for name in [probe(StructureId::ALL[4]), probe(StructureId::ALL[5])] {
             assert!(
@@ -1237,17 +1410,26 @@ fn a_composed_frame_does_not_depend_on_the_frames_before_it() {
     let target = returning(&state);
     let reference = cold(&state, &target, FLOOR_W, FLOOR_H);
 
-    let journal =
-        ViewState { overlay: Some(Overlay::Journal { anchor: 2 }), ..looking_at(&state, far_row()) };
+    let journal = ViewState {
+        overlay: Some(Overlay::Journal { anchor: 2 }),
+        ..looking_at(&state, far_row())
+    };
     let palette = ViewState {
-        overlay: Some(Overlay::Palette { query: "a".to_string(), selected: 0 }),
+        overlay: Some(Overlay::Palette {
+            query: "a".to_string(),
+            selected: 0,
+        }),
         ..looking_at(&state, near_row())
     };
 
     let mut term = terminal(FLOOR_W, FLOOR_H);
     let mut prev: Option<Layout> = None;
-    for view in [&journal, &palette, &inspecting(&state, far_row()), &looking_at(&state, near_row())]
-    {
+    for view in [
+        &journal,
+        &palette,
+        &inspecting(&state, far_row()),
+        &looking_at(&state, near_row()),
+    ] {
         prev = Some(draw(&mut term, &state, view, prev.as_ref()).layout);
     }
     let after = draw(&mut term, &state, &target, prev.as_ref());
@@ -1278,7 +1460,11 @@ fn composing_the_frame_touches_neither_the_snapshot_nor_the_view() {
     }
     let last = draw(&mut term, &state, &view, prev.as_ref());
 
-    assert_eq!(format!("{view:?}"), view_before, "the frame must not touch the view state");
+    assert_eq!(
+        format!("{view:?}"),
+        view_before,
+        "the frame must not touch the view state"
+    );
     assert_eq!(
         clowder_core::save_string(&state, 0),
         state_before,
@@ -1307,7 +1493,10 @@ fn the_same_inputs_compose_the_same_frame() {
             region_lines(&second.buffer, second.buffer.area),
             "{w}x{h}: two frames from identical inputs must be identical"
         );
-        assert_eq!(first.layout, second.layout, "{w}x{h}: and so must the layouts they used");
+        assert_eq!(
+            first.layout, second.layout,
+            "{w}x{h}: and so must the layouts they used"
+        );
     }
 }
 
@@ -1355,9 +1544,19 @@ fn left_by_dividers(l: &Layout) -> Rect {
 /// listed, alongside everything `settled` already has.
 fn far_along() -> GameState {
     let mut s = settled();
-    s.ideas = clowder_core::IdeaId::ALL.iter().copied().collect::<BTreeSet<_>>();
-    s.revealed.extend(clowder_core::IdeaId::ALL.iter().map(|i| ContentId::Idea(*i)));
-    s.discovered = clowder_core::ColonyId::ALL.iter().copied().collect::<BTreeSet<_>>();
+    s.ideas = clowder_core::IdeaId::ALL
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    s.revealed.extend(
+        clowder_core::IdeaId::ALL
+            .iter()
+            .map(|i| ContentId::Idea(*i)),
+    );
+    s.discovered = clowder_core::ColonyId::ALL
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
     s.peak_devotion = 1.0e9;
     s.generation = 1;
     s.roster_high_water = 100;
@@ -1373,14 +1572,18 @@ fn armed_view(state: &GameState) -> ViewState {
         .iter()
         .find_map(|s| {
             rows(state, *s).into_iter().find_map(|r| match r.kind {
-                RowKind::Act { command: c @ clowder_core::Command::PassItDown, .. } => {
-                    Some((*s, r.key, c))
-                }
+                RowKind::Act {
+                    command: c @ clowder_core::Command::PassItDown,
+                    ..
+                } => Some((*s, r.key, c)),
                 _ => None,
             })
         })
         .expect("fixture: some section lists a heavy row with a consequence summary");
-    let mut v = ViewState { section: Some(section), ..Default::default() };
+    let mut v = ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     v.focus[section.index()] = Some(key.clone());
     v.armed = Some(clowder_tui::nav::ArmedRow {
         key,
@@ -1394,7 +1597,10 @@ fn armed_view(state: &GameState) -> ViewState {
 fn prompting(state: &GameState, key: RowKey, wanted: bool) -> ViewState {
     ViewState {
         inspector_wanted: wanted,
-        prompt: Some(clowder_tui::nav::CountPrompt { digits: "12".to_string(), row: Some(key.clone()) }),
+        prompt: Some(clowder_tui::nav::CountPrompt {
+            digits: "12".to_string(),
+            row: Some(key.clone()),
+        }),
         ..looking_at(state, key)
     }
 }
@@ -1408,10 +1614,16 @@ fn list_space_views(state: &GameState) -> Vec<(&'static str, ViewState)> {
     vec![
         ("the list near its top", looking_at(state, near_row())),
         ("the list deep in its scroll", looking_at(state, far_row())),
-        ("the list with a prompt open", prompting(state, near_row(), false)),
+        (
+            "the list with a prompt open",
+            prompting(state, near_row(), false),
+        ),
         ("the list with a row armed", armed_view(state)),
         ("the inspector asked for", inspecting(state, near_row())),
-        ("the inspector asked for with a prompt open", prompting(state, far_row(), true)),
+        (
+            "the inspector asked for with a prompt open",
+            prompting(state, far_row(), true),
+        ),
         ("a banner showing", returning(state)),
     ]
 }
@@ -1579,7 +1791,10 @@ fn whatever_holds_the_lists_space_fits_its_lines_to_the_width_the_dividers_leave
                 let d = cold(&state, &view, w, h);
                 let space = left_by_dividers(&d.layout);
                 let alone = widget_alone(w, h, |f| inspector::draw(f, space, &state, &view));
-                assert!(has_content(&alone, space), "fixture: the inspector has something to say");
+                assert!(
+                    has_content(&alone, space),
+                    "fixture: the inspector has something to say"
+                );
                 assert_eq!(
                     region_lines(&d.buffer, space),
                     region_lines(&alone, space),
@@ -1597,7 +1812,10 @@ fn whatever_holds_the_lists_space_fits_its_lines_to_the_width_the_dividers_leave
     let list_views = [
         ("the list near its top", looking_at(&state, near_row())),
         ("the list deep in its scroll", looking_at(&state, far_row())),
-        ("the list with a prompt open", prompting(&state, near_row(), false)),
+        (
+            "the list with a prompt open",
+            prompting(&state, near_row(), false),
+        ),
         ("the list with a row armed", armed_view(&state)),
     ];
     for h in [FLOOR_H, 40] {
@@ -1606,8 +1824,14 @@ fn whatever_holds_the_lists_space_fits_its_lines_to_the_width_the_dividers_leave
             for (what, view) in &list_views {
                 let a = cold(&state, view, n, h);
                 let b = cold(&state, view, wide, h);
-                assert!(matches!(a.layout.body, Body::Narrow { .. }), "fixture: {n} is narrow");
-                assert!(matches!(b.layout.body, Body::Wide { .. }), "fixture: {wide} has a pane");
+                assert!(
+                    matches!(a.layout.body, Body::Narrow { .. }),
+                    "fixture: {n} is narrow"
+                );
+                assert!(
+                    matches!(b.layout.body, Body::Wide { .. }),
+                    "fixture: {wide} has a pane"
+                );
                 let (sa, sb) = (left_by_dividers(&a.layout), left_by_dividers(&b.layout));
                 assert_eq!(
                     (sa.width, sa.height),
@@ -1617,7 +1841,11 @@ fn whatever_holds_the_lists_space_fits_its_lines_to_the_width_the_dividers_leave
 
                 let cells = |d: &Drawn, s: Rect| -> Vec<Vec<ratatui::buffer::Cell>> {
                     (s.y..s.bottom())
-                        .map(|y| (s.x..s.right()).map(|x| d.buffer.cell((x, y)).expect("cell").clone()).collect())
+                        .map(|y| {
+                            (s.x..s.right())
+                                .map(|x| d.buffer.cell((x, y)).expect("cell").clone())
+                                .collect()
+                        })
                         .collect()
                 };
                 assert_eq!(
@@ -1643,7 +1871,10 @@ fn whatever_holds_the_lists_space_fits_its_lines_to_the_width_the_dividers_leave
                         "with {what} at {at}x{h}, the focused row does not begin at the first \
                          column the divider leaves: {focused:?}"
                     );
-                    for note in lines.iter().filter(|l| l.contains("more above") || l.contains("more below")) {
+                    for note in lines
+                        .iter()
+                        .filter(|l| l.contains("more above") || l.contains("more below"))
+                    {
                         assert!(
                             note.starts_with(|c: char| c.is_ascii_digit()),
                             "with {what} at {at}x{h}, the list's position indicator lost its \
@@ -1669,26 +1900,44 @@ fn no_divider_cuts_through_a_full_screen_overlay() {
     let overlays_open = [
         ("the Journal", Overlay::Journal { anchor: 0 }),
         ("help", Overlay::Help),
-        ("the palette", Overlay::Palette { query: probe(StructureId::ALL[7]), selected: 0 }),
+        (
+            "the palette",
+            Overlay::Palette {
+                query: probe(StructureId::ALL[7]),
+                selected: 0,
+            },
+        ),
     ];
 
     for h in [FLOOR_H, 40] {
         for w in FLOOR_W..=160 {
             for (what, overlay) in &overlays_open {
-                for base in [looking_at(&state, near_row()), inspecting(&state, near_row())] {
-                    let view = ViewState { overlay: Some(overlay.clone()), ..base };
+                for base in [
+                    looking_at(&state, near_row()),
+                    inspecting(&state, near_row()),
+                ] {
+                    let view = ViewState {
+                        overlay: Some(overlay.clone()),
+                        ..base
+                    };
                     let d = cold(&state, &view, w, h);
                     let size = (w, h);
                     match overlay {
-                        Overlay::Journal { .. } => assert_some_region_is(&d, size, what, "overlays::journal", |f, r| {
-                            overlays::journal(f, r, &state, &view)
-                        }),
-                        Overlay::Help => assert_some_region_is(&d, size, what, "overlays::help", |f, r| {
-                            overlays::help(f, r)
-                        }),
-                        Overlay::Palette { .. } => assert_some_region_is(&d, size, what, "overlays::palette", |f, r| {
-                            overlays::palette(f, r, &state, &view)
-                        }),
+                        Overlay::Journal { .. } => {
+                            assert_some_region_is(&d, size, what, "overlays::journal", |f, r| {
+                                overlays::journal(f, r, &state, &view)
+                            })
+                        }
+                        Overlay::Help => {
+                            assert_some_region_is(&d, size, what, "overlays::help", |f, r| {
+                                overlays::help(f, r)
+                            })
+                        }
+                        Overlay::Palette { .. } => {
+                            assert_some_region_is(&d, size, what, "overlays::palette", |f, r| {
+                                overlays::palette(f, r, &state, &view)
+                            })
+                        }
                     }
                     let body = sidebar_rect(&d.layout).union(main_rect(&d.layout));
                     let body = pane_rect(&d.layout).map_or(body, |p| body.union(p));

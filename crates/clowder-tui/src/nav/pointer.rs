@@ -26,7 +26,9 @@ pub fn journal_key(action: &Action, view: &mut ViewState, record: Option<&Pointe
     let Some(Overlay::Journal { anchor }) = view.overlay else {
         return false;
     };
-    let max = record.and_then(PointerRecord::journal_max_scroll).unwrap_or(0);
+    let max = record
+        .and_then(PointerRecord::journal_max_scroll)
+        .unwrap_or(0);
     let next = match action {
         Action::CursorDown => (anchor + 1).min(max),
         Action::CursorUp => anchor.saturating_sub(1),
@@ -70,7 +72,11 @@ pub fn pointer_event(
         Some(Overlay::Journal { anchor }) => {
             if let Some(step) = step.filter(|_| record.journal_at(x, y)) {
                 let max = record.journal_max_scroll().unwrap_or(0);
-                let next = if step > 0 { (anchor + 1).min(max) } else { anchor.saturating_sub(1) };
+                let next = if step > 0 {
+                    (anchor + 1).min(max)
+                } else {
+                    anchor.saturating_sub(1)
+                };
                 if next != *anchor {
                     view.overlay = Some(Overlay::Journal { anchor: next });
                 }
@@ -84,7 +90,9 @@ pub fn pointer_event(
     if view.prompt.is_some() {
         return Outcome::Handled;
     }
-    let Some(focus) = view.section else { return Outcome::Handled };
+    let Some(focus) = view.section else {
+        return Outcome::Handled;
+    };
 
     match step {
         None => {

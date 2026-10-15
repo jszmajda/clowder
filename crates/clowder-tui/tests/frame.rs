@@ -105,7 +105,10 @@ const VERY_TALL: u16 = 100;
 /// what the viewport, the group header and the overflow indicator all need.
 fn meadow(structures: &[StructureId], stocked: usize) -> GameState {
     let mut s = GameState::new(11);
-    s.revealed = structures.iter().map(|b| ContentId::Structure(*b)).collect::<BTreeSet<_>>();
+    s.revealed = structures
+        .iter()
+        .map(|b| ContentId::Structure(*b))
+        .collect::<BTreeSet<_>>();
     for r in ResourceId::ALL.into_iter().take(stocked) {
         s.resources[r.ix()] = 1_234.0;
     }
@@ -353,14 +356,21 @@ fn the_same_inputs_draw_the_same_frame() {
     let state = long_meadow();
     let view = looking_at(structure_row(StructureId::ALL[20]));
 
-    for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE, TALL), (VERY_TALL + 20, VERY_TALL)] {
+    for (w, h) in [
+        (FLOOR_W, FLOOR_H),
+        (WIDE, TALL),
+        (VERY_TALL + 20, VERY_TALL),
+    ] {
         let first = cold(&state, &view, w, h);
         let second = cold(&state, &view, w, h);
         assert_eq!(
             first.buffer, second.buffer,
             "{w}x{h}: two frames from identical inputs must be identical"
         );
-        assert_eq!(first.layout, second.layout, "{w}x{h}: and so must the layouts they used");
+        assert_eq!(
+            first.layout, second.layout,
+            "{w}x{h}: and so must the layouts they used"
+        );
     }
 }
 
@@ -435,7 +445,10 @@ fn the_frame_reads_the_snapshot_rather_than_a_shell_side_copy() {
     for b in StructureId::ALL {
         later.structures[b.ix()] = 3;
     }
-    later.revealed = StructureId::ALL.iter().map(|b| ContentId::Structure(*b)).collect();
+    later.revealed = StructureId::ALL
+        .iter()
+        .map(|b| ContentId::Structure(*b))
+        .collect();
 
     let a = cold(&early, &view, WIDE, TALL);
     let b = cold(&later, &view, WIDE, TALL);
@@ -448,7 +461,10 @@ fn the_frame_reads_the_snapshot_rather_than_a_shell_side_copy() {
     // ...and the first snapshot still draws the first frame, so the difference
     // was the snapshot rather than the passage of frames.
     let again = cold(&early, &view, WIDE, TALL);
-    assert_eq!(again.buffer, a.buffer, "the snapshot is the input; nothing else moved");
+    assert_eq!(
+        again.buffer, a.buffer,
+        "the snapshot is the input; nothing else moved"
+    );
 }
 
 /// A frame is a read. The core owns the game state and the shell owns the view
@@ -469,8 +485,16 @@ fn drawing_a_frame_changes_neither_the_snapshot_nor_the_view() {
         prev = Some(draw(&mut term, &state, &view, prev.as_ref()).layout);
     }
 
-    assert_eq!(save_string(&state, 0), state_before, "the frame must not touch the snapshot");
-    assert_eq!(format!("{view:?}"), view_before, "the frame must not touch the view state");
+    assert_eq!(
+        save_string(&state, 0),
+        state_before,
+        "the frame must not touch the snapshot"
+    );
+    assert_eq!(
+        format!("{view:?}"),
+        view_before,
+        "the frame must not touch the view state"
+    );
 }
 
 /// The layout escapes. The dead-band at each breakpoint is a function of the
@@ -484,7 +508,14 @@ fn the_frame_returns_the_layout_it_drew() {
     let state = long_meadow();
     let view = looking_at(structure_row(StructureId::ALL[4]));
 
-    for (w, h) in [(FLOOR_W, FLOOR_H), (99, 30), (100, 30), (119, 30), (WIDE, TALL), (200, 60)] {
+    for (w, h) in [
+        (FLOOR_W, FLOOR_H),
+        (99, 30),
+        (100, 30),
+        (119, 30),
+        (WIDE, TALL),
+        (200, 60),
+    ] {
         let drawn = cold(&state, &view, w, h);
         assert_eq!(
             drawn.layout,
@@ -543,8 +574,11 @@ fn the_rows_either_side_of_the_cursor_are_drawn_too() {
     let state = long_meadow();
 
     for ix in [10usize, 26, 44] {
-        let (above, at, below) =
-            (StructureId::ALL[ix - 1], StructureId::ALL[ix], StructureId::ALL[ix + 1]);
+        let (above, at, below) = (
+            StructureId::ALL[ix - 1],
+            StructureId::ALL[ix],
+            StructureId::ALL[ix + 1],
+        );
         let d = cold(&state, &looking_at(structure_row(at)), WIDE, TALL);
         let lines = list_lines(&d);
 
@@ -573,16 +607,26 @@ fn a_reveal_that_inserts_rows_above_the_cursor_cannot_hide_it() {
 
     // Before: only a few structures revealed, so the focused row is the fourth
     // row of the list and the viewport is at the very top.
-    let before = meadow(&[StructureId::ALL[0], StructureId::ALL[1], last], ResourceId::ALL.len());
+    let before = meadow(
+        &[StructureId::ALL[0], StructureId::ALL[1], last],
+        ResourceId::ALL.len(),
+    );
     // After: fifty rows have been revealed above the very same focused row.
     let after = long_meadow();
 
-    let inserted = row_index(&after, &structure_row(last)) - row_index(&before, &structure_row(last));
-    assert!(inserted > 30, "fixture: the reveal should insert far more rows than a viewport holds");
+    let inserted =
+        row_index(&after, &structure_row(last)) - row_index(&before, &structure_row(last));
+    assert!(
+        inserted > 30,
+        "fixture: the reveal should insert far more rows than a viewport holds"
+    );
 
     let mut term = terminal(WIDE, TALL);
     let first = draw(&mut term, &before, &view, None);
-    assert!(shows(&list_lines(&first), &name), "the cursor starts visible");
+    assert!(
+        shows(&list_lines(&first), &name),
+        "the cursor starts visible"
+    );
 
     let second = draw(&mut term, &after, &view, Some(&first.layout));
     let lines = list_lines(&second);
@@ -610,7 +654,12 @@ fn a_resize_that_changes_the_body_height_cannot_hide_the_cursor() {
     let mut term = terminal(WIDE, VERY_TALL);
     let mut prev = Some(draw(&mut term, &state, &view, None).layout);
 
-    for (w, h) in [(WIDE, TALL), (FLOOR_W, FLOOR_H), (WIDE, VERY_TALL), (FLOOR_W, 30)] {
+    for (w, h) in [
+        (WIDE, TALL),
+        (FLOOR_W, FLOOR_H),
+        (WIDE, VERY_TALL),
+        (FLOOR_W, 30),
+    ] {
         term.backend_mut().resize(w, h);
         term.clear().expect("TestBackend is infallible");
         let d = draw(&mut term, &state, &view, prev.as_ref());
@@ -659,7 +708,10 @@ fn only_the_rows_around_the_cursor_are_drawn() {
     let deep = StructureId::ALL[52];
     let d = cold(&state, &looking_at(structure_row(deep)), WIDE, TALL);
 
-    assert!(shows(&list_lines(&d), &probe(deep)), "the cursor's row is drawn");
+    assert!(
+        shows(&list_lines(&d), &probe(deep)),
+        "the cursor's row is drawn"
+    );
 
     for ix in 0..8 {
         let far = StructureId::ALL[ix];
@@ -690,7 +742,12 @@ fn a_group_header_scrolls_out_of_view_like_any_other_row() {
     let anchor = probe(StructureId::ALL[0]);
     let anchor_row = row_index(&state, &structure_row(StructureId::ALL[0]));
 
-    let top = cold(&state, &looking_at(RowKey::Fixed("GatherCatnip")), WIDE, TALL);
+    let top = cold(
+        &state,
+        &looking_at(RowKey::Fixed("GatherCatnip")),
+        WIDE,
+        TALL,
+    );
     let top_lines = list_lines(&top);
     let offset = row_offset(&top_lines, &anchor, anchor_row, 0);
 
@@ -797,7 +854,9 @@ fn every_group_listed() -> GameState {
     s.peak_devotion = 1.0e12;
     s.devotion = 1.0e6;
     s.serenity = 1.0e12;
-    s.rites = [RiteId::TheReverie, RiteId::Enlightenment].into_iter().collect::<BTreeSet<_>>();
+    s.rites = [RiteId::TheReverie, RiteId::Enlightenment]
+        .into_iter()
+        .collect::<BTreeSet<_>>();
     s.arches_bought = [ArchId::EverdreamArch].into_iter().collect::<BTreeSet<_>>();
     s.discovered = ColonyId::ALL.iter().copied().collect::<BTreeSet<_>>();
     s.sites_reached = BTreeSet::new();
@@ -824,7 +883,9 @@ fn header_words_for(row: &Row) -> &'static str {
         RowKey::Content(ContentId::Arch(_), _) => "arches",
         RowKey::Content(ContentId::Tradition(_), _) => "traditions",
         RowKey::Content(ContentId::DreamLoom(_), _) => "loom upgrades",
-        RowKey::Content(ContentId::Craft(_), _) => panic!("the one-group section's rows wear no header"),
+        RowKey::Content(ContentId::Craft(_), _) => {
+            panic!("the one-group section's rows wear no header")
+        }
         RowKey::Resource(_) => "stores",
         RowKey::Kitten(..) => "kittens",
         RowKey::Colony(..) => "colonies",
@@ -844,7 +905,10 @@ fn designed_headers() -> BTreeSet<(usize, &'static str)> {
         (Section::Friends, &["colonies", "things to do"]),
         (Section::Sky, &["sites", "things to do"]),
         (Section::Dreams, &["things to do", "loom upgrades"]),
-        (Section::Legacy, &["things to do", "traditions", "adventures"]),
+        (
+            Section::Legacy,
+            &["things to do", "traditions", "adventures"],
+        ),
     ];
     table
         .iter()
@@ -861,8 +925,17 @@ struct HeaderLine {
 
 /// Draw `section` with the cursor on `beneath` and return the pane line
 /// directly above the cursor's — the header of the group `beneath` opens.
-fn header_above(state: &GameState, section: Section, beneath: &RowKey, w: u16, h: u16) -> HeaderLine {
-    let mut view = ViewState { section: Some(section), ..Default::default() };
+fn header_above(
+    state: &GameState,
+    section: Section,
+    beneath: &RowKey,
+    w: u16,
+    h: u16,
+) -> HeaderLine {
+    let mut view = ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     view.focus[section.index()] = Some(beneath.clone());
     // The rows beneath the Ideas section's done header are drawn only while
     // its group is open (TUI-NAV-113).
@@ -873,13 +946,25 @@ fn header_above(state: &GameState, section: Section, beneath: &RowKey, w: u16, h
     let at = lines
         .iter()
         .position(|l| l.starts_with('\u{25B8}'))
-        .unwrap_or_else(|| panic!("the cursor's row is not drawn in {}'s pane:\n{}", section.title(), lines.join("\n")));
-    assert!(at > 0, "the cursor's row is the pane's first line; no header can stand above it");
+        .unwrap_or_else(|| {
+            panic!(
+                "the cursor's row is not drawn in {}'s pane:\n{}",
+                section.title(),
+                lines.join("\n")
+            )
+        });
+    assert!(
+        at > 0,
+        "the cursor's row is the pane's first line; no header can stand above it"
+    );
     let y = rect.y + (at - 1) as u16;
     let cells = (rect.x..rect.right())
         .map(|x| d.buffer.cell((x, y)).expect("inside the buffer").clone())
         .collect();
-    HeaderLine { text: lines[at - 1].clone(), cells }
+    HeaderLine {
+        text: lines[at - 1].clone(),
+        cells,
+    }
 }
 
 /// Every header the row list carries for `state`, as (section, the row
@@ -890,9 +975,12 @@ fn headers_of(state: &GameState) -> Vec<(Section, Row)> {
         let list = rows(state, section);
         for (i, row) in list.iter().enumerate() {
             if matches!(row.kind, RowKind::Group) {
-                let next = list
-                    .get(i + 1)
-                    .unwrap_or_else(|| panic!("{}'s header at line {i} stands above nothing", section.title()));
+                let next = list.get(i + 1).unwrap_or_else(|| {
+                    panic!(
+                        "{}'s header at line {i} stands above nothing",
+                        section.title()
+                    )
+                });
                 out.push((section, next.clone()));
             }
         }
@@ -936,7 +1024,8 @@ fn every_group_header_is_worded_as_the_plain_plural_of_its_kind() {
             let line = header_above(&state, section, &beneath.key, WIDE, TALL);
             let words = words_of(&line.text);
             assert_eq!(
-                words, expected,
+                words,
+                expected,
                 "{}'s header over {:?} reads {:?}; the design words it {expected:?}. Line: {:?}",
                 section.title(),
                 beneath.key,
@@ -944,7 +1033,9 @@ fn every_group_header_is_worded_as_the_plain_plural_of_its_kind() {
                 line.text
             );
             assert!(
-                !words.chars().any(|c| c.is_ascii_digit() || c.is_uppercase()),
+                !words
+                    .chars()
+                    .any(|c| c.is_ascii_digit() || c.is_uppercase()),
                 "{}'s header {words:?} carries a figure or a capital",
                 section.title()
             );
@@ -979,7 +1070,11 @@ fn a_group_header_is_a_dim_labelled_rule_spanning_the_list() {
     let state = every_group_listed();
     let headers = headers_of(&state);
     let dim = clowder_tui::theme::Role::Dim.color();
-    let longest = designed_headers().iter().map(|(_, w)| w.chars().count()).max().unwrap_or(0);
+    let longest = designed_headers()
+        .iter()
+        .map(|(_, w)| w.chars().count())
+        .max()
+        .unwrap_or(0);
 
     for w in [FLOOR_W, 85, 99, 100, 104, 119, 120, 121, WIDE, 160, 200] {
         for (section, beneath) in &headers {
@@ -990,7 +1085,12 @@ fn a_group_header_is_a_dim_labelled_rule_spanning_the_list() {
                 "fixture: at {w} columns the list is {width} wide, too narrow to hold every header whole"
             );
             let words = words_of(&line.text);
-            assert!(!words.is_empty(), "{}'s header at {w} columns carries no words: {:?}", section.title(), line.text);
+            assert!(
+                !words.is_empty(),
+                "{}'s header at {w} columns carries no words: {:?}",
+                section.title(),
+                line.text
+            );
             let n = words.chars().count();
             let expected = format!(
                 "\u{2500}\u{2500} {words} {}",
@@ -1074,7 +1174,10 @@ fn a_list_longer_than_its_viewport_says_that_there_is_more() {
 
     let small = short_meadow();
     let fitting = list_lines(&cold(&small, &view, WIDE, TALL));
-    assert!(meadow_rows(&small).len() < fitting.len(), "fixture: this list must fit");
+    assert!(
+        meadow_rows(&small).len() < fitting.len(),
+        "fixture: this list must fit"
+    );
     assert_eq!(
         overflow_note(&fitting),
         None,
@@ -1131,8 +1234,14 @@ fn the_indication_costs_a_row_and_not_a_column() {
     let over_lines = list_lines(&overflows);
     let fit_lines = list_lines(&fits);
 
-    assert!(meadow_rows(&state).len() > over_lines.len(), "fixture: this list overflows at {TALL}");
-    assert!(meadow_rows(&state).len() < fit_lines.len(), "fixture: it fits at {VERY_TALL}");
+    assert!(
+        meadow_rows(&state).len() > over_lines.len(),
+        "fixture: this list overflows at {TALL}"
+    );
+    assert!(
+        meadow_rows(&state).len() < fit_lines.len(),
+        "fixture: it fits at {VERY_TALL}"
+    );
     assert_eq!(
         list_rect(&overflows.layout).width,
         list_rect(&fits.layout).width,
@@ -1174,7 +1283,10 @@ fn assert_no_scrollbar_column(d: &Drawn) {
     let rect = list_rect(&d.layout);
     let lines = region_lines(&d.buffer, rect);
     let height = lines.len();
-    assert!(height > 4, "fixture: a pane tall enough for the question to mean anything");
+    assert!(
+        height > 4,
+        "fixture: a pane tall enough for the question to mean anything"
+    );
 
     for x in 0..rect.width as usize {
         let column: Vec<char> = lines.iter().filter_map(|l| l.chars().nth(x)).collect();
@@ -1182,8 +1294,11 @@ fn assert_no_scrollbar_column(d: &Drawn) {
         if bars * 10 < height * 9 {
             continue;
         }
-        let distinct: BTreeSet<char> =
-            column.iter().copied().filter(|c| BAR_GLYPHS.contains(*c)).collect();
+        let distinct: BTreeSet<char> = column
+            .iter()
+            .copied()
+            .filter(|c| BAR_GLYPHS.contains(*c))
+            .collect();
         assert!(
             distinct.len() < 2,
             "column {x} of the list pane is a run of {distinct:?} down its height — that is a \
@@ -1266,10 +1381,10 @@ fn a_row_that_exists_but_is_not_drawn_costs_far_less_than_one_that_is() {
          ({long_at_floor:?} at {FLOOR_H} rows, {long_when_tall:?} at {VERY_TALL})"
     );
 
-    let per_drawn_row = (long_when_tall - long_at_floor).as_secs_f64() / f64::from(extra_visible_rows);
+    let per_drawn_row =
+        (long_when_tall - long_at_floor).as_secs_f64() / f64::from(extra_visible_rows);
     let hidden_rows = (long_rows - short_rows) as f64;
-    let per_hidden_row =
-        (long_at_floor.saturating_sub(short_at_floor)).as_secs_f64() / hidden_rows;
+    let per_hidden_row = (long_at_floor.saturating_sub(short_at_floor)).as_secs_f64() / hidden_rows;
 
     assert!(
         per_hidden_row * 4.0 < per_drawn_row,
@@ -1287,7 +1402,12 @@ fn a_row_that_exists_but_is_not_drawn_costs_far_less_than_one_that_is() {
 #[test]
 fn a_frame_draws_no_more_rows_than_the_viewport_holds() {
     let state = long_meadow();
-    let d = cold(&state, &looking_at(structure_row(StructureId::ALL[25])), WIDE, TALL);
+    let d = cold(
+        &state,
+        &looking_at(structure_row(StructureId::ALL[25])),
+        WIDE,
+        TALL,
+    );
     let viewport = list_lines(&d).len();
     let all = meadow_rows(&state).len();
     assert!(all > viewport * 2, "fixture: far more rows exist than fit");
@@ -1303,7 +1423,6 @@ fn a_frame_draws_no_more_rows_than_the_viewport_holds() {
          is bounded by what is visible, not by what exists"
     );
 }
-
 
 // ---------------------------------------------------------------------------
 // TUI-RENDER-020 — a list row's count and cost fields
@@ -1331,7 +1450,11 @@ fn cell_lines(buf: &Buffer, rect: Rect) -> Vec<Vec<String>> {
     (rect.y..rect.bottom())
         .map(|y| {
             (rect.x..rect.right())
-                .map(|x| buf.cell((x, y)).map(|c| c.symbol().to_string()).unwrap_or_else(|| " ".into()))
+                .map(|x| {
+                    buf.cell((x, y))
+                        .map(|c| c.symbol().to_string())
+                        .unwrap_or_else(|| " ".into())
+                })
                 .collect()
         })
         .collect()
@@ -1357,7 +1480,11 @@ fn later_row_label(state: &GameState, section: Section, key: &RowKey) -> Option<
         (RowKey::Colony(a, _), RowKey::Colony(b, _)) => a == b,
         _ => false,
     };
-    rows(state, section).iter().find(|r| same_item(&r.key)).filter(|first| &first.key != key).map(|_| label)
+    rows(state, section)
+        .iter()
+        .find(|r| same_item(&r.key))
+        .filter(|first| &first.key != key)
+        .map(|_| label)
 }
 
 /// What a row draws in its name's place, in full: on a later row of an item
@@ -1369,12 +1496,19 @@ fn inspector_name(state: &GameState, section: Section, key: &RowKey) -> String {
         return label.to_string();
     }
     let (w, h) = (180u16, 6u16);
-    let mut view = ViewState { section: Some(section), ..Default::default() };
+    let mut view = ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     view.focus[section.index()] = Some(key.clone());
     unfold_focus(state, &mut view);
     let mut term = terminal(w, h);
-    term.draw(|f| inspector::draw(f, area(w, h), state, &view)).expect("TestBackend is infallible");
-    cell_lines(term.backend().buffer(), area(w, h))[0].concat().trim().to_string()
+    term.draw(|f| inspector::draw(f, area(w, h), state, &view))
+        .expect("TestBackend is infallible");
+    cell_lines(term.backend().buffer(), area(w, h))[0]
+        .concat()
+        .trim()
+        .to_string()
 }
 
 /// Every resource's stores-row spelling, read from the inspector over its row
@@ -1393,7 +1527,13 @@ fn store_names() -> HashMap<ResourceId, String> {
 /// The cost field's width: six columns of figure, a space, the widest
 /// stores-row name in the resource vocabulary, and three columns for `, …`.
 fn cost_field_width(names: &HashMap<ResourceId, String>) -> usize {
-    6 + 1 + names.values().map(|n| n.chars().count()).max().expect("a vocabulary") + 3
+    6 + 1
+        + names
+            .values()
+            .map(|n| n.chars().count())
+            .max()
+            .expect("a vocabulary")
+        + 3
 }
 
 /// Whether a section can list a row whose description states an owned count
@@ -1401,7 +1541,10 @@ fn cost_field_width(names: &HashMap<ResourceId, String>) -> usize {
 /// count row, the tinkerers on a craft's tinkerer row. Judged by the section
 /// alone, from what its rows are — checked against real lists below.
 fn gives_count_field(section: Section) -> bool {
-    matches!(section, Section::Meadow | Section::Clowder | Section::Crafts | Section::Sunbeams)
+    matches!(
+        section,
+        Section::Meadow | Section::Clowder | Section::Crafts | Section::Sunbeams
+    )
 }
 
 /// Whether a section can list a row whose description states a next cost
@@ -1467,7 +1610,9 @@ fn cost_field(
     names: &HashMap<ResourceId, String>,
     width: usize,
 ) -> (String, bool) {
-    let Some(cost) = cost else { return (" ".repeat(width), false) };
+    let Some(cost) = cost else {
+        return (" ".repeat(width), false);
+    };
     let parts: Vec<String> = cost
         .iter()
         .enumerate()
@@ -1490,7 +1635,10 @@ fn cost_field(
             break;
         }
     }
-    assert!(!text.is_empty(), "the field holds the widest single component and `, …` after it");
+    assert!(
+        !text.is_empty(),
+        "the field holds the widest single component and `, …` after it"
+    );
     (format!("{text:<width$}"), cut)
 }
 
@@ -1526,8 +1674,9 @@ fn rich_meadow() -> GameState {
         .chain(IdeaId::ALL.iter().map(|i| ContentId::Idea(*i)))
         .collect();
     s.roster_high_water = MEADOW_MOVE_MIN_KITTENS + 9;
-    let mut roster: Vec<Kitten> =
-        (0..MEADOW_MOVE_MIN_KITTENS + 9).map(|i| kitten_named(&format!("kitten-{i}"), None)).collect();
+    let mut roster: Vec<Kitten> = (0..MEADOW_MOVE_MIN_KITTENS + 9)
+        .map(|i| kitten_named(&format!("kitten-{i}"), None))
+        .collect();
     for k in roster.iter_mut().take(4) {
         k.job = Some(JobId::Tinkerer);
     }
@@ -1537,7 +1686,9 @@ fn rich_meadow() -> GameState {
     s.peak_devotion = 1.0e12;
     s.devotion = 1.0e6;
     s.serenity = 1.0e12;
-    s.rites = [RiteId::TheReverie, RiteId::Enlightenment].into_iter().collect();
+    s.rites = [RiteId::TheReverie, RiteId::Enlightenment]
+        .into_iter()
+        .collect();
     s.rite_counts[RiteId::TheReverie.ix()] = 2;
     s.arches_bought = [ArchId::EverdreamArch].into_iter().collect();
     s.discovered = ColonyId::ALL.iter().copied().collect();
@@ -1595,15 +1746,34 @@ fn ragged_meadow() -> GameState {
 fn every_list_row_draws_its_count_and_cost_in_fixed_fields_at_its_right() {
     let names = store_names();
     let c = cost_field_width(&names);
-    let meadows = [rich_meadow(), poor_meadow(), ragged_meadow(), GameState::new(11)];
+    let meadows = [
+        rich_meadow(),
+        poor_meadow(),
+        ragged_meadow(),
+        GameState::new(11),
+    ];
 
     // The per-section table is the section's own: check it against what the
     // sections really list, over every meadow here.
     for section in Section::ALL {
-        let lists_count = meadows.iter().any(|s| rows(s, section).iter().any(|r| stated_count(s, r).is_some()));
-        let lists_cost = meadows.iter().any(|s| rows(s, section).iter().any(|r| stated_cost(s, r).is_some()));
-        assert_eq!(lists_count, gives_count_field(section), "fixture: {section:?} and owned counts");
-        assert_eq!(lists_cost, gives_cost_field(section), "fixture: {section:?} and next costs");
+        let lists_count = meadows.iter().any(|s| {
+            rows(s, section)
+                .iter()
+                .any(|r| stated_count(s, r).is_some())
+        });
+        let lists_cost = meadows
+            .iter()
+            .any(|s| rows(s, section).iter().any(|r| stated_cost(s, r).is_some()));
+        assert_eq!(
+            lists_count,
+            gives_count_field(section),
+            "fixture: {section:?} and owned counts"
+        );
+        assert_eq!(
+            lists_cost,
+            gives_cost_field(section),
+            "fixture: {section:?} and next costs"
+        );
     }
 
     let mut seen = (0usize, 0usize, 0usize, 0usize); // rows, cut costs, marked counts, blank zero counts
@@ -1612,10 +1782,21 @@ fn every_list_row_draws_its_count_and_cost_in_fixed_fields_at_its_right() {
         for section in Section::ALL {
             let all = rows(state, section);
             let selectable: Vec<usize> = (0..all.len()).filter(|i| all[*i].selectable()).collect();
-            let (Some(&first), Some(&last)) = (selectable.first(), selectable.last()) else { continue };
-            for (w, h) in [(FLOOR_W, FLOOR_H), (99, 30), (100, 30), (130, TALL), (200, 60)] {
+            let (Some(&first), Some(&last)) = (selectable.first(), selectable.last()) else {
+                continue;
+            };
+            for (w, h) in [
+                (FLOOR_W, FLOOR_H),
+                (99, 30),
+                (100, 30),
+                (130, TALL),
+                (200, 60),
+            ] {
                 for cursor in [first, last] {
-                    let mut view = ViewState { section: Some(section), ..Default::default() };
+                    let mut view = ViewState {
+                        section: Some(section),
+                        ..Default::default()
+                    };
                     // Every listed row is drawn, in list order, only with the
                     // Ideas section's done group open (TUI-NAV-113).
                     if drawn_rows(state, section, &view) != all {
@@ -1633,14 +1814,16 @@ fn every_list_row_draws_its_count_and_cost_in_fixed_fields_at_its_right() {
 
                     let counted = gives_count_field(section);
                     let costed = gives_cost_field(section);
-                    let name_w = width - 4 - if counted { 8 } else { 0 } - if costed { c + 1 } else { 0 };
+                    let name_w =
+                        width - 4 - if counted { 8 } else { 0 } - if costed { c + 1 } else { 0 };
                     let count_at = if costed { width - c - 8 } else { width - 7 };
 
                     for (y, line) in lines.iter().enumerate() {
                         if line[0].chars().next().is_some_and(|ch| ch.is_ascii_digit()) {
                             continue; // an overflow note (TUI-RENDER-011)
                         }
-                        let Some(ix) = (cursor + y).checked_sub(cy).filter(|ix| *ix < all.len()) else {
+                        let Some(ix) = (cursor + y).checked_sub(cy).filter(|ix| *ix < all.len())
+                        else {
                             continue;
                         };
                         let row = &all[ix];
@@ -1670,7 +1853,10 @@ fn every_list_row_draws_its_count_and_cost_in_fixed_fields_at_its_right() {
                         // share.
                         let expected_column = match row.key {
                             RowKey::Kitten(kix, _) => {
-                                assert_eq!(full, state.kittens[kix].name, "fixture: {at} is named by its kitten");
+                                assert_eq!(
+                                    full, state.kittens[kix].name,
+                                    "fixture: {at} is named by its kitten"
+                                );
                                 expected_name_column(state, kix, name_w)
                             }
                             _ => {
@@ -1685,7 +1871,11 @@ fn every_list_row_draws_its_count_and_cost_in_fixed_fields_at_its_right() {
                              column on every row (TUI-RENDER-020).\n{drawn:?}"
                         );
                         if counted || costed {
-                            assert_eq!(line[4 + name_w], " ", "{at}: a blank column before the first field.\n{drawn:?}");
+                            assert_eq!(
+                                line[4 + name_w],
+                                " ",
+                                "{at}: a blank column before the first field.\n{drawn:?}"
+                            );
                         }
                         if matches!(row.key, RowKey::Kitten(..)) {
                             // A kitten's row states neither heading; its
@@ -1712,7 +1902,11 @@ fn every_list_row_draws_its_count_and_cost_in_fixed_fields_at_its_right() {
                                  for zero or for nothing stated (TUI-RENDER-020).\n{drawn:?}"
                             );
                             if costed {
-                                assert_eq!(line[count_at + 7], " ", "{at}: a blank column before the cost field.\n{drawn:?}");
+                                assert_eq!(
+                                    line[count_at + 7],
+                                    " ",
+                                    "{at}: a blank column before the cost field.\n{drawn:?}"
+                                );
                             }
                         }
                         if costed {
@@ -1737,7 +1931,10 @@ fn every_list_row_draws_its_count_and_cost_in_fixed_fields_at_its_right() {
         }
     }
     assert!(seen.0 > 0, "fixture: rows were checked");
-    assert!(seen.1 > 0, "fixture: some cost too long for its field was drawn");
+    assert!(
+        seen.1 > 0,
+        "fixture: some cost too long for its field was drawn"
+    );
     assert!(seen.2 > 0, "fixture: some count past a thousand was drawn");
     assert!(seen.3 > 0, "fixture: some zero count was drawn");
 }
@@ -1791,7 +1988,9 @@ fn name_of_len(head: char, len: usize) -> String {
 /// @spec TUI-NAV-095
 #[test]
 fn every_kitten_row_but_the_elders_carries_the_whole_elder_hint_where_it_fits() {
-    let dim = clowder_tui::theme::Role::Dim.color().expect("the dim role is a colour");
+    let dim = clowder_tui::theme::Role::Dim
+        .color()
+        .expect("the dim role is a colour");
     let store = store_names();
     let c = cost_field_width(&store);
     let hint_w = ELDER_HINT.chars().count();
@@ -1799,14 +1998,35 @@ fn every_kitten_row_but_the_elders_carries_the_whole_elder_hint_where_it_fits() 
         gives_count_field(Section::Clowder) && gives_cost_field(Section::Clowder),
         "fixture: the Clowder list gives both fields, so the name column is bounded by both"
     );
-    assert!(ELDER_HINT.is_ascii(), "fixture: the hint as the spec words it is single-width");
+    assert!(
+        ELDER_HINT.is_ascii(),
+        "fixture: the hint as the spec words it is single-width"
+    );
 
     let (mut drawn_with, mut drawn_without, mut focused_with) = (0u32, 0u32, 0u32);
     let (mut elder_rows, mut elder_rows_with_room, mut beside_an_elder) = (0u32, 0u32, 0u32);
-    for (w, h) in [(FLOOR_W, 60u16), (90, 60), (99, 60), (100, 60), (130, 60), (200, 60)] {
+    for (w, h) in [
+        (FLOOR_W, 60u16),
+        (90, 60),
+        (99, 60),
+        (100, 60),
+        (130, 60),
+        (200, 60),
+    ] {
         // The name column's width, taken from the frame's own list space.
         let probe = clowder_named(&["Biscuit".to_string()]);
-        let space = list_space(&cold(&probe, &ViewState { section: Some(Section::Clowder), ..Default::default() }, w, h).layout);
+        let space = list_space(
+            &cold(
+                &probe,
+                &ViewState {
+                    section: Some(Section::Clowder),
+                    ..Default::default()
+                },
+                w,
+                h,
+            )
+            .layout,
+        );
         let width = space.width as usize;
         let name_w = width - 4 - 8 - (c + 1);
 
@@ -1822,33 +2042,56 @@ fn every_kitten_row_but_the_elders_carries_the_whole_elder_hint_where_it_fits() 
             }
         }
         // Nobody the Elder, then each kitten in turn.
-        let elders: Vec<Option<usize>> = std::iter::once(None).chain((0..names.len()).map(Some)).collect();
+        let elders: Vec<Option<usize>> = std::iter::once(None)
+            .chain((0..names.len()).map(Some))
+            .collect();
         for elder in elders {
             let mut state = clowder_named(&names);
             state.elder = elder;
             let all = rows(&state, Section::Clowder);
-            let kitten_ix: Vec<usize> = (0..all.len()).filter(|i| matches!(all[*i].key, RowKey::Kitten(..))).collect();
-            assert!(!kitten_ix.is_empty(), "fixture: kitten rows are listed at {w}x{h}");
+            let kitten_ix: Vec<usize> = (0..all.len())
+                .filter(|i| matches!(all[*i].key, RowKey::Kitten(..)))
+                .collect();
+            assert!(
+                !kitten_ix.is_empty(),
+                "fixture: kitten rows are listed at {w}x{h}"
+            );
 
-            let mut cursors: Vec<Option<RowKey>> = kitten_ix.iter().map(|i| Some(all[*i].key.clone())).collect();
-            cursors.push(all.iter().find(|r| r.selectable() && !matches!(r.key, RowKey::Kitten(..))).map(|r| r.key.clone()));
+            let mut cursors: Vec<Option<RowKey>> = kitten_ix
+                .iter()
+                .map(|i| Some(all[*i].key.clone()))
+                .collect();
+            cursors.push(
+                all.iter()
+                    .find(|r| r.selectable() && !matches!(r.key, RowKey::Kitten(..)))
+                    .map(|r| r.key.clone()),
+            );
 
             for cursor_key in cursors {
-                let mut view = ViewState { section: Some(Section::Clowder), ..Default::default() };
+                let mut view = ViewState {
+                    section: Some(Section::Clowder),
+                    ..Default::default()
+                };
                 view.focus[Section::Clowder.index()] = cursor_key.clone();
                 let d = cold(&state, &view, w, h);
                 let space = list_space(&d.layout);
                 let lines = cell_lines(&d.buffer, space);
-                let cursor = cursor_key.as_ref().and_then(|k| all.iter().position(|r| &r.key == k)).unwrap_or(0);
-                let cy = lines
-                    .iter()
-                    .position(|l| l[0] == "▸")
-                    .unwrap_or_else(|| panic!("fixture: the cursor is drawn in the Clowder list at {w}x{h}"));
+                let cursor = cursor_key
+                    .as_ref()
+                    .and_then(|k| all.iter().position(|r| &r.key == k))
+                    .unwrap_or(0);
+                let cy = lines.iter().position(|l| l[0] == "▸").unwrap_or_else(|| {
+                    panic!("fixture: the cursor is drawn in the Clowder list at {w}x{h}")
+                });
 
                 for &ri in &kitten_ix {
                     let row = &all[ri];
-                    let RowKey::Kitten(k, _) = row.key else { unreachable!() };
-                    let y = (cy + ri).checked_sub(cursor).expect("fixture: the list is drawn unscrolled");
+                    let RowKey::Kitten(k, _) = row.key else {
+                        unreachable!()
+                    };
+                    let y = (cy + ri)
+                        .checked_sub(cursor)
+                        .expect("fixture: the list is drawn unscrolled");
                     let line = &lines[y];
                     let name = &state.kittens[k].name;
                     let name_len = name.chars().count();
@@ -1860,7 +2103,11 @@ fn every_kitten_row_but_the_elders_carries_the_whole_elder_hint_where_it_fits() 
                             Some(e) => format!("kitten {e} the Elder"),
                             None => "nobody the Elder".to_string(),
                         },
-                        if focused { "the cursor's" } else { "not the cursor's" },
+                        if focused {
+                            "the cursor's"
+                        } else {
+                            "not the cursor's"
+                        },
                         line.concat()
                     );
                     let column = cells_text(line, 4, 4 + name_w);
@@ -1871,7 +2118,9 @@ fn every_kitten_row_but_the_elders_carries_the_whole_elder_hint_where_it_fits() 
                     // `every_kitten_row_names_its_one_state_whole_in_its_fields_place`
                     // (TUI-RENDER-024); here only that no part of the hint is there.
                     assert!(
-                        fields.starts_with(' ') && !fields.contains(ELDER_HINT) && !fields.contains("(n:"),
+                        fields.starts_with(' ')
+                            && !fields.contains(ELDER_HINT)
+                            && !fields.contains("(n:"),
                         "{at}: the hint never stands in the count or cost field's place"
                     );
 
@@ -1880,7 +2129,9 @@ fn every_kitten_row_but_the_elders_carries_the_whole_elder_hint_where_it_fits() 
                     // hint's place is swept by the TUI-NAV-104–106 tests.
                     if elder == Some(k) {
                         assert!(
-                            !column.contains(ELDER_HINT) && !column.contains("(n") && !column.contains("n:"),
+                            !column.contains(ELDER_HINT)
+                                && !column.contains("(n")
+                                && !column.contains("n:"),
                             "{at}: the row of the kitten the core holds as the Elder carries no \
                              hint — the hint would offer what is already true"
                         );
@@ -1909,14 +2160,31 @@ fn every_kitten_row_but_the_elders_carries_the_whole_elder_hint_where_it_fits() 
                         let head: String = column.chars().take(name_len).collect();
                         assert_eq!(&head, name, "{at}: the hint cost the name a character");
                         let between = &column[name.len()..off];
-                        assert!(between.chars().all(|ch| ch == ' '), "{at}: something other than blanks between the name and the hint");
+                        assert!(
+                            between.chars().all(|ch| ch == ' '),
+                            "{at}: something other than blanks between the name and the hint"
+                        );
                         let after = &column[off + ELDER_HINT.len()..];
-                        assert!(after.chars().all(|ch| ch == ' '), "{at}: something other than blanks after the hint");
+                        assert!(
+                            after.chars().all(|ch| ch == ' '),
+                            "{at}: something other than blanks after the hint"
+                        );
                         let cell0 = 4 + column[..off].chars().count();
                         for (i, sym) in line[cell0..cell0 + hint_w].iter().enumerate() {
-                            assert_eq!(sym.chars().count(), 1, "{at}: the hint's cell {i} is not one single-width character");
-                            let fg = d.buffer.cell((space.x + (cell0 + i) as u16, space.y + y as u16)).expect("in the buffer").fg;
-                            assert_eq!(fg, dim, "{at}: the hint's cell {i} ({sym:?}) is not drawn in the dim role");
+                            assert_eq!(
+                                sym.chars().count(),
+                                1,
+                                "{at}: the hint's cell {i} is not one single-width character"
+                            );
+                            let fg = d
+                                .buffer
+                                .cell((space.x + (cell0 + i) as u16, space.y + y as u16))
+                                .expect("in the buffer")
+                                .fg;
+                            assert_eq!(
+                                fg, dim,
+                                "{at}: the hint's cell {i} ({sym:?}) is not drawn in the dim role"
+                            );
                         }
                     }
 
@@ -1946,11 +2214,26 @@ fn every_kitten_row_but_the_elders_carries_the_whole_elder_hint_where_it_fits() 
             }
         }
     }
-    assert!(drawn_with > 0, "fixture: no row was wide enough to require the hint");
-    assert!(focused_with > 0, "fixture: the cursor's own row never required the hint");
-    assert!(drawn_without > 0, "fixture: no row was too narrow to hold the hint");
-    assert!(beside_an_elder > 0, "fixture: no other kitten's row was read while an Elder stood");
-    assert!(elder_rows > 0, "fixture: the Elder's own row was never read");
+    assert!(
+        drawn_with > 0,
+        "fixture: no row was wide enough to require the hint"
+    );
+    assert!(
+        focused_with > 0,
+        "fixture: the cursor's own row never required the hint"
+    );
+    assert!(
+        drawn_without > 0,
+        "fixture: no row was too narrow to hold the hint"
+    );
+    assert!(
+        beside_an_elder > 0,
+        "fixture: no other kitten's row was read while an Elder stood"
+    );
+    assert!(
+        elder_rows > 0,
+        "fixture: the Elder's own row was never read"
+    );
     assert!(
         elder_rows_with_room > 0,
         "fixture: the Elder's own row never had room for the hint it must not carry"
@@ -1990,14 +2273,21 @@ impl ClowderList {
 
     /// Every line of the list's space that draws the mark's glyph anywhere.
     fn lines_with_the_glyph(&self) -> Vec<usize> {
-        (0..self.lines.len()).filter(|y| self.lines[*y].iter().any(|sym| sym == ELDER_GLYPH)).collect()
+        (0..self.lines.len())
+            .filter(|y| self.lines[*y].iter().any(|sym| sym == ELDER_GLYPH))
+            .collect()
     }
 }
 
 /// Read the Clowder list out of a drawn frame whose cursor stands on
 /// `cursor_key`, or where the list puts it when none is remembered. `c` is the
 /// cost field's width.
-fn clowder_list_in(d: Drawn, state: &GameState, cursor_key: Option<&RowKey>, c: usize) -> ClowderList {
+fn clowder_list_in(
+    d: Drawn,
+    state: &GameState,
+    cursor_key: Option<&RowKey>,
+    c: usize,
+) -> ClowderList {
     let space = list_space(&d.layout);
     let lines = cell_lines(&d.buffer, space);
     let all = rows(state, Section::Clowder);
@@ -2011,22 +2301,45 @@ fn clowder_list_in(d: Drawn, state: &GameState, cursor_key: Option<&RowKey>, c: 
         .and_then(|k| all.iter().position(|r| &r.key == k))
         .or_else(|| all.iter().position(|r| r.selectable()))
         .expect("fixture: the Clowder list has a row the cursor can stand on");
-    let cy = lines.iter().position(|l| l[0] == "▸").expect("fixture: the cursor is drawn in the Clowder list");
+    let cy = lines
+        .iter()
+        .position(|l| l[0] == "▸")
+        .expect("fixture: the cursor is drawn in the Clowder list");
     let kitten_lines = all
         .iter()
         .enumerate()
         .filter_map(|(ri, r)| match r.key {
-            RowKey::Kitten(k, _) => Some((k, (cy + ri).checked_sub(cursor).expect("fixture: the list is drawn unscrolled"))),
+            RowKey::Kitten(k, _) => Some((
+                k,
+                (cy + ri)
+                    .checked_sub(cursor)
+                    .expect("fixture: the list is drawn unscrolled"),
+            )),
             _ => None,
         })
         .collect();
     let name_w = space.width as usize - 4 - 8 - (c + 1);
-    ClowderList { d, space, lines, name_w, kitten_lines }
+    ClowderList {
+        d,
+        space,
+        lines,
+        name_w,
+        kitten_lines,
+    }
 }
 
 /// The Clowder list drawn into a terminal that has never drawn anything.
-fn clowder_list(state: &GameState, cursor_key: Option<&RowKey>, w: u16, h: u16, c: usize) -> ClowderList {
-    let mut view = ViewState { section: Some(Section::Clowder), ..Default::default() };
+fn clowder_list(
+    state: &GameState,
+    cursor_key: Option<&RowKey>,
+    w: u16,
+    h: u16,
+    c: usize,
+) -> ClowderList {
+    let mut view = ViewState {
+        section: Some(Section::Clowder),
+        ..Default::default()
+    };
     view.focus[Section::Clowder.index()] = cursor_key.cloned();
     clowder_list_in(cold(state, &view, w, h), state, cursor_key, c)
 }
@@ -2053,15 +2366,31 @@ fn the_elders_mark_stands_on_the_elders_row_and_on_no_other_whoever_the_elder_is
     let mut marked_whole: BTreeSet<usize> = BTreeSet::new();
     let (mut elder_rows, mut other_rows, mut elderless_frames) = (0u32, 0u32, 0u32);
 
-    for (w, h) in [(FLOOR_W, 70u16), (90, 70), (99, 70), (100, 70), (130, 70), (200, 70)] {
-        let elders: Vec<Option<usize>> = std::iter::once(None).chain(everyone.iter().copied().map(Some)).collect();
+    for (w, h) in [
+        (FLOOR_W, 70u16),
+        (90, 70),
+        (99, 70),
+        (100, 70),
+        (130, 70),
+        (200, 70),
+    ] {
+        let elders: Vec<Option<usize>> = std::iter::once(None)
+            .chain(everyone.iter().copied().map(Some))
+            .collect();
         for elder in elders {
             let mut state = base.clone();
             state.elder = elder;
             let list = clowder_list(&state, None, w, h, c);
-            assert_eq!(list.kitten_lines.len(), state.kittens.len(), "fixture: every kitten is listed at {w}x{h}");
+            assert_eq!(
+                list.kitten_lines.len(),
+                state.kittens.len(),
+                "fixture: every kitten is listed at {w}x{h}"
+            );
             let whose = match elder {
-                Some(e) => format!("kitten {e} ({:?} at {:?}) the Elder", state.kittens[e].job, state.kittens[e].location),
+                Some(e) => format!(
+                    "kitten {e} ({:?} at {:?}) the Elder",
+                    state.kittens[e].job, state.kittens[e].location
+                ),
                 None => "the core holding no Elder".to_string(),
             };
 
@@ -2101,7 +2430,10 @@ fn the_elders_mark_stands_on_the_elders_row_and_on_no_other_whoever_the_elder_is
             }
         }
     }
-    assert!(elder_rows > 0 && other_rows > 0 && elderless_frames > 0, "fixture: rows were read with and without an Elder");
+    assert!(
+        elder_rows > 0 && other_rows > 0 && elderless_frames > 0,
+        "fixture: rows were read with and without an Elder"
+    );
     assert_eq!(
         marked_whole, everyone,
         "fixture: every kitten of the roster, whatever it is doing, wore the whole mark as the \
@@ -2113,7 +2445,15 @@ fn the_elders_mark_stands_on_the_elders_row_and_on_no_other_whoever_the_elder_is
     state.elder = Some(0);
     for section in Section::ALL.into_iter().filter(|s| *s != Section::Clowder) {
         for (w, h) in [(FLOOR_W, 70u16), (130, 70)] {
-            let d = cold(&state, &ViewState { section: Some(section), ..Default::default() }, w, h);
+            let d = cold(
+                &state,
+                &ViewState {
+                    section: Some(section),
+                    ..Default::default()
+                },
+                w,
+                h,
+            );
             let lines = cell_lines(&d.buffer, list_space(&d.layout));
             assert!(
                 !lines.iter().any(|l| l.iter().any(|sym| sym == ELDER_GLYPH)),
@@ -2139,9 +2479,15 @@ fn the_elders_mark_follows_the_cores_elder_on_the_frame_an_appointment_lands() {
     use clowder_core::Command;
 
     let c = cost_field_width(&store_names());
-    let names: Vec<String> = ["Biscuit", "Clover", "Biscuit", "Dumpling"].iter().map(|n| n.to_string()).collect();
+    let names: Vec<String> = ["Biscuit", "Clover", "Biscuit", "Dumpling"]
+        .iter()
+        .map(|n| n.to_string())
+        .collect();
     let mut state = clowder_named(&names);
-    let view = ViewState { section: Some(Section::Clowder), ..Default::default() };
+    let view = ViewState {
+        section: Some(Section::Clowder),
+        ..Default::default()
+    };
     let (w, h) = (130u16, 60u16);
     let mut term = terminal(w, h);
     let mut prev: Option<Layout> = None;
@@ -2150,22 +2496,38 @@ fn the_elders_mark_follows_the_cores_elder_on_the_frame_an_appointment_lands() {
     type MeadowStep<'a> = (&'a str, Box<dyn Fn(&mut GameState)>);
     let appoint = |k: usize| -> Box<dyn Fn(&mut GameState)> {
         Box::new(move |s: &mut GameState| {
-            s.apply(Command::AppointElder(k)).expect("fixture: the core accepts the appointment");
+            s.apply(Command::AppointElder(k))
+                .expect("fixture: the core accepts the appointment");
         })
     };
     let steps: Vec<MeadowStep> = vec![
-        ("nobody was yet the Elder", Box::new(|_s: &mut GameState| {})),
+        (
+            "nobody was yet the Elder",
+            Box::new(|_s: &mut GameState| {}),
+        ),
         ("kitten 0 was appointed", appoint(0)),
-        ("kitten 0's later namesake, kitten 2, was appointed", appoint(2)),
+        (
+            "kitten 0's later namesake, kitten 2, was appointed",
+            appoint(2),
+        ),
         ("kitten 2 was appointed again", appoint(2)),
-        ("the Elder wandered away", Box::new(move |s: &mut GameState| {
-            s.kittens[2].location = away;
-            s.kittens[2].away_seq = Some(1);
-        })),
-        ("the Elder took a job", Box::new(|s: &mut GameState| s.kittens[2].job = Some(JobId::ALL[0]))),
+        (
+            "the Elder wandered away",
+            Box::new(move |s: &mut GameState| {
+                s.kittens[2].location = away;
+                s.kittens[2].away_seq = Some(1);
+            }),
+        ),
+        (
+            "the Elder took a job",
+            Box::new(|s: &mut GameState| s.kittens[2].job = Some(JobId::ALL[0])),
+        ),
         ("kitten 1 was appointed", appoint(1)),
         ("kitten 3 was appointed", appoint(3)),
-        ("the core held no Elder again", Box::new(|s: &mut GameState| s.elder = None)),
+        (
+            "the core held no Elder again",
+            Box::new(|s: &mut GameState| s.elder = None),
+        ),
     ];
 
     let (mut marked, mut left) = (0u32, 0u32);
@@ -2182,7 +2544,10 @@ fn the_elders_mark_follows_the_cores_elder_on_the_frame_an_appointment_lands() {
             let name_w = list.name_w;
             let (aside, why) = if state.elder == Some(k) {
                 marked += 1;
-                (ELDER_MARK, "is the kitten the core now holds as the Elder, so its row carries the mark")
+                (
+                    ELDER_MARK,
+                    "is the kitten the core now holds as the Elder, so its row carries the mark",
+                )
             } else {
                 if before == Some(k) {
                     left += 1;
@@ -2196,7 +2561,10 @@ fn the_elders_mark_follows_the_cores_elder_on_the_frame_an_appointment_lands() {
                 line.concat()
             );
         }
-        let allowed: Vec<usize> = state.elder.map(|e| vec![list.line_of_kitten(e)]).unwrap_or_default();
+        let allowed: Vec<usize> = state
+            .elder
+            .map(|e| vec![list.line_of_kitten(e)])
+            .unwrap_or_default();
         assert_eq!(
             list.lines_with_the_glyph(),
             allowed,
@@ -2207,7 +2575,10 @@ fn the_elders_mark_follows_the_cores_elder_on_the_frame_an_appointment_lands() {
         before = state.elder;
     }
     assert!(marked > 0, "fixture: some frame was drawn with an Elder");
-    assert!(left > 0, "fixture: some frame was drawn just after the mark left a row");
+    assert!(
+        left > 0,
+        "fixture: some frame was drawn just after the mark left a row"
+    );
 }
 
 /// The mark is `◆ Elder` — the glyph, one blank column, and the word, each
@@ -2229,10 +2600,21 @@ fn the_elders_mark_is_its_glyph_a_blank_and_its_word_after_the_name_in_the_rows_
     let c = cost_field_width(&store_names());
     let place = 7 + 1 + c;
     let mark: Vec<String> = ELDER_MARK.chars().map(|ch| ch.to_string()).collect();
-    assert_eq!(mark.len(), 7, "fixture: the mark as the spec words it is the glyph, a blank, and a five-letter word");
-    assert_eq!((mark[0].as_str(), mark[1].as_str()), (ELDER_GLYPH, " "), "fixture: the glyph, then one blank column");
+    assert_eq!(
+        mark.len(),
+        7,
+        "fixture: the mark as the spec words it is the glyph, a blank, and a five-letter word"
+    );
+    assert_eq!(
+        (mark[0].as_str(), mark[1].as_str()),
+        (ELDER_GLYPH, " "),
+        "fixture: the glyph, then one blank column"
+    );
 
-    let names: Vec<String> = ["Bo", "Fig", "Mo", "Zu"].iter().map(|n| n.to_string()).collect();
+    let names: Vec<String> = ["Bo", "Fig", "Mo", "Zu"]
+        .iter()
+        .map(|n| n.to_string())
+        .collect();
     let mut base = clowder_named(&names);
     base.kittens[1].job = Some(JobId::ALL[0]);
     base.kittens[1].job_seq = Some(1);
@@ -2243,15 +2625,29 @@ fn the_elders_mark_is_its_glyph_a_blank_and_its_word_after_the_name_in_the_rows_
     base.kittens[3].tinkering = Some(CraftId::ALL[0]);
 
     let (mut whole, mut under_the_cursor, mut beside_a_hint) = (0u32, 0u32, 0u32);
-    for (w, h) in [(FLOOR_W, 60u16), (90, 60), (99, 60), (100, 60), (130, 60), (200, 60)] {
+    for (w, h) in [
+        (FLOOR_W, 60u16),
+        (90, 60),
+        (99, 60),
+        (100, 60),
+        (130, 60),
+        (200, 60),
+    ] {
         let mut whole_here = 0u32;
         for elder in 0..base.kittens.len() {
             let mut state = base.clone();
             state.elder = Some(elder);
             let all = rows(&state, Section::Clowder);
-            let mut cursors: Vec<Option<RowKey>> =
-                all.iter().filter(|r| matches!(r.key, RowKey::Kitten(..))).map(|r| Some(r.key.clone())).collect();
-            cursors.push(all.iter().find(|r| r.selectable() && !matches!(r.key, RowKey::Kitten(..))).map(|r| r.key.clone()));
+            let mut cursors: Vec<Option<RowKey>> = all
+                .iter()
+                .filter(|r| matches!(r.key, RowKey::Kitten(..)))
+                .map(|r| Some(r.key.clone()))
+                .collect();
+            cursors.push(
+                all.iter()
+                    .find(|r| r.selectable() && !matches!(r.key, RowKey::Kitten(..)))
+                    .map(|r| r.key.clone()),
+            );
 
             for cursor_key in cursors {
                 let list = clowder_list(&state, cursor_key.as_ref(), w, h, c);
@@ -2283,7 +2679,12 @@ fn the_elders_mark_is_its_glyph_a_blank_and_its_word_after_the_name_in_the_rows_
                      mark `{ELDER_MARK}` (TUI-NAV-105)"
                 );
                 let cell0 = 4 + name_len + 1;
-                let cell_at = |x: usize| list.d.buffer.cell((list.space.x + x as u16, list.space.y + y as u16)).expect("in the buffer");
+                let cell_at = |x: usize| {
+                    list.d
+                        .buffer
+                        .cell((list.space.x + x as u16, list.space.y + y as u16))
+                        .expect("in the buffer")
+                };
                 let name_cell = cell_at(4);
                 assert_eq!(
                     name_cell.modifier.contains(Modifier::REVERSED),
@@ -2293,7 +2694,11 @@ fn the_elders_mark_is_its_glyph_a_blank_and_its_word_after_the_name_in_the_rows_
                 for (i, expected) in mark.iter().enumerate() {
                     let sym = &line[cell0 + i];
                     assert_eq!(sym, expected, "{at}: the mark's cell {i} (TUI-NAV-105)");
-                    assert_eq!(sym.chars().count(), 1, "{at}: the mark's cell {i} is not one single-width character");
+                    assert_eq!(
+                        sym.chars().count(),
+                        1,
+                        "{at}: the mark's cell {i} is not one single-width character"
+                    );
                     let cell = cell_at(cell0 + i);
                     assert_eq!(
                         (cell.fg, cell.bg, cell.modifier),
@@ -2334,10 +2739,19 @@ fn the_elders_mark_is_its_glyph_a_blank_and_its_word_after_the_name_in_the_rows_
                 );
             }
         }
-        assert!(whole_here > 0, "fixture: at {w}x{h} no Elder's row had room for the whole mark");
+        assert!(
+            whole_here > 0,
+            "fixture: at {w}x{h} no Elder's row had room for the whole mark"
+        );
     }
-    assert!(whole > 0 && under_the_cursor > 0, "fixture: the whole mark was read, under the cursor too");
-    assert!(beside_a_hint > 0, "fixture: no frame drew the mark and another row's hint together");
+    assert!(
+        whole > 0 && under_the_cursor > 0,
+        "fixture: the whole mark was read, under the cursor too"
+    );
+    assert!(
+        beside_a_hint > 0,
+        "fixture: no frame drew the mark and another row's hint together"
+    );
 }
 
 /// The mark is its row's own and no part of the kitten's name: while the
@@ -2354,7 +2768,10 @@ fn the_elders_mark_is_its_rows_own_and_no_part_of_the_kittens_name() {
     use clowder_tui::nav::Overlay;
 
     let c = cost_field_width(&store_names());
-    let names: Vec<String> = ["Biscuit", "Clover", "Dumpling"].iter().map(|n| n.to_string()).collect();
+    let names: Vec<String> = ["Biscuit", "Clover", "Dumpling"]
+        .iter()
+        .map(|n| n.to_string())
+        .collect();
     let (w, h) = (130u16, 60u16);
     for elder in 0..names.len() {
         let mut state = clowder_named(&names);
@@ -2388,7 +2805,10 @@ fn the_elders_mark_is_its_rows_own_and_no_part_of_the_kittens_name() {
             for r in results(&state, query) {
                 if let RowKey::Kitten(ix, _) = r.key {
                     assert!(
-                        state.kittens[ix].name.to_lowercase().contains(&query.to_lowercase()),
+                        state.kittens[ix]
+                            .name
+                            .to_lowercase()
+                            .contains(&query.to_lowercase()),
                         "a palette query for {query:?} found kitten {ix} by a mark its name does \
                          not hold (TUI-NAV-105)"
                     );
@@ -2397,7 +2817,10 @@ fn the_elders_mark_is_its_rows_own_and_no_part_of_the_kittens_name() {
         }
         let view = ViewState {
             section: Some(Section::Clowder),
-            overlay: Some(Overlay::Palette { query: elder_name.clone(), selected: 0 }),
+            overlay: Some(Overlay::Palette {
+                query: elder_name.clone(),
+                selected: 0,
+            }),
             ..Default::default()
         };
         let d = cold(&state, &view, w, h);
@@ -2450,7 +2873,10 @@ fn the_elders_row_keeps_its_name_and_draws_the_first_step_of_the_mark_its_column
             sizes.push(w);
         }
     }
-    assert!(sizes.len() > 6, "fixture: the list takes many widths between the floor and its cap");
+    assert!(
+        sizes.len() > 6,
+        "fixture: the list takes many widths between the floor and its cap"
+    );
 
     let (mut step_whole, mut step_glyph, mut step_none, mut name_cut) = (0u32, 0u32, 0u32, 0u32);
     for w in sizes {
@@ -2476,7 +2902,11 @@ fn the_elders_row_keeps_its_name_and_draws_the_first_step_of_the_mark_its_column
         .filter(|l| *l >= 1)
         .collect();
         let heads = ['B', 'C', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N'];
-        let names: Vec<String> = lens.iter().zip(heads).map(|(len, head)| name_of_len(head, *len)).collect();
+        let names: Vec<String> = lens
+            .iter()
+            .zip(heads)
+            .map(|(len, head)| name_of_len(head, *len))
+            .collect();
         assert_eq!(names.len(), lens.len(), "fixture: a head for every name");
         let (mut whole_here, mut glyph_here, mut none_here) = (0u32, 0u32, 0u32);
 
@@ -2495,9 +2925,15 @@ fn the_elders_row_keeps_its_name_and_draws_the_first_step_of_the_mark_its_column
                 .map(|r| r.key.clone())
                 .expect("fixture: a row that is no kitten's is listed");
 
-            for (cursor_key, whose) in [(on_the_elder, "the cursor's row"), (off_the_roster, "not the cursor's row")] {
+            for (cursor_key, whose) in [
+                (on_the_elder, "the cursor's row"),
+                (off_the_roster, "not the cursor's row"),
+            ] {
                 let list = clowder_list(&state, Some(&cursor_key), w, h, c);
-                assert_eq!(list.name_w, name_w, "fixture: the list's space at {w}x{h} is the layout's");
+                assert_eq!(
+                    list.name_w, name_w,
+                    "fixture: the list's space at {w}x{h} is the layout's"
+                );
                 let line = &list.lines[list.line_of_kitten(elder)];
                 let name = &state.kittens[elder].name;
                 let len = name.chars().count();
@@ -2541,8 +2977,14 @@ fn the_elders_row_keeps_its_name_and_draws_the_first_step_of_the_mark_its_column
         step_glyph += glyph_here;
         step_none += none_here;
     }
-    assert!(step_whole > 0 && step_glyph > 0 && step_none > 0, "fixture: every step was drawn");
-    assert!(name_cut > 0, "fixture: some Elder's name was too long for its column");
+    assert!(
+        step_whole > 0 && step_glyph > 0 && step_none > 0,
+        "fixture: every step was drawn"
+    );
+    assert!(
+        name_cut > 0,
+        "fixture: some Elder's name was too long for its column"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -2635,7 +3077,9 @@ fn kitten_aside(state: &GameState, k: usize, name_w: usize) -> Option<&'static s
     let name_len = state.kittens[k].name.chars().count();
     let fits = |aside: &str| name_len + 1 + aside.chars().count() <= name_w;
     if state.elder == Some(k) {
-        [ELDER_MARK, ELDER_GLYPH].into_iter().find(|step| fits(step))
+        [ELDER_MARK, ELDER_GLYPH]
+            .into_iter()
+            .find(|step| fits(step))
     } else if state.command_gate_open(&clowder_core::Command::AppointElder(k)) {
         Some(ELDER_HINT).filter(|hint| fits(hint))
     } else {
@@ -2686,7 +3130,11 @@ fn every_kitten_row_names_its_one_state_whole_in_its_fields_place() {
         gives_count_field(Section::Clowder) && gives_cost_field(Section::Clowder),
         "fixture: the Clowder list gives both fields, so a kitten's row has their place"
     );
-    for word in JobId::ALL.iter().map(|j| job_def(*j).name).chain([AWAY_WORD, IDLE_WORD]) {
+    for word in JobId::ALL
+        .iter()
+        .map(|j| job_def(*j).name)
+        .chain([AWAY_WORD, IDLE_WORD])
+    {
         assert!(
             word.chars().count() < place,
             "the fields' place ({place} columns) is wider than every job name and both words; \
@@ -2697,13 +3145,35 @@ fn every_kitten_row_names_its_one_state_whole_in_its_fields_place() {
     let (mut checked, mut focused_checked, mut elder_checked) = (0u32, 0u32, 0u32);
     let mut words_seen: BTreeSet<String> = BTreeSet::new();
     let mut job_rows_checked: BTreeSet<String> = BTreeSet::new();
-    for (w, h) in [(FLOOR_W, 70u16), (90, 70), (99, 70), (100, 70), (130, 70), (200, 70)] {
+    for (w, h) in [
+        (FLOOR_W, 70u16),
+        (90, 70),
+        (99, 70),
+        (100, 70),
+        (130, 70),
+        (200, 70),
+    ] {
         let probe = every_state_roster(&[]);
-        let space = list_space(&cold(&probe, &ViewState { section: Some(Section::Clowder), ..Default::default() }, w, h).layout);
+        let space = list_space(
+            &cold(
+                &probe,
+                &ViewState {
+                    section: Some(Section::Clowder),
+                    ..Default::default()
+                },
+                w,
+                h,
+            )
+            .layout,
+        );
         let width = space.width as usize;
         let name_w = width - 4 - 8 - (c + 1);
         let count_at = 4 + name_w + 1;
-        assert_eq!(count_at + place, width, "fixture: the fields' place runs to the row's right edge");
+        assert_eq!(
+            count_at + place,
+            width,
+            "fixture: the fields' place runs to the row's right edge"
+        );
 
         let mut long: Vec<String> = vec![name_of_len('W', name_w + 7)];
         for (head, len) in [
@@ -2719,37 +3189,72 @@ fn every_kitten_row_names_its_one_state_whole_in_its_fields_place() {
         let mut state = every_state_roster(&long);
         // The Elder is a kitten at home with a job, so its word is the job's
         // and says nothing of the appointment.
-        let elder = state.kittens.iter().position(|k| k.location == Location::Home && k.job.is_some()).expect("fixture");
+        let elder = state
+            .kittens
+            .iter()
+            .position(|k| k.location == Location::Home && k.job.is_some())
+            .expect("fixture");
         state.elder = Some(elder);
 
         let all = rows(&state, Section::Clowder);
-        let kitten_ix: Vec<usize> = (0..all.len()).filter(|i| matches!(all[*i].key, RowKey::Kitten(..))).collect();
-        assert_eq!(kitten_ix.len(), state.kittens.len(), "fixture: every kitten is listed at {w}x{h}");
+        let kitten_ix: Vec<usize> = (0..all.len())
+            .filter(|i| matches!(all[*i].key, RowKey::Kitten(..)))
+            .collect();
+        assert_eq!(
+            kitten_ix.len(),
+            state.kittens.len(),
+            "fixture: every kitten is listed at {w}x{h}"
+        );
 
-        let mut cursors: Vec<Option<RowKey>> = kitten_ix.iter().map(|i| Some(all[*i].key.clone())).collect();
-        cursors.push(all.iter().find(|r| r.selectable() && !matches!(r.key, RowKey::Kitten(..))).map(|r| r.key.clone()));
+        let mut cursors: Vec<Option<RowKey>> = kitten_ix
+            .iter()
+            .map(|i| Some(all[*i].key.clone()))
+            .collect();
+        cursors.push(
+            all.iter()
+                .find(|r| r.selectable() && !matches!(r.key, RowKey::Kitten(..)))
+                .map(|r| r.key.clone()),
+        );
 
         for cursor_key in cursors {
-            let mut view = ViewState { section: Some(Section::Clowder), ..Default::default() };
+            let mut view = ViewState {
+                section: Some(Section::Clowder),
+                ..Default::default()
+            };
             view.focus[Section::Clowder.index()] = cursor_key.clone();
             let d = cold(&state, &view, w, h);
             let space = list_space(&d.layout);
-            assert_eq!(space.width as usize, width, "fixture: the list's width is the probe's at {w}x{h}");
+            assert_eq!(
+                space.width as usize, width,
+                "fixture: the list's width is the probe's at {w}x{h}"
+            );
             let lines = cell_lines(&d.buffer, space);
-            let cursor = cursor_key.as_ref().and_then(|k| all.iter().position(|r| &r.key == k)).unwrap_or(0);
-            let cy = lines
-                .iter()
-                .position(|l| l[0] == "▸")
-                .unwrap_or_else(|| panic!("fixture: the cursor is drawn in the Clowder list at {w}x{h}"));
-            let line_of_row = |ri: usize| (cy + ri).checked_sub(cursor).expect("fixture: the list is drawn unscrolled");
+            let cursor = cursor_key
+                .as_ref()
+                .and_then(|k| all.iter().position(|r| &r.key == k))
+                .unwrap_or(0);
+            let cy = lines.iter().position(|l| l[0] == "▸").unwrap_or_else(|| {
+                panic!("fixture: the cursor is drawn in the Clowder list at {w}x{h}")
+            });
+            let line_of_row = |ri: usize| {
+                (cy + ri)
+                    .checked_sub(cursor)
+                    .expect("fixture: the list is drawn unscrolled")
+            };
 
             // The job's name as its count row in the jobs group draws it.
             for (ri, row) in all.iter().enumerate() {
-                if let (RowKey::Content(ContentId::Job(j), _), RowKind::Count { .. }) = (&row.key, &row.kind) {
+                if let (RowKey::Content(ContentId::Job(j), _), RowKind::Count { .. }) =
+                    (&row.key, &row.kind)
+                {
                     let col = cells_text(&lines[line_of_row(ri)], 4, 4 + name_w);
                     let def = job_def(*j).name;
                     if def.chars().count() <= name_w {
-                        assert_eq!(col.trim_end(), def, "fixture: the job's count row draws its definition's name");
+                        assert_eq!(
+                            col.trim_end(),
+                            def,
+                            "fixture: the job's count row draws its definition's name"
+                        );
                         job_rows_checked.insert(def.to_string());
                     }
                 }
@@ -2757,7 +3262,9 @@ fn every_kitten_row_names_its_one_state_whole_in_its_fields_place() {
 
             for &ri in &kitten_ix {
                 let row = &all[ri];
-                let RowKey::Kitten(k, _) = row.key else { unreachable!() };
+                let RowKey::Kitten(k, _) = row.key else {
+                    unreachable!()
+                };
                 let y = line_of_row(ri);
                 let line = &lines[y];
                 let kitten = &state.kittens[k];
@@ -2767,8 +3274,16 @@ fn every_kitten_row_names_its_one_state_whole_in_its_fields_place() {
                     "at {w}x{h}, kitten {k} ({:?} at {:?}{}, {}) reads {:?}",
                     kitten.job,
                     kitten.location,
-                    if Some(k) == state.elder { ", the Elder" } else { "" },
-                    if focused { "the cursor's row" } else { "not the cursor's row" },
+                    if Some(k) == state.elder {
+                        ", the Elder"
+                    } else {
+                        ""
+                    },
+                    if focused {
+                        "the cursor's row"
+                    } else {
+                        "not the cursor's row"
+                    },
                     line.concat()
                 );
 
@@ -2782,7 +3297,11 @@ fn every_kitten_row_names_its_one_state_whole_in_its_fields_place() {
                      the hint — or, on the Elder's row, the Elder's mark — exactly as without \
                      the word (TUI-RENDER-024, TUI-NAV-095, TUI-NAV-104)"
                 );
-                assert_eq!(line[4 + name_w], " ", "{at}: one blank column after the name's column");
+                assert_eq!(
+                    line[4 + name_w],
+                    " ",
+                    "{at}: one blank column after the name's column"
+                );
 
                 // Exactly the one word, begun at the count field's left edge,
                 // left-aligned, whole, blank after it to the cost field's end.
@@ -2796,9 +3315,16 @@ fn every_kitten_row_names_its_one_state_whole_in_its_fields_place() {
 
                 // In the row's own style: every cell of the place wears what
                 // the row's marker wears, the cursor's reverse included.
-                let marker_cell = d.buffer.cell((space.x + 2, space.y + y as u16)).expect("in the buffer").clone();
+                let marker_cell = d
+                    .buffer
+                    .cell((space.x + 2, space.y + y as u16))
+                    .expect("in the buffer")
+                    .clone();
                 for x in count_at..count_at + word.chars().count() {
-                    let cell = d.buffer.cell((space.x + x as u16, space.y + y as u16)).expect("in the buffer");
+                    let cell = d
+                        .buffer
+                        .cell((space.x + x as u16, space.y + y as u16))
+                        .expect("in the buffer");
                     assert_eq!(
                         (cell.fg, cell.bg, cell.modifier),
                         (marker_cell.fg, marker_cell.bg, marker_cell.modifier),
@@ -2819,12 +3345,25 @@ fn every_kitten_row_names_its_one_state_whole_in_its_fields_place() {
         }
     }
     assert!(checked > 0, "fixture: kitten rows were checked");
-    assert!(focused_checked > 0, "fixture: the cursor's own row was checked");
+    assert!(
+        focused_checked > 0,
+        "fixture: the cursor's own row was checked"
+    );
     assert!(elder_checked > 0, "fixture: the Elder's row was checked");
-    for word in JobId::ALL.iter().map(|j| job_def(*j).name.to_string()).chain([AWAY_WORD.into(), IDLE_WORD.into()]) {
-        assert!(words_seen.contains(&word), "fixture: some kitten's row named {word:?}");
+    for word in JobId::ALL
+        .iter()
+        .map(|j| job_def(*j).name.to_string())
+        .chain([AWAY_WORD.into(), IDLE_WORD.into()])
+    {
+        assert!(
+            words_seen.contains(&word),
+            "fixture: some kitten's row named {word:?}"
+        );
     }
-    assert!(!job_rows_checked.is_empty(), "fixture: some job's count row was read for its spelling");
+    assert!(
+        !job_rows_checked.is_empty(),
+        "fixture: some job's count row was read for its spelling"
+    );
 }
 
 /// The word belongs to the row, not to the kitten's name: while every kitten's
@@ -2842,7 +3381,10 @@ fn a_kittens_state_word_is_drawn_on_its_row_and_is_no_part_of_its_name() {
     let place = 7 + 1 + c;
     let state = every_state_roster(&[]);
     let (w, h) = (130u16, 70u16);
-    let view = ViewState { section: Some(Section::Clowder), ..Default::default() };
+    let view = ViewState {
+        section: Some(Section::Clowder),
+        ..Default::default()
+    };
     let d = cold(&state, &view, w, h);
     let space = list_space(&d.layout);
     let width = space.width as usize;
@@ -2866,7 +3408,10 @@ fn a_kittens_state_word_is_drawn_on_its_row_and_is_no_part_of_its_name() {
             .filter(|r| matches!(r.key, RowKey::Kitten(ix, _) if ix == k))
             .collect();
         assert_eq!(named.len(), 1, "fixture: kitten {k} is one palette result");
-        assert_eq!(named[0].name, kitten.name, "kitten {k}'s palette result carries its name alone (TUI-NAV-101)");
+        assert_eq!(
+            named[0].name, kitten.name,
+            "kitten {k}'s palette result carries its name alone (TUI-NAV-101)"
+        );
 
         assert_eq!(
             inspector_name(&state, Section::Clowder, &RowKey::Kitten(k, "")),
@@ -2874,11 +3419,18 @@ fn a_kittens_state_word_is_drawn_on_its_row_and_is_no_part_of_its_name() {
             "the inspector names kitten {k} by its name alone (TUI-NAV-101)"
         );
     }
-    for word in JobId::ALL.iter().map(|j| job_def(*j).name.to_string()).chain([AWAY_WORD.into(), IDLE_WORD.into()]) {
+    for word in JobId::ALL
+        .iter()
+        .map(|j| job_def(*j).name.to_string())
+        .chain([AWAY_WORD.into(), IDLE_WORD.into()])
+    {
         for r in results(&state, &word) {
             if let RowKey::Kitten(ix, _) = r.key {
                 assert!(
-                    state.kittens[ix].name.to_lowercase().contains(&word.to_lowercase()),
+                    state.kittens[ix]
+                        .name
+                        .to_lowercase()
+                        .contains(&word.to_lowercase()),
                     "a palette query for {word:?} found kitten {ix} by a word its name does not \
                      hold (TUI-NAV-101)"
                 );
@@ -2899,7 +3451,10 @@ fn a_kittens_state_word_follows_the_core_on_the_next_frame() {
     let c = cost_field_width(&store);
     let place = 7 + 1 + c;
     let mut state = clowder_named(&["Biscuit".to_string(), "Marmalade".to_string()]);
-    let view = ViewState { section: Some(Section::Clowder), ..Default::default() };
+    let view = ViewState {
+        section: Some(Section::Clowder),
+        ..Default::default()
+    };
     let (w, h) = (130u16, 60u16);
     let mut term = terminal(w, h);
     let mut prev: Option<Layout> = None;
@@ -2908,19 +3463,40 @@ fn a_kittens_state_word_follows_the_core_on_the_next_frame() {
     type KittenStep<'a> = (&'a str, Box<dyn Fn(&mut Kitten)>);
     let mut steps: Vec<KittenStep> = vec![
         ("idle at home", Box::new(|_k: &mut Kitten| {})),
-        ("assigned", Box::new(|k: &mut Kitten| k.job = Some(JobId::ALL[0]))),
-        ("reassigned", Box::new(|k: &mut Kitten| k.job = Some(JobId::Tinkerer))),
+        (
+            "assigned",
+            Box::new(|k: &mut Kitten| k.job = Some(JobId::ALL[0])),
+        ),
+        (
+            "reassigned",
+            Box::new(|k: &mut Kitten| k.job = Some(JobId::Tinkerer)),
+        ),
     ];
     for loc in away {
-        steps.push(("wandered away", Box::new(move |k: &mut Kitten| k.location = loc)));
-        steps.push(("came home", Box::new(|k: &mut Kitten| k.location = Location::Home)));
-        steps.push(("wandered away jobless", Box::new(move |k: &mut Kitten| {
-            k.job = None;
-            k.location = loc;
-        })));
-        steps.push(("came home jobless", Box::new(|k: &mut Kitten| k.location = Location::Home)));
+        steps.push((
+            "wandered away",
+            Box::new(move |k: &mut Kitten| k.location = loc),
+        ));
+        steps.push((
+            "came home",
+            Box::new(|k: &mut Kitten| k.location = Location::Home),
+        ));
+        steps.push((
+            "wandered away jobless",
+            Box::new(move |k: &mut Kitten| {
+                k.job = None;
+                k.location = loc;
+            }),
+        ));
+        steps.push((
+            "came home jobless",
+            Box::new(|k: &mut Kitten| k.location = Location::Home),
+        ));
     }
-    steps.push(("assigned again", Box::new(|k: &mut Kitten| k.job = Some(JobId::ALL[1]))));
+    steps.push((
+        "assigned again",
+        Box::new(|k: &mut Kitten| k.job = Some(JobId::ALL[1])),
+    ));
     steps.push(("unassigned", Box::new(|k: &mut Kitten| k.job = None)));
 
     for (what, step) in steps {
@@ -2954,7 +3530,9 @@ fn a_kittens_state_word_follows_the_core_on_the_next_frame() {
 /// Whether the core names `row`'s item already the player's.
 fn is_done(state: &GameState, row: &Row) -> bool {
     match &row.key {
-        RowKey::Content(id, _) => state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours),
+        RowKey::Content(id, _) => {
+            state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours)
+        }
         _ => false,
     }
 }
@@ -2962,7 +3540,10 @@ fn is_done(state: &GameState, row: &Row) -> bool {
 /// `d` pressed as the player presses it, the repeat clock cleared after.
 fn press_done_key(state: &GameState, view: &mut ViewState) {
     let d = nav::keys::resolve(
-        crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Char('d'), crossterm::event::KeyModifiers::NONE),
+        crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Char('d'),
+            crossterm::event::KeyModifiers::NONE,
+        ),
         view,
     );
     nav::update(d, view, state);
@@ -2973,8 +3554,12 @@ fn press_done_key(state: &GameState, view: &mut ViewState) {
 /// the group by its key, keeping the focus on that row.
 fn unfold_focus(state: &GameState, view: &mut ViewState) {
     let Some(section) = view.section else { return };
-    let Some(key) = view.focus[section.index()].clone() else { return };
-    if drawn_rows(state, section, view).iter().any(|r| r.key == key)
+    let Some(key) = view.focus[section.index()].clone() else {
+        return;
+    };
+    if drawn_rows(state, section, view)
+        .iter()
+        .any(|r| r.key == key)
         || !rows(state, section).iter().any(|r| r.key == key)
     {
         return;
@@ -3084,21 +3669,37 @@ fn done_headers_drawn(d: &Drawn) -> Vec<String> {
 /// @spec TUI-NAV-111
 #[test]
 fn the_done_header_counts_its_rows_and_names_its_key_folded_and_open() {
-    for (label, state) in [("part done", ideas_part_done()), ("all done", ideas_all_done())] {
-        let n = rows(&state, Section::Ideas).iter().filter(|r| is_done(&state, r)).count();
+    for (label, state) in [
+        ("part done", ideas_part_done()),
+        ("all done", ideas_all_done()),
+    ] {
+        let n = rows(&state, Section::Ideas)
+            .iter()
+            .filter(|r| is_done(&state, r))
+            .count();
         assert!(n > 0, "fixture: {label} has finished Ideas rows");
         for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE, TALL)] {
             for open in [false, true] {
-                let want = format!("done ({n}) \u{b7} d to {}", if open { "fold" } else { "show" });
+                let want = format!(
+                    "done ({n}) \u{b7} d to {}",
+                    if open { "fold" } else { "show" }
+                );
                 // The cursor sits next to the header so it is in view: the
                 // last row drawn above it while folded, its first row open.
                 let probe = ideas_view(&state, open, None);
                 let drawn = drawn_rows(&state, Section::Ideas, &probe);
-                let header = drawn.iter().rposition(|r| matches!(r.kind, RowKind::Group)).expect("a header is drawn");
+                let header = drawn
+                    .iter()
+                    .rposition(|r| matches!(r.kind, RowKind::Group))
+                    .expect("a header is drawn");
                 let at = if open {
                     drawn.get(header + 1).map(|r| r.key.clone())
                 } else {
-                    drawn[..header].iter().rev().find(|r| r.selectable()).map(|r| r.key.clone())
+                    drawn[..header]
+                        .iter()
+                        .rev()
+                        .find(|r| r.selectable())
+                        .map(|r| r.key.clone())
                 };
                 let view = ideas_view(&state, open, at);
                 let d = cold(&state, &view, w, h);
@@ -3116,21 +3717,34 @@ fn the_done_header_counts_its_rows_and_names_its_key_folded_and_open() {
     // Re-derived on every frame: one more finished row, one more in the count.
     let state = ideas_part_done();
     let view = ideas_view(&state, true, None);
-    let n = rows(&state, Section::Ideas).iter().filter(|r| is_done(&state, r)).count();
+    let n = rows(&state, Section::Ideas)
+        .iter()
+        .filter(|r| is_done(&state, r))
+        .count();
     let mut more = state.clone();
     let next = rows(&state, Section::Ideas)
         .into_iter()
         .find_map(|r| match r.key {
-            RowKey::Content(ContentId::Idea(i), _) if !is_done(&state, &r) && state.lock_reason(ContentId::Idea(i)).is_none() => Some(i),
+            RowKey::Content(ContentId::Idea(i), _)
+                if !is_done(&state, &r) && state.lock_reason(ContentId::Idea(i)).is_none() =>
+            {
+                Some(i)
+            }
             _ => None,
         })
         .expect("fixture: an idea is ready to research");
     more.ideas.insert(next);
-    let m = rows(&more, Section::Ideas).iter().filter(|r| is_done(&more, r)).count();
+    let m = rows(&more, Section::Ideas)
+        .iter()
+        .filter(|r| is_done(&more, r))
+        .count();
     assert!(m > n, "fixture: researching an idea finishes one more row");
     let mut v = view.clone();
     let drawn = drawn_rows(&more, Section::Ideas, &v);
-    let header = drawn.iter().rposition(|r| matches!(r.kind, RowKind::Group)).expect("a header is drawn");
+    let header = drawn
+        .iter()
+        .rposition(|r| matches!(r.kind, RowKind::Group))
+        .expect("a header is drawn");
     v.focus[Section::Ideas.index()] = drawn.get(header + 1).map(|r| r.key.clone());
     let d = cold(&more, &v, WIDE, VERY_TALL);
     assert_eq!(
@@ -3140,10 +3754,16 @@ fn the_done_header_counts_its_rows_and_names_its_key_folded_and_open() {
     );
 
     let none = ideas_none_done();
-    assert!(rows(&none, Section::Ideas).iter().any(|r| r.selectable()), "fixture: the Ideas screen lists rows");
+    assert!(
+        rows(&none, Section::Ideas).iter().any(|r| r.selectable()),
+        "fixture: the Ideas screen lists rows"
+    );
     for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE, VERY_TALL)] {
         let d = cold(&none, &ideas_view(&none, false, None), w, h);
-        assert!(done_headers_drawn(&d).is_empty(), "with nothing finished a done header is drawn at {w}x{h}");
+        assert!(
+            done_headers_drawn(&d).is_empty(),
+            "with nothing finished a done header is drawn at {w}x{h}"
+        );
     }
 }
 
@@ -3158,7 +3778,10 @@ fn the_done_header_counts_its_rows_and_names_its_key_folded_and_open() {
 fn the_done_headers_key_clause_gives_way_whole_where_the_list_cannot_hold_it() {
     for count in [1usize, 9, 12, 100, 1234] {
         for open in [false, true] {
-            let full = format!("done ({count}) \u{b7} d to {}", if open { "fold" } else { "show" });
+            let full = format!(
+                "done ({count}) \u{b7} d to {}",
+                if open { "fold" } else { "show" }
+            );
             let short = format!("done ({count})");
             for width in 0..=60usize {
                 let got = render::fmt::done_header_line(count, open, width);
@@ -3187,10 +3810,26 @@ fn with_every_row_folded_the_list_draws_the_done_header_alone_and_no_cursor() {
     let view = ideas_view(&state, false, None);
     for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE, TALL)] {
         let d = cold(&state, &view, w, h);
-        let lines: Vec<String> = list_lines(&d).into_iter().filter(|l| !l.trim().is_empty()).collect();
-        assert_eq!(lines.len(), 1, "at {w}x{h} the all-folded list draws {} line(s):\n{}", lines.len(), lines.join("\n"));
-        assert!(lines[0].starts_with("\u{2500}\u{2500} done"), "at {w}x{h} the one line drawn is not the done header: {:?}", lines[0]);
-        assert!(!lines[0].contains('\u{25B8}'), "at {w}x{h} a cursor is drawn on the done header");
+        let lines: Vec<String> = list_lines(&d)
+            .into_iter()
+            .filter(|l| !l.trim().is_empty())
+            .collect();
+        assert_eq!(
+            lines.len(),
+            1,
+            "at {w}x{h} the all-folded list draws {} line(s):\n{}",
+            lines.len(),
+            lines.join("\n")
+        );
+        assert!(
+            lines[0].starts_with("\u{2500}\u{2500} done"),
+            "at {w}x{h} the one line drawn is not the done header: {:?}",
+            lines[0]
+        );
+        assert!(
+            !lines[0].contains('\u{25B8}'),
+            "at {w}x{h} a cursor is drawn on the done header"
+        );
     }
 }
 
@@ -3211,19 +3850,29 @@ fn an_open_done_row_is_drawn_under_the_cursor_and_described_by_the_inspector() {
     for key in &done {
         let view = ideas_view(&state, true, Some(key.clone()));
         let d = cold(&state, &view, WIDE, TALL);
-        let name = &names.iter().find(|r| &r.key == key).expect("a finished row is a palette result").name;
+        let name = &names
+            .iter()
+            .find(|r| &r.key == key)
+            .expect("a finished row is a palette result")
+            .name;
         let head: String = name.chars().take(8).collect();
         let cursor_line = list_lines(&d)
             .into_iter()
             .find(|l| l.contains('\u{25B8}'))
             .unwrap_or_else(|| panic!("no cursor is drawn with the open done row {key:?} focused"));
-        assert!(cursor_line.contains(&head), "the cursor is drawn on {cursor_line:?}, not on {key:?}");
+        assert!(
+            cursor_line.contains(&head),
+            "the cursor is drawn on {cursor_line:?}, not on {key:?}"
+        );
         let inspector = match d.layout.body {
             Body::Wide { inspector, .. } => inspector,
             other => panic!("fixture: {WIDE}x{TALL} lays out the inspector pane, not {other:?}"),
         };
         let pane = region_lines(&d.buffer, inspector).join("\n");
-        assert!(pane.contains(&head), "the inspector does not describe the open done row {key:?}:\n{pane}");
+        assert!(
+            pane.contains(&head),
+            "the inspector does not describe the open done row {key:?}:\n{pane}"
+        );
     }
 }
 
@@ -3253,7 +3902,8 @@ fn resource_name(r: ResourceId) -> String {
 /// partly covered and its cost field holds more than one name — and a second
 /// ungated structure for the cursor to rest on.
 fn two_priced_structures() -> (StructureId, StructureId) {
-    let ungated = |s: &StructureId| matches!(structure_def(*s).gate, clowder_core::StructureGate::Always);
+    let ungated =
+        |s: &StructureId| matches!(structure_def(*s).gate, clowder_core::StructureGate::Always);
     let a = StructureId::ALL
         .into_iter()
         .find(|s| ungated(s) && structure_def(*s).base_costs.len() >= 2)
@@ -3274,7 +3924,10 @@ fn bare_meadow(revealed: &[StructureId]) -> GameState {
 
 /// The Meadow drawn wide, `focus` under the cursor: the buffer and the list.
 fn meadow_list(state: &GameState, focus: RowKey) -> (Buffer, Rect) {
-    let mut view = ViewState { section: Some(Section::Meadow), ..Default::default() };
+    let mut view = ViewState {
+        section: Some(Section::Meadow),
+        ..Default::default()
+    };
     view.focus[Section::Meadow.index()] = Some(focus);
     let drawn = cold(state, &view, 150, 60);
     let list = match drawn.layout.body {
@@ -3299,12 +3952,19 @@ fn line_named(buf: &Buffer, list: Rect, name: &str) -> (u16, String) {
             column.starts_with(&format!("{name}  "))
         })
         .map(|(i, l)| (list.y + i as u16, l.clone()))
-        .unwrap_or_else(|| panic!("fixture: no list line is named {name:?}:\n{}", lines.join("\n")))
+        .unwrap_or_else(|| {
+            panic!(
+                "fixture: no list line is named {name:?}:\n{}",
+                lines.join("\n")
+            )
+        })
 }
 
 /// The cell column at which `needle` last occurs in `line`.
 fn last_at(line: &str, needle: &str) -> usize {
-    let at = line.rfind(needle).unwrap_or_else(|| panic!("{needle:?} is not on the line {line:?}"));
+    let at = line
+        .rfind(needle)
+        .unwrap_or_else(|| panic!("{needle:?} is not on the line {line:?}"));
     line[..at].chars().count()
 }
 
@@ -3325,7 +3985,10 @@ fn a_priced_row_wears_coats_on_its_cost_names_while_its_state_lets_it() {
     let a_name = structure_def(a).name;
     let a_id = ContentId::Structure(a);
     let cost = bare_meadow(&[a, other]).cost_of_next(a_id, 1);
-    assert!(cost.len() >= 2, "fixture: {a_name} is priced in two or more resources");
+    assert!(
+        cost.len() >= 2,
+        "fixture: {a_name} is priced in two or more resources"
+    );
 
     let mut ready = bare_meadow(&[a, other]);
     for (r, need) in &cost {
@@ -3345,12 +4008,26 @@ fn a_priced_row_wears_coats_on_its_cost_names_while_its_state_lets_it() {
         let (buf, list) = meadow_list(state, RowKey::Content(ContentId::Structure(other), ""));
         let (y, line) = line_named(&buf, list, a_name);
         let marker_x = list.x + 3;
-        let marker = buf.cell((marker_x, y)).expect("a cell").symbol().to_string();
-        assert_eq!(marker, glyph, "fixture: the {what} row wears {glyph}: {line:?}");
+        let marker = buf
+            .cell((marker_x, y))
+            .expect("a cell")
+            .symbol()
+            .to_string();
+        assert_eq!(
+            marker, glyph,
+            "fixture: the {what} row wears {glyph}: {line:?}"
+        );
         let role_colour = role.color().expect("a state colour");
-        assert_eq!(fg_at(&buf, marker_x, y), role_colour, "fixture: the {what} marker wears its colour");
+        assert_eq!(
+            fg_at(&buf, marker_x, y),
+            role_colour,
+            "fixture: the {what} marker wears its colour"
+        );
         assert!(
-            !buf.cell((marker_x, y)).expect("a cell").modifier.contains(Modifier::REVERSED),
+            !buf.cell((marker_x, y))
+                .expect("a cell")
+                .modifier
+                .contains(Modifier::REVERSED),
             "fixture: {a_name} is not the focused row"
         );
 
@@ -3405,9 +4082,16 @@ fn the_focused_row_reverses_whole_and_wears_no_coat() {
     }
     let (buf, list) = meadow_list(&state, RowKey::Content(ContentId::Structure(a), ""));
     let (y, line) = line_named(&buf, list, a_name);
-    assert_eq!(buf.cell((list.x + 1, y)).expect("a cell").symbol(), "▸", "fixture: {a_name} is focused");
+    assert_eq!(
+        buf.cell((list.x + 1, y)).expect("a cell").symbol(),
+        "▸",
+        "fixture: {a_name} is focused"
+    );
     assert!(
-        buf.cell((list.x + 3, y)).expect("a cell").modifier.contains(Modifier::REVERSED),
+        buf.cell((list.x + 3, y))
+            .expect("a cell")
+            .modifier
+            .contains(Modifier::REVERSED),
         "fixture: the focused row is reversed"
     );
     let ring: Vec<ratatui::style::Color> = Hue::RING.iter().map(|h| h.color()).collect();

@@ -102,7 +102,11 @@ fn narrow_parts(l: &Layout, at: u16) -> (Rect, Rect) {
 
 fn wide_parts(l: &Layout, at: u16) -> (Rect, Rect, Rect) {
     match l.body {
-        Body::Wide { sidebar, list, inspector } => (sidebar, list, inspector),
+        Body::Wide {
+            sidebar,
+            list,
+            inspector,
+        } => (sidebar, list, inspector),
         other => panic!("expected a three-pane body at {at} columns, got {other:?}"),
     }
 }
@@ -114,9 +118,18 @@ fn body_rect(l: &Layout, what: &str) -> Rect {
         Body::TooSmall(card) => card,
         Body::Narrow { sidebar, main } => {
             assert_columns_tile(&[sidebar, main], what);
-            Rect::new(sidebar.x, sidebar.y, sidebar.width + main.width, sidebar.height)
+            Rect::new(
+                sidebar.x,
+                sidebar.y,
+                sidebar.width + main.width,
+                sidebar.height,
+            )
         }
-        Body::Wide { sidebar, list, inspector } => {
+        Body::Wide {
+            sidebar,
+            list,
+            inspector,
+        } => {
             assert_columns_tile(&[sidebar, list, inspector], what);
             Rect::new(
                 sidebar.x,
@@ -132,7 +145,10 @@ fn assert_columns_tile(cols: &[Rect], what: &str) {
     for pair in cols.windows(2) {
         let (a, b) = (pair[0], pair[1]);
         assert_eq!(a.y, b.y, "{what}: body columns must share a top edge");
-        assert_eq!(a.height, b.height, "{what}: body columns must share a height");
+        assert_eq!(
+            a.height, b.height,
+            "{what}: body columns must share a height"
+        );
         assert_eq!(
             a.right(),
             b.x,
@@ -162,9 +178,18 @@ fn assert_frame_tiles(l: &Layout, a: Rect) {
     let mut y = a.y;
     let mut total = 0u16;
     for (name, r) in &rows {
-        assert_eq!(r.x, a.x, "{what}: the {name} row must start at the frame's left edge");
-        assert_eq!(r.width, a.width, "{what}: the {name} row must span the frame's width");
-        assert_eq!(r.y, y, "{what}: the {name} row must abut the region above it");
+        assert_eq!(
+            r.x, a.x,
+            "{what}: the {name} row must start at the frame's left edge"
+        );
+        assert_eq!(
+            r.width, a.width,
+            "{what}: the {name} row must span the frame's width"
+        );
+        assert_eq!(
+            r.y, y,
+            "{what}: the {name} row must abut the region above it"
+        );
         y = y.saturating_add(r.height);
         total += r.height;
     }
@@ -173,14 +198,20 @@ fn assert_frame_tiles(l: &Layout, a: Rect) {
         total, a.height,
         "{what}: the regions must sum to the terminal's height exactly — {rows:?}"
     );
-    assert_eq!(y, a.y + a.height, "{what}: the last row must reach the frame's bottom edge");
+    assert_eq!(
+        y,
+        a.y + a.height,
+        "{what}: the last row must reach the frame's bottom edge"
+    );
 }
 
 /// A representative spread of supported sizes: both breakpoints, both sides of
 /// each, the floor, and sizes far past anything the layout was tuned at.
 fn supported_sizes() -> Vec<Rect> {
     let mut out = Vec::new();
-    for w in [80u16, 81, 90, 99, 100, 101, 110, 119, 120, 121, 150, 200, 300] {
+    for w in [
+        80u16, 81, 90, 99, 100, 101, 110, 119, 120, 121, 150, 200, 300,
+    ] {
         for h in [24u16, 25, 30, 40, 60, 100] {
             out.push(area(w, h));
         }
@@ -229,7 +260,10 @@ fn the_chrome_is_a_header_a_tab_bar_a_ticker_of_one_or_more_rows_and_a_hint_bar(
         assert_eq!(l.header.height, 1, "{what}: the header is one row");
         assert_eq!(l.tabs.height, 1, "{what}: the tab bar is one row");
         assert_eq!(l.hints.height, 1, "{what}: the hint bar is one row");
-        assert!(l.ticker.height >= 1, "{what}: the ticker is one row at the floor and never none");
+        assert!(
+            l.ticker.height >= 1,
+            "{what}: the ticker is one row at the floor and never none"
+        );
 
         let banner_rows = l.banner.map_or(0, |b| b.height);
         assert_eq!(
@@ -249,7 +283,10 @@ fn at_the_eighty_by_twenty_four_floor_the_body_is_twenty_rows() {
     let l = compute(a, None, false);
     assert_frame_tiles(&l, a);
 
-    assert_eq!(l.ticker.height, 1, "at the floor the ticker collapses to a single row");
+    assert_eq!(
+        l.ticker.height, 1,
+        "at the floor the ticker collapses to a single row"
+    );
     assert_eq!(
         body_rect(&l, "80x24").height,
         20,
@@ -278,7 +315,10 @@ fn extra_terminal_rows_go_to_the_body_and_ticker_not_to_the_fixed_chrome() {
                 "at {w} columns, growing from {h} to {} rows must add the row below the tab bar",
                 h + 1
             );
-            assert_eq!(short.header.height + short.tabs.height + short.hints.height, 3);
+            assert_eq!(
+                short.header.height + short.tabs.height + short.hints.height,
+                3
+            );
             assert_eq!(tall.header.height + tall.tabs.height + tall.hints.height, 3);
         }
     }
@@ -364,7 +404,11 @@ fn under_eighty_columns_or_twenty_four_rows_only_the_too_small_card_is_drawn() {
 /// @spec TUI-RENDER-004
 #[test]
 fn eighty_by_twenty_four_exactly_is_supported() {
-    for (w, h) in [(FLOOR_W, FLOOR_H), (FLOOR_W, FLOOR_H + 1), (FLOOR_W + 1, FLOOR_H)] {
+    for (w, h) in [
+        (FLOOR_W, FLOOR_H),
+        (FLOOR_W, FLOOR_H + 1),
+        (FLOOR_W + 1, FLOOR_H),
+    ] {
         let l = compute(area(w, h), None, false);
         assert_ne!(
             mode(&l),
@@ -449,7 +493,11 @@ fn below_a_hundred_columns_there_is_no_pane_for_the_inspector_to_occupy() {
         // The list already occupies every column the sidebar does not, so an
         // inspector shown at this width has nowhere to go but over it.
         let (sidebar, main) = narrow_parts(&l, w);
-        assert_eq!(main.x, sidebar.right(), "{w} columns: the list abuts the sidebar");
+        assert_eq!(
+            main.x,
+            sidebar.right(),
+            "{w} columns: the list abuts the sidebar"
+        );
         assert_eq!(
             sidebar.width + main.width,
             w,
@@ -468,7 +516,10 @@ fn the_sidebar_is_a_fixed_width_and_the_list_absorbs_the_rest() {
     for w in FLOOR_W + 1..PANE_BREAKPOINT {
         let l = compute(area(w, FLOOR_H), None, false);
         let (sidebar, main) = narrow_parts(&l, w);
-        assert_eq!(sidebar.width, base_sidebar.width, "{w} columns: the sidebar is a fixed width");
+        assert_eq!(
+            sidebar.width, base_sidebar.width,
+            "{w} columns: the sidebar is a fixed width"
+        );
         assert_eq!(
             main.width,
             base_main.width + (w - FLOOR_W),
@@ -487,11 +538,18 @@ fn the_sidebar_is_a_fixed_width_and_the_list_absorbs_the_rest() {
 #[test]
 fn at_a_hundred_columns_the_inspector_becomes_a_pane_of_its_own() {
     let below = compute(area(PANE_BREAKPOINT - 1, FLOOR_H), None, false);
-    assert_eq!(mode(&below), Mode::Narrow, "99 columns is still sidebar and list");
+    assert_eq!(
+        mode(&below),
+        Mode::Narrow,
+        "99 columns is still sidebar and list"
+    );
 
     let at = compute(area(PANE_BREAKPOINT, FLOOR_H), None, false);
     let (sidebar, list, inspector) = wide_parts(&at, PANE_BREAKPOINT);
-    assert!(sidebar.width > 0 && list.width > 0 && inspector.width > 0, "all three are drawn");
+    assert!(
+        sidebar.width > 0 && list.width > 0 && inspector.width > 0,
+        "all three are drawn"
+    );
     assert_eq!(
         sidebar.width + list.width + inspector.width,
         PANE_BREAKPOINT,
@@ -510,13 +568,19 @@ fn the_inspector_takes_the_width_the_sidebar_and_list_leave() {
         assert_frame_tiles(&l, a);
 
         let (sidebar, list, inspector) = wide_parts(&l, w);
-        assert!(sidebar.x < list.x && list.x < inspector.x, "{w} columns: sidebar, list, inspector");
+        assert!(
+            sidebar.x < list.x && list.x < inspector.x,
+            "{w} columns: sidebar, list, inspector"
+        );
         assert_eq!(
             inspector.width,
             w - sidebar.width - list.width,
             "{w} columns: the inspector is the remainder"
         );
-        assert!(inspector.width > 0, "{w} columns: a pane with no width is not a pane");
+        assert!(
+            inspector.width > 0,
+            "{w} columns: a pane with no width is not a pane"
+        );
     }
 }
 
@@ -526,13 +590,20 @@ fn the_inspector_takes_the_width_the_sidebar_and_list_leave() {
 #[test]
 fn growing_the_terminal_never_shrinks_a_wide_pane() {
     let mut prev: Option<(u16, Rect, Rect, Rect)> = None;
-    let fixed_sidebar = wide_parts(&compute(area(PANE_BREAKPOINT, FLOOR_H), None, false), PANE_BREAKPOINT).0;
+    let fixed_sidebar = wide_parts(
+        &compute(area(PANE_BREAKPOINT, FLOOR_H), None, false),
+        PANE_BREAKPOINT,
+    )
+    .0;
 
     for w in PANE_BREAKPOINT..=240 {
         let l = compute(area(w, FLOOR_H), None, false);
         let (sidebar, list, inspector) = wide_parts(&l, w);
 
-        assert_eq!(sidebar.width, fixed_sidebar.width, "{w} columns: the sidebar is a fixed width");
+        assert_eq!(
+            sidebar.width, fixed_sidebar.width,
+            "{w} columns: the sidebar is a fixed width"
+        );
 
         if let Some((pw, _, plist, pinspector)) = prev {
             assert!(
@@ -559,7 +630,11 @@ fn growing_the_terminal_never_shrinks_a_wide_pane() {
 /// @spec TUI-RENDER-007
 #[test]
 fn at_a_hundred_and_twenty_columns_and_wider_the_list_stops_growing() {
-    let capped = wide_parts(&compute(area(CAP_BREAKPOINT, FLOOR_H), None, false), CAP_BREAKPOINT).1;
+    let capped = wide_parts(
+        &compute(area(CAP_BREAKPOINT, FLOOR_H), None, false),
+        CAP_BREAKPOINT,
+    )
+    .1;
 
     for w in [CAP_BREAKPOINT + 1, 130, 150, 200, 300, 400] {
         let list = wide_parts(&compute(area(w, FLOOR_H), None, false), w).1;
@@ -574,12 +649,17 @@ fn at_a_hundred_and_twenty_columns_and_wider_the_list_stops_growing() {
 /// @spec TUI-RENDER-007
 #[test]
 fn every_column_past_the_cap_goes_to_the_inspector() {
-    let (base_sidebar, _, base_inspector) =
-        wide_parts(&compute(area(CAP_BREAKPOINT, FLOOR_H), None, false), CAP_BREAKPOINT);
+    let (base_sidebar, _, base_inspector) = wide_parts(
+        &compute(area(CAP_BREAKPOINT, FLOOR_H), None, false),
+        CAP_BREAKPOINT,
+    );
 
     for w in [CAP_BREAKPOINT + 1, 130, 150, 200, 300] {
         let (sidebar, _, inspector) = wide_parts(&compute(area(w, FLOOR_H), None, false), w);
-        assert_eq!(sidebar.width, base_sidebar.width, "{w} columns: the sidebar stays fixed");
+        assert_eq!(
+            sidebar.width, base_sidebar.width,
+            "{w} columns: the sidebar stays fixed"
+        );
         assert_eq!(
             inspector.width,
             base_inspector.width + (w - CAP_BREAKPOINT),
@@ -620,8 +700,16 @@ fn the_capped_list_stays_readable_in_one_glance() {
 fn a_layout_is_entered_at_its_boundary() {
     let steps = walk(&[95, 96, 97, 98, 99, 100], FLOOR_H);
     for (w, l) in &steps {
-        let expected = if *w < PANE_BREAKPOINT { Mode::Narrow } else { Mode::Wide };
-        assert_eq!(mode(l), expected, "growing to {w} columns: entry happens at the boundary");
+        let expected = if *w < PANE_BREAKPOINT {
+            Mode::Narrow
+        } else {
+            Mode::Wide
+        };
+        assert_eq!(
+            mode(l),
+            expected,
+            "growing to {w} columns: entry happens at the boundary"
+        );
     }
 }
 
@@ -632,7 +720,11 @@ fn a_layout_is_entered_at_its_boundary() {
 #[test]
 fn a_layout_is_left_below_the_boundary_it_was_entered_at() {
     let entered = compute(area(PANE_BREAKPOINT, FLOOR_H), None, false);
-    assert_eq!(mode(&entered), Mode::Wide, "fixture: entered the three-pane layout at 100");
+    assert_eq!(
+        mode(&entered),
+        Mode::Wide,
+        "fixture: entered the three-pane layout at 100"
+    );
 
     let wobbled_down = compute(area(PANE_BREAKPOINT - 1, FLOOR_H), Some(&entered), false);
     assert_eq!(
@@ -642,7 +734,11 @@ fn a_layout_is_left_below_the_boundary_it_was_entered_at() {
     );
 
     let fresh = compute(area(PANE_BREAKPOINT - 1, FLOOR_H), None, false);
-    assert_eq!(mode(&fresh), Mode::Narrow, "99 columns approached fresh is sidebar and list");
+    assert_eq!(
+        mode(&fresh),
+        Mode::Narrow,
+        "99 columns approached fresh is sidebar and list"
+    );
     assert_ne!(
         mode(&wobbled_down),
         mode(&fresh),
@@ -685,14 +781,22 @@ fn a_resize_that_overshoots_and_settles_does_not_thrash() {
     let wobble = [96u16, 98, 99, 100, 101, 100, 99, 100, 99, 100, 101, 99, 100];
     let steps = walk(&wobble, FLOOR_H);
 
-    let flips = steps.windows(2).filter(|p| mode(&p[0].1) != mode(&p[1].1)).count();
+    let flips = steps
+        .windows(2)
+        .filter(|p| mode(&p[0].1) != mode(&p[1].1))
+        .count();
     assert_eq!(
-        flips, 1,
+        flips,
+        1,
         "a wobble across the boundary entered the three-pane layout once and should never have \
          left it; the layout changed {flips} times: {:?}",
         steps.iter().map(|(w, l)| (*w, mode(l))).collect::<Vec<_>>()
     );
-    assert_eq!(mode(&steps.last().unwrap().1), Mode::Wide, "it settles three-pane");
+    assert_eq!(
+        mode(&steps.last().unwrap().1),
+        Mode::Wide,
+        "it settles three-pane"
+    );
 }
 
 /// A full crossing in each direction changes the layout exactly once each way,
@@ -717,8 +821,16 @@ fn crossing_up_and_back_down_changes_the_layout_once_in_each_direction() {
         2,
         "one crossing up and one back down, no thrash in between: {crossings:?}"
     );
-    assert_eq!(crossings[0], (PANE_BREAKPOINT, Mode::Wide), "entry is at the boundary");
-    assert_eq!(crossings[1].1, Mode::Narrow, "the second crossing is the way back");
+    assert_eq!(
+        crossings[0],
+        (PANE_BREAKPOINT, Mode::Wide),
+        "entry is at the boundary"
+    );
+    assert_eq!(
+        crossings[1].1,
+        Mode::Narrow,
+        "the second crossing is the way back"
+    );
     assert!(
         crossings[1].0 < crossings[0].0,
         "the layout is left at a lower width ({}) than it was entered at ({})",
@@ -735,7 +847,12 @@ fn the_cap_breakpoint_carries_a_dead_band_too() {
     let at_cap = compute(area(CAP_BREAKPOINT, FLOOR_H), None, false);
     let capped_list = wide_parts(&at_cap, CAP_BREAKPOINT).1;
 
-    let wobble = [CAP_BREAKPOINT - 1, CAP_BREAKPOINT, CAP_BREAKPOINT - 1, CAP_BREAKPOINT];
+    let wobble = [
+        CAP_BREAKPOINT - 1,
+        CAP_BREAKPOINT,
+        CAP_BREAKPOINT - 1,
+        CAP_BREAKPOINT,
+    ];
     let mut prev = at_cap;
     for w in wobble {
         let l = compute(area(w, FLOOR_H), Some(&prev), false);

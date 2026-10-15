@@ -25,29 +25,61 @@ pub enum EventClass {
 // @spec SIM-ENG-009
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Event {
-    KittenArrived { name: String },
-    KittenWanderedOff { name: String },
-    KittenReturned { name: String },
-    JobAssigned { name: String, job: JobId },
-    JobUnassigned { name: String, job: JobId },
-    SeasonChanged { season: Season },
-    NewYear { year: u64 },
-    StructureBuilt { id: StructureId, count: u32 },
-    IdeaResearched { id: IdeaId },
-    ZoomiesStarted { until_tick: u64 },
+    KittenArrived {
+        name: String,
+    },
+    KittenWanderedOff {
+        name: String,
+    },
+    KittenReturned {
+        name: String,
+    },
+    JobAssigned {
+        name: String,
+        job: JobId,
+    },
+    JobUnassigned {
+        name: String,
+        job: JobId,
+    },
+    SeasonChanged {
+        season: Season,
+    },
+    NewYear {
+        year: u64,
+    },
+    StructureBuilt {
+        id: StructureId,
+        count: u32,
+    },
+    IdeaResearched {
+        id: IdeaId,
+    },
+    ZoomiesStarted {
+        until_tick: u64,
+    },
     ZoomiesEnded,
-    KittenMood { tier: MoodTier },
+    KittenMood {
+        tier: MoodTier,
+    },
     /// Index into `content::FLAVOR_TEMPLATES`, plus the featured kitten when
     /// the template wants one. No mechanical effect by construction.
-    Flavor { template: usize, kitten: Option<String> },
+    Flavor {
+        template: usize,
+        kitten: Option<String>,
+    },
     /// A content item became permanently visible. @spec SIM-ENG-023
-    Revealed { id: ContentId },
+    Revealed {
+        id: ContentId,
+    },
     /// Something bright crossed the sky and nobody happened to be looking —
     /// observable via ObserveSky until the end of the next day.
     /// @spec SIM-ENG-025
     SkyEventVisible,
     // @spec SIM-ENG-024
-    SpeedChanged { speed: f64 },
+    SpeedChanged {
+        speed: f64,
+    },
     /// A pounce came home with its full haul — data, not prose. Shinies are
     /// reported post-clamp, exactly as the stock moved.
     /// @spec SIM-EXP-005
@@ -59,49 +91,103 @@ pub enum Event {
         unicorns: u32,
     },
     // @spec SIM-KIT-025
-    JamboreeStarted { until_tick: u64 },
+    JamboreeStarted {
+        until_tick: u64,
+    },
     JamboreeEnded,
     // @spec SIM-KIT-022
-    ElderAppointed { name: String },
+    ElderAppointed {
+        name: String,
+    },
     // @spec SIM-KIT-021
-    KittenPromoted { name: String, rank: u8 },
+    KittenPromoted {
+        name: String,
+        rank: u8,
+    },
     // @spec SIM-CUR-010
-    RefinementBought { id: RefinementId },
+    RefinementBought {
+        id: RefinementId,
+    },
     // @spec SIM-CUR-011
-    RuleAdopted { id: RuleId },
+    RuleAdopted {
+        id: RuleId,
+    },
     // ---- Wave 4: ceremonies (SIM-SUN) ----
-    Basked { devotion: f64 },
-    Reveried { serenity: f64 },
-    RiteBought { id: RiteId },
-    Enlightened { tier: u32 },
+    Basked {
+        devotion: f64,
+    },
+    Reveried {
+        serenity: f64,
+    },
+    RiteBought {
+        id: RiteId,
+    },
+    Enlightened {
+        tier: u32,
+    },
     // ---- Wave 4: mystic (SIM-UNI) ----
-    ParadeHeld { rainbows: f64 },
-    ArchBought { id: ArchId },
+    ParadeHeld {
+        rainbows: f64,
+    },
+    ArchBought {
+        id: ArchId,
+    },
     StarshardRefined,
     EchoRefined,
     JarCondensed,
     PromiseMade,
-    PromiseQuieted { index: usize },
-    PromiseResumed { index: usize },
+    PromiseQuieted {
+        index: usize,
+    },
+    PromiseResumed {
+        index: usize,
+    },
     PrismDescended,
     // ---- Wave 4: colonies (SIM-TRADE) ----
-    TradeReturned { colony: ColonyId, caravans: u32 },
-    PenPalSent { colony: ColonyId, level: u32 },
-    ColonyDiscovered { colony: ColonyId },
+    TradeReturned {
+        colony: ColonyId,
+        caravans: u32,
+    },
+    PenPalSent {
+        colony: ColonyId,
+        level: u32,
+    },
+    ColonyDiscovered {
+        colony: ColonyId,
+    },
     // ---- Wave 5: prestige / adventures (SIM-MOVE / SIM-ADV) ----
-    MeadowMoved { generation: u32 },
-    Passed { passed_down_wisdom: f64 },
-    TraditionBought { id: TraditionId },
-    AdventureDeclared { id: Option<AdventureId> },
-    AdventureCompleted { id: AdventureId },
+    MeadowMoved {
+        generation: u32,
+    },
+    Passed {
+        passed_down_wisdom: f64,
+    },
+    TraditionBought {
+        id: TraditionId,
+    },
+    AdventureDeclared {
+        id: Option<AdventureId>,
+    },
+    AdventureCompleted {
+        id: AdventureId,
+    },
     // ---- Wave 6: cosmic (SIM-SKY) / dreamtime (SIM-DREAM) ----
-    SiteReached { site: SiteId },
+    SiteReached {
+        site: SiteId,
+    },
     WhaleSummoned,
-    WhaleFed { contentment: u32 },
+    WhaleFed {
+        contentment: u32,
+    },
     /// A summarized nap report — never a per-tick stream, and the same
     /// `OfflineReport` kind offline absence folds. @spec SIM-DREAM-001, SIM-DREAM-008
-    Napped { years: u32, report: Box<crate::save::OfflineReport> },
-    DreamLoomBought { id: DreamLoomId },
+    Napped {
+        years: u32,
+        report: Box<crate::save::OfflineReport>,
+    },
+    DreamLoomBought {
+        id: DreamLoomId,
+    },
     DejaVuDay,
     DistantDawn,
 }
@@ -117,7 +203,11 @@ impl Event {
         // copies are ordinary. Milestones are permanent, so every one must be
         // bounded over a playthrough by construction. @spec SIM-ENG-026, SIM-ENG-042
         if let Event::StructureBuilt { count, .. } = self {
-            return if *count == 1 { EventClass::Milestone } else { EventClass::Mechanical };
+            return if *count == 1 {
+                EventClass::Milestone
+            } else {
+                EventClass::Mechanical
+            };
         }
         match self {
             Event::Flavor { .. } => EventClass::Flavor,

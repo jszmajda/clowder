@@ -61,7 +61,9 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::Paragraph;
 use ratatui::Terminal;
 
-use theme::{blend, coat, coat_colours, seasonal_accent, truecolor_advertised, Coat, Dressing, Hue, Role};
+use theme::{
+    blend, coat, coat_colours, seasonal_accent, truecolor_advertised, Coat, Dressing, Hue, Role,
+};
 
 // ---------------------------------------------------------------------------
 // The roles, and a compile-time guard on there being six of them
@@ -127,7 +129,11 @@ struct Meaning {
 
 /// The design's second-channel table, one row per state.
 const MEANINGS: [Meaning; 12] = [
-    Meaning { what: "affordable now", first_channel: "●", tint: Tint::Role(Role::Ready) },
+    Meaning {
+        what: "affordable now",
+        first_channel: "●",
+        tint: Tint::Role(Role::Ready),
+    },
     Meaning {
         what: "partially affordable",
         first_channel: "◐",
@@ -138,7 +144,11 @@ const MEANINGS: [Meaning; 12] = [
         first_channel: "○",
         tint: Tint::Role(Role::Dim),
     },
-    Meaning { what: "owned or done", first_channel: "✓", tint: Tint::Role(Role::Dim) },
+    Meaning {
+        what: "owned or done",
+        first_channel: "✓",
+        tint: Tint::Role(Role::Dim),
+    },
     Meaning {
         what: "an attention chip",
         first_channel: "the chip's glyph, its count, and its word",
@@ -154,8 +164,16 @@ const MEANINGS: [Meaning; 12] = [
         first_channel: "the row expands in place to a consequence summary",
         tint: Tint::Role(Role::Attention),
     },
-    Meaning { what: "a milestone", first_channel: "★", tint: Tint::Role(Role::Milestone) },
-    Meaning { what: "a flavour event", first_channel: "·", tint: Tint::Role(Role::Dim) },
+    Meaning {
+        what: "a milestone",
+        first_channel: "★",
+        tint: Tint::Role(Role::Milestone),
+    },
+    Meaning {
+        what: "a flavour event",
+        first_channel: "·",
+        tint: Tint::Role(Role::Dim),
+    },
     Meaning {
         what: "a mechanical event",
         first_channel: "▪",
@@ -245,7 +263,11 @@ fn to_linear(component: u8) -> f64 {
 
 fn from_linear(value: f64) -> u8 {
     let v = value.clamp(0.0, 1.0);
-    let s = if v <= 0.003_130_8 { 12.92 * v } else { 1.055 * v.powf(1.0 / 2.4) - 0.055 };
+    let s = if v <= 0.003_130_8 {
+        12.92 * v
+    } else {
+        1.055 * v.powf(1.0 / 2.4) - 0.055
+    };
     (s * 255.0).round() as u8
 }
 
@@ -267,7 +289,13 @@ fn lab((r, g, b): (u8, u8, u8)) -> (f64, f64, f64) {
     let x = (0.4124 * lr + 0.3576 * lg + 0.1805 * lb) / 0.950_47;
     let y = 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
     let z = (0.0193 * lr + 0.1192 * lg + 0.9505 * lb) / 1.088_83;
-    let f = |t: f64| if t > 0.008_856 { t.cbrt() } else { 7.787 * t + 16.0 / 116.0 };
+    let f = |t: f64| {
+        if t > 0.008_856 {
+            t.cbrt()
+        } else {
+            7.787 * t + 16.0 / 116.0
+        }
+    };
     let (fx, fy, fz) = (f(x), f(y), f(z));
     (116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz))
 }
@@ -302,7 +330,11 @@ const DEUTERANOPIA: [[f64; 3]; 3] = [
 fn simulate((r, g, b): (u8, u8, u8), m: [[f64; 3]; 3]) -> (u8, u8, u8) {
     let v = [to_linear(r), to_linear(g), to_linear(b)];
     let out = |row: [f64; 3]| row[0] * v[0] + row[1] * v[1] + row[2] * v[2];
-    (from_linear(out(m[0])), from_linear(out(m[1])), from_linear(out(m[2])))
+    (
+        from_linear(out(m[0])),
+        from_linear(out(m[1])),
+        from_linear(out(m[2])),
+    )
 }
 
 /// The smallest difference between any two of a set of colours.
@@ -459,8 +491,10 @@ fn every_state_colour_clears_the_contrast_floor_against_both_extremes_of_ground(
 /// @spec TUI-THEME-002
 #[test]
 fn nothing_in_the_theme_is_a_pale_tint_or_a_deep_shade() {
-    let mut values: Vec<(String, (u8, u8, u8))> =
-        PALETTE_ROLES.iter().map(|r| (role_name(*r).to_string(), rgb(*r))).collect();
+    let mut values: Vec<(String, (u8, u8, u8))> = PALETTE_ROLES
+        .iter()
+        .map(|r| (role_name(*r).to_string(), rgb(*r)))
+        .collect();
     for season in Season::ALL {
         values.push((format!("the {season:?} accent"), accent(season)));
     }
@@ -586,7 +620,11 @@ fn only_a_resource_reaches_the_theme_and_only_for_its_coat() {
     // The season is the one thing outside the state vocabulary that reaches the
     // theme for a state colour, and it reaches only the chrome.
     assert_eq!(
-        PALETTE_ROLES.iter().map(|r| rgb(*r)).collect::<HashSet<_>>().len(),
+        PALETTE_ROLES
+            .iter()
+            .map(|r| rgb(*r))
+            .collect::<HashSet<_>>()
+            .len(),
         5,
         "five state colours, however many items exist"
     );
@@ -700,7 +738,11 @@ fn mood_is_a_word_and_takes_no_colour_at_all() {
     );
 
     let palette: Vec<(u8, u8, u8)> = PALETTE_ROLES.iter().map(|r| rgb(*r)).collect();
-    assert_eq!(palette.len(), 5, "and none of the five is spent on a mood ramp");
+    assert_eq!(
+        palette.len(),
+        5,
+        "and none of the five is spent on a mood ramp"
+    );
 
     assert!(
         !mood.first_channel.is_empty(),
@@ -855,7 +897,10 @@ fn meadow_on_day(day: u64) -> clowder_core::GameState {
     use clowder_core::{content, ContentId, GameState, ResourceId, StructureId};
     let mut s = GameState::new(11);
     s.ticks = day * content::TICKS_PER_DAY;
-    s.revealed = StructureId::ALL.iter().map(|b| ContentId::Structure(*b)).collect();
+    s.revealed = StructureId::ALL
+        .iter()
+        .map(|b| ContentId::Structure(*b))
+        .collect();
     for r in ResourceId::ALL {
         s.resources[r.ix()] = 1_234.0;
     }
@@ -872,23 +917,48 @@ fn chrome_views() -> Vec<(&'static str, clowder_tui::nav::ViewState)> {
     use clowder_core::{ContentId, StructureId};
     use clowder_tui::nav::{Overlay, RowKey, Section, ViewState};
     let at = |i: usize| {
-        let mut v = ViewState { section: Some(Section::Meadow), ..Default::default() };
-        v.focus[Section::Meadow.index()] =
-            Some(RowKey::Content(ContentId::Structure(StructureId::ALL[i]), ""));
+        let mut v = ViewState {
+            section: Some(Section::Meadow),
+            ..Default::default()
+        };
+        v.focus[Section::Meadow.index()] = Some(RowKey::Content(
+            ContentId::Structure(StructureId::ALL[i]),
+            "",
+        ));
         v
     };
     vec![
         ("the list", at(4)),
         ("the list scrolled", at(44)),
-        ("the inspector asked for", ViewState { inspector_wanted: true, ..at(4) }),
-        ("help open", ViewState { overlay: Some(Overlay::Help), ..at(4) }),
+        (
+            "the inspector asked for",
+            ViewState {
+                inspector_wanted: true,
+                ..at(4)
+            },
+        ),
+        (
+            "help open",
+            ViewState {
+                overlay: Some(Overlay::Help),
+                ..at(4)
+            },
+        ),
     ]
 }
 
 /// Sizes either side of both layout breakpoints: one divider below 100
 /// columns, two at 100 and wider.
-const CHROME_SIZES: [(u16, u16); 8] =
-    [(80, 24), (90, 24), (99, 24), (100, 30), (110, 30), (119, 40), (120, 40), (150, 50)];
+const CHROME_SIZES: [(u16, u16); 8] = [
+    (80, 24),
+    (90, 24),
+    (99, 24),
+    (100, 30),
+    (110, 30),
+    (119, 40),
+    (120, 40),
+    (150, 50),
+];
 
 /// Draw one frame into `term` after `prev`, returning its cells and layout.
 fn draw_frame(
@@ -900,7 +970,10 @@ fn draw_frame(
     let mut layout = None;
     term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, view, prev)))
         .expect("drawing into an in-memory backend cannot fail");
-    (term.backend().buffer().clone(), layout.expect("frame returns the layout it used"))
+    (
+        term.backend().buffer().clone(),
+        layout.expect("frame returns the layout it used"),
+    )
 }
 
 /// The cells a frame's pane dividers occupy (TUI-RENDER-016): each body row
@@ -920,7 +993,10 @@ fn divider_cells(
         Body::Wide { list, .. } => (list, vec![list.x, list.right() - 1]),
         Body::TooSmall(_) => return HashSet::new(),
     };
-    columns.into_iter().flat_map(|x| (space.y..space.bottom()).map(move |y| (x, y))).collect()
+    columns
+        .into_iter()
+        .flat_map(|x| (space.y..space.bottom()).map(move |y| (x, y)))
+        .collect()
 }
 
 /// The claim at one frame: the header rule's underline, on every header cell,
@@ -979,7 +1055,8 @@ fn assert_only_the_chrome_wears(
             }
             if dividers.contains(&(x, y)) {
                 assert_eq!(
-                    cell.fg, accent,
+                    cell.fg,
+                    accent,
                     "{w}x{h} with {what}: the divider cell ({x},{y}) (`{}`) is drawn in {:?}, \
                      not the snapshot's season's accent {accent:?}",
                     cell.symbol(),
@@ -987,9 +1064,11 @@ fn assert_only_the_chrome_wears(
                 );
                 continue;
             }
-            for (part, colour) in
-                [("foreground", cell.fg), ("background", cell.bg), ("underline", cell.underline_color)]
-            {
+            for (part, colour) in [
+                ("foreground", cell.fg),
+                ("background", cell.bg),
+                ("underline", cell.underline_color),
+            ] {
                 assert!(
                     !accents.contains(&colour),
                     "{w}x{h} with {what}: `{}` at ({x},{y}) wears a seasonal accent ({colour:?}) \
@@ -1030,10 +1109,18 @@ fn the_rule_and_every_divider_wear_the_snapshots_season_and_nothing_else_does() 
         s.active_adventure = Some(AdventureId::LongWinter);
         s
     };
-    snapshots.push(("a season held by the core".to_string(), held, Season::Winter));
+    snapshots.push((
+        "a season held by the core".to_string(),
+        held,
+        Season::Winter,
+    ));
 
     for (name, state, season) in &snapshots {
-        assert_eq!(state.season(), *season, "fixture: the {name} snapshot holds {season:?}");
+        assert_eq!(
+            state.season(),
+            *season,
+            "fixture: the {name} snapshot holds {season:?}"
+        );
         let accent = seasonal_accent(*season);
         for (w, h) in CHROME_SIZES {
             for (what, view) in chrome_views() {
@@ -1086,19 +1173,41 @@ fn the_accent_turns_on_the_frame_the_season_word_does_with_no_blend() {
         let (old_accent, new_accent) = (seasonal_accent(old), seasonal_accent(new));
 
         for (w, h) in [(80, 24), (130, 40)] {
-            let mut term = Terminal::new(TestBackend::new(w, h)).expect("a test backend always builds");
+            let mut term =
+                Terminal::new(TestBackend::new(w, h)).expect("a test backend always builds");
             let (buf_old, layout_old) = draw_frame(&mut term, &before, &view, None);
-            let header_old: String = (0..w).map(|x| buf_old.cell((x, 0)).expect("cell").symbol()).collect();
-            assert!(header_old.contains(&word(old)), "fixture: the header names {old:?}: {header_old:?}");
-            assert_only_the_chrome_wears(&buf_old, &layout_old, &before, &view, old_accent, "the last frame of a season");
+            let header_old: String = (0..w)
+                .map(|x| buf_old.cell((x, 0)).expect("cell").symbol())
+                .collect();
+            assert!(
+                header_old.contains(&word(old)),
+                "fixture: the header names {old:?}: {header_old:?}"
+            );
+            assert_only_the_chrome_wears(
+                &buf_old,
+                &layout_old,
+                &before,
+                &view,
+                old_accent,
+                "the last frame of a season",
+            );
 
             let (buf_new, layout_new) = draw_frame(&mut term, &after, &view, Some(&layout_old));
-            let header_new: String = (0..w).map(|x| buf_new.cell((x, 0)).expect("cell").symbol()).collect();
+            let header_new: String = (0..w)
+                .map(|x| buf_new.cell((x, 0)).expect("cell").symbol())
+                .collect();
             assert!(
                 header_new.contains(&word(new)) && !header_new.contains(&word(old)),
                 "fixture: the first frame of the new season names {new:?} and not {old:?}: {header_new:?}"
             );
-            assert_only_the_chrome_wears(&buf_new, &layout_new, &after, &view, new_accent, "the first frame of a season");
+            assert_only_the_chrome_wears(
+                &buf_new,
+                &layout_new,
+                &after,
+                &view,
+                new_accent,
+                "the first frame of a season",
+            );
             for y in 0..h {
                 for x in 0..w {
                     let c = buf_new.cell((x, y)).expect("cell");
@@ -1110,7 +1219,8 @@ fn the_accent_turns_on_the_frame_the_season_word_does_with_no_blend() {
                 }
             }
 
-            let mut fresh = Terminal::new(TestBackend::new(w, h)).expect("a test backend always builds");
+            let mut fresh =
+                Terminal::new(TestBackend::new(w, h)).expect("a test backend always builds");
             let (cold, _) = draw_frame(&mut fresh, &after, &view, None);
             assert_eq!(
                 buf_new, cold,
@@ -1140,8 +1250,11 @@ fn the_accent_turns_on_the_frame_the_season_word_does_with_no_blend() {
 /// @spec TUI-THEME-009
 #[test]
 fn only_the_season_wears_the_seasonal_accent() {
-    let wearers: Vec<&str> =
-        MEANINGS.iter().filter(|m| m.tint == Tint::SeasonalAccent).map(|m| m.what).collect();
+    let wearers: Vec<&str> = MEANINGS
+        .iter()
+        .filter(|m| m.tint == Tint::SeasonalAccent)
+        .map(|m| m.what)
+        .collect();
     assert_eq!(
         wearers,
         vec!["the season"],
@@ -1155,7 +1268,8 @@ fn only_the_season_wears_the_seasonal_accent() {
         for role in PALETTE_ROLES {
             let s = rgb(role);
             assert_ne!(
-                a, s,
+                a,
+                s,
                 "the {season:?} accent is exactly `{}` (#{:02X}{:02X}{:02X}). One value cannot \
                  mean both a season and a state.",
                 role_name(role),
@@ -1181,7 +1295,10 @@ fn the_accent_is_kept_unambiguous_by_confinement_and_not_by_colour_distance() {
         for role in PALETTE_ROLES {
             let d = delta_e(accent(season), rgb(role));
             if d < nearest.1 {
-                nearest = (format!("the {season:?} accent and `{}`", role_name(role)), d);
+                nearest = (
+                    format!("the {season:?} accent and `{}`", role_name(role)),
+                    d,
+                );
             }
         }
     }
@@ -1316,8 +1433,10 @@ fn the_three_states_a_red_green_deficiency_compresses_are_told_apart_by_glyph() 
     );
 
     for (deficiency, matrix) in [("protanopia", PROTANOPIA), ("deuteranopia", DEUTERANOPIA)] {
-        let simulated: Vec<(&str, (u8, u8, u8))> =
-            three.iter().map(|(n, c)| (*n, simulate(*c, matrix))).collect();
+        let simulated: Vec<(&str, (u8, u8, u8))> = three
+            .iter()
+            .map(|(n, c)| (*n, simulate(*c, matrix)))
+            .collect();
         let (pair, distance) = closest_pair(&simulated);
         assert!(
             distance < normal,
@@ -1524,8 +1643,12 @@ impl TempDir {
         use std::sync::atomic::{AtomicU32, Ordering};
         static COUNTER: AtomicU32 = AtomicU32::new(0);
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir()
-            .join(format!("clowder-theme-{}-{}-{}", std::process::id(), tag, n));
+        let path = std::env::temp_dir().join(format!(
+            "clowder-theme-{}-{}-{}",
+            std::process::id(),
+            tag,
+            n
+        ));
         let _ = std::fs::remove_dir_all(&path);
         std::fs::create_dir_all(&path).expect("a scratch directory should be creatable");
         TempDir { path }
@@ -1550,7 +1673,9 @@ fn run_clowder(tag: &str, colorterm: Option<&str>) -> String {
     let home = TempDir::new(tag);
     let output_path = home.path.join("clowder-output.txt");
     let file = std::fs::File::create(&output_path).expect("creating the child's output file");
-    let stderr = file.try_clone().expect("duplicating the output file for stderr");
+    let stderr = file
+        .try_clone()
+        .expect("duplicating the output file for stderr");
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_clowder"));
     command
@@ -1812,7 +1937,11 @@ fn from_oklab((l, a, b): (f64, f64, f64)) -> (u8, u8, u8) {
     let r = 4.076_741_662_1 * l3 - 3.307_711_591_3 * m3 + 0.230_969_929_2 * s3;
     let g = -1.268_438_004_6 * l3 + 2.609_757_401_1 * m3 - 0.341_319_396_5 * s3;
     let bb = -0.004_196_086_3 * l3 - 0.703_418_614_7 * m3 + 1.707_614_701_0 * s3;
-    (from_linear(r.clamp(0.0, 1.0)), from_linear(g.clamp(0.0, 1.0)), from_linear(bb.clamp(0.0, 1.0)))
+    (
+        from_linear(r.clamp(0.0, 1.0)),
+        from_linear(g.clamp(0.0, 1.0)),
+        from_linear(bb.clamp(0.0, 1.0)),
+    )
 }
 
 /// The colour at character `i` of `n` on the piecewise-linear OKLab path
@@ -1848,8 +1977,10 @@ const CLEARANCE_FLOOR: f64 = 18.0;
 /// @spec TUI-THEME-002
 #[test]
 fn every_coat_colour_clears_the_contrast_floor_against_both_grounds_and_keeps_the_band() {
-    let mut values: Vec<(String, (u8, u8, u8))> =
-        Hue::RING.iter().map(|h| (format!("the {} hue", h.name()), hue_rgb(*h))).collect();
+    let mut values: Vec<(String, (u8, u8, u8))> = Hue::RING
+        .iter()
+        .map(|h| (format!("the {} hue", h.name()), hue_rgb(*h)))
+        .collect();
     for r in ResourceId::ALL {
         let c = coat(r);
         if c.dressing != Dressing::Blended {
@@ -1947,8 +2078,7 @@ fn every_resource_wears_a_coat_of_its_own() {
         let n = c.stops.len();
         match c.dressing {
             Dressing::Solid => assert_eq!(
-                n,
-                1,
+                n, 1,
                 "{r:?} wears a solid coat of {n} stops; a solid coat has exactly one"
             ),
             Dressing::Patched | Dressing::Blended => assert!(
@@ -1971,7 +2101,10 @@ fn every_resource_wears_a_coat_of_its_own() {
         dressings.insert(c.dressing);
     }
     for d in [Dressing::Solid, Dressing::Patched, Dressing::Blended] {
-        assert!(dressings.contains(&d), "no resource wears a {d:?} coat; the clowder is diverse");
+        assert!(
+            dressings.contains(&d),
+            "no resource wears a {d:?} coat; the clowder is diverse"
+        );
     }
 }
 
@@ -1986,7 +2119,10 @@ fn every_resource_wears_a_coat_of_its_own() {
 fn a_solid_coat_is_its_one_stop_on_every_character() {
     for hue in Hue::RING {
         let stops: &'static [Hue] = Box::leak(Box::new([hue]));
-        let c = Coat { stops, dressing: Dressing::Solid };
+        let c = Coat {
+            stops,
+            dressing: Dressing::Solid,
+        };
         for n in 1..=13 {
             for (i, colour) in coat_colours(c, n).into_iter().enumerate() {
                 assert_eq!(
@@ -2014,11 +2150,16 @@ fn a_patched_coat_lies_in_near_equal_runs_the_first_ones_a_character_longer() {
         &[Hue::Pond, Hue::Blush, Hue::Pond, Hue::Blush],
     ];
     for stops in STOPS {
-        let c = Coat { stops, dressing: Dressing::Patched };
+        let c = Coat {
+            stops,
+            dressing: Dressing::Patched,
+        };
         let k = stops.len();
         for n in 1..=20 {
-            let drawn: Vec<(u8, u8, u8)> =
-                coat_colours(c, n).into_iter().map(|col| rgb_of(col, "a patched coat")).collect();
+            let drawn: Vec<(u8, u8, u8)> = coat_colours(c, n)
+                .into_iter()
+                .map(|col| rgb_of(col, "a patched coat"))
+                .collect();
             let expected: Vec<(u8, u8, u8)> = if n < k {
                 stops[..n].iter().map(|h| hue_rgb(*h)).collect()
             } else {
@@ -2049,10 +2190,22 @@ fn a_blend_is_a_straight_path_in_oklab_between_its_two_colours() {
     for (i, a) in Hue::RING.iter().enumerate() {
         for b in Hue::RING.iter().skip(i + 1) {
             let (ca, cb) = (a.color(), b.color());
-            assert_eq!(rgb_of(blend(ca, cb, 0.0), "a blend"), hue_rgb(*a), "a blend at 0 is its first colour");
-            assert_eq!(rgb_of(blend(ca, cb, 1.0), "a blend"), hue_rgb(*b), "a blend at 1 is its second colour");
+            assert_eq!(
+                rgb_of(blend(ca, cb, 0.0), "a blend"),
+                hue_rgb(*a),
+                "a blend at 0 is its first colour"
+            );
+            assert_eq!(
+                rgb_of(blend(ca, cb, 1.0), "a blend"),
+                hue_rgb(*b),
+                "a blend at 1 is its second colour"
+            );
             let (la, lb) = (oklab(hue_rgb(*a)), oklab(hue_rgb(*b)));
-            let mid = from_oklab(((la.0 + lb.0) / 2.0, (la.1 + lb.1) / 2.0, (la.2 + lb.2) / 2.0));
+            let mid = from_oklab((
+                (la.0 + lb.0) / 2.0,
+                (la.1 + lb.1) / 2.0,
+                (la.2 + lb.2) / 2.0,
+            ));
             let got = rgb_of(blend(ca, cb, 0.5), "a blend");
             let off = |x: u8, y: u8| (i16::from(x) - i16::from(y)).unsigned_abs();
             assert!(
@@ -2081,23 +2234,47 @@ fn a_blend_is_a_straight_path_in_oklab_between_its_two_colours() {
 fn a_blended_coat_runs_from_first_stop_to_last_with_each_segment_an_equal_share() {
     const THREE: &[Hue] = &[Hue::Sky, Hue::Bluebell, Hue::Orchid];
     const TWO: &[Hue] = &[Hue::Poppy, Hue::Sky];
-    let three = Coat { stops: THREE, dressing: Dressing::Blended };
-    let two = Coat { stops: TWO, dressing: Dressing::Blended };
+    let three = Coat {
+        stops: THREE,
+        dressing: Dressing::Blended,
+    };
+    let two = Coat {
+        stops: TWO,
+        dressing: Dressing::Blended,
+    };
     let value = |c: Color| rgb_of(c, "a blended coat");
 
     let one = coat_colours(three, 1);
-    assert_eq!(value(one[0]), hue_rgb(Hue::Sky), "a one-character name wears the first stop");
+    assert_eq!(
+        value(one[0]),
+        hue_rgb(Hue::Sky),
+        "a one-character name wears the first stop"
+    );
 
     let pair = coat_colours(three, 2);
     assert_eq!(value(pair[0]), hue_rgb(Hue::Sky));
-    assert_eq!(value(pair[1]), hue_rgb(Hue::Orchid), "a two-character name ends on the last stop");
+    assert_eq!(
+        value(pair[1]),
+        hue_rgb(Hue::Orchid),
+        "a two-character name ends on the last stop"
+    );
 
     let five = coat_colours(three, 5);
     assert_eq!(value(five[0]), hue_rgb(Hue::Sky));
-    assert_eq!(value(five[2]), hue_rgb(Hue::Bluebell), "the middle character lands on the middle stop");
+    assert_eq!(
+        value(five[2]),
+        hue_rgb(Hue::Bluebell),
+        "the middle character lands on the middle stop"
+    );
     assert_eq!(value(five[4]), hue_rgb(Hue::Orchid));
-    assert_eq!(value(five[1]), value(blend(Hue::Sky.color(), Hue::Bluebell.color(), 0.5)));
-    assert_eq!(value(five[3]), value(blend(Hue::Bluebell.color(), Hue::Orchid.color(), 0.5)));
+    assert_eq!(
+        value(five[1]),
+        value(blend(Hue::Sky.color(), Hue::Bluebell.color(), 0.5))
+    );
+    assert_eq!(
+        value(five[3]),
+        value(blend(Hue::Bluebell.color(), Hue::Orchid.color(), 0.5))
+    );
 
     let nine = coat_colours(two, 9);
     for (i, colour) in nine.iter().enumerate() {
@@ -2121,8 +2298,10 @@ fn a_blended_coat_runs_from_first_stop_to_last_with_each_segment_an_equal_share(
 /// @spec TUI-THEME-018
 #[test]
 fn every_coat_colour_keeps_the_clearance_floor_from_every_state_colour() {
-    let states: Vec<(&str, (u8, u8, u8))> =
-        PALETTE_ROLES.iter().map(|r| (role_name(*r), rgb(*r))).collect();
+    let states: Vec<(&str, (u8, u8, u8))> = PALETTE_ROLES
+        .iter()
+        .map(|r| (role_name(*r), rgb(*r)))
+        .collect();
     let check = |what: &str, value: (u8, u8, u8)| {
         for (name, state) in &states {
             let d = delta_e(value, *state);
@@ -2146,7 +2325,10 @@ fn every_coat_colour_keeps_the_clearance_floor_from_every_state_colour() {
         }
         for n in 2..=32 {
             for (i, colour) in coat_colours(c, n).into_iter().enumerate() {
-                check(&format!("{r:?}'s blended coat, character {i} of {n}"), rgb_of(colour, "a blend"));
+                check(
+                    &format!("{r:?}'s blended coat, character {i} of {n}"),
+                    rgb_of(colour, "a blend"),
+                );
             }
         }
     }
@@ -2165,7 +2347,9 @@ fn a_blend_runs_only_between_stops_whose_path_keeps_the_clearance() {
         for b in Hue::RING.iter().skip(i + 1) {
             let clear = (0..=64).all(|k| {
                 let colour = rgb_of(blend(a.color(), b.color(), f64::from(k) / 64.0), "a blend");
-                PALETTE_ROLES.iter().all(|role| delta_e(colour, rgb(*role)) >= CLEARANCE_FLOOR)
+                PALETTE_ROLES
+                    .iter()
+                    .all(|role| delta_e(colour, rgb(*role)) >= CLEARANCE_FLOOR)
             });
             if clear {
                 allowed.push((*a, *b));
@@ -2180,7 +2364,10 @@ fn a_blend_runs_only_between_stops_whose_path_keeps_the_clearance() {
          forbidden {forbidden:?}"
     );
     let names = |pairs: &[(Hue, Hue)]| -> Vec<String> {
-        pairs.iter().map(|(a, b)| format!("{}–{}", a.name(), b.name())).collect()
+        pairs
+            .iter()
+            .map(|(a, b)| format!("{}–{}", a.name(), b.name()))
+            .collect()
     };
     for r in ResourceId::ALL {
         let c = coat(r);

@@ -82,7 +82,10 @@ pub fn run() -> ExitCode {
             return ExitCode::FAILURE;
         }
         Err(lock::LockError::Io(e)) => {
-            eprintln!("clowder could not take its session lock beside {}: {e}", save_path.display());
+            eprintln!(
+                "clowder could not take its session lock beside {}: {e}",
+                save_path.display()
+            );
             return ExitCode::FAILURE;
         }
     };
@@ -158,7 +161,9 @@ pub fn run() -> ExitCode {
                     }
                 }
             }
-            Err(clowder_core::LoadError::NotFound) => Startup::NewGame(GameState::new(load_now_unix)),
+            Err(clowder_core::LoadError::NotFound) => {
+                Startup::NewGame(GameState::new(load_now_unix))
+            }
         },
     };
 
@@ -199,7 +204,13 @@ pub fn run() -> ExitCode {
         let backend = ratatui::backend::CrosstermBackend::new(std::io::stdout());
         match ratatui::Terminal::new(backend) {
             Ok(mut terminal) => {
-                parting = session(startup, save_path.clone(), &mut terminal, &mut TerminalInput, &term::termination_requested);
+                parting = session(
+                    startup,
+                    save_path.clone(),
+                    &mut terminal,
+                    &mut TerminalInput,
+                    &term::termination_requested,
+                );
                 // The drawing library shows the cursor again when it is let
                 // go, and answers a failure of that with a print — fatal when
                 // standard error is the terminal that was lost
@@ -341,7 +352,14 @@ pub fn session<B: ratatui::backend::Backend>(
         }
         // TUI-RUN-033/034: a load's catch-up replays behind the waking
         // screen, after the terminal is taken — never before.
-        Startup::Loaded(catch_up) => run_wake(*catch_up, save_path, terminal, input, terminated, &mut parting),
+        Startup::Loaded(catch_up) => run_wake(
+            *catch_up,
+            save_path,
+            terminal,
+            input,
+            terminated,
+            &mut parting,
+        ),
     };
     let Some(mut app) = opened else {
         return parting;
@@ -547,12 +565,16 @@ impl App {
         // width, and read once, before any resize this frame's own events
         // apply, exactly as every other per-frame decision reads the layout
         // that was in force when the key arrived. @spec TUI-NAV-017
-        let narrow_on_screen =
-            matches!(self.prev_layout.map(|l| l.body), Some(crate::render::Body::Narrow { .. }));
+        let narrow_on_screen = matches!(
+            self.prev_layout.map(|l| l.body),
+            Some(crate::render::Body::Narrow { .. })
+        );
         // Space and i's swap step is judged the same way, over the same
         // frozen layout. @spec TUI-NAV-088
-        let pane_on_screen =
-            matches!(self.prev_layout.map(|l| l.body), Some(crate::render::Body::Wide { .. }));
+        let pane_on_screen = matches!(
+            self.prev_layout.map(|l| l.body),
+            Some(crate::render::Body::Wide { .. })
+        );
         let (mut others, mut mice) = (0, 0);
         for event in input {
             // The frame's two bounds, as input is taken under them; a step
@@ -583,13 +605,21 @@ impl App {
                     // TUI-NAV-088: Space and i act on the inspector call only
                     // where the narrow-mode swap is what would answer them.
                     if action == crate::nav::Action::ToggleInspector {
-                        crate::nav::toggle_inspector(&mut self.view, narrow_on_screen, pane_on_screen);
+                        crate::nav::toggle_inspector(
+                            &mut self.view,
+                            narrow_on_screen,
+                            pane_on_screen,
+                        );
                         continue;
                     }
                     // The Journal's own scrolling by key stops where the last
                     // frame drew its last line, which only that frame's record
                     // holds. @spec TUI-NAV-134
-                    if crate::nav::journal_key(&action, &mut self.view, self.pointer_record.as_ref()) {
+                    if crate::nav::journal_key(
+                        &action,
+                        &mut self.view,
+                        self.pointer_record.as_ref(),
+                    ) {
                         continue;
                     }
                     match crate::nav::update(action, &mut self.view, &self.state) {
@@ -601,7 +631,11 @@ impl App {
                             // that runs through a command rather than a load.
                             // @spec TUI-NAV-027, TUI-NAV-050, TUI-NAV-107
                             Ok(events) => {
-                                crate::nav::queue_command_reports(&mut self.view, &self.state, &events);
+                                crate::nav::queue_command_reports(
+                                    &mut self.view,
+                                    &self.state,
+                                    &events,
+                                );
                             }
                             Err(e) => {
                                 self.view.footer = Some((
@@ -639,8 +673,10 @@ impl App {
                                 } else {
                                     format!("{why} — {done} of {n} done")
                                 };
-                                self.view.footer =
-                                    Some((message, Instant::now() + std::time::Duration::from_secs(4)));
+                                self.view.footer = Some((
+                                    message,
+                                    Instant::now() + std::time::Duration::from_secs(4),
+                                ));
                             }
                         }
                     }
@@ -654,7 +690,13 @@ impl App {
                 crossterm::event::Event::Mouse(mouse) => {
                     if let Some(record) = &self.pointer_record {
                         let size = last_resize.unwrap_or_else(|| record.size());
-                        let _ = crate::nav::pointer_event(*mouse, &mut self.view, &self.state, record, size);
+                        let _ = crate::nav::pointer_event(
+                            *mouse,
+                            &mut self.view,
+                            &self.state,
+                            record,
+                            size,
+                        );
                     }
                 }
                 _ => {}
@@ -713,7 +755,12 @@ impl App {
         // @spec TUI-RUN-014
         let mut used = None;
         terminal.draw(|f| {
-            used = Some(crate::render::frame_recorded(f, &self.state, &self.view, self.prev_layout.as_ref()));
+            used = Some(crate::render::frame_recorded(
+                f,
+                &self.state,
+                &self.view,
+                self.prev_layout.as_ref(),
+            ));
         })?;
         if let Some((layout, record)) = used {
             self.prev_layout = Some(layout);
@@ -735,7 +782,12 @@ impl App {
         // earned slow and saved fast were conjured, by the ratio between the
         // two speeds. What the player earned is theirs, so it is stored as
         // what it is. @spec TUI-RUN-027, SAVE-017
-        clowder_core::write_save_owing(&self.save_path, &self.state, now_unix(), self.clock.backlog())
+        clowder_core::write_save_owing(
+            &self.save_path,
+            &self.state,
+            now_unix(),
+            self.clock.backlog(),
+        )
     }
 
     /// How long the awake game waits out its frame budget. @spec TUI-RUN-035

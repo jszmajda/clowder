@@ -44,16 +44,22 @@ fn boundary_events_fire_on_crossings_and_not_at_start() {
     let mut s = GameState::new(2);
     let early = run_ticks(&mut s, 249);
     assert!(
-        !early.iter().any(|e| matches!(e, Event::SeasonChanged { .. } | Event::NewYear { .. })),
+        !early
+            .iter()
+            .any(|e| matches!(e, Event::SeasonChanged { .. } | Event::NewYear { .. })),
         "no season/year events before the first season boundary"
     );
     let cross = run_ticks(&mut s, 1); // tick 250 = day 25
-    assert!(cross.contains(&Event::SeasonChanged { season: Season::Summer }));
+    assert!(cross.contains(&Event::SeasonChanged {
+        season: Season::Summer
+    }));
 
     s.ticks = 990;
     let newyear = run_ticks(&mut s, 10); // tick 1000 = day 100 = year 1
     assert!(newyear.contains(&Event::NewYear { year: 1 }));
-    assert!(newyear.contains(&Event::SeasonChanged { season: Season::Spring }));
+    assert!(newyear.contains(&Event::SeasonChanged {
+        season: Season::Spring
+    }));
 }
 
 // @spec SIM-ENG-004
@@ -100,17 +106,22 @@ fn error_precedence_reports_the_most_fundamental_blocker() {
     // AlreadyResearched beats InsufficientResources.
     grant(&mut s, StructureId::CardboardBox, 1);
     give(&mut s, ResourceId::Curiosity, 20.0);
-    s.apply(Command::ResearchIdea(IdeaId::PantryOrganization)).unwrap();
+    s.apply(Command::ResearchIdea(IdeaId::PantryOrganization))
+        .unwrap();
     give(&mut s, ResourceId::Curiosity, 0.0);
     assert_eq!(
-        s.apply(Command::ResearchIdea(IdeaId::PantryOrganization)).unwrap_err(),
+        s.apply(Command::ResearchIdea(IdeaId::PantryOrganization))
+            .unwrap_err(),
         CommandError::AlreadyResearched
     );
     // StorageFull beats InsufficientResources: twigs at cap AND catnip < 10.
     let twig_cap = s.cap(ResourceId::Twigs);
     give(&mut s, ResourceId::Twigs, twig_cap);
     give(&mut s, ResourceId::Catnip, 3.0);
-    assert_eq!(s.apply(Command::Forage).unwrap_err(), CommandError::StorageFull);
+    assert_eq!(
+        s.apply(Command::Forage).unwrap_err(),
+        CommandError::StorageFull
+    );
 }
 
 // @spec SIM-ENG-007
@@ -140,7 +151,11 @@ fn same_seed_same_commands_bit_identical_state() {
 
     let mut c = GameState::new(43);
     script(&mut c);
-    assert_ne!(save_string(&a, 0), save_string(&c, 0), "different seed, different world");
+    assert_ne!(
+        save_string(&a, 0),
+        save_string(&c, 0),
+        "different seed, different world"
+    );
 }
 
 // @spec SIM-ENG-008
@@ -154,7 +169,11 @@ fn rng_is_deterministic_and_serializable() {
 
     let json = serde_json::to_string(&a).unwrap();
     let mut restored: Pcg32 = serde_json::from_str(&json).unwrap();
-    assert_eq!(restored.next_u32(), b.next_u32(), "round-trip preserves position");
+    assert_eq!(
+        restored.next_u32(),
+        b.next_u32(),
+        "round-trip preserves position"
+    );
 }
 
 // @spec SIM-ENG-015
@@ -182,7 +201,10 @@ fn events_carry_data_not_prose() {
     let mut s = GameState::new(8);
     adopt(&mut s, 1);
     let name = &s.kittens[0].name;
-    assert!(!name.is_empty(), "arrival event/kitten must carry a real name");
+    assert!(
+        !name.is_empty(),
+        "arrival event/kitten must carry a real name"
+    );
 }
 
 // @spec SIM-ENG-010
@@ -193,7 +215,10 @@ fn mood_events_fire_only_on_tier_transitions() {
     give(&mut s, ResourceId::Catnip, 150.0);
     let steady = run_days(&mut s, 3);
     assert_eq!(
-        steady.iter().filter(|e| matches!(e, Event::KittenMood { .. })).count(),
+        steady
+            .iter()
+            .filter(|e| matches!(e, Event::KittenMood { .. }))
+            .count(),
         0,
         "steady mood emits no mood events"
     );
@@ -201,7 +226,14 @@ fn mood_events_fire_only_on_tier_transitions() {
     let famine = run_ticks(&mut s, 3);
     let grumpy_events: Vec<_> = famine
         .iter()
-        .filter(|e| matches!(e, Event::KittenMood { tier: MoodTier::Grumpy }))
+        .filter(|e| {
+            matches!(
+                e,
+                Event::KittenMood {
+                    tier: MoodTier::Grumpy
+                }
+            )
+        })
         .collect();
     assert_eq!(grumpy_events.len(), 1, "exactly one transition into Grumpy");
 }
@@ -211,7 +243,10 @@ fn mood_events_fire_only_on_tier_transitions() {
 fn zoomies_start_roughly_once_a_season() {
     let mut s = GameState::new(10);
     let events = run_days(&mut s, 2000);
-    let starts = events.iter().filter(|e| matches!(e, Event::ZoomiesStarted { .. })).count();
+    let starts = events
+        .iter()
+        .filter(|e| matches!(e, Event::ZoomiesStarted { .. }))
+        .count();
     // 4%/day over 2000 days ⇒ ~80 expected; generous bounds against seed luck.
     assert!((30..=150).contains(&starts), "zoomies starts: {starts}");
 }
@@ -252,8 +287,9 @@ fn zoomies_window_covers_exactly_the_stated_duration() {
     for seed in 0..1000u64 {
         let mut s = GameState::new(seed);
         let events = run_ticks(&mut s, 10);
-        if let Some(Event::ZoomiesStarted { until_tick }) =
-            events.iter().find(|e| matches!(e, Event::ZoomiesStarted { .. }))
+        if let Some(Event::ZoomiesStarted { until_tick }) = events
+            .iter()
+            .find(|e| matches!(e, Event::ZoomiesStarted { .. }))
         {
             found = Some((s.ticks, *until_tick, s));
             break;
@@ -270,8 +306,9 @@ fn zoomies_window_covers_exactly_the_stated_duration() {
         let mut s = GameState::new(seed);
         s.ideas.insert(IdeaId::ZoomieChanneling);
         let events = run_ticks(&mut s, 10);
-        if let Some(Event::ZoomiesStarted { until_tick }) =
-            events.iter().find(|e| matches!(e, Event::ZoomiesStarted { .. }))
+        if let Some(Event::ZoomiesStarted { until_tick }) = events
+            .iter()
+            .find(|e| matches!(e, Event::ZoomiesStarted { .. }))
         {
             found_long = Some((s.ticks, *until_tick));
             break;
@@ -306,7 +343,11 @@ fn flavor_events_are_pure_delight() {
         })
         .collect();
     // 8%/day over 1500 days ⇒ ~120 expected.
-    assert!((50..=220).contains(&flavors.len()), "flavor count: {}", flavors.len());
+    assert!(
+        (50..=220).contains(&flavors.len()),
+        "flavor count: {}",
+        flavors.len()
+    );
     // With zero kittens ever, only ambient templates may fire, kitten-less.
     for (template, kitten) in &flavors {
         assert!(!content::FLAVOR_TEMPLATES[*template].needs_kitten);
@@ -342,7 +383,10 @@ fn boundary_tick_processing_and_draws_run_in_fixed_order() {
         .iter()
         .position(|e| matches!(e, Event::KittenArrived { .. }))
         .expect("pity-forced arrival");
-    assert!(returned_at < arrived_at, "returns come home before newcomers arrive");
+    assert!(
+        returned_at < arrived_at,
+        "returns come home before newcomers arrive"
+    );
 
     // Phase-1 arrivals precede phase-5 zoomies/flavor in the same tick's events.
     let mut hunted = None;
@@ -352,17 +396,23 @@ fn boundary_tick_processing_and_draws_run_in_fixed_order() {
         grant(&mut s, StructureId::CozyCushion, 1);
         s.pity = 4;
         let events = run_days(&mut s, 1);
-        let arrival = events.iter().position(|e| matches!(e, Event::KittenArrived { .. }));
-        let phase5 = events.iter().position(|e| {
-            matches!(e, Event::ZoomiesStarted { .. } | Event::Flavor { .. })
-        });
+        let arrival = events
+            .iter()
+            .position(|e| matches!(e, Event::KittenArrived { .. }));
+        let phase5 = events
+            .iter()
+            .position(|e| matches!(e, Event::ZoomiesStarted { .. } | Event::Flavor { .. }));
         if let (Some(a), Some(p)) = (arrival, phase5) {
             hunted = Some((a, p));
             break;
         }
     }
-    let (arrival_ix, phase5_ix) = hunted.expect("some seed fires arrival + a phase-5 event same day");
-    assert!(arrival_ix < phase5_ix, "daily processing precedes random events");
+    let (arrival_ix, phase5_ix) =
+        hunted.expect("some seed fires arrival + a phase-5 event same day");
+    assert!(
+        arrival_ix < phase5_ix,
+        "daily processing precedes random events"
+    );
 }
 
 // @spec SIM-ENG-017
@@ -433,24 +483,41 @@ fn converter_throttle_scales_by_worst_input() {
 fn content_reveals_stick_and_availability_advises() {
     let mut s = GameState::new(32);
     // A fresh meadow has never seen 30% of a patch's price.
-    assert_eq!(s.availability(ContentId::Structure(StructureId::CatnipPatch)), Availability::Hidden);
+    assert_eq!(
+        s.availability(ContentId::Structure(StructureId::CatnipPatch)),
+        Availability::Hidden
+    );
     // Gather up to the reveal fraction (30% of 10 = 3 catnip).
     for _ in 0..3 {
         s.apply(Command::GatherCatnip).unwrap();
     }
     let events = run_ticks(&mut s, 1);
-    assert!(events.contains(&Event::Revealed { id: ContentId::Structure(StructureId::CatnipPatch) }));
-    assert_eq!(s.availability(ContentId::Structure(StructureId::CatnipPatch)), Availability::Teased);
+    assert!(events.contains(&Event::Revealed {
+        id: ContentId::Structure(StructureId::CatnipPatch)
+    }));
+    assert_eq!(
+        s.availability(ContentId::Structure(StructureId::CatnipPatch)),
+        Availability::Teased
+    );
     for _ in 0..8 {
         s.apply(Command::GatherCatnip).unwrap();
     }
-    assert_eq!(s.availability(ContentId::Structure(StructureId::CatnipPatch)), Availability::Available);
+    assert_eq!(
+        s.availability(ContentId::Structure(StructureId::CatnipPatch)),
+        Availability::Available
+    );
     // Sticky: spending back below the fraction keeps it revealed.
     s.apply(Command::Build(StructureId::CatnipPatch)).unwrap();
     give(&mut s, ResourceId::Catnip, 0.0);
-    assert_ne!(s.availability(ContentId::Structure(StructureId::CatnipPatch)), Availability::Hidden);
+    assert_ne!(
+        s.availability(ContentId::Structure(StructureId::CatnipPatch)),
+        Availability::Hidden
+    );
     // Idea-gated structures stay Hidden until their idea exists.
-    assert_eq!(s.availability(ContentId::Structure(StructureId::Pantry)), Availability::Hidden);
+    assert_eq!(
+        s.availability(ContentId::Structure(StructureId::Pantry)),
+        Availability::Hidden
+    );
 }
 
 // @spec SIM-ENG-024, SIM-ENG-043
@@ -472,7 +539,10 @@ fn speed_is_clamped_state_that_never_touches_tick_rules() {
     fast.apply(Command::SetSpeed(8.0)).unwrap();
     let ev_slow = run_ticks(&mut slow, 200);
     let ev_fast = run_ticks(&mut fast, 200);
-    assert_eq!(ev_slow, ev_fast, "speed changes cadence at the boundary, never tick behavior");
+    assert_eq!(
+        ev_slow, ev_fast,
+        "speed changes cadence at the boundary, never tick behavior"
+    );
 
     // The speed field is the ONE permitted difference. The journals must match
     // outright: a speed change is never journaled, because the journal records
@@ -480,7 +550,10 @@ fn speed_is_clamped_state_that_never_touches_tick_rules() {
     // assertion is that spec's only coverage, which is why it is annotated on
     // the test rather than on any code — a rule about what never happens has no
     // production sink to point at.
-    assert_eq!(slow.journal, fast.journal, "a speed change leaves no trace in the journal");
+    assert_eq!(
+        slow.journal, fast.journal,
+        "a speed change leaves no trace in the journal"
+    );
 
     fast.speed = slow.speed;
     assert_eq!(save_string(&slow, 0), save_string(&fast, 0));
@@ -498,7 +571,8 @@ fn speed_is_clamped_state_that_never_touches_tick_rules() {
 fn a_speed_that_is_not_a_number_is_replaced_rather_than_clamped() {
     for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         let mut s = GameState::new(11);
-        s.apply(Command::SetSpeed(bad)).expect("setting speed never fails");
+        s.apply(Command::SetSpeed(bad))
+            .expect("setting speed never fails");
         assert!(
             s.speed.is_finite(),
             "SetSpeed({bad}) left speed at {}, which no save can carry and no interval can \
@@ -618,14 +692,19 @@ fn no_rejected_command_of_any_kind_leaves_a_mark() {
 #[test]
 #[ignore = "golden: run before shipping — a change means existing saves diverge"]
 fn the_draw_schedule_has_not_moved() {
-    for (seed, expected) in [(7u64, 11_951_728_235_097_488_807u64), (99, 12_315_264_012_441_656_832)] {
+    for (seed, expected) in [
+        (7u64, 11_951_728_235_097_488_807u64),
+        (99, 12_315_264_012_441_656_832),
+    ] {
         let mut s = GameState::new(seed);
         s.resources[ResourceId::Catnip.ix()] += 5_000.0;
         for _ in 0..20_000 {
             s.tick();
         }
         let saved: serde_json::Value = serde_json::from_str(&save_string(&s, 0)).unwrap();
-        let actual = saved["state"]["rng"]["state"].as_u64().expect("the rng records a position");
+        let actual = saved["state"]["rng"]["state"]
+            .as_u64()
+            .expect("the rng records a position");
         assert_eq!(
             actual, expected,
             "after 20000 ticks on seed {seed} the generator sits at {actual}, not {expected}: \

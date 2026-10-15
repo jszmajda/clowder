@@ -65,7 +65,11 @@ fn universe(state: &GameState) -> Vec<PaletteResult> {
                 continue;
             }
             seen.push(item);
-            out.push(PaletteResult { section, key: row.key.clone(), name: name_for(state, &row.key) });
+            out.push(PaletteResult {
+                section,
+                key: row.key.clone(),
+                name: name_for(state, &row.key),
+            });
         }
     }
     out
@@ -117,7 +121,11 @@ fn name_for(state: &GameState, key: &RowKey) -> String {
         RowKey::Adventure(Some(a)) => humanize(&format!("{a:?}")),
         RowKey::Adventure(None) => "No Adventure".to_string(),
         RowKey::Kitten(ix, _) => {
-            let name = state.kittens.get(*ix).map(|k| k.name.as_str()).unwrap_or("");
+            let name = state
+                .kittens
+                .get(*ix)
+                .map(|k| k.name.as_str())
+                .unwrap_or("");
             if name.is_empty() {
                 format!("Kitten {}", ix + 1)
             } else {

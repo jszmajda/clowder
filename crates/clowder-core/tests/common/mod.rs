@@ -92,7 +92,10 @@ pub fn per_unit_commands() -> Vec<Command> {
 /// The resources a meadow holds: every stock standing above zero, by any
 /// amount (SIM-ENG-048 draws no dust guard).
 pub fn held_resources(s: &GameState) -> BTreeSet<ResourceId> {
-    ResourceId::ALL.into_iter().filter(|r| s.stock(*r) > 0.0).collect()
+    ResourceId::ALL
+        .into_iter()
+        .filter(|r| s.stock(*r) > 0.0)
+        .collect()
 }
 
 /// The resources named in a price the core would state for this meadow,

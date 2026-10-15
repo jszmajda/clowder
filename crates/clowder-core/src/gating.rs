@@ -7,7 +7,9 @@
 
 use crate::content;
 use crate::effects::Effect;
-use crate::state::{AdventureId, ContentId, GameState, IdeaId, Location, ResourceId, RiteId, StructureId, EPSILON};
+use crate::state::{
+    AdventureId, ContentId, GameState, IdeaId, Location, ResourceId, RiteId, StructureId, EPSILON,
+};
 
 pub use crate::query::LockReason;
 
@@ -51,7 +53,10 @@ impl GameState {
                 if !self.job_unlocked(j) {
                     return Some(LockReason::Prerequisite);
                 }
-                let idle = self.kittens.iter().any(|k| k.location == Location::Home && k.job.is_none());
+                let idle = self
+                    .kittens
+                    .iter()
+                    .any(|k| k.location == Location::Home && k.job.is_none());
                 if !idle {
                     return Some(LockReason::NoOneFree);
                 }
@@ -66,7 +71,8 @@ impl GameState {
                     return Some(LockReason::Prerequisite);
                 }
                 let count = self.rite_counts[r.ix()];
-                let restackable = self.rites.contains(&RiteId::Enlightenment) && content::rite_restackable(r);
+                let restackable =
+                    self.rites.contains(&RiteId::Enlightenment) && content::rite_restackable(r);
                 if count >= 1 && !restackable {
                     return Some(LockReason::AlreadyYours);
                 }
@@ -109,7 +115,9 @@ impl GameState {
                 if self.elder_wisdom + EPSILON < cost {
                     // Elder Wisdom is not a `ResourceId`, so — exactly as the
                     // command layer does — the shortfall names no amount.
-                    return Some(LockReason::ShortBy { missing: Vec::new() });
+                    return Some(LockReason::ShortBy {
+                        missing: Vec::new(),
+                    });
                 }
                 None
             }
@@ -173,7 +181,13 @@ impl GameState {
             return 1.0;
         }
         cost.iter()
-            .map(|(r, amount)| if *amount <= EPSILON { 1.0 } else { (self.stock(*r) / amount).clamp(0.0, 1.0) })
+            .map(|(r, amount)| {
+                if *amount <= EPSILON {
+                    1.0
+                } else {
+                    (self.stock(*r) / amount).clamp(0.0, 1.0)
+                }
+            })
             .fold(f64::INFINITY, f64::min)
     }
 
@@ -224,7 +238,10 @@ impl GameState {
                 let count = self.rite_counts[r.ix()] + extra;
                 let ramp = content::RITE_RESTACK_RATIO.powi(count as i32);
                 let discount = 1.0 + self.effect(Effect::RiteCostRatio);
-                def.cost.iter().map(|(res, amt)| (*res, amt * ramp * discount)).collect()
+                def.cost
+                    .iter()
+                    .map(|(res, amt)| (*res, amt * ramp * discount))
+                    .collect()
             }
             ContentId::Arch(a) => content::arch_def(a).cost.to_vec(),
             ContentId::Refinement(r) => {

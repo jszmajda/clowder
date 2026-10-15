@@ -324,7 +324,10 @@ fn all_rows(state: &GameState) -> Vec<(Section, Row)> {
 fn commands_of(row: &Row) -> Vec<Command> {
     match &row.kind {
         RowKind::Act { command, .. } => vec![*command],
-        RowKind::Count { increment, decrement } => vec![*increment, *decrement],
+        RowKind::Count {
+            increment,
+            decrement,
+        } => vec![*increment, *decrement],
         RowKind::Display | RowKind::Group => Vec::new(),
     }
 }
@@ -351,8 +354,16 @@ fn content_keys(state: &GameState) -> Vec<(Section, ContentId)> {
 /// `1` by the static map; nothing in the game ever renumbers it.
 fn home() -> Section {
     let home = Section::from_digit('1').expect("digit 1 addresses a section");
-    assert_eq!(home, Section::Meadow, "home — where the stores live — is digit 1");
-    assert_eq!(home.digit(), '1', "and home answers to that digit in both directions");
+    assert_eq!(
+        home,
+        Section::Meadow,
+        "home — where the stores live — is digit 1"
+    );
+    assert_eq!(
+        home.digit(),
+        '1',
+        "and home answers to that digit in both directions"
+    );
     home
 }
 
@@ -443,7 +454,12 @@ fn the_section_map_accounts_for_every_command_variant() {
 /// @spec TUI-NAV-039
 #[test]
 fn the_two_sectionless_commands_are_offered_by_no_row() {
-    for state in [maximal(), poor_but_unlocked(), rich_but_locked(), GameState::new(5)] {
+    for state in [
+        maximal(),
+        poor_but_unlocked(),
+        rich_but_locked(),
+        GameState::new(5),
+    ] {
         for (section, row) in all_rows(&state) {
             for c in commands_of(&row) {
                 assert!(
@@ -469,7 +485,10 @@ fn standing_down_is_a_row_on_the_declare_list() {
     assert!(
         legacy.iter().any(|r| matches!(
             &r.kind,
-            RowKind::Act { command: Command::DeclareAdventure(None), .. }
+            RowKind::Act {
+                command: Command::DeclareAdventure(None),
+                ..
+            }
         )),
         "the declare list offers no stand-down row, so declaring nothing is reachable only by Esc"
     );
@@ -624,7 +643,10 @@ fn building_and_crafting_repeat_rather_than_pass_a_count() {
         );
     }
 
-    assert!(found > 0, "fixture: build and craft rows must be present for this to mean anything");
+    assert!(
+        found > 0,
+        "fixture: build and craft rows must be present for this to mean anything"
+    );
 }
 
 /// A command carries one count tag wherever it is offered. A later chunk reads
@@ -666,7 +688,9 @@ fn a_command_carries_the_same_count_tag_wherever_it_appears() {
 /// command, and single for every other command.
 fn tag_the_spec_names(command: &Command) -> CountSemantics {
     match command {
-        Command::Pounce(_) | Command::Trade(_, _) | Command::DeepNap(_) => CountSemantics::CountTaking,
+        Command::Pounce(_) | Command::Trade(_, _) | Command::DeepNap(_) => {
+            CountSemantics::CountTaking
+        }
         Command::Build(_)
         | Command::Craft(_)
         | Command::BuyRefinement(_)
@@ -707,7 +731,10 @@ fn every_action_row_carries_exactly_the_tag_the_spec_names_for_its_command() {
 
     for (label, state) in [
         ("a maximal meadow", maximal()),
-        ("everything unlocked, nothing affordable", poor_but_unlocked()),
+        (
+            "everything unlocked, nothing affordable",
+            poor_but_unlocked(),
+        ),
         ("wealth without progress", rich_but_locked()),
         ("a brand-new meadow", GameState::new(5)),
     ] {
@@ -738,7 +765,10 @@ fn every_action_row_carries_exactly_the_tag_the_spec_names_for_its_command() {
         "fixture: every command the spec tags count-taking or repeat-N must be offered by some \
          row, or the tagging assertion says nothing about it"
     );
-    assert!(singles > 0, "fixture: some single-tagged row must be listed");
+    assert!(
+        singles > 0,
+        "fixture: some single-tagged row must be listed"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -753,7 +783,10 @@ fn every_action_row_carries_exactly_the_tag_the_spec_names_for_its_command() {
 fn no_row_names_content_the_core_calls_hidden() {
     for (label, state) in [
         ("a maximal meadow", maximal()),
-        ("everything unlocked, nothing affordable", poor_but_unlocked()),
+        (
+            "everything unlocked, nothing affordable",
+            poor_but_unlocked(),
+        ),
         ("wealth without progress", rich_but_locked()),
         ("a brand-new meadow", GameState::new(5)),
     ] {
@@ -857,7 +890,10 @@ fn wealth_changes_the_marker_never_the_list() {
 fn a_kind_with_no_reveal_ladder_is_present_or_absent_and_never_in_between() {
     for (label, state) in [
         ("a maximal meadow", maximal()),
-        ("everything unlocked, nothing affordable", poor_but_unlocked()),
+        (
+            "everything unlocked, nothing affordable",
+            poor_but_unlocked(),
+        ),
     ] {
         let listed: HashSet<ContentId> =
             content_keys(&state).into_iter().map(|(_, id)| id).collect();
@@ -947,11 +983,17 @@ fn maximal_first_generation() -> GameState {
 fn a_content_row_is_listed_exactly_while_the_core_reports_it_revealed_and_its_gate_open() {
     let meadows: Vec<(&str, GameState)> = vec![
         ("a maximal meadow", maximal()),
-        ("everything unlocked, nothing affordable", poor_but_unlocked()),
+        (
+            "everything unlocked, nothing affordable",
+            poor_but_unlocked(),
+        ),
         ("wealth without progress", rich_but_locked()),
         ("a brand-new meadow", GameState::new(5)),
         ("an open meadow with no kittens", maximal_without_a_roster()),
-        ("an open meadow that has never Moved", maximal_first_generation()),
+        (
+            "an open meadow that has never Moved",
+            maximal_first_generation(),
+        ),
     ];
 
     let mut listed_seen = 0;
@@ -1016,7 +1058,10 @@ fn a_content_row_is_listed_exactly_while_the_core_reports_it_revealed_and_its_ga
     }
 
     assert!(listed_seen > 0, "fixture: some content rows must be listed");
-    assert!(hidden_seen > 0, "fixture: some items must be reported Hidden");
+    assert!(
+        hidden_seen > 0,
+        "fixture: some items must be reported Hidden"
+    );
     assert!(
         shut_gate_seen > 0,
         "fixture: some item must be revealed while its command's gate is shut, or the gate half \
@@ -1050,7 +1095,10 @@ fn drawn_marker(state: &GameState, section: Section, key: &RowKey) -> DrawnMarke
 
     let (w, h) = (150u16, 60u16);
     let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
-    let mut view = nav::ViewState { section: Some(section), ..Default::default() };
+    let mut view = nav::ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     view.focus[section.index()] = Some(key.clone());
     // A finished Ideas row is drawn only while the done group is open
     // (TUI-NAV-113), so it is read with the group opened.
@@ -1065,7 +1113,9 @@ fn drawn_marker(state: &GameState, section: Section, key: &RowKey) -> DrawnMarke
 
     let buf = term.backend().buffer();
     let sym = |x: u16, y: u16| -> String {
-        buf.cell((x, y)).map(|c| c.symbol().to_string()).unwrap_or_default()
+        buf.cell((x, y))
+            .map(|c| c.symbol().to_string())
+            .unwrap_or_default()
     };
     for y in list.y..list.bottom() {
         for x in list.x..list.right() {
@@ -1073,11 +1123,18 @@ fn drawn_marker(state: &GameState, section: Section, key: &RowKey) -> DrawnMarke
                 let glyph = sym(x + 2, y).chars().next().unwrap_or(' ');
                 let style = buf.cell((x + 2, y)).map(|c| c.style()).unwrap_or_default();
                 let name_aligned = sym(x + 3, y) == " " && sym(x + 4, y).trim() != "";
-                return DrawnMarker { glyph, style, name_aligned };
+                return DrawnMarker {
+                    glyph,
+                    style,
+                    name_aligned,
+                };
             }
         }
     }
-    panic!("fixture: no cursor line drawn for {key:?} in {}", section.title())
+    panic!(
+        "fixture: no cursor line drawn for {key:?} in {}",
+        section.title()
+    )
 }
 
 /// The marker TUI-NAV-053 gives a listed row, read from nothing but the core's
@@ -1120,7 +1177,10 @@ fn teased_and_half_covered() -> GameState {
         }
         let covered = state.affordability(id);
         if state.availability(id) == Availability::Teased
-            && matches!(state.lock_reason(id), Some(clowder_core::LockReason::ShortBy { .. }))
+            && matches!(
+                state.lock_reason(id),
+                Some(clowder_core::LockReason::ShortBy { .. })
+            )
             && covered > 0.0
             && covered < 1.0
         {
@@ -1159,9 +1219,18 @@ fn every_row_wears_the_marker_the_cores_lock_reason_and_coverage_give_it() {
 
     let meadows: Vec<(&str, GameState)> = vec![
         ("a maximal meadow", maximal()),
-        ("everything unlocked, nothing affordable", poor_but_unlocked()),
-        ("a revealed structure half paid for", teased_and_half_covered()),
-        ("an open meadow with every kitten at work", maximal_all_hands_busy()),
+        (
+            "everything unlocked, nothing affordable",
+            poor_but_unlocked(),
+        ),
+        (
+            "a revealed structure half paid for",
+            teased_and_half_covered(),
+        ),
+        (
+            "an open meadow with every kitten at work",
+            maximal_all_hands_busy(),
+        ),
         ("a brand-new meadow", GameState::new(5)),
     ];
 
@@ -1307,19 +1376,33 @@ fn every_row_wears_the_marker_the_cores_lock_reason_and_coverage_give_it() {
 fn every_row_the_core_reports_no_lock_reason_for_wears_ready_whatever_the_stock() {
     let meadows: Vec<(&str, GameState)> = vec![
         ("a maximal meadow", maximal()),
-        ("everything unlocked, nothing affordable", poor_but_unlocked()),
-        ("an open meadow with every stock emptied", with_every_stock(&maximal(), 0.0)),
-        ("an open meadow with every kitten at work", maximal_all_hands_busy()),
+        (
+            "everything unlocked, nothing affordable",
+            poor_but_unlocked(),
+        ),
+        (
+            "an open meadow with every stock emptied",
+            with_every_stock(&maximal(), 0.0),
+        ),
+        (
+            "an open meadow with every kitten at work",
+            maximal_all_hands_busy(),
+        ),
         ("wealth without progress", rich_but_locked()),
         ("a brand-new meadow", GameState::new(5)),
-        ("a brand-new meadow with every stock emptied", with_every_stock(&GameState::new(5), 0.0)),
+        (
+            "a brand-new meadow with every stock emptied",
+            with_every_stock(&GameState::new(5), 0.0),
+        ),
     ];
 
     let mut reached: BTreeSet<&'static str> = BTreeSet::new();
     let mut wrong: Vec<String> = Vec::new();
 
     for (label, state) in &meadows {
-        let emptied = ResourceId::ALL.iter().all(|r| state.resources[r.ix()] == 0.0);
+        let emptied = ResourceId::ALL
+            .iter()
+            .all(|r| state.resources[r.ix()] == 0.0);
         for (section, row) in all_rows(state) {
             if !matches!(row.kind, RowKind::Act { .. } | RowKind::Count { .. }) {
                 continue;
@@ -1410,10 +1493,15 @@ fn a_listed_row_of_a_kind_with_no_reveal_ladder_is_never_dimmed_as_teased() {
 
     for (label, state) in [
         ("a maximal meadow", maximal()),
-        ("everything unlocked, nothing affordable", poor_but_unlocked()),
+        (
+            "everything unlocked, nothing affordable",
+            poor_but_unlocked(),
+        ),
     ] {
         for (section, row) in all_rows(&state) {
-            let RowKey::Content(id, _) = row.key else { continue };
+            let RowKey::Content(id, _) = row.key else {
+                continue;
+            };
             if id.is_reveal_tracked() {
                 continue;
             }
@@ -1551,7 +1639,10 @@ fn item_name(state: &GameState, section: Section, key: &RowKey) -> String {
     use ratatui::Terminal;
 
     let (w, h) = (160u16, 12u16);
-    let mut view = nav::ViewState { section: Some(section), ..Default::default() };
+    let mut view = nav::ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     view.focus[section.index()] = Some(key.clone());
     unfold_focus(state, &mut view);
     let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
@@ -1559,7 +1650,11 @@ fn item_name(state: &GameState, section: Section, key: &RowKey) -> String {
         .expect("TestBackend is infallible");
     let buf = term.backend().buffer();
     (0..w)
-        .map(|x| buf.cell((x, 0)).map(|c| c.symbol().to_string()).unwrap_or_default())
+        .map(|x| {
+            buf.cell((x, 0))
+                .map(|c| c.symbol().to_string())
+                .unwrap_or_default()
+        })
         .collect::<String>()
         .trim()
         .to_string()
@@ -1575,7 +1670,10 @@ fn drawn_name_fields(state: &GameState, section: Section, w: u16, h: u16) -> Vec
     use ratatui::Terminal;
 
     let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
-    let mut view = nav::ViewState { section: Some(section), ..Default::default() };
+    let mut view = nav::ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     // Every listed row is drawn, in list order, only with the Ideas section's
     // done group open (TUI-NAV-113).
     if drawn_rows(state, section, &view) != rows(state, section) {
@@ -1605,10 +1703,20 @@ fn drawn_name_fields(state: &GameState, section: Section, w: u16, h: u16) -> Vec
         .map(|(i, row)| {
             let y = y0 + i as u16;
             let line: String = (x0..x1)
-                .map(|x| buf.cell((x, y)).map(|c| c.symbol().to_string()).unwrap_or_default())
+                .map(|x| {
+                    buf.cell((x, y))
+                        .map(|c| c.symbol().to_string())
+                        .unwrap_or_default()
+                })
                 .collect();
             let after_marker: String = line.chars().skip(4).collect();
-            let field = after_marker.trim_start().split("  ").next().unwrap_or("").trim_end().to_string();
+            let field = after_marker
+                .trim_start()
+                .split("  ")
+                .next()
+                .unwrap_or("")
+                .trim_end()
+                .to_string();
             (row, field)
         })
         .collect()
@@ -1652,8 +1760,10 @@ fn every_multi_row_item_listed() -> GameState {
 #[test]
 fn an_items_first_listed_row_draws_its_name_and_each_later_row_its_own_label() {
     let state = every_multi_row_item_listed();
-    let crafts_revealed =
-        CraftId::ALL.iter().filter(|c| state.availability(ContentId::Craft(**c)) != Availability::Hidden).count();
+    let crafts_revealed = CraftId::ALL
+        .iter()
+        .filter(|c| state.availability(ContentId::Craft(**c)) != Availability::Hidden)
+        .count();
     assert!(crafts_revealed > 1, "fixture: several recipes are listed");
     assert!(state.discovered.len() > 1, "fixture: several colonies");
 
@@ -1681,11 +1791,21 @@ fn an_items_first_listed_row_draws_its_name_and_each_later_row_its_own_label() {
                 *multi_items.entry(kind).or_default() += 1;
                 let whr = format!("at {w}x{h}, in the {} list, {item}", section.title());
                 let name = item_name(&state, section, &item_rows[0].0.key);
-                assert!(!name.is_empty(), "fixture: {whr} has a name the inspector states");
+                assert!(
+                    !name.is_empty(),
+                    "fixture: {whr} has a name the inspector states"
+                );
 
                 // Each is a row of its own, with an identity of its own.
-                let keys: HashSet<String> = item_rows.iter().map(|(r, _)| format!("{:?}", r.key)).collect();
-                assert_eq!(keys.len(), item_rows.len(), "{whr}: two of the item's rows share one identity");
+                let keys: HashSet<String> = item_rows
+                    .iter()
+                    .map(|(r, _)| format!("{:?}", r.key))
+                    .collect();
+                assert_eq!(
+                    keys.len(),
+                    item_rows.len(),
+                    "{whr}: two of the item's rows share one identity"
+                );
 
                 // The first listed row draws the item's name.
                 let (first, first_field) = &item_rows[0];
@@ -1699,7 +1819,10 @@ fn an_items_first_listed_row_draws_its_name_and_each_later_row_its_own_label() {
                 // Each later listed row draws its own label, in the name's place.
                 for (later, field) in &item_rows[1..] {
                     let label = act_label(&later.key).unwrap_or_else(|| {
-                        panic!("{whr}: the later row {:?} has no label TUI-NAV-089 names", later.key)
+                        panic!(
+                            "{whr}: the later row {:?} has no label TUI-NAV-089 names",
+                            later.key
+                        )
                     });
                     assert!(
                         reads_as(field, label),
@@ -1730,7 +1853,10 @@ fn an_items_first_listed_row_draws_its_name_and_each_later_row_its_own_label() {
                 );
 
                 // And the list shows the item's name once.
-                let named = drawn.iter().filter(|(r, f)| r.selectable() && reads_as(f, &name)).count();
+                let named = drawn
+                    .iter()
+                    .filter(|(r, f)| r.selectable() && reads_as(f, &name))
+                    .count();
                 assert_eq!(
                     named, 1,
                     "{whr}: the list shows the item's name {name:?} on {named} rows; it heads the \
@@ -1741,7 +1867,10 @@ fn an_items_first_listed_row_draws_its_name_and_each_later_row_its_own_label() {
 
         let craft_rows = multi_items.get("recipe").copied().unwrap_or(0);
         let colony_rows = multi_items.get("colony").copied().unwrap_or(0);
-        assert_eq!(craft_rows, crafts_revealed, "at {w}x{h}: every listed recipe carries several rows");
+        assert_eq!(
+            craft_rows, crafts_revealed,
+            "at {w}x{h}: every listed recipe carries several rows"
+        );
         let colonies = rows(&state, Section::Friends)
             .iter()
             .filter_map(|r| match r.key {
@@ -1751,7 +1880,10 @@ fn an_items_first_listed_row_draws_its_name_and_each_later_row_its_own_label() {
             .collect::<HashSet<ColonyId>>()
             .len();
         assert!(colonies > 1, "fixture: several colonies are listed");
-        assert_eq!(colony_rows, colonies, "at {w}x{h}: every listed colony carries several rows");
+        assert_eq!(
+            colony_rows, colonies,
+            "at {w}x{h}: every listed colony carries several rows"
+        );
         assert_eq!(
             multi_items.get("other").copied().unwrap_or(0),
             0,
@@ -1775,18 +1907,30 @@ fn an_items_first_listed_row_draws_its_name_and_each_later_row_its_own_label() {
 fn each_kitten_is_exactly_one_clowder_row_whose_enter_promotes_it() {
     for (label, state) in [
         ("a maximal meadow", maximal()),
-        ("everything unlocked, nothing affordable", poor_but_unlocked()),
+        (
+            "everything unlocked, nothing affordable",
+            poor_but_unlocked(),
+        ),
         ("a short roster", every_multi_row_item_listed()),
     ] {
-        assert!(state.kittens.len() > 1, "fixture: {label} has several kittens");
+        assert!(
+            state.kittens.len() > 1,
+            "fixture: {label} has several kittens"
+        );
         let mut per_kitten: HashMap<usize, Vec<(Section, Row)>> = HashMap::new();
         for (section, row) in all_rows(&state) {
             if let RowKey::Kitten(ix, _) = row.key {
-                per_kitten.entry(ix).or_default().push((section, row.clone()));
+                per_kitten
+                    .entry(ix)
+                    .or_default()
+                    .push((section, row.clone()));
             }
             let takes_elder = match &row.kind {
                 RowKind::Act { command, .. } => matches!(command, Command::AppointElder(_)),
-                RowKind::Count { increment, decrement } => {
+                RowKind::Count {
+                    increment,
+                    decrement,
+                } => {
                     matches!(increment, Command::AppointElder(_))
                         || matches!(decrement, Command::AppointElder(_))
                 }
@@ -1809,10 +1953,17 @@ fn each_kitten_is_exactly_one_clowder_row_whose_enter_promotes_it() {
                 "in {label}, kitten {ix} is listed as {} rows ({:?}); each kitten is exactly one \
                  row",
                 listed.len(),
-                listed.iter().map(|(s, r)| (s.title(), r.key.clone())).collect::<Vec<_>>()
+                listed
+                    .iter()
+                    .map(|(s, r)| (s.title(), r.key.clone()))
+                    .collect::<Vec<_>>()
             );
             let (section, row) = &listed[0];
-            assert_eq!(*section, Section::Clowder, "in {label}, kitten {ix}'s row is not in the Clowder section");
+            assert_eq!(
+                *section,
+                Section::Clowder,
+                "in {label}, kitten {ix}'s row is not in the Clowder section"
+            );
             match &row.kind {
                 RowKind::Act { command, .. } => assert_eq!(
                     *command,
@@ -1822,7 +1973,10 @@ fn each_kitten_is_exactly_one_clowder_row_whose_enter_promotes_it() {
                 ),
                 other => panic!("in {label}, kitten {ix}'s one row is {other:?}; its Enter promotes that kitten"),
             }
-            assert!(!row.heavy, "in {label}, kitten {ix}'s row is heavy; a kitten's row never is");
+            assert!(
+                !row.heavy,
+                "in {label}, kitten {ix}'s row is heavy; a kitten's row never is"
+            );
         }
         assert!(
             per_kitten.is_empty(),
@@ -1857,13 +2011,23 @@ fn a_kittens_row_is_drawn_with_its_name_and_no_list_shows_a_kitten_twice() {
                 // What a kitten's row may carry after its name: the hint, or
                 // the Elder's mark as far as its column holds it.
                 let asides = ["(n: Elder)", "\u{25c6} Elder", "\u{25c6}"];
-                let bare = asides.iter().find_map(|a| field.strip_suffix(a)).map(str::trim_end).unwrap_or(&field);
+                let bare = asides
+                    .iter()
+                    .find_map(|a| field.strip_suffix(a))
+                    .map(str::trim_end)
+                    .unwrap_or(&field);
                 for name in &names {
                     if reads_as(bare, name) {
-                        shown.entry(name.clone()).or_default().push(format!("{} {:?}", section.title(), row.key));
+                        shown.entry(name.clone()).or_default().push(format!(
+                            "{} {:?}",
+                            section.title(),
+                            row.key
+                        ));
                     }
                 }
-                let RowKey::Kitten(ix, _) = row.key else { continue };
+                let RowKey::Kitten(ix, _) = row.key else {
+                    continue;
+                };
                 let name = &state.kittens[ix].name;
                 let whr = format!("at {w}x{h}, kitten {ix}'s row {:?}", row.key);
                 let rest = field.strip_prefix(name.as_str()).unwrap_or_else(|| {
@@ -1892,7 +2056,10 @@ fn a_kittens_row_is_drawn_with_its_name_and_no_list_shows_a_kitten_twice() {
                  kitten twice",
                 on.len()
             );
-            assert!(on[0].starts_with("Clowder"), "at {w}x{h}, the kitten {name:?} is shown outside the Clowder list: {on:?}");
+            assert!(
+                on[0].starts_with("Clowder"),
+                "at {w}x{h}, the kitten {name:?} is shown outside the Clowder list: {on:?}"
+            );
         }
     }
 }
@@ -1915,7 +2082,10 @@ fn every_held_resource_is_a_row_in_the_home_sections_stores_group() {
 
     let listed = resource_rows(&early, home());
     for r in [ResourceId::Catnip, ResourceId::Twigs] {
-        assert!(listed.contains(&r), "{r:?} is in the stores but has no row in home");
+        assert!(
+            listed.contains(&r),
+            "{r:?} is in the stores but has no row in home"
+        );
     }
     assert!(
         listed.len() < ResourceId::ALL.len(),
@@ -1928,15 +2098,24 @@ fn every_held_resource_is_a_row_in_the_home_sections_stores_group() {
     let mut later = early.clone();
     later.resources[ResourceId::Pebbles.ix()] = 1.0;
     let grown = resource_rows(&later, home());
-    assert!(grown.contains(&ResourceId::Pebbles), "a newly acquired resource gained no row");
+    assert!(
+        grown.contains(&ResourceId::Pebbles),
+        "a newly acquired resource gained no row"
+    );
     for r in &listed {
-        assert!(grown.contains(r), "{r:?} lost its row when another resource appeared");
+        assert!(
+            grown.contains(r),
+            "{r:?} lost its row when another resource appeared"
+        );
     }
 
     // And a meadow that holds everything lists everything.
     let full = resource_rows(&maximal(), home());
     for r in ResourceId::ALL {
-        assert!(full.contains(&r), "{r:?} is held but has no row; the full truth lives in home");
+        assert!(
+            full.contains(&r),
+            "{r:?} is held but has no row; the full truth lives in home"
+        );
     }
 }
 
@@ -1972,7 +2151,11 @@ fn the_stores_rows_are_inspectable_display_rows_under_a_group_header() {
             "the cursor cannot land on the store {:?}, so Space can never inspect it",
             row.key
         );
-        assert!(!row.heavy, "a store {:?} is marked heavy; there is nothing to confirm", row.key);
+        assert!(
+            !row.heavy,
+            "a store {:?} is marked heavy; there is nothing to confirm",
+            row.key
+        );
     }
 
     let first = positions[0];
@@ -2031,13 +2214,25 @@ fn the_complete_resource_table_lives_in_home_and_nowhere_else() {
 fn gathered_and_spent() -> (GameState, Vec<ResourceId>) {
     let mut s = GameState::new(49);
     for _ in 0..10 {
-        s.apply(Command::GatherCatnip).expect("fixture: a new meadow can gather");
+        s.apply(Command::GatherCatnip)
+            .expect("fixture: a new meadow can gather");
     }
-    let gathered: Vec<ResourceId> = ResourceId::ALL.into_iter().filter(|r| s.stock(*r) > 0.0).collect();
-    s.apply(Command::Forage).expect("fixture: ten gathers pay for a forage");
-    assert!(!gathered.is_empty(), "fixture: gathering leaves something in store");
+    let gathered: Vec<ResourceId> = ResourceId::ALL
+        .into_iter()
+        .filter(|r| s.stock(*r) > 0.0)
+        .collect();
+    s.apply(Command::Forage)
+        .expect("fixture: ten gathers pay for a forage");
+    assert!(
+        !gathered.is_empty(),
+        "fixture: gathering leaves something in store"
+    );
     for r in &gathered {
-        assert_eq!(s.stock(*r), 0.0, "fixture: the forage spends {r:?} to exactly nothing");
+        assert_eq!(
+            s.stock(*r),
+            0.0,
+            "fixture: the forage spends {r:?} to exactly nothing"
+        );
     }
     (s, gathered)
 }
@@ -2048,7 +2243,10 @@ fn maximal_met_and_spent() -> GameState {
     let mut s = maximal();
     s.tick();
     for r in ResourceId::ALL {
-        assert!(s.stock(r) > 0.0, "fixture: the maximal meadow holds {r:?} after a tick");
+        assert!(
+            s.stock(r) > 0.0,
+            "fixture: the maximal meadow holds {r:?} after a tick"
+        );
     }
     with_every_stock(&s, 0.0)
 }
@@ -2057,7 +2255,8 @@ fn maximal_met_and_spent() -> GameState {
 /// shows has been recorded by the core, and none of what they name is held.
 fn poor_with_its_prices_recorded() -> GameState {
     let mut s = poor_but_unlocked();
-    s.apply(Command::SetSpeed(1.0)).expect("fixture: setting the speed is always accepted");
+    s.apply(Command::SetSpeed(1.0))
+        .expect("fixture: setting the speed is always accepted");
     s
 }
 
@@ -2066,7 +2265,8 @@ fn poor_with_its_prices_recorded() -> GameState {
 fn a_whale_visiting_a_bare_meadow() -> GameState {
     let mut s = GameState::new(49);
     s.whale_visit_years = 3;
-    s.apply(Command::SetSpeed(1.0)).expect("fixture: setting the speed is always accepted");
+    s.apply(Command::SetSpeed(1.0))
+        .expect("fixture: setting the speed is always accepted");
     s
 }
 
@@ -2079,7 +2279,10 @@ fn making_what_it_cannot_keep() -> (GameState, ResourceId) {
     for _ in 0..3 {
         s.tick();
     }
-    assert!(s.net_rate(made) > 0.0, "fixture: the kitten's work should produce {made:?}");
+    assert!(
+        s.net_rate(made) > 0.0,
+        "fixture: the kitten's work should produce {made:?}"
+    );
     assert_eq!(s.cap(made), 0.0, "fixture: with nowhere to keep it");
     assert_eq!(s.stock(made), 0.0, "fixture: so none is ever held");
     (s, made)
@@ -2118,11 +2321,23 @@ fn resources_named_on_screen(state: &GameState) -> BTreeSet<ResourceId> {
 #[test]
 fn the_stores_group_lists_exactly_the_resources_the_core_reports_revealed_in_the_cores_order() {
     let mut spread: Vec<(&'static str, GameState)> = grouping_spread();
-    spread.push(("a meadow that gathered and spent it all", gathered_and_spent().0));
+    spread.push((
+        "a meadow that gathered and spent it all",
+        gathered_and_spent().0,
+    ));
     spread.push(("the maximal meadow, met and spent", maximal_met_and_spent()));
-    spread.push(("the maximal meadow, poor, its prices recorded", poor_with_its_prices_recorded()));
-    spread.push(("a meadow making what it cannot keep", making_what_it_cannot_keep().0));
-    spread.push(("a bare meadow with a whale visiting", a_whale_visiting_a_bare_meadow()));
+    spread.push((
+        "the maximal meadow, poor, its prices recorded",
+        poor_with_its_prices_recorded(),
+    ));
+    spread.push((
+        "a meadow making what it cannot keep",
+        making_what_it_cannot_keep().0,
+    ));
+    spread.push((
+        "a bare meadow with a whale visiting",
+        a_whale_visiting_a_bare_meadow(),
+    ));
 
     let mut listed_at_nothing = 0;
     let mut room_and_no_row = 0;
@@ -2178,11 +2393,26 @@ fn the_stores_group_lists_exactly_the_resources_the_core_reports_revealed_in_the
         }
     }
 
-    assert!(held_and_listed > 0, "fixture: some held store should be listed");
-    assert!(listed_at_nothing > 0, "fixture: some store standing at nothing should be listed");
-    assert!(listed_without_room > 0, "fixture: some store with no room to keep any should be listed");
-    assert!(room_and_no_row > 0, "fixture: some store with room should be unrevealed, and unlisted");
-    assert!(rate_and_no_row > 0, "fixture: some store with a rising rate should be unrevealed, and unlisted");
+    assert!(
+        held_and_listed > 0,
+        "fixture: some held store should be listed"
+    );
+    assert!(
+        listed_at_nothing > 0,
+        "fixture: some store standing at nothing should be listed"
+    );
+    assert!(
+        listed_without_room > 0,
+        "fixture: some store with no room to keep any should be listed"
+    );
+    assert!(
+        room_and_no_row > 0,
+        "fixture: some store with room should be unrevealed, and unlisted"
+    );
+    assert!(
+        rate_and_no_row > 0,
+        "fixture: some store with a rising rate should be unrevealed, and unlisted"
+    );
     assert!(
         price_and_no_row > 0,
         "fixture: some store a price on screen names should be unrevealed by the core, and unlisted"
@@ -2199,25 +2429,39 @@ fn a_store_spent_to_exactly_nothing_keeps_its_row_where_it_stood() {
     // By a command, with no tick between the gain and the spend.
     let mut s = GameState::new(49);
     for _ in 0..10 {
-        s.apply(Command::GatherCatnip).expect("fixture: a new meadow can gather");
+        s.apply(Command::GatherCatnip)
+            .expect("fixture: a new meadow can gather");
     }
     let before = resource_rows(&s, home());
     assert!(!before.is_empty(), "fixture: the gathered store is listed");
     let spent = before[0];
     let key = RowKey::Resource(spent);
     let list = rows(&s, home());
-    let stood = nav::rows::cursor_index(&list, Some(&key)).expect("the cursor finds the store's row");
-    assert_eq!(list[stood].key, key, "fixture: the cursor rests on the store");
+    let stood =
+        nav::rows::cursor_index(&list, Some(&key)).expect("the cursor finds the store's row");
+    assert_eq!(
+        list[stood].key, key,
+        "fixture: the cursor rests on the store"
+    );
 
-    s.apply(Command::Forage).expect("fixture: ten gathers pay for a forage");
-    assert_eq!(s.stock(spent), 0.0, "fixture: the forage spends {spent:?} to exactly nothing");
+    s.apply(Command::Forage)
+        .expect("fixture: ten gathers pay for a forage");
+    assert_eq!(
+        s.stock(spent),
+        0.0,
+        "fixture: the forage spends {spent:?} to exactly nothing"
+    );
 
     let after = resource_rows(&s, home());
     assert!(
         after.contains(&spent),
         "{spent:?} was spent to nothing and its row left the stores group: {after:?}"
     );
-    assert_eq!(&after[..before.len()], &before[..], "the stores listed before the spend moved");
+    assert_eq!(
+        &after[..before.len()],
+        &before[..],
+        "the stores listed before the spend moved"
+    );
     let list = rows(&s, home());
     let rests = nav::rows::cursor_index(&list, Some(&key)).expect("the cursor finds a row");
     assert_eq!(
@@ -2225,7 +2469,11 @@ fn a_store_spent_to_exactly_nothing_keeps_its_row_where_it_stood() {
         "the cursor resting on {spent:?} was thrown to {:?} when the store was spent",
         list[rests].key
     );
-    assert_eq!(list[rests].kind, RowKind::Display, "and its row is still a store's row");
+    assert_eq!(
+        list[rests].kind,
+        RowKind::Display,
+        "and its row is still a store's row"
+    );
 
     // It stays while the meadow waits for more.
     for _ in 0..40 {
@@ -2242,7 +2490,11 @@ fn a_store_spent_to_exactly_nothing_keeps_its_row_where_it_stood() {
     let mut met = maximal();
     met.tick();
     let listed = resource_rows(&met, home());
-    assert_eq!(listed, ResourceId::ALL.to_vec(), "fixture: the maximal meadow lists every store after a tick");
+    assert_eq!(
+        listed,
+        ResourceId::ALL.to_vec(),
+        "fixture: the maximal meadow lists every store after a tick"
+    );
     let home_before = rows(&met, home());
 
     let mut spent_out = with_every_stock(&met, 0.0);
@@ -2289,9 +2541,17 @@ fn a_resource_never_met_has_no_stores_row() {
     );
 
     // One gather: exactly what was gathered, and nothing else.
-    s.apply(Command::GatherCatnip).expect("fixture: a new meadow can gather");
-    let held: Vec<ResourceId> = ResourceId::ALL.into_iter().filter(|r| s.stock(*r) > 0.0).collect();
-    assert_eq!(resource_rows(&s, home()), held, "after one gather the stores are exactly what was gathered");
+    s.apply(Command::GatherCatnip)
+        .expect("fixture: a new meadow can gather");
+    let held: Vec<ResourceId> = ResourceId::ALL
+        .into_iter()
+        .filter(|r| s.stock(*r) > 0.0)
+        .collect();
+    assert_eq!(
+        resource_rows(&s, home()),
+        held,
+        "after one gather the stores are exactly what was gathered"
+    );
 
     // Made every tick and never kept: never met.
     let (working, made) = making_what_it_cannot_keep();
@@ -2314,7 +2574,10 @@ fn a_store_a_stated_price_names_is_listed_before_any_is_held() {
         assert_eq!(state.stock(r), 0.0, "fixture: nothing is in store");
     }
     let named = resources_named_on_screen(&state);
-    assert!(named.len() > 10, "fixture: the rows on screen should name a good many stores");
+    assert!(
+        named.len() > 10,
+        "fixture: the rows on screen should name a good many stores"
+    );
 
     let listed = resource_rows(&state, home());
     for r in &named {
@@ -2326,8 +2589,14 @@ fn a_store_a_stated_price_names_is_listed_before_any_is_held() {
     }
     let list = rows(&state, home());
     for r in &listed {
-        let row = list.iter().find(|row| row.key == RowKey::Resource(*r)).expect("listed");
-        assert!(row.selectable() && row.kind == RowKind::Display, "{r:?}'s row at zero is inspectable");
+        let row = list
+            .iter()
+            .find(|row| row.key == RowKey::Resource(*r))
+            .expect("listed");
+        assert!(
+            row.selectable() && row.kind == RowKind::Display,
+            "{r:?}'s row at zero is inspectable"
+        );
     }
 }
 
@@ -2431,7 +2700,13 @@ fn design_verbs(section: Section) -> Vec<&'static str> {
         Section::Clowder => vec!["HostJamboree", "Pounce"],
         Section::Ideas | Section::Crafts => vec![],
         Section::Sunbeams => vec!["Bask", "Reverie", "Enlighten"],
-        Section::Wonders => vec!["HoldParade", "RefineStarshard", "RefineEcho", "CondenseJar", "MakePromise"],
+        Section::Wonders => vec![
+            "HoldParade",
+            "RefineStarshard",
+            "RefineEcho",
+            "CondenseJar",
+            "MakePromise",
+        ],
         Section::Friends => vec!["ScoutPicnic"],
         Section::Sky => vec!["SummonStarWhale", "FeedWhale"],
         Section::Dreams => vec!["DeepNap"],
@@ -2440,7 +2715,9 @@ fn design_verbs(section: Section) -> Vec<&'static str> {
 }
 
 fn position_in<T: PartialEq>(all: &[T], x: &T) -> usize {
-    all.iter().position(|y| y == x).expect("every id is in its kind's ALL table")
+    all.iter()
+        .position(|y| y == x)
+        .expect("every id is in its kind's ALL table")
 }
 
 /// Where the core lists a content item among its kind.
@@ -2474,7 +2751,9 @@ fn place_in_group(state: &GameState, section: Section, row: &Row) -> Option<usiz
             RowKey::Content(ContentId::Refinement(_), _) => 1,
             _ => 2,
         };
-        let RowKey::Content(id, _) = &row.key else { return None };
+        let RowKey::Content(id, _) = &row.key else {
+            return None;
+        };
         return Some(rank * 10_000 + core_position(*id));
     }
     match &row.key {
@@ -2532,16 +2811,37 @@ fn grouping_spread() -> Vec<(&'static str, GameState)> {
     vec![
         ("a new meadow", GameState::new(7)),
         ("a new meadow with unlimited stock", rich_but_locked()),
-        ("a meadow with only verbs and stores", verbs_and_stores_only()),
-        ("a meadow with one teased structure", teased_and_half_covered()),
+        (
+            "a meadow with only verbs and stores",
+            verbs_and_stores_only(),
+        ),
+        (
+            "a meadow with one teased structure",
+            teased_and_half_covered(),
+        ),
         ("the maximal meadow", maximal()),
         ("the maximal meadow, poor", poor_but_unlocked()),
         ("the maximal meadow, no roster", maximal_without_a_roster()),
-        ("the maximal meadow, first generation", maximal_first_generation()),
-        ("the maximal meadow, every hand busy", maximal_all_hands_busy()),
-        ("the maximal meadow, a small named roster", every_multi_row_item_listed()),
-        ("the maximal meadow, no whale and no friends", maximal_no_whale_no_friends()),
-        ("the maximal meadow, its Clowder verbs gated shut", maximal_clowder_verbs_shut()),
+        (
+            "the maximal meadow, first generation",
+            maximal_first_generation(),
+        ),
+        (
+            "the maximal meadow, every hand busy",
+            maximal_all_hands_busy(),
+        ),
+        (
+            "the maximal meadow, a small named roster",
+            every_multi_row_item_listed(),
+        ),
+        (
+            "the maximal meadow, no whale and no friends",
+            maximal_no_whale_no_friends(),
+        ),
+        (
+            "the maximal meadow, its Clowder verbs gated shut",
+            maximal_clowder_verbs_shut(),
+        ),
         ("a meadow mid-game, its ideas part done", mid_game()),
         ("a meadow whose every idea is done", all_ideas_done()),
     ]
@@ -2579,7 +2879,9 @@ fn every_row_of_a_kind_stands_contiguous_in_its_kinds_one_group_in_the_specs_ord
 
             let mut positions: HashMap<GroupKind, Vec<usize>> = HashMap::new();
             for (i, row) in list.iter().enumerate() {
-                let Some(kind) = kind_in(&state, section, row) else { continue };
+                let Some(kind) = kind_in(&state, section, row) else {
+                    continue;
+                };
                 assert!(
                     design.contains(&kind),
                     "in {label}, {} lists {:?}, a row of kind {kind:?}, which is not one of its \
@@ -2692,7 +2994,10 @@ fn a_sections_groups_stand_in_the_designs_fixed_order_whichever_are_listed() {
             }
         }
     }
-    assert!(partial_seen, "fixture: the spread never lists a section with only some of its groups");
+    assert!(
+        partial_seen,
+        "fixture: the spread never lists a section with only some of its groups"
+    );
 }
 
 /// Each group a several-group section lists — judged on the rows it lists
@@ -2782,7 +3087,8 @@ fn every_listed_group_of_a_several_group_section_and_no_other_wears_one_header_d
             );
             for h in &headers {
                 assert!(
-                    list.get(h + 1).is_some_and(|r| kind_in(&state, section, r).is_some()),
+                    list.get(h + 1)
+                        .is_some_and(|r| kind_in(&state, section, r).is_some()),
                     "in {label}, {}'s header at line {h} stands above nothing — at the list's \
                      end or above another header. List:\n{}",
                     section.title(),
@@ -2815,7 +3121,10 @@ fn every_listed_group_of_a_several_group_section_and_no_other_wears_one_header_d
         }
     }
 
-    assert!(teased_only_group_seen, "fixture: the spread never lists a group whose only rows are teased");
+    assert!(
+        teased_only_group_seen,
+        "fixture: the spread never lists a group whose only rows are teased"
+    );
     assert!(
         gated_group_seen,
         "fixture: the spread never lists a several-group section with its verbs all held back by a gate"
@@ -2841,7 +3150,9 @@ fn every_listed_group_of_a_several_group_section_and_no_other_wears_one_header_d
 /// TUI-NAV-110 calls finished.
 fn finished(state: &GameState, row: &Row) -> bool {
     match &row.key {
-        RowKey::Content(id, _) => state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours),
+        RowKey::Content(id, _) => {
+            state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours)
+        }
         _ => false,
     }
 }
@@ -2860,8 +3171,12 @@ fn press_done_key(state: &GameState, view: &mut ViewState) {
 /// row (TUI-NAV-113) — keeping the focus on that row.
 fn unfold_focus(state: &GameState, view: &mut ViewState) {
     let Some(section) = view.section else { return };
-    let Some(key) = view.focus[section.index()].clone() else { return };
-    if drawn_rows(state, section, view).iter().any(|r| r.key == key)
+    let Some(key) = view.focus[section.index()].clone() else {
+        return;
+    };
+    if drawn_rows(state, section, view)
+        .iter()
+        .any(|r| r.key == key)
         || !rows(state, section).iter().any(|r| r.key == key)
     {
         return;
@@ -2872,7 +3187,10 @@ fn unfold_focus(state: &GameState, view: &mut ViewState) {
 
 /// The Ideas section in focus, its done group as every sitting opens it.
 fn ideas_view() -> ViewState {
-    ViewState { section: Some(Section::Ideas), ..Default::default() }
+    ViewState {
+        section: Some(Section::Ideas),
+        ..Default::default()
+    }
 }
 
 /// The Ideas section in focus with its done group opened by its key.
@@ -2897,8 +3215,13 @@ fn ideas_rank(row: &Row) -> Option<usize> {
 /// A row's place in the Ideas section with nothing gathered: its kind's rank,
 /// then the order the core lists that kind.
 fn ideas_place(row: &Row) -> (usize, usize) {
-    let RowKey::Content(id, _) = &row.key else { panic!("an Ideas row is about a content item: {:?}", row.key) };
-    (ideas_rank(row).expect("an Ideas row is an idea, a refinement, or a rule"), core_position(*id))
+    let RowKey::Content(id, _) = &row.key else {
+        panic!("an Ideas row is about a content item: {:?}", row.key)
+    };
+    (
+        ideas_rank(row).expect("an Ideas row is an idea, a refinement, or a rule"),
+        core_position(*id),
+    )
 }
 
 /// A meadow mid-game: the open meadow with every other idea that no other idea
@@ -2943,7 +3266,10 @@ fn mid_game() -> GameState {
 
     let list = rows(&s, Section::Ideas);
     for rank in 0..3 {
-        let of_kind: Vec<&Row> = list.iter().filter(|r| ideas_rank(r) == Some(rank)).collect();
+        let of_kind: Vec<&Row> = list
+            .iter()
+            .filter(|r| ideas_rank(r) == Some(rank))
+            .collect();
         let done = of_kind.iter().filter(|r| finished(&s, r)).count();
         assert!(
             done >= 2 && of_kind.len() - done >= 2,
@@ -2971,9 +3297,14 @@ fn all_ideas_done() -> GameState {
         }
     }
     let list = rows(&s, Section::Ideas);
-    assert!(list.iter().any(|r| r.selectable()), "fixture: the Ideas section lists rows");
     assert!(
-        list.iter().filter(|r| r.selectable()).all(|r| finished(&s, r)),
+        list.iter().any(|r| r.selectable()),
+        "fixture: the Ideas section lists rows"
+    );
+    assert!(
+        list.iter()
+            .filter(|r| r.selectable())
+            .all(|r| finished(&s, r)),
         "fixture: every row the Ideas section lists is finished"
     );
     s
@@ -2992,14 +3323,19 @@ fn an_idea_held_past_a_missing_prerequisite() -> (GameState, IdeaId) {
         .find(|i| !idea_def(*i).prereqs.is_empty())
         .expect("fixture: some idea has a prerequisite");
     s.ideas.remove(&idea_def(held).prereqs[0]);
-    assert!(s.ideas.contains(&held), "fixture: the idea is in the state's set of known ideas");
+    assert!(
+        s.ideas.contains(&held),
+        "fixture: the idea is in the state's set of known ideas"
+    );
     assert_ne!(
         s.lock_reason(ContentId::Idea(held)),
         Some(clowder_core::LockReason::AlreadyYours),
         "fixture: the core does not name the idea already the player's"
     );
     assert!(
-        rows(&s, Section::Ideas).iter().any(|r| r.key == RowKey::Content(ContentId::Idea(held), "")),
+        rows(&s, Section::Ideas)
+            .iter()
+            .any(|r| r.key == RowKey::Content(ContentId::Idea(held), "")),
         "fixture: the idea's row is listed"
     );
     (s, held)
@@ -3008,7 +3344,10 @@ fn an_idea_held_past_a_missing_prerequisite() -> (GameState, IdeaId) {
 /// Every meadow the done group's claims are quantified over.
 fn done_spread() -> Vec<(&'static str, GameState)> {
     let mut spread = grouping_spread();
-    spread.push(("a meadow holding an idea past a missing prerequisite", an_idea_held_past_a_missing_prerequisite().0));
+    spread.push((
+        "a meadow holding an idea past a missing prerequisite",
+        an_idea_held_past_a_missing_prerequisite().0,
+    ));
     spread
 }
 
@@ -3030,7 +3369,10 @@ fn groups_of(list: &[Row]) -> Vec<Vec<Row>> {
 }
 
 fn keys_of(groups: &[Vec<Row>]) -> Vec<Vec<RowKey>> {
-    groups.iter().map(|g| g.iter().map(|r| r.key.clone()).collect()).collect()
+    groups
+        .iter()
+        .map(|g| g.iter().map(|r| r.key.clone()).collect())
+        .collect()
 }
 
 /// In the Ideas section, a row is finished exactly where the core's lock reason
@@ -3061,15 +3403,22 @@ fn every_finished_ideas_row_stands_in_one_done_group_at_the_sections_foot() {
         let all: Vec<Row> = list.iter().filter(|r| r.selectable()).cloned().collect();
         let mut expected: Vec<Vec<Row>> = Vec::new();
         for (rank, seen) in reached.iter_mut().enumerate() {
-            let mut g: Vec<Row> =
-                all.iter().filter(|r| ideas_rank(r) == Some(rank) && !finished(&state, r)).cloned().collect();
+            let mut g: Vec<Row> = all
+                .iter()
+                .filter(|r| ideas_rank(r) == Some(rank) && !finished(&state, r))
+                .cloned()
+                .collect();
             g.sort_by_key(ideas_place);
             if !g.is_empty() {
                 seen[0] = true;
                 expected.push(g);
             }
         }
-        let mut done: Vec<Row> = all.iter().filter(|r| finished(&state, r)).cloned().collect();
+        let mut done: Vec<Row> = all
+            .iter()
+            .filter(|r| finished(&state, r))
+            .cloned()
+            .collect();
         done.sort_by_key(ideas_place);
         for r in &done {
             reached[ideas_rank(r).expect("an Ideas row")][1] = true;
@@ -3086,15 +3435,23 @@ fn every_finished_ideas_row_stands_in_one_done_group_at_the_sections_foot() {
         );
     }
     for (rank, kind) in ["ideas", "refinements", "rules"].iter().enumerate() {
-        assert!(reached[rank][0], "fixture: no meadow lists an unfinished row among the {kind}");
-        assert!(reached[rank][1], "fixture: no meadow lists a finished row among the {kind}");
+        assert!(
+            reached[rank][0],
+            "fixture: no meadow lists an unfinished row among the {kind}"
+        );
+        assert!(
+            reached[rank][1],
+            "fixture: no meadow lists a finished row among the {kind}"
+        );
     }
 
     let (state, held) = an_idea_held_past_a_missing_prerequisite();
     let groups = groups_of(&rows(&state, Section::Ideas));
     let key = RowKey::Content(ContentId::Idea(held), "");
     assert!(
-        groups.first().is_some_and(|g| g.iter().any(|r| r.key == key)),
+        groups
+            .first()
+            .is_some_and(|g| g.iter().any(|r| r.key == key)),
         "an idea the state's set calls known, whose lock reason the core does not name ownership, \
          must stand among the unfinished ideas, not in the done group: the shell judges by the \
          core's answer alone. Groups: {:?}",
@@ -3142,7 +3499,10 @@ fn no_section_but_ideas_has_a_done_group() {
             finished_elsewhere += list.iter().filter(|r| finished(&state, r)).count();
         }
     }
-    assert!(finished_elsewhere > 0, "fixture: no section but Ideas lists a finished row");
+    assert!(
+        finished_elsewhere > 0,
+        "fixture: no section but Ideas lists a finished row"
+    );
 }
 
 /// While the done group is folded the list draws its header and none of its
@@ -3157,7 +3517,11 @@ fn a_folded_done_group_draws_only_its_header_and_an_open_one_draws_every_listed_
     for (label, state) in done_spread() {
         let listed = rows(&state, Section::Ideas);
         let folded = drawn_rows(&state, Section::Ideas, &ideas_view());
-        let expected: Vec<Row> = listed.iter().filter(|r| !finished(&state, r)).cloned().collect();
+        let expected: Vec<Row> = listed
+            .iter()
+            .filter(|r| !finished(&state, r))
+            .cloned()
+            .collect();
         assert_eq!(
             folded.iter().map(|r| r.key.clone()).collect::<Vec<_>>(),
             expected.iter().map(|r| r.key.clone()).collect::<Vec<_>>(),
@@ -3179,7 +3543,10 @@ fn a_folded_done_group_draws_only_its_header_and_an_open_one_draws_every_listed_
 
         for section in Section::ALL.into_iter().filter(|s| *s != Section::Ideas) {
             for (how, view) in [("folded", ideas_view()), ("open", open.clone())] {
-                let view = ViewState { section: Some(section), ..view };
+                let view = ViewState {
+                    section: Some(section),
+                    ..view
+                };
                 assert_eq!(
                     drawn_rows(&state, section, &view),
                     rows(&state, section),
@@ -3189,7 +3556,10 @@ fn a_folded_done_group_draws_only_its_header_and_an_open_one_draws_every_listed_
             }
         }
     }
-    assert!(folded_seen > 0, "fixture: no meadow lists a done group to fold");
+    assert!(
+        folded_seen > 0,
+        "fixture: no meadow lists a done group to fold"
+    );
 }
 
 /// The done header is listed exactly while its group holds a row, and while
@@ -3202,7 +3572,9 @@ fn a_folded_done_group_draws_only_its_header_and_an_open_one_draws_every_listed_
 fn while_folded_the_done_header_stands_alone_as_the_lists_last_line() {
     let mut alone_seen = 0;
     for (label, state) in done_spread() {
-        let has_done = rows(&state, Section::Ideas).iter().any(|r| finished(&state, r));
+        let has_done = rows(&state, Section::Ideas)
+            .iter()
+            .any(|r| finished(&state, r));
         let drawn = drawn_rows(&state, Section::Ideas, &ideas_view());
         for (i, row) in drawn.iter().enumerate() {
             if !matches!(row.kind, RowKind::Group) {
@@ -3223,7 +3595,9 @@ fn while_folded_the_done_header_stands_alone_as_the_lists_last_line() {
         }
         if has_done {
             assert!(
-                drawn.last().is_some_and(|r| matches!(r.kind, RowKind::Group)),
+                drawn
+                    .last()
+                    .is_some_and(|r| matches!(r.kind, RowKind::Group)),
                 "in {label}, the done group holds rows but the folded list does not end with its \
                  header standing alone. Drawn:\n{}",
                 describe_list(&drawn)
@@ -3243,7 +3617,9 @@ fn while_folded_the_done_header_stands_alone_as_the_lists_last_line() {
 fn a_section_whose_every_row_is_folded_keeps_its_tab() {
     let state = all_ideas_done();
     assert!(
-        !drawn_rows(&state, Section::Ideas, &ideas_view()).iter().any(|r| r.selectable()),
+        !drawn_rows(&state, Section::Ideas, &ideas_view())
+            .iter()
+            .any(|r| r.selectable()),
         "with its group folded, the Ideas section must draw no row the cursor can land on, every \
          row it lists being finished (TUI-NAV-113)"
     );
@@ -3319,7 +3695,10 @@ fn drawn_line_named(
 
     let (w, h) = (150u16, 60u16);
     let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
-    let mut view = nav::ViewState { section: Some(section), ..Default::default() };
+    let mut view = nav::ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     view.focus[section.index()] = Some(focus.clone());
     unfold_focus(state, &mut view);
     let mut layout = None;
@@ -3331,8 +3710,9 @@ fn drawn_line_named(
     };
     let buf = term.backend().buffer().clone();
     for y in list.y..list.bottom() {
-        let line: String =
-            (list.x..list.right()).map(|x| buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" ")).collect();
+        let line: String = (list.x..list.right())
+            .map(|x| buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+            .collect();
         let column: String = line.chars().skip(5).collect();
         if column.starts_with(&format!("{name}  ")) {
             return Some((buf, list, y, line));
@@ -3360,7 +3740,9 @@ fn a_partial_row_wears_coats_on_its_cost_names() {
     let mut verified = 0usize;
     let mut tried: Vec<String> = Vec::new();
     for (section, row) in all_rows(&state) {
-        let RowKey::Content(id, tag) = &row.key else { continue };
+        let RowKey::Content(id, tag) = &row.key else {
+            continue;
+        };
         if *tag == "tinker" || id.is_reveal_tracked() || !row.selectable() {
             continue;
         }
@@ -3378,7 +3760,10 @@ fn a_partial_row_wears_coats_on_its_cost_names() {
         // The cursor rests on the row beside this one, so this one is drawn
         // unfocused and in view.
         let listed = rows(&state, section);
-        let at = listed.iter().position(|r| r.key == row.key).expect("the row is listed");
+        let at = listed
+            .iter()
+            .position(|r| r.key == row.key)
+            .expect("the row is listed");
         let Some(beside) = listed[..at]
             .iter()
             .rev()
@@ -3388,24 +3773,46 @@ fn a_partial_row_wears_coats_on_its_cost_names() {
             continue;
         };
         let name = content_name(*id);
-        let Some((buf, list, y, line)) = drawn_line_named(&state, section, &beside.key, &name) else {
+        let Some((buf, list, y, line)) = drawn_line_named(&state, section, &beside.key, &name)
+        else {
             tried.push(format!("{name} in {} (not drawn in view)", section.title()));
             continue;
         };
-        let fg = |x: usize| buf.cell((list.x + x as u16, y)).map(|c| c.fg).unwrap_or_default();
-        let marker = buf.cell((list.x + 3, y)).map(|c| c.symbol().to_string()).unwrap_or_default();
-        assert_eq!(marker, "◐", "fixture: {name} in {} is short with some coverage: {line:?}", section.title());
-        assert_eq!(fg(3), partial, "fixture: a two-state kind's `◐` wears partial: {line:?}");
+        let fg = |x: usize| {
+            buf.cell((list.x + x as u16, y))
+                .map(|c| c.fg)
+                .unwrap_or_default()
+        };
+        let marker = buf
+            .cell((list.x + 3, y))
+            .map(|c| c.symbol().to_string())
+            .unwrap_or_default();
+        assert_eq!(
+            marker,
+            "◐",
+            "fixture: {name} in {} is short with some coverage: {line:?}",
+            section.title()
+        );
+        assert_eq!(
+            fg(3),
+            partial,
+            "fixture: a two-state kind's `◐` wears partial: {line:?}"
+        );
 
         let mut names_checked = 0usize;
         for (r, _) in &cost {
             let rname = resource_name(*r);
-            let Some(at) = line.rfind(&format!(" {rname}")) else { continue };
+            let Some(at) = line.rfind(&format!(" {rname}")) else {
+                continue;
+            };
             let cx = line[..at].chars().count() + 1;
             if cx < 5 + name.chars().count() {
                 continue;
             }
-            for (k, want) in coat_colours(coat(*r), rname.chars().count()).iter().enumerate() {
+            for (k, want) in coat_colours(coat(*r), rname.chars().count())
+                .iter()
+                .enumerate()
+            {
                 let got = fg(cx + k);
                 assert_eq!(
                     &got, want,
@@ -3413,11 +3820,18 @@ fn a_partial_row_wears_coats_on_its_cost_names() {
                      its coat's {want:?}: {line:?}"
                 );
             }
-            assert_eq!(fg(cx - 2), partial, "the figure before {rname} wears the row's colour: {line:?}");
+            assert_eq!(
+                fg(cx - 2),
+                partial,
+                "the figure before {rname} wears the row's colour: {line:?}"
+            );
             names_checked += 1;
         }
         if names_checked == 0 {
-            tried.push(format!("{name} in {} (no cost name drawn)", section.title()));
+            tried.push(format!(
+                "{name} in {} (no cost name drawn)",
+                section.title()
+            ));
             continue;
         }
         verified += 1;

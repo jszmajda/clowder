@@ -20,11 +20,9 @@ use super::view::{PendingReport, ViewState};
 /// tick; an entry an earlier session already pinned, or one the core
 /// declined to keep at all, answers `None`. @spec TUI-NAV-027
 fn retained_entry_index(state: &GameState, report: &OfflineReport) -> Option<usize> {
-    state
-        .journal
-        .kept
-        .iter()
-        .position(|entry| entry.tick == state.ticks && matches!(&entry.item, JournalItem::Away(r) if r == report))
+    state.journal.kept.iter().position(|entry| {
+        entry.tick == state.ticks && matches!(&entry.item, JournalItem::Away(r) if r == report)
+    })
 }
 
 /// Queue a banner for `report`, if the journal shows it was in fact retained,
@@ -36,7 +34,13 @@ fn queue(view: &mut ViewState, state: &GameState, report: &OfflineReport, nap_ye
     let Some(entry) = retained_entry_index(state, report) else {
         return;
     };
-    view.reports.insert(0, PendingReport { entry, dismissed: false });
+    view.reports.insert(
+        0,
+        PendingReport {
+            entry,
+            dismissed: false,
+        },
+    );
     if let Some(years) = nap_years {
         view.nap_years.push((entry, years));
     }

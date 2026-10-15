@@ -26,7 +26,11 @@ pub enum Body {
     /// 100+: sidebar, list, and inspector side by side. At 120+ the list is
     /// capped and the surplus goes to the inspector.
     /// @spec TUI-RENDER-006, TUI-RENDER-007
-    Wide { sidebar: Rect, list: Rect, inspector: Rect },
+    Wide {
+        sidebar: Rect,
+        list: Rect,
+        inspector: Rect,
+    },
 }
 
 /// One frame's regions.
@@ -94,11 +98,17 @@ fn name_floor() -> usize {
     use std::sync::OnceLock;
     static FLOOR: OnceLock<usize> = OnceLock::new();
     *FLOOR.get_or_init(|| {
-        let names: Vec<String> = ResourceId::ALL.iter().map(|r| humanize(&format!("{r:?}"))).collect();
+        let names: Vec<String> = ResourceId::ALL
+            .iter()
+            .map(|r| humanize(&format!("{r:?}")))
+            .collect();
         (1..=64)
             .find(|w| {
                 names.iter().enumerate().all(|(i, a)| {
-                    names.iter().skip(i + 1).all(|b| a == b || fmt::fit(a, *w) != fmt::fit(b, *w))
+                    names
+                        .iter()
+                        .skip(i + 1)
+                        .all(|b| a == b || fmt::fit(a, *w) != fmt::fit(b, *w))
                 })
             })
             .unwrap_or(64)
@@ -164,15 +174,18 @@ pub fn compute(area: Rect, prev: Option<&Layout>, banner: bool) -> Layout {
     // showing. Computed here rather than in the caller, because the sum
     // invariant belongs to whatever owns the chrome algebra; carved anywhere
     // else, the one place that guarantees it stops being one place.
-    let banner_rect = if banner { Some(Rect::new(area.x, y, w, 1)) } else { None };
+    let banner_rect = if banner {
+        Some(Rect::new(area.x, y, w, 1))
+    } else {
+        None
+    };
     let banner_rows = if banner { 1 } else { 0 };
     let body_height = area.height - 2 - ticker_rows - 1 - banner_rows;
     let body_top = y + banner_rows;
 
     // @spec TUI-RENDER-005, TUI-RENDER-006, TUI-RENDER-008
     let prev_was_wide = matches!(prev.map(|p| &p.body), Some(Body::Wide { .. }));
-    let pane_wide =
-        w >= PANE_BREAKPOINT || (prev_was_wide && w >= PANE_BREAKPOINT - DEAD_BAND);
+    let pane_wide = w >= PANE_BREAKPOINT || (prev_was_wide && w >= PANE_BREAKPOINT - DEAD_BAND);
 
     let sidebar_w = sidebar_width();
     let body = if !pane_wide {
@@ -186,10 +199,13 @@ pub fn compute(area: Rect, prev: Option<&Layout>, banner: bool) -> Layout {
             prev.map(|p| &p.body),
             Some(Body::Wide { list, .. }) if list.width == capped_list_w
         );
-        let capped =
-            w >= CAP_BREAKPOINT || (prev_was_capped && w >= CAP_BREAKPOINT - DEAD_BAND);
+        let capped = w >= CAP_BREAKPOINT || (prev_was_capped && w >= CAP_BREAKPOINT - DEAD_BAND);
 
-        let list_width = if capped { capped_list_w } else { w - sidebar_w - MIN_INSPECTOR_WIDTH };
+        let list_width = if capped {
+            capped_list_w
+        } else {
+            w - sidebar_w - MIN_INSPECTOR_WIDTH
+        };
 
         let sidebar = Rect::new(area.x, body_top, sidebar_w, body_height);
         let list = Rect::new(area.x + sidebar_w, body_top, list_width, body_height);
@@ -200,7 +216,11 @@ pub fn compute(area: Rect, prev: Option<&Layout>, banner: bool) -> Layout {
             inspector_width,
             body_height,
         );
-        Body::Wide { sidebar, list, inspector }
+        Body::Wide {
+            sidebar,
+            list,
+            inspector,
+        }
     };
 
     y = body_top + body_height;
@@ -209,5 +229,12 @@ pub fn compute(area: Rect, prev: Option<&Layout>, banner: bool) -> Layout {
     let hints = Rect::new(area.x, y, w, 1);
 
     // @spec TUI-RENDER-003
-    Layout { header, tabs, banner: banner_rect, body, ticker, hints }
+    Layout {
+        header,
+        tabs,
+        banner: banner_rect,
+        body,
+        ticker,
+        hints,
+    }
 }

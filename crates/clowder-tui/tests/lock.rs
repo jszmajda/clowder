@@ -250,7 +250,11 @@ fn dropping_the_lock_releases_it() {
     let save = save_path(&dir);
 
     let held = SessionLock::acquire(&save, false).expect("an unlocked save should lock");
-    assert_eq!(beside_the_save(&dir, &save).len(), 1, "a lock should be held");
+    assert_eq!(
+        beside_the_save(&dir, &save).len(),
+        1,
+        "a lock should be held"
+    );
     drop(held);
 
     assert!(
@@ -471,7 +475,9 @@ fn a_forced_session_still_holds_the_lock() {
     );
     match SessionLock::acquire(&save, false) {
         Err(LockError::Held { .. }) => {}
-        Ok(_) => panic!("a launch arriving after a forced session should be refused like any other"),
+        Ok(_) => {
+            panic!("a launch arriving after a forced session should be refused like any other")
+        }
         Err(other) => panic!("expected Held, got {other:?}"),
     }
 }
@@ -501,8 +507,9 @@ fn the_lock_does_not_depend_on_the_save_being_readable() {
     let corrupt_dir = scratch_dir("before-read-corrupt");
     let corrupt = save_path(&corrupt_dir);
     fs::write(&corrupt, b"{ this is not a save").expect("writing a corrupt save should succeed");
-    let _b = SessionLock::acquire(&corrupt, false)
-        .expect("the lock is taken before the save is parsed, so unparseable contents cannot block it");
+    let _b = SessionLock::acquire(&corrupt, false).expect(
+        "the lock is taken before the save is parsed, so unparseable contents cannot block it",
+    );
 
     let unreadable_dir = scratch_dir("before-read-unreadable");
     let unreadable = save_path(&unreadable_dir);

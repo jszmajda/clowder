@@ -23,7 +23,10 @@ const TPS_F: f64 = TPS as f64;
 
 /// Both clocks in step — an ordinary attended frame.
 fn steady(d: Duration) -> Reading {
-    Reading { monotonic: d, wall: d }
+    Reading {
+        monotonic: d,
+        wall: d,
+    }
 }
 
 fn reading(monotonic: Duration, wall: Duration) -> Reading {
@@ -42,7 +45,10 @@ fn assert_span(actual: Duration, expected_secs: f64, what: &str) {
 /// the core's current rate. If the core changes it, recompute them rather than
 /// loosening the assertions.
 fn require_known_rate() {
-    assert_eq!(TPS, 4, "hand-computed fixtures assume the core's ticks-per-second");
+    assert_eq!(
+        TPS, 4,
+        "hand-computed fixtures assume the core's ticks-per-second"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +61,11 @@ fn elapsed_converts_at_ticks_per_second_times_speed() {
     let mut acc = TickAccumulator::default();
 
     acc.observe(steady(Duration::from_secs(1)), 1.0);
-    assert_eq!(acc.backlog(), TPS, "one second at normal speed is one second of ticks");
+    assert_eq!(
+        acc.backlog(),
+        TPS,
+        "one second at normal speed is one second of ticks"
+    );
 
     acc.observe(steady(Duration::from_secs(3)), 2.0);
     assert_eq!(
@@ -94,7 +104,11 @@ fn sub_tick_time_is_banked_across_frames_and_neither_lost_nor_double_counted() {
     // 1.1 s observed, 4 whole ticks converted (1.0 s worth); the remaining
     // 0.1 s is still banked as time, not yet as a tick, and so is not part of
     // the unrun backlog's span.
-    assert_span(acc.unrun_span(), 1.0, "only converted whole ticks carry a span");
+    assert_span(
+        acc.unrun_span(),
+        1.0,
+        "only converted whole ticks carry a span",
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -117,10 +131,18 @@ fn a_large_backlog_is_counted_exactly() {
 
     // One more tick's worth of time adds exactly one tick, at that magnitude.
     acc.observe(steady(Duration::from_millis(1000 / TPS)), 1.0);
-    assert_eq!(acc.backlog(), hundred_days * TPS + 1, "no whole tick is lost at scale");
+    assert_eq!(
+        acc.backlog(),
+        hundred_days * TPS + 1,
+        "no whole tick is lost at scale"
+    );
 
     let taken = acc.take(u64::MAX);
-    assert_eq!(taken, hundred_days * TPS + 1, "the drained count matches the owed count exactly");
+    assert_eq!(
+        taken,
+        hundred_days * TPS + 1,
+        "the drained count matches the owed count exactly"
+    );
     assert_eq!(acc.backlog(), 0);
 }
 
@@ -151,7 +173,11 @@ fn a_speed_change_never_rescales_the_whole_tick_backlog() {
         "the first four seconds must not be re-converted at the new speed"
     );
 
-    assert_span(acc.unrun_span(), 8.0, "the banked span is real time and is speed-agnostic");
+    assert_span(
+        acc.unrun_span(),
+        8.0,
+        "the banked span is real time and is speed-agnostic",
+    );
 }
 
 /// The two banked quantities are distinct: time not yet worth a whole tick is
@@ -164,7 +190,11 @@ fn the_sub_tick_remainder_is_not_the_whole_tick_backlog() {
 
     acc.observe(steady(Duration::from_millis(200)), 1.0);
     assert_eq!(acc.backlog(), 0, "0.8 of a tick is not a tick");
-    assert_span(acc.unrun_span(), 0.0, "unconverted time is not an unrun backlog");
+    assert_span(
+        acc.unrun_span(),
+        0.0,
+        "unconverted time is not an unrun backlog",
+    );
 
     acc.observe(steady(Duration::from_millis(100)), 1.0);
     assert_eq!(acc.backlog(), 1, "the banked remainder completes the tick");
@@ -204,7 +234,11 @@ fn banked_time_is_never_re_rated_by_a_later_speed_change() {
         "0.8 earned at 1x plus 3.2 earned at 4x; the first interval keeps its own rate"
     );
     // Four ticks, all attributed to the 4x conversion that emitted them.
-    assert_span(acc.unrun_span(), 0.25, "four ticks at 4x is 0.25 s of real time");
+    assert_span(
+        acc.unrun_span(),
+        0.25,
+        "four ticks at 4x is 0.25 s of real time",
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -225,7 +259,11 @@ fn the_monotonic_clock_drives_accumulation_when_the_wall_clock_does_not_move() {
         4 * TPS,
         "four monotonic seconds owe four seconds of ticks whatever the wall clock says"
     );
-    assert_span(acc.unrun_span(), 4.0, "the span follows the monotonic reading");
+    assert_span(
+        acc.unrun_span(),
+        4.0,
+        "the span follows the monotonic reading",
+    );
 }
 
 /// No observed time, no ticks: the accumulator never invents an interval.
@@ -236,7 +274,11 @@ fn no_elapsed_time_injects_no_ticks() {
 
     acc.observe(steady(Duration::ZERO), 1.0);
     acc.observe(steady(Duration::ZERO), 8.0);
-    assert_eq!(acc.backlog(), 0, "a zero-length frame owes nothing at any speed");
+    assert_eq!(
+        acc.backlog(),
+        0,
+        "a zero-length frame owes nothing at any speed"
+    );
     assert_span(acc.unrun_span(), 0.0, "and represents no real time");
 }
 
@@ -274,7 +316,11 @@ fn a_suspended_machine_costs_the_player_no_game_time() {
         attended.backlog(),
         "a suspended machine owes exactly what an attended one would have earned"
     );
-    assert_span(suspended.unrun_span(), (eight_hours + 1) as f64, "the whole absence is banked");
+    assert_span(
+        suspended.unrun_span(),
+        (eight_hours + 1) as f64,
+        "the whole absence is banked",
+    );
 }
 
 /// "Through the same accumulator": suspend excess is not a special path — it
@@ -286,13 +332,20 @@ fn suspend_excess_runs_through_the_same_accumulator() {
 
     // 60 monotonic seconds, 660 wall seconds: a ten-minute suspend inside an
     // otherwise ordinary interval, at double speed.
-    acc.observe(reading(Duration::from_secs(60), Duration::from_secs(660)), 2.0);
+    acc.observe(
+        reading(Duration::from_secs(60), Duration::from_secs(660)),
+        2.0,
+    );
     assert_eq!(
         acc.backlog(),
         660 * TPS * 2,
         "the recovered excess is converted at the current speed like any other time"
     );
-    assert_span(acc.unrun_span(), 660.0, "and banks the real interval it represents");
+    assert_span(
+        acc.unrun_span(),
+        660.0,
+        "and banks the real interval it represents",
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -310,14 +363,24 @@ fn a_backwards_wall_clock_never_rewinds_the_simulation() {
 
     // The wall clock reports less than the monotonic clock: a correction, not
     // a suspend. The monotonic reading wins.
-    acc.observe(reading(Duration::from_secs(10), Duration::from_secs(2)), 1.0);
+    acc.observe(
+        reading(Duration::from_secs(10), Duration::from_secs(2)),
+        1.0,
+    );
     assert_eq!(
         acc.backlog(),
         before + 10 * TPS,
         "the monotonic reading is kept in full when the wall clock falls short"
     );
-    assert!(acc.backlog() >= before, "the simulation never moves backwards");
-    assert_span(acc.unrun_span(), 20.0, "the banked span follows the monotonic reading too");
+    assert!(
+        acc.backlog() >= before,
+        "the simulation never moves backwards"
+    );
+    assert_span(
+        acc.unrun_span(),
+        20.0,
+        "the banked span follows the monotonic reading too",
+    );
 }
 
 /// The checkpoint re-bases silently: a backwards correction leaves no deficit
@@ -349,10 +412,16 @@ fn a_backwards_wall_clock_leaves_no_lingering_deficit() {
 #[test]
 fn an_in_process_gap_is_capped_at_the_cores_catch_up_limit() {
     let two_years = 2 * 365 * 86_400;
-    assert!(two_years > CATCHUP_CAP_SECONDS, "fixture must exceed the cap to exercise it");
+    assert!(
+        two_years > CATCHUP_CAP_SECONDS,
+        "fixture must exceed the cap to exercise it"
+    );
 
     let mut acc = TickAccumulator::default();
-    acc.observe(reading(Duration::from_secs(1), Duration::from_secs(two_years)), 1.0);
+    acc.observe(
+        reading(Duration::from_secs(1), Duration::from_secs(two_years)),
+        1.0,
+    );
 
     assert_eq!(
         acc.backlog(),
@@ -373,9 +442,16 @@ fn a_gap_below_the_cap_is_not_truncated() {
     let gap = CATCHUP_CAP_SECONDS - 10;
 
     let mut acc = TickAccumulator::default();
-    acc.observe(reading(Duration::from_secs(1), Duration::from_secs(gap)), 1.0);
+    acc.observe(
+        reading(Duration::from_secs(1), Duration::from_secs(gap)),
+        1.0,
+    );
 
-    assert_eq!(acc.backlog(), gap * TPS, "an absence inside the cap is replayed in full");
+    assert_eq!(
+        acc.backlog(),
+        gap * TPS,
+        "an absence inside the cap is replayed in full"
+    );
     assert_span(acc.unrun_span(), gap as f64, "and banks its whole span");
 }
 
@@ -419,9 +495,16 @@ fn a_backlog_drains_in_bounded_slices_and_nothing_owed_is_discarded() {
         assert!(frames < 1_000, "the drain must terminate");
     }
 
-    assert_eq!(ran, total, "every owed tick is eventually run; none is discarded");
+    assert_eq!(
+        ran, total,
+        "every owed tick is eventually run; none is discarded"
+    );
     assert_eq!(acc.take(100), 0, "an empty backlog yields nothing");
-    assert_span(acc.unrun_span(), 0.0, "a fully drained backlog owes no real time");
+    assert_span(
+        acc.unrun_span(),
+        0.0,
+        "a fully drained backlog owes no real time",
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -442,9 +525,17 @@ fn the_unrun_span_is_banked_as_it_accrues_not_derived_from_the_backlog() {
     acc.observe(steady(Duration::from_secs(1)), 0.25);
 
     let backlog = acc.backlog();
-    assert_eq!(backlog, 10 * TPS * 8 + 1, "321 ticks owed across two speeds");
+    assert_eq!(
+        backlog,
+        10 * TPS * 8 + 1,
+        "321 ticks owed across two speeds"
+    );
 
-    assert_span(acc.unrun_span(), 11.0, "eleven real seconds elapsed, and eleven were banked");
+    assert_span(
+        acc.unrun_span(),
+        11.0,
+        "eleven real seconds elapsed, and eleven were banked",
+    );
 
     let derived_at_current_speed = backlog as f64 / (TPS_F * 0.25);
     assert!(
@@ -478,7 +569,11 @@ fn a_derived_span_would_cross_the_absence_cap_on_an_absence_that_never_happened(
     );
 
     let span = acc.unrun_span();
-    assert_span(span, (twenty_days + 1) as f64, "the true span is the interval actually observed");
+    assert_span(
+        span,
+        (twenty_days + 1) as f64,
+        "the true span is the interval actually observed",
+    );
     assert!(
         span.as_secs() < CATCHUP_CAP_SECONDS,
         "a twenty-day absence must stay a twenty-day absence"
@@ -499,7 +594,10 @@ fn an_outstanding_backlog_is_reported_without_being_drained() {
 
     let before = acc.backlog();
     let span = acc.unrun_span();
-    assert!(span > Duration::ZERO, "an outstanding backlog owes real time");
+    assert!(
+        span > Duration::ZERO,
+        "an outstanding backlog owes real time"
+    );
     assert_eq!(acc.unrun_span(), span, "asking twice gives the same answer");
     assert_eq!(acc.backlog(), before, "asking does not run anything");
 }
@@ -522,7 +620,11 @@ fn back_dating_by_the_unrun_span_carries_the_backlog_into_the_next_load() {
 
     let now_unix = 1_800_000_000u64;
     let saved_at = now_unix - acc.unrun_span().as_secs();
-    assert_eq!(saved_at, now_unix - 60, "the stamp names the instant the sim actually reached");
+    assert_eq!(
+        saved_at,
+        now_unix - 60,
+        "the stamp names the instant the sim actually reached"
+    );
 
     let loaded = load_string(&save_string(&state, saved_at), now_unix)
         .expect("a freshly written save loads");
@@ -533,7 +635,10 @@ fn back_dating_by_the_unrun_span_carries_the_backlog_into_the_next_load() {
 
     // Why back-dating exists: a wall-clock stamp on a banked save tells the
     // next load it is caught up, and the owed interval simply vanishes.
-    let naive =
-        load_string(&save_string(&state, now_unix), now_unix).expect("a freshly written save loads");
-    assert_eq!(naive.state.ticks, 0, "a wall-clock stamp would swallow the owed interval");
+    let naive = load_string(&save_string(&state, now_unix), now_unix)
+        .expect("a freshly written save loads");
+    assert_eq!(
+        naive.state.ticks, 0,
+        "a wall-clock stamp would swallow the owed interval"
+    );
 }

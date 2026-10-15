@@ -83,7 +83,7 @@ pub const BASE_CAPS: [f64; RESOURCE_COUNT] = [
     INF,   // reverie
     INF, INF, INF, INF, INF, INF, INF, INF, INF, // wands..quills (crafted)
     INF, INF, INF, INF, INF, INF, INF, INF, INF, // stories..cometsilk (crafted)
-    INF,   // cleverness — the Yarn Computer's wit has no ceiling
+    INF, // cleverness — the Yarn Computer's wit has no ceiling
 ];
 
 /// Fraction of each cost component that must be held for a content item to
@@ -271,20 +271,20 @@ pub const STRUCTURE_OUTPUT_ADD_TARGETS: [(StructureId, ResourceId); 3] = [
 // ---- Wave 4: ceremonies / mystic / colonies ----
 // @spec SIM-UNI-006
 pub const RAINBOW_ARCH_PRISM_DESCENT: f64 = 0.0002; // per day per Rainbow Arch structure
-// @spec SIM-UNI-001
+                                                    // @spec SIM-UNI-001
 pub const PARADE_UNICORN_COST: f64 = 2500.0;
 pub const PARADE_RAINBOWS_PER_ARCH: f64 = 2500.0;
 // @spec SIM-UNI-003
 pub const REFINE_INPUT: f64 = 25.0; // 25 prisms → 1 starshard, 25 starshards → 1 echo
-// @spec SIM-UNI-004
+                                    // @spec SIM-UNI-004
 pub const JAR_RAINBOW_COST: f64 = 10000.0;
 // @spec SIM-UNI-007
 pub const DREAM_DRIFT_PER_ARCH: f64 = 0.000001; // per tick per Memory Arch
 pub const DREAM_DRIFT_THROTTLE: f64 = 0.25; // while any dreamcorn already dreams
 pub const SKY_ARCH_PRISM_DRIFT: f64 = 0.00002; // per tick, the Sky Arch's steady drift
-// @spec SIM-UNI-005
+                                               // @spec SIM-UNI-005
 pub const RAINBOW_SHOWER_AMOUNT: f64 = 5000.0; // a windfall on a shower day
-// @spec SIM-UNI-009, SIM-UNI-010
+                                               // @spec SIM-UNI-009, SIM-UNI-010
 pub const PROMISE_ECHO_COST: f64 = 1.0;
 pub const PROMISE_UPKEEP_DREAMCORN: f64 = 0.0005; // per day, per kept Promise
 pub const PROMISE_GLOBAL_RATIO: f64 = 0.0005; // each kept Promise's global effect
@@ -294,7 +294,7 @@ pub const TRADE_PEP_PER_CARAVAN: f64 = 50.0;
 pub const TRADE_SHINIES_PER_CARAVAN: f64 = 15.0;
 pub const TRADE_FUZZ_WIDTH: f64 = 0.15; // ± width on the basket
 pub const TRADE_BONUS_MULT: f64 = 1.25; // a bonus (warm) outcome
-// @spec SIM-TRADE-005, SIM-TRADE-006
+                                        // @spec SIM-TRADE-005, SIM-TRADE-006
 pub const PENPAL_STANDING_PER: f64 = 0.01; // standing warmed per Pen Pal level
 pub const PENPAL_STANDING_CAP: f64 = 0.75; // soft cap on Pen Pal warming
 pub const PENPAL_BASE_CHARM: f64 = 100.0; // × 1.15^level
@@ -830,7 +830,10 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
     },
     StructureDef {
         name: "Yarn Computer",
-        base_costs: &[(ResourceId::Stardust, 30.0), (ResourceId::Curiosity, 60000.0)],
+        base_costs: &[
+            (ResourceId::Stardust, 30.0),
+            (ResourceId::Curiosity, 60000.0),
+        ],
         productions: &[(ResourceId::Cleverness, 0.02)],
         energy_cons: 0.0, // special-cased: 2n + n²/2 in total at n copies
         gate: StructureGate::Idea(IdeaId::YarnComputing),
@@ -995,7 +998,10 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
     // 52: Wishing Star — the capstone: outdoor +200%; a large global bonus; energy −40.
     StructureDef {
         name: "Wishing Star",
-        base_costs: &[(ResourceId::Echoes, 2000.0), (ResourceId::JarsOfPurrs, 50.0)],
+        base_costs: &[
+            (ResourceId::Echoes, 2000.0),
+            (ResourceId::JarsOfPurrs, 50.0),
+        ],
         global_ratio: 0.5,
         energy_cons: 40.0,
         gate: StructureGate::Site(SiteId::TheFurthestStar),
@@ -1102,7 +1108,13 @@ pub struct IdeaDef {
     pub prereqs: &'static [IdeaId],
 }
 
-const IDEA: IdeaDef = IdeaDef { name: "", blurb: "", cost: 0.0, gate: &[], prereqs: &[] };
+const IDEA: IdeaDef = IdeaDef {
+    name: "",
+    blurb: "",
+    cost: 0.0,
+    gate: &[],
+    prereqs: &[],
+};
 
 // @spec SIM-CUR-005
 pub fn idea_def(i: IdeaId) -> &'static IdeaDef {
@@ -1681,7 +1693,10 @@ static CRAFTS: [CraftDef; 18] = [
     },
     CraftDef {
         name: "Schemes",
-        inputs: &[(ResourceId::Curiosity, 2500.0), (ResourceId::Anthologies, 3.0)],
+        inputs: &[
+            (ResourceId::Curiosity, 2500.0),
+            (ResourceId::Anthologies, 3.0),
+        ],
         gate: Some(IdeaId::GrandSchemes),
         tier: 4,
     },
@@ -1723,7 +1738,10 @@ static CRAFTS: [CraftDef; 18] = [
     },
     CraftDef {
         name: "Dreamweave",
-        inputs: &[(ResourceId::Hushfelt, 100.0), (ResourceId::Moonsteel, 250.0)],
+        inputs: &[
+            (ResourceId::Hushfelt, 100.0),
+            (ResourceId::Moonsteel, 250.0),
+        ],
         gate: Some(IdeaId::Dreamweaving),
         tier: 5,
     },
@@ -1926,7 +1944,8 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
     },
     RefinementDef {
         name: "Labeled Jars",
-        blurb: "Labels nobody reads, order everybody feels. +50 button, +30 ember, +10 moonstone cap.",
+        blurb:
+            "Labels nobody reads, order everybody feels. +50 button, +30 ember, +10 moonstone cap.",
         cost: 60000.0,
         materials: &[(ResourceId::Moonstone, 25.0), (ResourceId::Brass, 200.0)],
         gate: IdeaId::Moonmetallurgy,
@@ -2198,11 +2217,46 @@ static RULES: [RuleDef; 8] = [
 // ---- Names ----
 
 pub static NAME_POOL: [&str; 40] = [
-    "Biscuit", "Mochi", "Pixel", "Waffles", "Miso", "Clementine", "Tofu", "Pepper", "Marmalade",
-    "Noodle", "Pretzel", "Juniper", "Bean", "Dumpling", "Ziggy", "Olive", "Paprika", "Maple",
-    "Sprocket", "Turnip", "Gnocchi", "Butterscotch", "Fig", "Pancake", "Nimbus", "Tangerine",
-    "Pickles", "Comet", "Bramble", "Cricket", "Fennel", "Sesame", "Plum", "Wasabi", "Doodle",
-    "Crumpet", "Nutmeg", "Socks", "Clover", "Captain Whiskers",
+    "Biscuit",
+    "Mochi",
+    "Pixel",
+    "Waffles",
+    "Miso",
+    "Clementine",
+    "Tofu",
+    "Pepper",
+    "Marmalade",
+    "Noodle",
+    "Pretzel",
+    "Juniper",
+    "Bean",
+    "Dumpling",
+    "Ziggy",
+    "Olive",
+    "Paprika",
+    "Maple",
+    "Sprocket",
+    "Turnip",
+    "Gnocchi",
+    "Butterscotch",
+    "Fig",
+    "Pancake",
+    "Nimbus",
+    "Tangerine",
+    "Pickles",
+    "Comet",
+    "Bramble",
+    "Cricket",
+    "Fennel",
+    "Sesame",
+    "Plum",
+    "Wasabi",
+    "Doodle",
+    "Crumpet",
+    "Nutmeg",
+    "Socks",
+    "Clover",
+    "Captain Whiskers",
 ];
 
 // ---- Flavor templates ----
@@ -2213,16 +2267,46 @@ pub struct FlavorTemplate {
 }
 
 pub static FLAVOR_TEMPLATES: [FlavorTemplate; 10] = [
-    FlavorTemplate { text: "{name} knocked a pencil off the table. It was necessary.", needs_kitten: true },
-    FlavorTemplate { text: "{name} is sitting in the fresh laundry. The laundry is warm now.", needs_kitten: true },
-    FlavorTemplate { text: "{name} stared at the wall for a while. It knows something.", needs_kitten: true },
-    FlavorTemplate { text: "{name} found the exact center of the sunniest spot and claimed it.", needs_kitten: true },
-    FlavorTemplate { text: "{name} chirped at a bird through the window. Negotiations continue.", needs_kitten: true },
-    FlavorTemplate { text: "{name} performed the ceremonial pre-nap stretch. Flawless form.", needs_kitten: true },
-    FlavorTemplate { text: "A sunbeam moved; the whole clowder relocated accordingly.", needs_kitten: false },
-    FlavorTemplate { text: "Somewhere, a cardboard box settled with a dignified whumpf.", needs_kitten: false },
-    FlavorTemplate { text: "A moth got in. The meadow has never been so alert.", needs_kitten: false },
-    FlavorTemplate { text: "It rained gently. The porch smelled like spring for an hour.", needs_kitten: false },
+    FlavorTemplate {
+        text: "{name} knocked a pencil off the table. It was necessary.",
+        needs_kitten: true,
+    },
+    FlavorTemplate {
+        text: "{name} is sitting in the fresh laundry. The laundry is warm now.",
+        needs_kitten: true,
+    },
+    FlavorTemplate {
+        text: "{name} stared at the wall for a while. It knows something.",
+        needs_kitten: true,
+    },
+    FlavorTemplate {
+        text: "{name} found the exact center of the sunniest spot and claimed it.",
+        needs_kitten: true,
+    },
+    FlavorTemplate {
+        text: "{name} chirped at a bird through the window. Negotiations continue.",
+        needs_kitten: true,
+    },
+    FlavorTemplate {
+        text: "{name} performed the ceremonial pre-nap stretch. Flawless form.",
+        needs_kitten: true,
+    },
+    FlavorTemplate {
+        text: "A sunbeam moved; the whole clowder relocated accordingly.",
+        needs_kitten: false,
+    },
+    FlavorTemplate {
+        text: "Somewhere, a cardboard box settled with a dignified whumpf.",
+        needs_kitten: false,
+    },
+    FlavorTemplate {
+        text: "A moth got in. The meadow has never been so alert.",
+        needs_kitten: false,
+    },
+    FlavorTemplate {
+        text: "It rained gently. The porch smelled like spring for an hour.",
+        needs_kitten: false,
+    },
 ];
 
 // ---- Sunbeam Rites ----
@@ -2242,7 +2326,11 @@ pub fn rite_def(r: RiteId) -> &'static RiteDef {
 }
 
 static RITES: [RiteDef; 11] = [
-    RiteDef { name: "Morning Stretch", cost: &[(ResourceId::Warmth, 100.0)], devotion_gate: 150.0 },
+    RiteDef {
+        name: "Morning Stretch",
+        cost: &[(ResourceId::Warmth, 100.0)],
+        devotion_gate: 150.0,
+    },
     RiteDef {
         name: "Shared Sunpuddle",
         cost: &[(ResourceId::Warmth, 250.0), (ResourceId::Shinies, 150.0)],
@@ -2329,7 +2417,10 @@ pub fn arch_def(a: ArchId) -> &'static ArchDef {
 }
 
 static ARCHES: [ArchDef; 8] = [
-    ArchDef { name: "Ribbon Arch", cost: &[(ResourceId::Rainbows, 500.0)] },
+    ArchDef {
+        name: "Ribbon Arch",
+        cost: &[(ResourceId::Rainbows, 500.0)],
+    },
     ArchDef {
         name: "Crystal Arch",
         cost: &[(ResourceId::Rainbows, 25000.0), (ResourceId::Prisms, 25.0)],
@@ -2340,7 +2431,10 @@ static ARCHES: [ArchDef; 8] = [
     },
     ArchDef {
         name: "Sky Arch",
-        cost: &[(ResourceId::Rainbows, 125000.0), (ResourceId::Prisms, 500.0)],
+        cost: &[
+            (ResourceId::Rainbows, 125000.0),
+            (ResourceId::Prisms, 500.0),
+        ],
     },
     ArchDef {
         name: "Dreaming Arch",
@@ -2360,11 +2454,17 @@ static ARCHES: [ArchDef; 8] = [
     },
     ArchDef {
         name: "Memory Arch",
-        cost: &[(ResourceId::Stardust, 2500.0), (ResourceId::Prisms, 50000.0)],
+        cost: &[
+            (ResourceId::Stardust, 2500.0),
+            (ResourceId::Prisms, 50000.0),
+        ],
     },
     ArchDef {
         name: "Everdream Arch",
-        cost: &[(ResourceId::Dreamcorns, 100.0), (ResourceId::Cairns, 1000.0)],
+        cost: &[
+            (ResourceId::Dreamcorns, 100.0),
+            (ResourceId::Cairns, 1000.0),
+        ],
     },
 ];
 
@@ -2420,7 +2520,12 @@ static COLONIES: [ColonyDef; 8] = [
                 season_bonus: 0.35,
                 ..SELL
             },
-            ColonySell { resource: ResourceId::Wands, amount: 10.0, chance: 0.25, ..SELL },
+            ColonySell {
+                resource: ResourceId::Wands,
+                amount: 10.0,
+                chance: 0.25,
+                ..SELL
+            },
         ],
     },
     ColonyDef {
@@ -2435,8 +2540,18 @@ static COLONIES: [ColonyDef; 8] = [
                 season_bonus: 0.45,
                 ..SELL
             },
-            ColonySell { resource: ResourceId::Quills, amount: 5.0, chance: 0.25, ..SELL },
-            ColonySell { resource: ResourceId::Stories, amount: 3.0, chance: 0.15, ..SELL },
+            ColonySell {
+                resource: ResourceId::Quills,
+                amount: 5.0,
+                chance: 0.25,
+                ..SELL
+            },
+            ColonySell {
+                resource: ResourceId::Stories,
+                amount: 3.0,
+                chance: 0.15,
+                ..SELL
+            },
         ],
     },
     ColonyDef {
@@ -2452,8 +2567,18 @@ static COLONIES: [ColonyDef; 8] = [
                 season_bonus: 0.35,
                 ..SELL
             },
-            ColonySell { resource: ResourceId::Brass, amount: 25.0, chance: 0.25, ..SELL },
-            ColonySell { resource: ResourceId::Cogs, amount: 5.0, chance: 0.10, ..SELL },
+            ColonySell {
+                resource: ResourceId::Brass,
+                amount: 25.0,
+                chance: 0.25,
+                ..SELL
+            },
+            ColonySell {
+                resource: ResourceId::Cogs,
+                amount: 5.0,
+                chance: 0.10,
+                ..SELL
+            },
         ],
     },
     ColonyDef {
@@ -2468,8 +2593,18 @@ static COLONIES: [ColonyDef; 8] = [
                 season_bonus: 0.25,
                 ..SELL
             },
-            ColonySell { resource: ResourceId::Tiles, amount: 5.0, chance: 0.75, ..SELL },
-            ColonySell { resource: ResourceId::Pavers, amount: 1.0, chance: 0.10, ..SELL },
+            ColonySell {
+                resource: ResourceId::Tiles,
+                amount: 5.0,
+                chance: 0.75,
+                ..SELL
+            },
+            ColonySell {
+                resource: ResourceId::Pavers,
+                amount: 1.0,
+                chance: 0.10,
+                ..SELL
+            },
         ],
     },
     ColonyDef {
@@ -2477,8 +2612,17 @@ static COLONIES: [ColonyDef; 8] = [
         start_standing: 0.15,
         buy: (ResourceId::Tiles, 50.0),
         sells: &[
-            ColonySell { resource: ResourceId::Embers, amount: 350.0, ..SELL },
-            ColonySell { resource: ResourceId::Dew, amount: 100.0, chance: 0.25, ..SELL },
+            ColonySell {
+                resource: ResourceId::Embers,
+                amount: 350.0,
+                ..SELL
+            },
+            ColonySell {
+                resource: ResourceId::Dew,
+                amount: 100.0,
+                chance: 0.25,
+                ..SELL
+            },
         ],
     },
     ColonyDef {
@@ -2486,7 +2630,12 @@ static COLONIES: [ColonyDef; 8] = [
         start_standing: 0.0,
         buy: (ResourceId::Shinies, 250.0),
         sells: &[
-            ColonySell { resource: ResourceId::Moonstone, amount: 1.0, chance: 0.95, ..SELL },
+            ColonySell {
+                resource: ResourceId::Moonstone,
+                amount: 1.0,
+                chance: 0.95,
+                ..SELL
+            },
             ColonySell {
                 resource: ResourceId::Stardust,
                 amount: 0.1,
@@ -2500,7 +2649,11 @@ static COLONIES: [ColonyDef; 8] = [
         name: "Owls",
         start_standing: -0.10,
         buy: (ResourceId::Mint, 500.0),
-        sells: &[ColonySell { resource: ResourceId::Curiosity, amount: 80.0, ..SELL }],
+        sells: &[ColonySell {
+            resource: ResourceId::Curiosity,
+            amount: 80.0,
+            ..SELL
+        }],
     },
     ColonyDef {
         name: "Star Whales",
@@ -2534,36 +2687,52 @@ pub fn tradition_def(t: TraditionId) -> &'static TraditionDef {
 
 /// The prestige shop table, in TraditionId order. @spec SIM-MOVE-010
 static TRADITIONS: [TraditionDef; 30] = [
-    TraditionDef { cost_wisdom: 5.0 },      // CarefulPacking
-    TraditionDef { cost_wisdom: 5.0 },      // TravelingBasketsI
-    TraditionDef { cost_wisdom: 35.0 },     // TravelingBasketsII
-    TraditionDef { cost_wisdom: 300.0 },    // TravelingBasketsIII
-    TraditionDef { cost_wisdom: 10.0 },     // MemoryChestI
-    TraditionDef { cost_wisdom: 100.0 },    // MemoryChestII
-    TraditionDef { cost_wisdom: 5.0 },      // WarmWelcomeHome
-    TraditionDef { cost_wisdom: 25.0 },     // ElderStories
-    TraditionDef { cost_wisdom: 50.0 },     // GoldenRatio
-    TraditionDef { cost_wisdom: 100.0 },    // GrandProportion
-    TraditionDef { cost_wisdom: 250.0 },    // VitruvianCat
-    TraditionDef { cost_wisdom: 750.0 },    // Renaissance
-    TraditionDef { cost_wisdom: 500.0 },    // NineLivesI
-    TraditionDef { cost_wisdom: 750.0 },    // NineLivesII
-    TraditionDef { cost_wisdom: 1250.0 },   // NineLivesIII
-    TraditionDef { cost_wisdom: 1750.0 },   // NineLivesIV
-    TraditionDef { cost_wisdom: 2500.0 },   // NineLivesV
-    TraditionDef { cost_wisdom: 5000.0 },   // NineLivesVI
-    TraditionDef { cost_wisdom: 7500.0 },   // NineLivesVII
-    TraditionDef { cost_wisdom: 15000.0 },  // NineLivesVIII
-    TraditionDef { cost_wisdom: 30000.0 },  // NineLivesIX
-    TraditionDef { cost_wisdom: 60000.0 },  // NineLivesX
-    TraditionDef { cost_wisdom: 5.0 },      // GoodNeighbours
-    TraditionDef { cost_wisdom: 25.0 },     // WellRested
-    TraditionDef { cost_wisdom: 400.0 },    // BrightEyed
-    TraditionDef { cost_wisdom: 25.0 },     // FestivalSpirit
-    TraditionDef { cost_wisdom: 50.0 },     // SecondWind
-    TraditionDef { cost_wisdom: 25.0 },     // Forecaster
-    TraditionDef { cost_wisdom: 125.0 },    // PrismSight
-    TraditionDef { cost_wisdom: 40.0 },     // AdventurousSpirit
+    TraditionDef { cost_wisdom: 5.0 },   // CarefulPacking
+    TraditionDef { cost_wisdom: 5.0 },   // TravelingBasketsI
+    TraditionDef { cost_wisdom: 35.0 },  // TravelingBasketsII
+    TraditionDef { cost_wisdom: 300.0 }, // TravelingBasketsIII
+    TraditionDef { cost_wisdom: 10.0 },  // MemoryChestI
+    TraditionDef { cost_wisdom: 100.0 }, // MemoryChestII
+    TraditionDef { cost_wisdom: 5.0 },   // WarmWelcomeHome
+    TraditionDef { cost_wisdom: 25.0 },  // ElderStories
+    TraditionDef { cost_wisdom: 50.0 },  // GoldenRatio
+    TraditionDef { cost_wisdom: 100.0 }, // GrandProportion
+    TraditionDef { cost_wisdom: 250.0 }, // VitruvianCat
+    TraditionDef { cost_wisdom: 750.0 }, // Renaissance
+    TraditionDef { cost_wisdom: 500.0 }, // NineLivesI
+    TraditionDef { cost_wisdom: 750.0 }, // NineLivesII
+    TraditionDef {
+        cost_wisdom: 1250.0,
+    }, // NineLivesIII
+    TraditionDef {
+        cost_wisdom: 1750.0,
+    }, // NineLivesIV
+    TraditionDef {
+        cost_wisdom: 2500.0,
+    }, // NineLivesV
+    TraditionDef {
+        cost_wisdom: 5000.0,
+    }, // NineLivesVI
+    TraditionDef {
+        cost_wisdom: 7500.0,
+    }, // NineLivesVII
+    TraditionDef {
+        cost_wisdom: 15000.0,
+    }, // NineLivesVIII
+    TraditionDef {
+        cost_wisdom: 30000.0,
+    }, // NineLivesIX
+    TraditionDef {
+        cost_wisdom: 60000.0,
+    }, // NineLivesX
+    TraditionDef { cost_wisdom: 5.0 },   // GoodNeighbours
+    TraditionDef { cost_wisdom: 25.0 },  // WellRested
+    TraditionDef { cost_wisdom: 400.0 }, // BrightEyed
+    TraditionDef { cost_wisdom: 25.0 },  // FestivalSpirit
+    TraditionDef { cost_wisdom: 50.0 },  // SecondWind
+    TraditionDef { cost_wisdom: 25.0 },  // Forecaster
+    TraditionDef { cost_wisdom: 125.0 }, // PrismSight
+    TraditionDef { cost_wisdom: 40.0 },  // AdventurousSpirit
 ];
 
 // ---- Wave 5: adventures (SIM-ADV) ----
@@ -2700,7 +2869,10 @@ static SITES: [SiteDef; 13] = [
     },
     SiteDef {
         name: "Old Oak",
-        mission_fuel: &[(ResourceId::Curiosity, 25000.0), (ResourceId::Skymaps, 200.0)],
+        mission_fuel: &[
+            (ResourceId::Curiosity, 25000.0),
+            (ResourceId::Skymaps, 200.0),
+        ],
         outpost: StructureId::Treehouse,
     },
     SiteDef {
@@ -2720,7 +2892,10 @@ static SITES: [SiteDef; 13] = [
     },
     SiteDef {
         name: "The Brook",
-        mission_fuel: &[(ResourceId::Moonmilk, 1000.0), (ResourceId::Cometsilk, 75.0)],
+        mission_fuel: &[
+            (ResourceId::Moonmilk, 1000.0),
+            (ResourceId::Cometsilk, 75.0),
+        ],
         outpost: StructureId::HushfeltGrotto,
     },
     SiteDef {
@@ -2745,17 +2920,26 @@ static SITES: [SiteDef; 13] = [
     },
     SiteDef {
         name: "The Milky Way",
-        mission_fuel: &[(ResourceId::JarsOfPurrs, 25.0), (ResourceId::Echoes, 1000.0)],
+        mission_fuel: &[
+            (ResourceId::JarsOfPurrs, 25.0),
+            (ResourceId::Echoes, 1000.0),
+        ],
         outpost: StructureId::StarNursery,
     },
     SiteDef {
         name: "The Far Shore",
-        mission_fuel: &[(ResourceId::JarsOfPurrs, 100.0), (ResourceId::Echoes, 4000.0)],
+        mission_fuel: &[
+            (ResourceId::JarsOfPurrs, 100.0),
+            (ResourceId::Echoes, 4000.0),
+        ],
         outpost: StructureId::FarBeacon,
     },
     SiteDef {
         name: "The Furthest Star",
-        mission_fuel: &[(ResourceId::JarsOfPurrs, 500.0), (ResourceId::Echoes, 16000.0)],
+        mission_fuel: &[
+            (ResourceId::JarsOfPurrs, 500.0),
+            (ResourceId::Echoes, 16000.0),
+        ],
         outpost: StructureId::WishingStar,
     },
 ];
@@ -2772,16 +2956,43 @@ pub fn dream_loom_def(l: DreamLoomId) -> &'static DreamLoomDef {
 }
 
 static DREAM_LOOMS: [DreamLoomDef; 9] = [
-    DreamLoomDef { name: "Soft Pillow", cost: &[(ResourceId::Reverie, 5.0)] },
-    DreamLoomDef { name: "Warm Blanket", cost: &[(ResourceId::Reverie, 15.0)] },
-    DreamLoomDef { name: "Dream Catcher", cost: &[(ResourceId::Reverie, 40.0)] },
-    DreamLoomDef { name: "Deep Cushion", cost: &[(ResourceId::Reverie, 100.0)] },
-    DreamLoomDef { name: "Lucid Nap", cost: &[(ResourceId::Reverie, 250.0)] },
-    DreamLoomDef { name: "Cozy Cave", cost: &[(ResourceId::Reverie, 500.0)] },
-    DreamLoomDef { name: "Long Slumber", cost: &[(ResourceId::Reverie, 1000.0)] },
-    DreamLoomDef { name: "Reverie Net", cost: &[(ResourceId::Reverie, 2500.0)] },
+    DreamLoomDef {
+        name: "Soft Pillow",
+        cost: &[(ResourceId::Reverie, 5.0)],
+    },
+    DreamLoomDef {
+        name: "Warm Blanket",
+        cost: &[(ResourceId::Reverie, 15.0)],
+    },
+    DreamLoomDef {
+        name: "Dream Catcher",
+        cost: &[(ResourceId::Reverie, 40.0)],
+    },
+    DreamLoomDef {
+        name: "Deep Cushion",
+        cost: &[(ResourceId::Reverie, 100.0)],
+    },
+    DreamLoomDef {
+        name: "Lucid Nap",
+        cost: &[(ResourceId::Reverie, 250.0)],
+    },
+    DreamLoomDef {
+        name: "Cozy Cave",
+        cost: &[(ResourceId::Reverie, 500.0)],
+    },
+    DreamLoomDef {
+        name: "Long Slumber",
+        cost: &[(ResourceId::Reverie, 1000.0)],
+    },
+    DreamLoomDef {
+        name: "Reverie Net",
+        cost: &[(ResourceId::Reverie, 2500.0)],
+    },
     DreamLoomDef {
         name: "The Distant Dawn",
-        cost: &[(ResourceId::Reverie, 10000.0), (ResourceId::JarsOfPurrs, 100.0)],
+        cost: &[
+            (ResourceId::Reverie, 10000.0),
+            (ResourceId::JarsOfPurrs, 100.0),
+        ],
     },
 ];

@@ -34,7 +34,10 @@ impl Section {
 
     /// Position in the fixed digit map, 0-based. `Meadow` is `1`, `Legacy` is `0`.
     pub fn index(self) -> usize {
-        Self::ALL.iter().position(|s| *s == self).expect("ALL is total")
+        Self::ALL
+            .iter()
+            .position(|s| *s == self)
+            .expect("ALL is total")
     }
 
     /// The digit that jumps here. @spec TUI-NAV-005

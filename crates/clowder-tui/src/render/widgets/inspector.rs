@@ -75,7 +75,11 @@ fn full_name(state: &GameState, key: &RowKey) -> String {
         RowKey::Adventure(Some(a)) => humanize(&format!("{a:?}")),
         RowKey::Adventure(None) => "No Adventure".to_string(),
         RowKey::Kitten(ix, _) => {
-            let name = state.kittens.get(*ix).map(|k| k.name.as_str()).unwrap_or("");
+            let name = state
+                .kittens
+                .get(*ix)
+                .map(|k| k.name.as_str())
+                .unwrap_or("");
             if name.is_empty() {
                 format!("Kitten {}", ix + 1)
             } else {
@@ -129,8 +133,11 @@ fn structure_statement(s: clowder_core::StructureId) -> String {
     let mut parts: Vec<String> = Vec::new();
 
     for (r, amt) in d.productions {
-        let mut clause =
-            format!("Produces {} {} per second", per_second(*amt), resource_label(*r));
+        let mut clause = format!(
+            "Produces {} {} per second",
+            per_second(*amt),
+            resource_label(*r)
+        );
         let mut qualifiers: Vec<&str> = Vec::new();
         if d.seasonal {
             qualifiers.push("seasonal");
@@ -165,38 +172,75 @@ fn structure_statement(s: clowder_core::StructureId) -> String {
         parts.push(format!("Houses {} kittens.", d.housing));
     }
     for (r, amt) in d.cap_bonuses {
-        parts.push(format!("Adds {} storage for {}.", fmt::exact(*amt), resource_label(*r)));
+        parts.push(format!(
+            "Adds {} storage for {}.",
+            fmt::exact(*amt),
+            resource_label(*r)
+        ));
     }
     if d.happiness_points != 0.0 {
-        parts.push(format!("Lifts mood by {} points.", fmt::exact(d.happiness_points)));
+        parts.push(format!(
+            "Lifts mood by {} points.",
+            fmt::exact(d.happiness_points)
+        ));
     }
     if d.crowding_relief != 0.0 {
-        parts.push(format!("Eases crowding by {}%.", percent(d.crowding_relief)));
+        parts.push(format!(
+            "Eases crowding by {}%.",
+            percent(d.crowding_relief)
+        ));
     }
     for (r, amt) in d.resource_ratios {
-        parts.push(format!("Raises production of {} by {}%.", resource_label(*r), percent(*amt)));
+        parts.push(format!(
+            "Raises production of {} by {}%.",
+            resource_label(*r),
+            percent(*amt)
+        ));
     }
     if d.craft_ratio != 0.0 {
-        parts.push(format!("Raises craft output by {}%.", percent(d.craft_ratio)));
+        parts.push(format!(
+            "Raises craft output by {}%.",
+            percent(d.craft_ratio)
+        ));
     }
     if d.luxury_demand != 0.0 {
-        parts.push(format!("Shifts luxury demand by {}%.", percent(d.luxury_demand)));
+        parts.push(format!(
+            "Shifts luxury demand by {}%.",
+            percent(d.luxury_demand)
+        ));
     }
     if d.jamboree_ratio != 0.0 {
-        parts.push(format!("Raises jamboree mood by {}%.", percent(d.jamboree_ratio)));
+        parts.push(format!(
+            "Raises jamboree mood by {}%.",
+            percent(d.jamboree_ratio)
+        ));
     }
     if d.jamboree_arrival != 0.0 {
-        parts.push(format!("Raises jamboree arrivals by {}%.", percent(d.jamboree_arrival)));
+        parts.push(format!(
+            "Raises jamboree arrivals by {}%.",
+            percent(d.jamboree_arrival)
+        ));
     }
     if d.global_ratio != 0.0 {
-        parts.push(format!("Raises the global ratio by {}%.", percent(d.global_ratio)));
+        parts.push(format!(
+            "Raises the global ratio by {}%.",
+            percent(d.global_ratio)
+        ));
     }
     if let Some(conv) = &d.converter {
         for (r, amt) in conv.inputs {
-            parts.push(format!("Converts {} {} per second.", per_second(*amt), resource_label(*r)));
+            parts.push(format!(
+                "Converts {} {} per second.",
+                per_second(*amt),
+                resource_label(*r)
+            ));
         }
         for (r, amt) in conv.outputs {
-            parts.push(format!("Yields {} {} per second.", per_second(*amt), resource_label(*r)));
+            parts.push(format!(
+                "Yields {} {} per second.",
+                per_second(*amt),
+                resource_label(*r)
+            ));
         }
     }
     if d.mess != 0.0 {
@@ -209,10 +253,16 @@ fn structure_statement(s: clowder_core::StructureId) -> String {
         parts.push(format!("Uses {} energy.", fmt::exact(d.energy_cons)));
     }
     if d.outdoor_ratio != 0.0 {
-        parts.push(format!("Raises outdoor production by {}%.", percent(d.outdoor_ratio)));
+        parts.push(format!(
+            "Raises outdoor production by {}%.",
+            percent(d.outdoor_ratio)
+        ));
     }
     if d.long_sun_cap != 0.0 {
-        parts.push(format!("Extends the long sun by {}.", fmt::exact(d.long_sun_cap)));
+        parts.push(format!(
+            "Extends the long sun by {}.",
+            fmt::exact(d.long_sun_cap)
+        ));
     }
 
     parts.join(" ")
@@ -223,7 +273,11 @@ fn structure_statement(s: clowder_core::StructureId) -> String {
 fn job_statement(j: clowder_core::JobId) -> String {
     match content::job_def(j).yield_per_tick {
         Some((r, per_tick)) => {
-            format!("Yields {} {} per worker per second.", per_second(per_tick), resource_label(r))
+            format!(
+                "Yields {} {} per worker per second.",
+                per_second(per_tick),
+                resource_label(r)
+            )
         }
         None => String::new(),
     }
@@ -255,9 +309,10 @@ fn statement(id: ContentId) -> String {
         ContentId::Idea(i) => content::idea_def(i).blurb.to_string(),
         ContentId::Refinement(r) => content::refinement_def(r).blurb.to_string(),
         ContentId::Rule(r) => content::rule_def(r).blurb.to_string(),
-        ContentId::Rite(_) | ContentId::Arch(_) | ContentId::Tradition(_) | ContentId::DreamLoom(_) => {
-            String::new()
-        }
+        ContentId::Rite(_)
+        | ContentId::Arch(_)
+        | ContentId::Tradition(_)
+        | ContentId::DreamLoom(_) => String::new(),
     }
 }
 
@@ -298,8 +353,12 @@ pub fn lock_reason_text(reason: &LockReason) -> String {
 /// A stretch of real time, in a plain unit — never rounded to sooner than the
 /// rate gives.
 fn wait_text(seconds: f64) -> String {
-    const UNITS: [(f64, &str); 4] =
-        [(86_400.0, "days"), (3_600.0, "hours"), (60.0, "minutes"), (1.0, "seconds")];
+    const UNITS: [(f64, &str); 4] = [
+        (86_400.0, "days"),
+        (3_600.0, "hours"),
+        (60.0, "minutes"),
+        (1.0, "seconds"),
+    ];
     for (size, name) in UNITS {
         if seconds >= size {
             let n = (seconds / size).ceil();
@@ -314,7 +373,12 @@ fn wait_text(seconds: f64) -> String {
 /// by the amount a shortfall names, covered where a shortfall leaves it out or
 /// the core reports no reason, unmarked where another reason holds the item
 /// back. @spec TUI-NAV-078
-fn component_line(state: &GameState, r: ResourceId, need: f64, reason: &Option<LockReason>) -> Pieces {
+fn component_line(
+    state: &GameState,
+    r: ResourceId,
+    need: f64,
+    reason: &Option<LockReason>,
+) -> Pieces {
     let have = state.stock(r);
     let name = resource_label(r);
     let chars = name.chars().count();
@@ -360,7 +424,9 @@ fn component_line(state: &GameState, r: ResourceId, need: f64, reason: &Option<L
 /// reason. @spec TUI-NAV-078
 fn cost_lines(state: &GameState, id: ContentId, reason: &Option<LockReason>) -> Vec<Pieces> {
     let cost = state.cost_of_next(id, 1);
-    cost.iter().map(|(r, need)| component_line(state, *r, *need, reason)).collect()
+    cost.iter()
+        .map(|(r, need)| component_line(state, *r, *need, reason))
+        .collect()
 }
 
 /// The next cost for a Pounce or Trade row: the one-unit price the core
@@ -374,7 +440,11 @@ fn unit_cost_lines(state: &GameState, unit: &[(ResourceId, f64)]) -> Vec<Pieces>
             let chars = name.chars().count();
             vec![
                 Piece::name(*r, name, chars),
-                Piece::plain(format!(": need {}, have {}", fmt::exact(*need), fmt::exact(state.stock(*r)))),
+                Piece::plain(format!(
+                    ": need {}, have {}",
+                    fmt::exact(*need),
+                    fmt::exact(state.stock(*r))
+                )),
             ]
         })
         .collect()
@@ -390,7 +460,13 @@ fn unit_cost_lines(state: &GameState, unit: &[(ResourceId, f64)]) -> Vec<Pieces>
 /// substitution the list makes in its own cost slot, leaving the lock reason
 /// stated beside it exactly where the core reports one, prompt or none.
 /// @spec TUI-NAV-018, TUI-NAV-078, TUI-NAV-079, TUI-NAV-035
-fn content_lines(state: &GameState, row: &Row, id: ContentId, tag: &str, prompt: Option<&CountPrompt>) -> Vec<Pieces> {
+fn content_lines(
+    state: &GameState,
+    row: &Row,
+    id: ContentId,
+    tag: &str,
+    prompt: Option<&CountPrompt>,
+) -> Vec<Pieces> {
     let mut out: Vec<Pieces> = Vec::new();
 
     let stmt = statement(id);
@@ -405,15 +481,23 @@ fn content_lines(state: &GameState, row: &Row, id: ContentId, tag: &str, prompt:
     }
 
     if let ContentId::Job(j) = id {
-        out.push(plain(format!("Workers in the meadow: {}.", state.effective_workers(j))));
+        out.push(plain(format!(
+            "Workers in the meadow: {}.",
+            state.effective_workers(j)
+        )));
     }
 
     if tag == "tinker" {
         if let ContentId::Craft(c) = id {
-            out.push(plain(format!("Tinkerers in the meadow: {}.", bound_tinkerers(state, c))));
+            out.push(plain(format!(
+                "Tinkerers in the meadow: {}.",
+                bound_tinkerers(state, c)
+            )));
         }
         if let Some(p) = prompt {
-            out.push(crate::render::count_prompt_preview_pieces(state, row, &p.digits));
+            out.push(crate::render::count_prompt_preview_pieces(
+                state, row, &p.digits,
+            ));
         }
         // A tinkerer count row binds rather than makes: no next cost, no
         // reason — the core reports neither for it.
@@ -427,7 +511,9 @@ fn content_lines(state: &GameState, row: &Row, id: ContentId, tag: &str, prompt:
     // lock reason beside it (TUI-NAV-079) is read whether or not a prompt is
     // held to this row.
     if let Some(p) = prompt {
-        out.push(crate::render::count_prompt_preview_pieces(state, row, &p.digits));
+        out.push(crate::render::count_prompt_preview_pieces(
+            state, row, &p.digits,
+        ));
     } else if reason != Some(LockReason::AlreadyYours) {
         out.extend(cost_lines(state, id, &reason));
     }
@@ -444,9 +530,7 @@ fn bound_tinkerers(state: &GameState, c: clowder_core::CraftId) -> usize {
     state
         .kittens
         .iter()
-        .filter(|k| {
-            k.tinkering == Some(c) && k.location == clowder_core::Location::Home
-        })
+        .filter(|k| k.tinkering == Some(c) && k.location == clowder_core::Location::Home)
         .count()
 }
 
@@ -457,7 +541,11 @@ fn bound_tinkerers(state: &GameState, c: clowder_core::CraftId) -> usize {
 /// TUI-RENDER-012
 fn store_lines(state: &GameState, r: ResourceId) -> Vec<Pieces> {
     let cap = state.cap(r);
-    let cap_text = if cap.is_finite() { fmt::exact(cap) } else { "none".to_string() };
+    let cap_text = if cap.is_finite() {
+        fmt::exact(cap)
+    } else {
+        "none".to_string()
+    };
     let rate = state.net_rate(r);
     let size = fmt::exact(rate.abs());
     let rate_text = if size == "0" {
@@ -515,7 +603,11 @@ fn draw_body(
     if let Some(armed) = armed.filter(|a| a.key == *key && crate::render::armed_is_live(a)) {
         let start = lines.len();
         lines.push(Vec::new());
-        lines.extend(crate::render::consequence_summary(state, armed).into_iter().map(plain));
+        lines.extend(
+            crate::render::consequence_summary(state, armed)
+                .into_iter()
+                .map(plain),
+        );
         attention_rows = Some(start..lines.len());
     }
 
@@ -531,7 +623,9 @@ fn draw_body(
         _ => {
             if let Some(p) = on_this_row {
                 lines.push(Vec::new());
-                lines.push(crate::render::count_prompt_preview_pieces(state, &row, &p.digits));
+                lines.push(crate::render::count_prompt_preview_pieces(
+                    state, &row, &p.digits,
+                ));
             } else if let RowKind::Act { command, .. } = &row.kind {
                 if let Some(unit) = state.unit_price(command) {
                     lines.push(Vec::new());
@@ -576,14 +670,23 @@ pub fn draw(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     // TUI-NAV-032
     // Never a header: where the remembered key has left the list, the list
     // falls back to its first selectable row. @spec TUI-NAV-032, TUI-NAV-099
-    let Some(cursor) = crate::nav::rows::cursor_index(&all, view.focus[section.index()].as_ref()) else {
+    let Some(cursor) = crate::nav::rows::cursor_index(&all, view.focus[section.index()].as_ref())
+    else {
         return;
     };
     let Some(row) = all.get(cursor) else {
         return;
     };
     let key = row.key.clone();
-    draw_body(f, area, state, section, &key, view.armed.as_ref(), view.prompt.as_ref());
+    draw_body(
+        f,
+        area,
+        state,
+        section,
+        &key,
+        view.armed.as_ref(),
+        view.prompt.as_ref(),
+    );
 }
 
 /// Where the inspector stops being a swap over the list and becomes a pane of

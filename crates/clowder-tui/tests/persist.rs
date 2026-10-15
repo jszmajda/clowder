@@ -66,8 +66,12 @@ impl TempDir {
     fn new(tag: &str) -> TempDir {
         static COUNTER: AtomicU32 = AtomicU32::new(0);
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir()
-            .join(format!("clowder-persist-{}-{}-{}", std::process::id(), tag, n));
+        let path = std::env::temp_dir().join(format!(
+            "clowder-persist-{}-{}-{}",
+            std::process::id(),
+            tag,
+            n
+        ));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).expect("a scratch directory should be creatable");
         TempDir { path }
@@ -89,7 +93,10 @@ impl Drop for TempDir {
 }
 
 fn now_unix() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).expect("the clock is past 1970").as_secs()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("the clock is past 1970")
+        .as_secs()
 }
 
 /// Directory contents by name, sorted — so a test can assert what the shell did
@@ -97,7 +104,12 @@ fn now_unix() -> u64 {
 fn entries(dir: &Path) -> Vec<String> {
     let mut names: Vec<String> = fs::read_dir(dir)
         .expect("the scratch directory should be readable")
-        .map(|e| e.expect("a directory entry").file_name().to_string_lossy().into_owned())
+        .map(|e| {
+            e.expect("a directory entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
         .collect();
     names.sort();
     names
@@ -126,7 +138,10 @@ fn session(save_path: PathBuf, clock: TickAccumulator) -> App {
 /// Both clocks in step — an ordinary attended interval, with no suspend to
 /// detect and no correction to reject.
 fn steady(d: Duration) -> Reading {
-    Reading { monotonic: d, wall: d }
+    Reading {
+        monotonic: d,
+        wall: d,
+    }
 }
 
 /// Bytes that are emphatically not a save: unbalanced braces, no
@@ -236,7 +251,10 @@ fn an_unparseable_save_is_moved_off_the_live_path() {
         !save.exists(),
         "the unparseable save must not still sit at the live path after being set aside"
     );
-    assert!(moved_to.exists(), "the set-aside save must exist where the player is told it went");
+    assert!(
+        moved_to.exists(),
+        "the set-aside save must exist where the player is told it went"
+    );
     assert_ne!(moved_to, save, "moving a file onto itself moves nothing");
 }
 
@@ -283,7 +301,11 @@ fn the_set_aside_save_is_the_original_name_plus_a_suffix_in_the_same_directory()
          it went to {moved_to:?}"
     );
 
-    let original = save.file_name().expect("the fixture names a file").to_string_lossy().into_owned();
+    let original = save
+        .file_name()
+        .expect("the fixture names a file")
+        .to_string_lossy()
+        .into_owned();
     let rescued = moved_to
         .file_name()
         .expect("the set-aside path names a file")
@@ -366,12 +388,16 @@ fn the_save_the_shell_writes_is_one_the_core_can_read_back() {
     let save = dir.join("save.json");
     let app = session(save.clone(), TickAccumulator::default());
 
-    app.save().expect("saving to a writable directory should succeed");
+    app.save()
+        .expect("saving to a writable directory should succeed");
 
-    clowder_core::read_save(&save, now_unix()).expect("the core must be able to load what the shell wrote");
+    clowder_core::read_save(&save, now_unix())
+        .expect("the core must be able to load what the shell wrote");
 
-    let leftovers: Vec<String> =
-        entries(dir.path()).into_iter().filter(|n| n.ends_with(".tmp")).collect();
+    let leftovers: Vec<String> = entries(dir.path())
+        .into_iter()
+        .filter(|n| n.ends_with(".tmp"))
+        .collect();
     assert!(
         leftovers.is_empty(),
         "the atomic write renames its temp file into place; found {leftovers:?}"
@@ -393,7 +419,8 @@ fn a_save_with_nothing_banked_is_stamped_with_the_present() {
         "fixture: a fresh accumulator owes nothing"
     );
 
-    app.save().expect("saving to a writable directory should succeed");
+    app.save()
+        .expect("saving to a writable directory should succeed");
     let after = now_unix();
 
     let loaded = clowder_core::read_save(&save, after).expect("the save should load");
@@ -429,7 +456,8 @@ fn a_save_taken_mid_catch_up_owes_exactly_what_it_banked() {
 
     let app = session(save.clone(), clock);
     let ticks_at_save = app.state.ticks;
-    app.save().expect("saving to a writable directory should succeed");
+    app.save()
+        .expect("saving to a writable directory should succeed");
 
     // Reloaded immediately: no new absence, so the only ticks that run are the
     // ones that were banked.
@@ -464,7 +492,8 @@ fn an_interval_that_has_already_run_is_not_owed_again() {
     );
 
     let app = session(save.clone(), clock);
-    app.save().expect("saving to a writable directory should succeed");
+    app.save()
+        .expect("saving to a writable directory should succeed");
     let after = now_unix();
 
     let loaded = clowder_core::read_save(&save, after).expect("the save should load");
@@ -501,11 +530,17 @@ fn a_failed_save_is_an_error_the_session_survives() {
     let app = session(save, TickAccumulator::default());
 
     let result = app.save();
-    assert!(result.is_err(), "a save into an impossible path must report failure, not succeed");
+    assert!(
+        result.is_err(),
+        "a save into an impossible path must report failure, not succeed"
+    );
 
     // Still a live session: the same app can be asked again, and asking does
     // not panic or take the process down.
-    assert!(app.save().is_err(), "the session survives the failure and can be asked again");
+    assert!(
+        app.save().is_err(),
+        "the session survives the failure and can be asked again"
+    );
 }
 
 /// "Retry at the next cadence" is only meaningful if the retry can succeed. A
@@ -527,7 +562,8 @@ fn a_save_that_failed_once_succeeds_when_the_obstacle_clears() {
     // whatever it was, the next cadence finds a path that works.
     fs::remove_file(&blocked).expect("clearing the obstacle");
 
-    app.save().expect("the next cadence must be able to save once the obstacle is gone");
+    app.save()
+        .expect("the next cadence must be able to save once the obstacle is gone");
     clowder_core::read_save(&save, now_unix())
         .expect("the retried save should be a save the core can load");
 }

@@ -79,8 +79,12 @@ use std::time::{Duration, Instant};
 use clowder_core::{begin_load, save_string, Advance, GameState, SetDown};
 use clowder_tui::nav::{self, ViewState};
 use clowder_tui::runtime::clock::Reading;
-use clowder_tui::runtime::{session, App, InputSource, Startup, TickAccumulator, WAKE_TICKS_PER_FRAME};
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use clowder_tui::runtime::{
+    session, App, InputSource, Startup, TickAccumulator, WAKE_TICKS_PER_FRAME,
+};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use ratatui::backend::{Backend, ClearType, TestBackend, WindowSize};
 use ratatui::buffer::Cell;
 use ratatui::layout::{Position, Size};
@@ -123,19 +127,32 @@ struct Cue {
 }
 
 fn quiet() -> Cue {
-    Cue { answer: Answer::Quiet, signal: false, screen_goes: false }
+    Cue {
+        answer: Answer::Quiet,
+        signal: false,
+        screen_goes: false,
+    }
 }
 
 fn ready(event: Event) -> Cue {
-    Cue { answer: Answer::Ready(event), ..quiet() }
+    Cue {
+        answer: Answer::Ready(event),
+        ..quiet()
+    }
 }
 
 fn wait_fails(kind: io::ErrorKind) -> Cue {
-    Cue { answer: Answer::WaitFails(kind), ..quiet() }
+    Cue {
+        answer: Answer::WaitFails(kind),
+        ..quiet()
+    }
 }
 
 fn read_fails(kind: io::ErrorKind) -> Cue {
-    Cue { answer: Answer::ReadFails(kind), ..quiet() }
+    Cue {
+        answer: Answer::ReadFails(kind),
+        ..quiet()
+    }
 }
 
 impl Cue {
@@ -225,9 +242,9 @@ impl InputSource for Scripted {
     fn read(&mut self) -> io::Result<Event> {
         let mut w = self.0.borrow_mut();
         w.log.push(Op::Read);
-        w.pending
-            .take()
-            .expect("the loop read an event no wait had said was ready — the real source would block here")
+        w.pending.take().expect(
+            "the loop read an event no wait had said was ready — the real source would block here",
+        )
     }
 }
 
@@ -317,7 +334,8 @@ impl Backend for Screen {
 fn scratch(name: &str) -> PathBuf {
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!("clowder-session-{}-{name}-{n}", std::process::id()));
+    let dir =
+        std::env::temp_dir().join(format!("clowder-session-{}-{name}-{n}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir.join("save.json")
@@ -358,12 +376,20 @@ fn play_out(setup: Setup, cues: Vec<Cue>) -> Run {
         screen_gone: setup.screen_gone,
         ..World::default()
     }));
-    let backend = Screen { inner: TestBackend::new(setup.size.0, setup.size.1), world: world.clone() };
+    let backend = Screen {
+        inner: TestBackend::new(setup.size.0, setup.size.1),
+        world: world.clone(),
+    };
     let mut terminal = Terminal::new(backend).expect("a terminal over a TestBackend");
     let mut input = Scripted(world.clone());
     let flag = world.clone();
-    let parting =
-        session(setup.startup, setup.save_path.clone(), &mut terminal, &mut input, &move || flag.borrow().signalled);
+    let parting = session(
+        setup.startup,
+        setup.save_path.clone(),
+        &mut terminal,
+        &mut input,
+        &move || flag.borrow().signalled,
+    );
     // Read the world before the terminal is let go: the drawing library
     // writes once more as its handle drops (it restores the cursor), and that
     // write is this harness's doing, not the session's.
@@ -380,11 +406,17 @@ fn play_out(setup: Setup, cues: Vec<Cue>) -> Run {
 
 impl Run {
     fn waits(&self) -> Vec<Duration> {
-        self.log.iter().filter_map(|op| if let Op::Wait(t) = op { Some(*t) } else { None }).collect()
+        self.log
+            .iter()
+            .filter_map(|op| if let Op::Wait(t) = op { Some(*t) } else { None })
+            .collect()
     }
 
     fn refused_writes(&self) -> usize {
-        self.log.iter().filter(|op| matches!(op, Op::Write { refused: true })).count()
+        self.log
+            .iter()
+            .filter(|op| matches!(op, Op::Write { refused: true }))
+            .count()
     }
 
     /// The loop's frames as the log shows them: each run of waits and reads
@@ -411,20 +443,28 @@ impl Run {
 
     /// The parting lines that name a failed save.
     fn save_failures(&self) -> Vec<&String> {
-        self.parting.iter().filter(|l| l.to_lowercase().contains("save")).collect()
+        self.parting
+            .iter()
+            .filter(|l| l.to_lowercase().contains("save"))
+            .collect()
     }
 
     /// What the save the session left carries.
     fn saved(&self, what: &str) -> SetDown {
         let contents = std::fs::read_to_string(&self.save_path)
             .unwrap_or_else(|e| panic!("{what}: the session ended without leaving a save ({e})"));
-        begin_load(&contents, 0).expect("the session's save loads").set_down()
+        begin_load(&contents, 0)
+            .expect("the session's save loads")
+            .set_down()
     }
 
     /// The loop stopped where it was told to: it used the whole script and
     /// asked for nothing beyond it.
     fn expect_it_stopped_there(&self, what: &str) {
-        assert_eq!(self.unanswered, 0, "{what}: fixture — the loop ended before the script's last cue");
+        assert_eq!(
+            self.unanswered, 0,
+            "{what}: fixture — the loop ended before the script's last cue"
+        );
         assert_eq!(
             self.past_the_script, 0,
             "{what}: the loop went on to wait for input again after it had its reason to stop"
@@ -441,7 +481,11 @@ impl Run {
             "{what}: after its input failed the loop went on to {last:?} — it must neither wait, \
              nor read, nor draw again over a terminal that is gone"
         );
-        assert_eq!(self.refused_writes(), 0, "{what}: fixture — the screen was never taken away");
+        assert_eq!(
+            self.refused_writes(),
+            0,
+            "{what}: fixture — the screen was never taken away"
+        );
     }
 
     /// A frame was refused, once, and that was the last thing the loop did
@@ -494,7 +538,12 @@ fn inert() -> Event {
 }
 
 fn play(save_path: PathBuf) -> Setup {
-    Setup { startup: Startup::NewGame(GameState::new(PLAY_SEED)), size: WIDE, screen_gone: false, save_path }
+    Setup {
+        startup: Startup::NewGame(GameState::new(PLAY_SEED)),
+        size: WIDE,
+        screen_gone: false,
+        save_path,
+    }
 }
 
 /// A new game as the session opens it.
@@ -516,12 +565,18 @@ fn opened_app(save_path: PathBuf) -> App {
 }
 
 fn still() -> Reading {
-    Reading { monotonic: Duration::ZERO, wall: Duration::ZERO }
+    Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::ZERO,
+    }
 }
 
 fn elapsed(secs: f64) -> Reading {
     let d = Duration::from_secs_f64(secs);
-    Reading { monotonic: d, wall: d }
+    Reading {
+        monotonic: d,
+        wall: d,
+    }
 }
 
 /// The speed a new game starts at, and the speed the speed key takes it to.
@@ -530,7 +585,10 @@ fn speeds() -> (f64, f64) {
     let before = app.state.speed;
     let mut t = Terminal::new(TestBackend::new(WIDE.0, WIDE.1)).unwrap();
     app.step(&mut t, still(), &[speed_key()]).unwrap();
-    assert_ne!(app.state.speed, before, "fixture: the speed key changes a new game's speed");
+    assert_ne!(
+        app.state.speed, before,
+        "fixture: the speed key changes a new game's speed"
+    );
     (before, app.state.speed)
 }
 
@@ -556,7 +614,12 @@ fn waking(save_path: PathBuf) -> Setup {
         catch_up.total_ticks() >= 10 * WAKE_TICKS_PER_FRAME,
         "fixture: the wake is many bounds long, so no scripted session finishes it"
     );
-    Setup { startup: Startup::Loaded(Box::new(catch_up)), size: WIDE, screen_gone: false, save_path }
+    Setup {
+        startup: Startup::Loaded(Box::new(catch_up)),
+        size: WIDE,
+        screen_gone: false,
+        save_path,
+    }
 }
 
 /// Where a wake of the fixture save stands after replaying a number of
@@ -606,9 +669,13 @@ impl Run {
             "{what}: the save holds a wake that had replayed a different number of ticks than the \
              {bounds} bound(s) its frames replayed"
         );
-        assert!(save_string(&saved.state, 0) == want.state, "{what}: the saved state is not the wake's state so far");
         assert!(
-            saved.owed_ticks >= want.remaining && saved.owed_ticks <= want.remaining + BANKED_AT_MOST,
+            save_string(&saved.state, 0) == want.state,
+            "{what}: the saved state is not the wake's state so far"
+        );
+        assert!(
+            saved.owed_ticks >= want.remaining
+                && saved.owed_ticks <= want.remaining + BANKED_AT_MOST,
             "{what}: the save owes {} ticks; the wake had {} left to replay",
             saved.owed_ticks,
             want.remaining
@@ -656,13 +723,22 @@ fn a_frame_of_play_takes_all_the_input_that_is_ready_and_never_waits_no_time() {
     run.expect_it_stopped_there("play");
 
     for (n, wait) in run.waits().iter().enumerate() {
-        assert!(!wait.is_zero(), "wait {n} of the session asked the input source to wait no time at all");
+        assert!(
+            !wait.is_zero(),
+            "wait {n} of the session asked the input source to wait no time at all"
+        );
     }
     let frames = run.frames_of_input();
     let budget = frame_budget();
-    assert!(budget > BRIEFEST_AT_MOST, "fixture: the frame budget is longer than the briefest wait");
+    assert!(
+        budget > BRIEFEST_AT_MOST,
+        "fixture: the frame budget is longer than the briefest wait"
+    );
     for (n, (waits, _)) in frames.iter().enumerate() {
-        assert_eq!(waits[0], budget, "frame {n}: a frame of play first waits out the frame budget");
+        assert_eq!(
+            waits[0], budget,
+            "frame {n}: a frame of play first waits out the frame budget"
+        );
         for later in &waits[1..] {
             assert!(
                 *later > Duration::ZERO && *later <= BRIEFEST_AT_MOST,
@@ -685,7 +761,14 @@ fn a_frame_of_play_takes_all_the_input_that_is_ready_and_never_waits_no_time() {
 /// @spec TUI-RUN-059, TUI-RUN-035
 #[test]
 fn every_wait_of_a_waking_frame_is_the_briefest_and_the_quit_key_is_heard() {
-    let cues = vec![quiet(), ready(inert()), ready(inert()), quiet(), ready(quit_key()), quiet()];
+    let cues = vec![
+        quiet(),
+        ready(inert()),
+        ready(inert()),
+        quiet(),
+        ready(quit_key()),
+        quiet(),
+    ];
     let run = play_out(waking(scratch("waking-quit")), cues);
     run.expect_it_stopped_there("waking");
 
@@ -698,11 +781,22 @@ fn every_wait_of_a_waking_frame_is_the_briefest_and_the_quit_key_is_heard() {
              ready, and no longer than a millisecond, so the replay runs at the machine's pace"
         );
     }
-    let reads: Vec<usize> = run.frames_of_input().iter().map(|(_, reads)| *reads).collect();
-    assert_eq!(reads, vec![0, 2, 1], "a waking frame takes all that is ready, the quit key included");
+    let reads: Vec<usize> = run
+        .frames_of_input()
+        .iter()
+        .map(|(_, reads)| *reads)
+        .collect();
+    assert_eq!(
+        reads,
+        vec![0, 2, 1],
+        "a waking frame takes all that is ready, the quit key included"
+    );
     assert_eq!(run.refused_writes(), 0);
     let saved = run.saved("q while waking");
-    assert!(saved.owed_ticks > 0, "the quit key ended the wake, which saved still owing the rest");
+    assert!(
+        saved.owed_ticks > 0,
+        "the quit key ended the wake, which saved still owing the rest"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -718,7 +812,10 @@ fn every_wait_of_a_waking_frame_is_the_briefest_and_the_quit_key_is_heard() {
 fn lost_input_in_play_ends_the_session_there_with_the_frames_events_unapplied() {
     let (starting_speed, _) = speeds();
     for cause in CAUSES {
-        for (failure, last) in [(wait_fails(cause), Op::Wait(Duration::ZERO)), (read_fails(cause), Op::Read)] {
+        for (failure, last) in [
+            (wait_fails(cause), Op::Wait(Duration::ZERO)),
+            (read_fails(cause), Op::Read),
+        ] {
             let what = format!("{:?} in play", failure.answer);
             let cues = vec![quiet(), ready(speed_key()), ready(inert()), failure];
             let run = play_out(play(scratch("lost-input")), cues);
@@ -730,7 +827,10 @@ fn lost_input_in_play_ends_the_session_there_with_the_frames_events_unapplied() 
                 .skip_while(|op| !matches!(op, Op::Read))
                 .filter(|op| matches!(op, Op::Write { .. }))
                 .count();
-            assert_eq!(frames_drawn_after_the_key, 0, "{what}: the frame that lost its input drew");
+            assert_eq!(
+                frames_drawn_after_the_key, 0,
+                "{what}: the frame that lost its input drew"
+            );
 
             let saved = run.saved(&what);
             assert_eq!(
@@ -787,27 +887,52 @@ fn what_a_refused_frame_applied_and_ticked_stands_and_is_what_the_shutdown_saves
 
     let mut accepted = opened_app(scratch("accepted"));
     let mut screen = Terminal::new(TestBackend::new(WIDE.0, WIDE.1)).unwrap();
-    accepted.step(&mut screen, hour, &[speed_key()]).expect("a frame on a working screen");
-    assert!(accepted.state.ticks > 0 && accepted.clock.backlog() > 0, "fixture: the frame ticked and banked");
+    accepted
+        .step(&mut screen, hour, &[speed_key()])
+        .expect("a frame on a working screen");
+    assert!(
+        accepted.state.ticks > 0 && accepted.clock.backlog() > 0,
+        "fixture: the frame ticked and banked"
+    );
 
-    let world = Rc::new(RefCell::new(World { screen_gone: true, ..World::default() }));
-    let gone = Screen { inner: TestBackend::new(WIDE.0, WIDE.1), world: world.clone() };
+    let world = Rc::new(RefCell::new(World {
+        screen_gone: true,
+        ..World::default()
+    }));
+    let gone = Screen {
+        inner: TestBackend::new(WIDE.0, WIDE.1),
+        world: world.clone(),
+    };
     let mut gone = Terminal::new(gone).unwrap();
     let path = scratch("refused-step");
     let mut refused = opened_app(path.clone());
-    refused.step(&mut gone, hour, &[speed_key()]).expect_err("a frame on a vanished screen is refused");
+    refused
+        .step(&mut gone, hour, &[speed_key()])
+        .expect_err("a frame on a vanished screen is refused");
 
     assert!(
         save_string(&refused.state, 0) == save_string(&accepted.state, 0),
         "a refused frame left a different state than an accepted one: what it applied and ticked \
          before its draw must stand"
     );
-    assert_eq!(refused.clock, accepted.clock, "and the time it banked stands with it");
+    assert_eq!(
+        refused.clock, accepted.clock,
+        "and the time it banked stands with it"
+    );
 
     refused.save().expect("the shutdown save");
-    let saved = begin_load(&std::fs::read_to_string(&path).unwrap(), 0).unwrap().set_down();
-    assert!(save_string(&saved.state, 0) == save_string(&accepted.state, 0), "the save is of the meadow as that frame left it");
-    assert_eq!(saved.owed_ticks, accepted.clock.backlog(), "carrying the ticks that frame banked");
+    let saved = begin_load(&std::fs::read_to_string(&path).unwrap(), 0)
+        .unwrap()
+        .set_down();
+    assert!(
+        save_string(&saved.state, 0) == save_string(&accepted.state, 0),
+        "the save is of the meadow as that frame left it"
+    );
+    assert_eq!(
+        saved.owed_ticks,
+        accepted.clock.backlog(),
+        "carrying the ticks that frame banked"
+    );
 }
 
 /// A terminal too small to draw is a working terminal, not a lost one: the
@@ -818,11 +943,29 @@ fn what_a_refused_frame_applied_and_ticked_stands_and_is_what_the_shutdown_saves
 fn a_terminal_too_small_to_draw_is_not_a_lost_terminal() {
     let mut setup = play(scratch("small-play"));
     setup.size = TOO_SMALL;
-    let run_play = play_out(setup, vec![quiet(), quiet(), quiet(), quiet(), ready(quit_key()), quiet()]);
+    let run_play = play_out(
+        setup,
+        vec![
+            quiet(),
+            quiet(),
+            quiet(),
+            quiet(),
+            ready(quit_key()),
+            quiet(),
+        ],
+    );
     run_play.expect_it_stopped_there("too small, in play");
     assert_eq!(run_play.refused_writes(), 0);
-    assert_eq!(run_play.frames_of_input().len(), 5, "every frame ran, down to the one the quit key ended");
-    assert!(run_play.parting.is_empty(), "nothing went wrong, so there is nothing to say: {:?}", run_play.parting);
+    assert_eq!(
+        run_play.frames_of_input().len(),
+        5,
+        "every frame ran, down to the one the quit key ended"
+    );
+    assert!(
+        run_play.parting.is_empty(),
+        "nothing went wrong, so there is nothing to say: {:?}",
+        run_play.parting
+    );
 
     let mut setup = waking(scratch("small-waking"));
     setup.size = TOO_SMALL;
@@ -850,7 +993,10 @@ fn a_terminal_too_small_to_draw_is_not_a_lost_terminal() {
 fn lost_input_while_waking_sets_the_catch_up_down_where_it_stands() {
     let failures = [
         (wait_fails(io::ErrorKind::Other), Op::Wait(Duration::ZERO)),
-        (wait_fails(io::ErrorKind::Interrupted), Op::Wait(Duration::ZERO)),
+        (
+            wait_fails(io::ErrorKind::Interrupted),
+            Op::Wait(Duration::ZERO),
+        ),
         (read_fails(io::ErrorKind::Other), Op::Read),
         (read_fails(io::ErrorKind::UnexpectedEof), Op::Read),
     ];
@@ -871,11 +1017,18 @@ fn a_waking_frame_that_cannot_be_written_keeps_what_it_had_replayed() {
     let what = "the wake's first frame refused";
     let run = run_with_the_screen_gone(waking(scratch("waking-refused-first")), vec![]);
     run.expect_one_refused_frame_and_nothing_after(what);
-    assert_eq!(run.waits().len(), 0, "{what}: the loop went on to wait for input");
+    assert_eq!(
+        run.waits().len(),
+        0,
+        "{what}: the loop went on to wait for input"
+    );
     run.expect_the_wake_set_down_after(1, what);
 
     let what = "a later waking frame refused";
-    let run = play_out(waking(scratch("waking-refused-later")), vec![quiet().and_the_screen_goes()]);
+    let run = play_out(
+        waking(scratch("waking-refused-later")),
+        vec![quiet().and_the_screen_goes()],
+    );
     run.expect_one_refused_frame_and_nothing_after(what);
     run.expect_the_wake_set_down_after(2, what);
 }
@@ -895,23 +1048,41 @@ fn shutdown_begins_by_the_end_of_the_frame_whose_wait_it_happened_during() {
 
     // In play.
     let scenarios: [(&str, Vec<Cue>); 4] = [
-        ("a signal in play", vec![quiet(), quiet(), quiet().and_a_signal()]),
-        ("a signal in play, as an event arrives", vec![quiet(), ready(inert()).and_a_signal(), quiet()]),
-        ("lost input in play", vec![quiet(), quiet(), wait_fails(io::ErrorKind::Other)]),
-        ("the screen gone in play", vec![quiet(), quiet(), quiet().and_the_screen_goes()]),
+        (
+            "a signal in play",
+            vec![quiet(), quiet(), quiet().and_a_signal()],
+        ),
+        (
+            "a signal in play, as an event arrives",
+            vec![quiet(), ready(inert()).and_a_signal(), quiet()],
+        ),
+        (
+            "lost input in play",
+            vec![quiet(), quiet(), wait_fails(io::ErrorKind::Other)],
+        ),
+        (
+            "the screen gone in play",
+            vec![quiet(), quiet(), quiet().and_the_screen_goes()],
+        ),
     ];
     for (what, cues) in scenarios {
         let run = play_out(play(scratch("prompt-play")), cues);
         run.expect_it_stopped_there(what);
         for wait in run.waits() {
-            assert!(wait <= budget, "{what}: a wait of {wait:?} outlasts the frame budget");
+            assert!(
+                wait <= budget,
+                "{what}: a wait of {wait:?} outlasts the frame budget"
+            );
         }
         if let Some(at) = run.signalled_at {
             let frames_begun_after = run.log[at..]
                 .windows(2)
                 .filter(|pair| matches!(pair, [Op::Write { .. }, Op::Wait(_)]))
                 .count();
-            assert_eq!(frames_begun_after, 0, "{what}: another frame began its wait after the signal's frame ended");
+            assert_eq!(
+                frames_begun_after, 0,
+                "{what}: another frame began its wait after the signal's frame ended"
+            );
         }
         run.saved(what);
     }
@@ -919,8 +1090,14 @@ fn shutdown_begins_by_the_end_of_the_frame_whose_wait_it_happened_during() {
     // While waking.
     let scenarios: [(&str, Vec<Cue>); 3] = [
         ("a signal while waking", vec![quiet().and_a_signal()]),
-        ("lost input while waking", vec![wait_fails(io::ErrorKind::Other)]),
-        ("the screen gone while waking", vec![quiet().and_the_screen_goes()]),
+        (
+            "lost input while waking",
+            vec![wait_fails(io::ErrorKind::Other)],
+        ),
+        (
+            "the screen gone while waking",
+            vec![quiet().and_the_screen_goes()],
+        ),
     ];
     for (what, cues) in scenarios {
         let run = play_out(waking(scratch("prompt-waking")), cues);
@@ -937,7 +1114,10 @@ fn shutdown_begins_by_the_end_of_the_frame_whose_wait_it_happened_during() {
             "{what}: the wake replayed on past the frame it should have stopped in ({} ticks)",
             saved.state.ticks
         );
-        assert!(saved.owed_ticks > 0, "{what}: the wake was set down, not finished");
+        assert!(
+            saved.owed_ticks > 0,
+            "{what}: the wake was set down, not finished"
+        );
     }
 }
 
@@ -950,9 +1130,18 @@ fn shutdown_begins_by_the_end_of_the_frame_whose_wait_it_happened_during() {
 /// draw is then refused.
 fn both_at_once() -> Vec<(&'static str, Vec<Cue>)> {
     vec![
-        ("the wait fails as a signal is recorded", vec![wait_fails(io::ErrorKind::Other).and_a_signal()]),
-        ("the read fails as a signal is recorded", vec![read_fails(io::ErrorKind::Other).and_a_signal()]),
-        ("a signal is recorded and the frame is refused", vec![quiet().and_a_signal().and_the_screen_goes()]),
+        (
+            "the wait fails as a signal is recorded",
+            vec![wait_fails(io::ErrorKind::Other).and_a_signal()],
+        ),
+        (
+            "the read fails as a signal is recorded",
+            vec![read_fails(io::ErrorKind::Other).and_a_signal()],
+        ),
+        (
+            "a signal is recorded and the frame is refused",
+            vec![quiet().and_a_signal().and_the_screen_goes()],
+        ),
     ]
 }
 
@@ -971,22 +1160,41 @@ fn a_signal_and_a_lost_terminal_together_are_one_shutdown() {
         let what = format!("{how}, in play");
         let saved = play_out(play(scratch("both-play")), play_cues.clone());
         saved.expect_it_stopped_there(&what);
-        assert!(saved.refused_writes() <= 1, "{what}: the vanished screen was written to again");
+        assert!(
+            saved.refused_writes() <= 1,
+            "{what}: the vanished screen was written to again"
+        );
         saved.saved(&what);
 
         let unsaved = play_out(play(unwritable("both-play-unwritable")), play_cues);
         unsaved.expect_it_stopped_there(&what);
-        assert_eq!(unsaved.save_failures().len(), 1, "{what}: one shutdown saves once: {:?}", unsaved.parting);
+        assert_eq!(
+            unsaved.save_failures().len(),
+            1,
+            "{what}: one shutdown saves once: {:?}",
+            unsaved.parting
+        );
 
         let what = format!("{how}, while waking");
         let saved = play_out(waking(scratch("both-waking")), cues.clone());
         saved.expect_it_stopped_there(&what);
-        assert!(saved.refused_writes() <= 1, "{what}: the vanished screen was written to again");
-        assert!(saved.saved(&what).owed_ticks > 0, "{what}: the wake was set down and saved");
+        assert!(
+            saved.refused_writes() <= 1,
+            "{what}: the vanished screen was written to again"
+        );
+        assert!(
+            saved.saved(&what).owed_ticks > 0,
+            "{what}: the wake was set down and saved"
+        );
 
         let unsaved = play_out(waking(unwritable("both-waking-unwritable")), cues);
         unsaved.expect_it_stopped_there(&what);
-        assert_eq!(unsaved.save_failures().len(), 1, "{what}: one shutdown saves once: {:?}", unsaved.parting);
+        assert_eq!(
+            unsaved.save_failures().len(),
+            1,
+            "{what}: one shutdown saves once: {:?}",
+            unsaved.parting
+        );
     }
 }
 
@@ -1004,8 +1212,14 @@ fn a_shutdown_save_that_cannot_be_written_is_tried_once_whatever_began_the_shutd
     let endings: [(&str, Vec<Cue>); 5] = [
         ("a quit key", vec![ready(quit_key()), quiet()]),
         ("a termination signal", vec![quiet().and_a_signal()]),
-        ("a failed wait for input", vec![wait_fails(io::ErrorKind::Other)]),
-        ("a failed read of an event", vec![read_fails(io::ErrorKind::Other)]),
+        (
+            "a failed wait for input",
+            vec![wait_fails(io::ErrorKind::Other)],
+        ),
+        (
+            "a failed read of an event",
+            vec![read_fails(io::ErrorKind::Other)],
+        ),
         ("a refused frame", vec![quiet().and_the_screen_goes()]),
     ];
     for (ending, cues) in endings {
@@ -1013,7 +1227,11 @@ fn a_shutdown_save_that_cannot_be_written_is_tried_once_whatever_began_the_shutd
         play_cues.extend(cues.clone());
         for (phase, setup, cues) in [
             ("in play", play(unwritable("unwritable-play")), play_cues),
-            ("while waking", waking(unwritable("unwritable-waking")), cues),
+            (
+                "while waking",
+                waking(unwritable("unwritable-waking")),
+                cues,
+            ),
         ] {
             let what = format!("{ending}, {phase}, the save unwritable");
             let run = play_out(setup, cues);
@@ -1049,7 +1267,11 @@ fn a_shutdown_save_that_cannot_be_written_is_tried_once_whatever_began_the_shutd
 fn every_mouse_kind() -> Vec<MouseEventKind> {
     let mut kinds = Vec::new();
     for b in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
-        kinds.extend([MouseEventKind::Down(b), MouseEventKind::Up(b), MouseEventKind::Drag(b)]);
+        kinds.extend([
+            MouseEventKind::Down(b),
+            MouseEventKind::Up(b),
+            MouseEventKind::Drag(b),
+        ]);
     }
     kinds.extend([
         MouseEventKind::Moved,
@@ -1081,7 +1303,12 @@ fn every_mouse_modifier() -> Vec<KeyModifiers> {
 }
 
 fn mouse_event(kind: MouseEventKind, modifiers: KeyModifiers) -> Event {
-    Event::Mouse(MouseEvent { kind, column: 30, row: 4, modifiers })
+    Event::Mouse(MouseEvent {
+        kind,
+        column: 30,
+        row: 4,
+        modifiers,
+    })
 }
 
 /// A wheel step: the mouse event a fling of the wheel delivers by the dozen.
@@ -1094,7 +1321,10 @@ fn wheel() -> Event {
 /// the size already drawn at, focus gained and lost, a paste.
 fn every_other_kind() -> Vec<(&'static str, Event)> {
     vec![
-        ("a key", Event::Key(KeyEvent::new(KeyCode::F(12), KeyModifiers::NONE))),
+        (
+            "a key",
+            Event::Key(KeyEvent::new(KeyCode::F(12), KeyModifiers::NONE)),
+        ),
         ("a resize", Event::Resize(WIDE.0, WIDE.1)),
         ("focus gained", Event::FocusGained),
         ("focus lost", Event::FocusLost),
@@ -1110,7 +1340,10 @@ fn first_frame_takes(setup: Setup, events: Vec<Event>) -> usize {
     cues[0] = cues[0].clone().and_a_signal();
     let run = play_out(setup, cues);
     let frames = run.frames_of_input();
-    assert!(!frames.is_empty(), "fixture: the session took input at least once");
+    assert!(
+        !frames.is_empty(),
+        "fixture: the session took input at least once"
+    );
     frames[0].1
 }
 
@@ -1142,7 +1375,10 @@ fn bounds(setup: impl Fn(PathBuf) -> Setup, what: &str) -> (usize, usize) {
 /// @spec TUI-RUN-064, TUI-RUN-016
 #[test]
 fn a_frames_mouse_bound_is_its_own_and_at_least_four_times_the_bound_on_other_input() {
-    for (what, setup) in [("in play", play as fn(PathBuf) -> Setup), ("while waking", waking)] {
+    for (what, setup) in [
+        ("in play", play as fn(PathBuf) -> Setup),
+        ("while waking", waking),
+    ] {
         let (other, mouse) = bounds(setup, what);
         assert!(other > 0, "{what}: fixture — a frame takes some input");
         assert!(
@@ -1162,11 +1398,17 @@ fn a_frames_mouse_bound_is_its_own_and_at_least_four_times_the_bound_on_other_in
 /// @spec TUI-RUN-064
 #[test]
 fn every_mouse_event_counts_against_the_mouse_bound_and_every_other_event_against_the_other() {
-    for (what, setup) in [("in play", play as fn(PathBuf) -> Setup), ("while waking", waking)] {
+    for (what, setup) in [
+        ("in play", play as fn(PathBuf) -> Setup),
+        ("while waking", waking),
+    ] {
         let (other, mouse) = bounds(setup, what);
         for kind in every_mouse_kind() {
             for modifiers in every_mouse_modifier() {
-                let taken = first_frame_takes(setup(scratch("bound-kind")), vec![mouse_event(kind, modifiers); mouse + 1]);
+                let taken = first_frame_takes(
+                    setup(scratch("bound-kind")),
+                    vec![mouse_event(kind, modifiers); mouse + 1],
+                );
                 assert_eq!(
                     taken, mouse,
                     "{what}: {kind:?} with {modifiers:?} held is a mouse event, counted against the \
@@ -1176,9 +1418,11 @@ fn every_mouse_event_counts_against_the_mouse_bound_and_every_other_event_agains
             }
         }
         for (name, event) in every_other_kind() {
-            let taken = first_frame_takes(setup(scratch("bound-other-kind")), vec![event; other + 1]);
+            let taken =
+                first_frame_takes(setup(scratch("bound-other-kind")), vec![event; other + 1]);
             assert_eq!(
-                taken, other,
+                taken,
+                other,
                 "{what}: {name} is not a mouse event, counted against the other bound ({other}) — \
                  a frame took {taken} of {} of them",
                 other + 1
@@ -1189,14 +1433,23 @@ fn every_mouse_event_counts_against_the_mouse_bound_and_every_other_event_agains
         let mut events = vec![inert(); other];
         events.extend(vec![wheel(); 5]);
         let taken = first_frame_takes(setup(scratch("bound-other-first")), events);
-        assert_eq!(taken, other, "{what}: the other bound was reached, and the frame went on taking mouse events");
+        assert_eq!(
+            taken, other,
+            "{what}: the other bound was reached, and the frame went on taking mouse events"
+        );
 
         let mut events = vec![wheel(); mouse];
         events.extend(vec![inert(); 5]);
         let taken = first_frame_takes(setup(scratch("bound-mouse-first")), events);
-        assert_eq!(taken, mouse, "{what}: the mouse bound was reached, and the frame went on taking other events");
+        assert_eq!(
+            taken, mouse,
+            "{what}: the mouse bound was reached, and the frame went on taking other events"
+        );
 
-        let events: Vec<Event> = (0..other).flat_map(|_| [wheel(), inert()]).chain([wheel(), inert()]).collect();
+        let events: Vec<Event> = (0..other)
+            .flat_map(|_| [wheel(), inert()])
+            .chain([wheel(), inert()])
+            .collect();
         let taken = first_frame_takes(setup(scratch("bound-interleaved")), events);
         assert_eq!(
             taken,
@@ -1233,7 +1486,11 @@ fn a_key_behind_fewer_mouse_events_than_the_mouse_bound_is_taken_in_their_frame(
         "in play: {} wheel steps and the two keys behind them should all be taken in one frame",
         mouse - 1
     );
-    assert_eq!(run.saved("a burst then two keys").state.speed, sped_up, "in play: the key behind the burst was not applied");
+    assert_eq!(
+        run.saved("a burst then two keys").state.speed,
+        sped_up,
+        "in play: the key behind the burst was not applied"
+    );
 
     let mut cues = vec![quiet()];
     cues.extend((0..mouse).map(|_| ready(wheel())));
@@ -1241,7 +1498,11 @@ fn a_key_behind_fewer_mouse_events_than_the_mouse_bound_is_taken_in_their_frame(
     let run = play_out(play(scratch("burst-play-full")), cues);
     run.expect_it_stopped_there("a full burst then the quit key, in play");
     let reads: Vec<usize> = run.frames_of_input().iter().map(|(_, n)| *n).collect();
-    assert_eq!(reads, vec![0, mouse, 1], "in play: a key behind a full mouse bound is taken in the next frame");
+    assert_eq!(
+        reads,
+        vec![0, mouse, 1],
+        "in play: a key behind a full mouse bound is taken in the next frame"
+    );
 
     // While waking.
     let (_, mouse) = bounds(waking, "while waking");
@@ -1250,6 +1511,10 @@ fn a_key_behind_fewer_mouse_events_than_the_mouse_bound_is_taken_in_their_frame(
     let run = play_out(waking(scratch("burst-waking")), cues);
     run.expect_it_stopped_there("a burst then the quit key, while waking");
     let reads: Vec<usize> = run.frames_of_input().iter().map(|(_, n)| *n).collect();
-    assert_eq!(reads, vec![mouse], "while waking: the quit key behind the burst should be taken in its frame");
+    assert_eq!(
+        reads,
+        vec![mouse],
+        "while waking: the quit key behind the burst should be taken in its frame"
+    );
     run.expect_the_wake_set_down_after(2, "a burst then the quit key, while waking");
 }

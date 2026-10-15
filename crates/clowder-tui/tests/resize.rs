@@ -64,7 +64,10 @@ fn meadow() -> GameState {
     for r in ResourceId::ALL {
         s.resources[r.ix()] = 1.0e9;
     }
-    s.revealed = StructureId::ALL.iter().map(|b| clowder_core::ContentId::Structure(*b)).collect();
+    s.revealed = StructureId::ALL
+        .iter()
+        .map(|b| clowder_core::ContentId::Structure(*b))
+        .collect();
     s.ideas.insert(IdeaId::DeepNapTheory);
     s.resources[ResourceId::Starshards.ix()] = 1.0e12;
     s.ticks = 5_000;
@@ -73,7 +76,10 @@ fn meadow() -> GameState {
 
 /// A distinct report per `n`, long enough that the core keeps it.
 fn away_report(n: u64) -> OfflineReport {
-    let mut r = OfflineReport { elapsed_seconds: (3 + n) * 86_400, ..OfflineReport::default() };
+    let mut r = OfflineReport {
+        elapsed_seconds: (3 + n) * 86_400,
+        ..OfflineReport::default()
+    };
     r.resource_deltas[ResourceId::Feathers.ix()] = 4_800.0 + n as f64;
     r
 }
@@ -81,13 +87,25 @@ fn away_report(n: u64) -> OfflineReport {
 fn nap_key(state: &GameState) -> RowKey {
     rows(state, Section::Dreams)
         .into_iter()
-        .find(|r| matches!(r.kind, RowKind::Act { command: Command::DeepNap(_), .. }))
+        .find(|r| {
+            matches!(
+                r.kind,
+                RowKind::Act {
+                    command: Command::DeepNap(_),
+                    ..
+                }
+            )
+        })
         .map(|r| r.key)
         .expect("fixture: the nap row is listed")
 }
 
 fn meadow_rows(state: &GameState) -> Vec<RowKey> {
-    rows(state, Section::Meadow).into_iter().filter(|r| r.selectable()).map(|r| r.key).collect()
+    rows(state, Section::Meadow)
+        .into_iter()
+        .filter(|r| r.selectable())
+        .map(|r| r.key)
+        .collect()
 }
 
 /// A session past its opening, with a queue of three reports — the newest two
@@ -102,14 +120,24 @@ fn session(name: &str) -> App {
         state.ticks += 1;
         let report = away_report(n);
         state.journal.record_away(state.ticks, &report);
-        let loaded = LoadedGame { state: state.clone(), report };
+        let loaded = LoadedGame {
+            state: state.clone(),
+            report,
+        };
         clowder_tui::nav::queue_load_report(&mut view, &loaded);
     }
-    assert_eq!(view.reports.len(), 3, "fixture: all three reports queued a banner");
+    assert_eq!(
+        view.reports.len(),
+        3,
+        "fixture: all three reports queued a banner"
+    );
     view.reports[2].dismissed = true;
 
     let list = meadow_rows(&state);
-    assert!(list.len() > 3, "fixture: the Meadow lists enough rows to remember one past the first");
+    assert!(
+        list.len() > 3,
+        "fixture: the Meadow lists enough rows to remember one past the first"
+    );
     view.focus[Section::Meadow.index()] = Some(list[2].clone());
     view.section = Some(Section::Dreams);
     view.focus[Section::Dreams.index()] = Some(nap_key(&state));
@@ -128,12 +156,18 @@ fn session(name: &str) -> App {
 }
 
 fn still() -> Reading {
-    Reading { monotonic: Duration::ZERO, wall: Duration::ZERO }
+    Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::ZERO,
+    }
 }
 
 fn elapsed(secs: f64) -> Reading {
     let d = Duration::from_secs_f64(secs);
-    Reading { monotonic: d, wall: d }
+    Reading {
+        monotonic: d,
+        wall: d,
+    }
 }
 
 fn term(w: u16, h: u16) -> Terminal<TestBackend> {
@@ -145,20 +179,26 @@ fn press(code: KeyCode) -> Event {
 }
 
 fn press_char(c: char) -> Event {
-    let modifiers = if c.is_ascii_uppercase() { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
+    let modifiers = if c.is_ascii_uppercase() {
+        KeyModifiers::SHIFT
+    } else {
+        KeyModifiers::NONE
+    };
     Event::Key(KeyEvent::new(KeyCode::Char(c), modifiers))
 }
 
 /// Step once with these keys and no time passing.
 fn keys(a: &mut App, t: &mut Terminal<TestBackend>, input: &[Event]) {
-    a.step(t, still(), input).expect("a step against a TestBackend does not fail");
+    a.step(t, still(), input)
+        .expect("a step against a TestBackend does not fail");
 }
 
 /// Resize the terminal to `w`×`h` as a real one is resized: its size changes,
 /// and the change arrives as an event to the next step.
 fn resize(a: &mut App, t: &mut Terminal<TestBackend>, w: u16, h: u16) {
     t.backend_mut().resize(w, h);
-    a.step(t, still(), &[Event::Resize(w, h)]).expect("a step against a TestBackend does not fail");
+    a.step(t, still(), &[Event::Resize(w, h)])
+        .expect("a step against a TestBackend does not fail");
 }
 
 fn view_of(a: &App) -> String {
@@ -182,14 +222,17 @@ fn region(buf: &Buffer, rect: Rect) -> Vec<String> {
 /// The inspector widget drawn alone into `rect` of a terminal this size.
 fn inspector_alone(w: u16, h: u16, rect: Rect, state: &GameState, view: &ViewState) -> Vec<String> {
     let mut t = term(w, h);
-    t.draw(|f| inspector::draw(f, rect, state, view)).expect("TestBackend is infallible");
+    t.draw(|f| inspector::draw(f, rect, state, view))
+        .expect("TestBackend is infallible");
     region(t.backend().buffer(), rect)
 }
 
 /// A long-lived footer note, set the way a rejection leaves one.
 fn note(a: &mut App) {
-    a.view.footer =
-        Some(("a note already showing".to_string(), Instant::now() + Duration::from_secs(600)));
+    a.view.footer = Some((
+        "a note already showing".to_string(),
+        Instant::now() + Duration::from_secs(600),
+    ));
 }
 
 /// The topmost transient a session is built with, above the arming.
@@ -202,7 +245,13 @@ enum Top {
     Journal,
 }
 
-const TOPS: [Top; 5] = [Top::Nothing, Top::Prompt, Top::Palette, Top::Help, Top::Journal];
+const TOPS: [Top; 5] = [
+    Top::Nothing,
+    Top::Prompt,
+    Top::Palette,
+    Top::Help,
+    Top::Journal,
+];
 
 /// A session carrying every piece of view state a resize must keep, built by
 /// a player's own keys at the floor: the inspector called for (where
@@ -215,20 +264,41 @@ fn loaded_session(top: Top, wanted: bool, name: &str) -> (App, Terminal<TestBack
     keys(&mut a, &mut t, &[]);
     if wanted {
         keys(&mut a, &mut t, &[press_char(' ')]);
-        assert!(a.view.inspector_wanted, "fixture: Space at the floor called for the inspector");
+        assert!(
+            a.view.inspector_wanted,
+            "fixture: Space at the floor called for the inspector"
+        );
     }
     keys(&mut a, &mut t, &[press(KeyCode::Enter)]);
     assert!(a.view.armed.is_some(), "fixture: Enter armed the nap row");
     match top {
         Top::Nothing => {}
         Top::Prompt => {
-            keys(&mut a, &mut t, &[press_char('x'), press_char('3'), press_char('7')]);
-            let prompt = a.view.prompt.as_ref().expect("fixture: x opened the count prompt");
-            assert_eq!(prompt.digits, "37", "fixture: 37 was typed into the count prompt");
-            assert!(prompt.row.is_some(), "fixture: the count prompt is held to a row");
+            keys(
+                &mut a,
+                &mut t,
+                &[press_char('x'), press_char('3'), press_char('7')],
+            );
+            let prompt = a
+                .view
+                .prompt
+                .as_ref()
+                .expect("fixture: x opened the count prompt");
+            assert_eq!(
+                prompt.digits, "37",
+                "fixture: 37 was typed into the count prompt"
+            );
+            assert!(
+                prompt.row.is_some(),
+                "fixture: the count prompt is held to a row"
+            );
         }
         Top::Palette => {
-            keys(&mut a, &mut t, &[press_char('/'), press_char('a'), press_char('b')]);
+            keys(
+                &mut a,
+                &mut t,
+                &[press_char('/'), press_char('a'), press_char('b')],
+            );
             assert!(
                 matches!(&a.view.overlay, Some(Overlay::Palette { query, .. }) if query == "ab"),
                 "fixture: the palette opened with ab typed into it"
@@ -247,8 +317,14 @@ fn loaded_session(top: Top, wanted: bool, name: &str) -> (App, Terminal<TestBack
             a.view.overlay = Some(Overlay::Journal { anchor: 2 });
         }
     }
-    assert!(a.view.armed.is_some(), "fixture: {top:?} left the nap armed beneath");
-    assert_eq!(a.view.inspector_wanted, wanted, "fixture: the inspector call is as built");
+    assert!(
+        a.view.armed.is_some(),
+        "fixture: {top:?} left the nap armed beneath"
+    );
+    assert_eq!(
+        a.view.inspector_wanted, wanted,
+        "fixture: the inspector call is as built"
+    );
     note(&mut a);
     (a, t)
 }
@@ -339,14 +415,26 @@ fn the_inspector_call_survives_a_round_trip_through_the_pane_and_the_card() {
         ("across the breakpoint", vec![((130, 40), vec![space()])]),
         (
             "across the breakpoint, pressing each key",
-            vec![((130, 40), vec![space(), i(), space()]), ((100, 30), vec![i()])],
+            vec![
+                ((130, 40), vec![space(), i(), space()]),
+                ((100, 30), vec![i()]),
+            ],
         ),
         (
             "into the pane, then back into its dead-band",
-            vec![((100, 30), vec![i()]), ((97, 30), vec![space(), i(), space()])],
+            vec![
+                ((100, 30), vec![i()]),
+                ((97, 30), vec![space(), i(), space()]),
+            ],
         ),
-        ("under the card", vec![((60, 20), vec![space(), i(), space()])]),
-        ("under the card by height alone", vec![((200, 10), vec![i()])]),
+        (
+            "under the card",
+            vec![((60, 20), vec![space(), i(), space()])],
+        ),
+        (
+            "under the card by height alone",
+            vec![((200, 10), vec![i()])],
+        ),
         (
             "through the pane and the card",
             vec![
@@ -366,7 +454,10 @@ fn the_inspector_call_survives_a_round_trip_through_the_pane_and_the_card() {
             if wanted {
                 keys(&mut a, &mut t, &[press_char(' ')]);
             }
-            assert_eq!(a.view.inspector_wanted, wanted, "fixture: the call is as built");
+            assert_eq!(
+                a.view.inspector_wanted, wanted,
+                "fixture: the call is as built"
+            );
 
             for ((w, h), pressed) in excursion {
                 resize(&mut a, &mut t, *w, *h);
@@ -381,7 +472,8 @@ fn the_inspector_call_survives_a_round_trip_through_the_pane_and_the_card() {
                 for key in pressed {
                     keys(&mut a, &mut t, std::slice::from_ref(key));
                     assert_eq!(
-                        a.view.inspector_wanted, wanted,
+                        a.view.inspector_wanted,
+                        wanted,
                         "{what}: {key:?} at {w}×{h} ({:?} drawn) changed the inspector call; it \
                          is set or cleared only where the narrow layout is on screen",
                         drawn(&a)
@@ -437,7 +529,8 @@ fn under_the_card_the_sim_advances_and_the_frame_returns_as_the_view_describes()
             drawn(&a)
         );
         let ticks = a.state.ticks;
-        a.step(&mut t, elapsed(3.0), &[]).expect("a step below the floor must not fail");
+        a.step(&mut t, elapsed(3.0), &[])
+            .expect("a step below the floor must not fail");
         assert!(
             a.state.ticks > ticks,
             "under the too-small card at {w}×{h}, three seconds passed and the sim did not advance"

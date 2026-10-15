@@ -1863,7 +1863,6 @@ fn determinism_holds_with_arrivals_traits_and_pounces() {
     );
 }
 
-
 /// "Available" means actionable: whatever the Elder's trait does to a price,
 /// the availability the core reports for a revealed item agrees with whether
 /// acting on it succeeds. Checked across every reveal-tracked item, holding
@@ -1886,7 +1885,11 @@ fn availability_agrees_with_acting_under_a_discounted_price() {
     let items = StructureId::ALL
         .iter()
         .map(|&x| (ContentId::Structure(x), Command::Build(x)))
-        .chain(IdeaId::ALL.iter().map(|&x| (ContentId::Idea(x), Command::ResearchIdea(x))));
+        .chain(
+            IdeaId::ALL
+                .iter()
+                .map(|&x| (ContentId::Idea(x), Command::ResearchIdea(x))),
+        );
     for (id, cmd) in items {
         let mut t = s.clone();
         t.revealed.insert(id);
@@ -1896,7 +1899,10 @@ fn availability_agrees_with_acting_under_a_discounted_price() {
         }
         let available = t.availability(id) == Availability::Available;
         let acted = t.clone().apply(cmd).is_ok();
-        assert_eq!(available, acted, "{id:?}: availability says {available}, acting says {acted}");
+        assert_eq!(
+            available, acted,
+            "{id:?}: availability says {available}, acting says {acted}"
+        );
         checked += 1;
         if let ContentId::Idea(i) = id {
             if acted && t.stock(ResourceId::Curiosity) < clowder_core::content::idea_def(i).cost {
@@ -1905,5 +1911,8 @@ fn availability_agrees_with_acting_under_a_discounted_price() {
         }
     }
     assert!(checked > 20, "every reveal-tracked item is walked");
-    assert!(decided_by_discount > 0, "at least one idea is affordable only through the discount");
+    assert!(
+        decided_by_discount > 0,
+        "at least one idea is affordable only through the discount"
+    );
 }

@@ -3,7 +3,7 @@ use crate::events::Event;
 use crate::state::{
     AdventureId, ArchId, ArchivedKitten, ColonyId, CraftId, DreamLoomId, GameState, IdeaId, JobId,
     Kitten, Location, Promise, RefinementId, ResourceId, RiteId, RuleId, SiteId, StructureId,
-    TraditionId, RESOURCE_COUNT, STRUCTURE_COUNT, EPSILON,
+    TraditionId, EPSILON, RESOURCE_COUNT, STRUCTURE_COUNT,
 };
 use serde::{Deserialize, Serialize};
 
@@ -110,7 +110,9 @@ pub enum CommandError {
     NoSeats,
     NoWorkersAssigned,
     StorageFull,
-    InsufficientResources { missing: Vec<(ResourceId, f64)> },
+    InsufficientResources {
+        missing: Vec<(ResourceId, f64)>,
+    },
 }
 
 impl GameState {
@@ -155,7 +157,10 @@ impl GameState {
                     if self.whale_visit_years == 0 {
                         return None;
                     }
-                    return Some(vec![(ResourceId::Hushfelt, content::WHALE_HUSHFELT_PER_CARAVAN)]);
+                    return Some(vec![(
+                        ResourceId::Hushfelt,
+                        content::WHALE_HUSHFELT_PER_CARAVAN,
+                    )]);
                 }
                 if !self.discovered.contains(&colony) {
                     return None;
@@ -325,7 +330,10 @@ impl GameState {
         let costs = self.next_cost(s);
         self.spend(&costs)?;
         self.structures[s.ix()] += 1;
-        Ok(vec![Event::StructureBuilt { id: s, count: self.structures[s.ix()] }])
+        Ok(vec![Event::StructureBuilt {
+            id: s,
+            count: self.structures[s.ix()],
+        }])
     }
 
     // @spec SIM-KIT-008
@@ -347,7 +355,10 @@ impl GameState {
         let kitten = &mut self.kittens[ix];
         kitten.job = Some(j);
         kitten.job_seq = Some(seq);
-        Ok(vec![Event::JobAssigned { name: kitten.name.clone(), job: j }])
+        Ok(vec![Event::JobAssigned {
+            name: kitten.name.clone(),
+            job: j,
+        }])
     }
 
     // @spec SIM-KIT-009
@@ -368,7 +379,10 @@ impl GameState {
         // A Tinkerer leaving the job releases its recipe binding (and seat).
         // @spec SIM-ECO-043
         kitten.tinkering = None;
-        Ok(vec![Event::JobUnassigned { name: kitten.name.clone(), job: j }])
+        Ok(vec![Event::JobUnassigned {
+            name: kitten.name.clone(),
+            job: j,
+        }])
     }
 
     /// Research spends curiosity and any gate-craft components together,
@@ -425,7 +439,10 @@ impl GameState {
         if squads == 0 {
             return Err(CommandError::UnknownId); // a zero-squad pounce is no pounce
         }
-        self.spend(&[(ResourceId::Pep, content::POUNCE_PEP_PER_SQUAD * squads as f64)])?;
+        self.spend(&[(
+            ResourceId::Pep,
+            content::POUNCE_PEP_PER_SQUAD * squads as f64,
+        )])?;
 
         // Gentle Paws: the squads still trot out (pep spent), but come home with
         // nothing — no yields, no RNG draws. @spec SIM-ADV-002
@@ -441,9 +458,8 @@ impl GameState {
 
         // @spec SIM-EXP-004
         let ratio = self.effect(crate::effects::Effect::PounceRatio);
-        let feathers =
-            (content::POUNCE_FEATHERS_BASE + content::POUNCE_FEATHERS_PER_RATIO * ratio)
-                * self.irwin_hall(squads);
+        let feathers = (content::POUNCE_FEATHERS_BASE + content::POUNCE_FEATHERS_PER_RATIO * ratio)
+            * self.irwin_hall(squads);
         let bell_hits = self.binomial(
             squads,
             content::POUNCE_BELLS_CHANCE + content::POUNCE_BELLS_CHANCE_PER_RATIO * ratio,
@@ -466,7 +482,13 @@ impl GameState {
         self.resources[ResourceId::Shinies.ix()] = held + shinies;
         self.resources[ResourceId::Unicorns.ix()] += unicorns as f64;
 
-        Ok(vec![Event::PounceReturned { squads, feathers, bells, shinies, unicorns }])
+        Ok(vec![Event::PounceReturned {
+            squads,
+            feathers,
+            bells,
+            shinies,
+            unicorns,
+        }])
     }
 
     /// Irwin–Hall: the sum of n uniform draws (mean n/2, bell-shaped).
@@ -496,7 +518,9 @@ impl GameState {
             (ResourceId::Quills, content::JAMBOREE_QUILLS),
         ])?;
         self.jamboree_until = self.ticks + content::JAMBOREE_TICKS;
-        Ok(vec![Event::JamboreeStarted { until_tick: self.jamboree_until }])
+        Ok(vec![Event::JamboreeStarted {
+            until_tick: self.jamboree_until,
+        }])
     }
 
     /// Promote a kitten: 500 × 1.75^rank exp from its own pool plus
@@ -521,7 +545,10 @@ impl GameState {
         let kitten = &mut self.kittens[ix];
         kitten.exp = (kitten.exp - exp_cost).max(0.0);
         kitten.rank += 1;
-        Ok(vec![Event::KittenPromoted { name: kitten.name.clone(), rank: kitten.rank }])
+        Ok(vec![Event::KittenPromoted {
+            name: kitten.name.clone(),
+            rank: kitten.rank,
+        }])
     }
 
     /// Name a kitten the Elder. Free, replaceable anytime; the game itself
@@ -537,7 +564,9 @@ impl GameState {
             return Ok(Vec::new());
         }
         self.elder = Some(ix);
-        Ok(vec![Event::ElderAppointed { name: kitten.name.clone() }])
+        Ok(vec![Event::ElderAppointed {
+            name: kitten.name.clone(),
+        }])
     }
 
     /// Buy a refinement: Locked before its gate idea, purchasable once,
@@ -589,7 +618,11 @@ impl GameState {
             return Err(CommandError::NoIdleKittens);
         };
         let seats = self.structures[StructureId::ToyWorkshop.ix()];
-        let bound = self.kittens.iter().filter(|k| k.tinkering.is_some()).count() as u32;
+        let bound = self
+            .kittens
+            .iter()
+            .filter(|k| k.tinkering.is_some())
+            .count() as u32;
         if bound + 1 > seats {
             return Err(CommandError::NoSeats);
         }
@@ -633,7 +666,9 @@ impl GameState {
         self.devotion += warmth * (1.0 + self.reverence());
         self.resources[ResourceId::Warmth.ix()] = 0.0;
         self.peak_devotion = self.peak_devotion.max(self.devotion);
-        Ok(vec![Event::Basked { devotion: self.devotion }])
+        Ok(vec![Event::Basked {
+            devotion: self.devotion,
+        }])
     }
 
     /// Settle devotion into permanent serenity (needs the Reverie rite):
@@ -655,7 +690,9 @@ impl GameState {
         let tier = (self.enlightenment_tier as f64 + 1.0).powi(2);
         self.serenity += self.devotion / 1.0e6 * tier * 1.01;
         self.devotion = 0.01;
-        Ok(vec![Event::Reveried { serenity: self.serenity }])
+        Ok(vec![Event::Reveried {
+            serenity: self.serenity,
+        }])
     }
 
     /// Buy or (post-Enlightenment) restack a Sunbeam Rite. Gated on devotion's
@@ -678,8 +715,11 @@ impl GameState {
         }
         let ramp = content::RITE_RESTACK_RATIO.powi(count as i32);
         let discount = 1.0 + self.effect(crate::effects::Effect::RiteCostRatio);
-        let costs: Vec<(ResourceId, f64)> =
-            def.cost.iter().map(|(res, amt)| (*res, amt * ramp * discount)).collect();
+        let costs: Vec<(ResourceId, f64)> = def
+            .cost
+            .iter()
+            .map(|(res, amt)| (*res, amt * ramp * discount))
+            .collect();
         self.spend(&costs)?;
         self.rites.insert(r);
         self.rite_counts[r.ix()] += 1;
@@ -704,7 +744,9 @@ impl GameState {
         }
         self.serenity = (self.serenity - cost).max(0.0);
         self.enlightenment_tier += 1;
-        Ok(vec![Event::Enlightened { tier: self.enlightenment_tier }])
+        Ok(vec![Event::Enlightened {
+            tier: self.enlightenment_tier,
+        }])
     }
 
     // ---- Mystic (SIM-UNI) ----
@@ -829,7 +871,11 @@ impl GameState {
                 continue; // a nap: the caravan travelled, cost already paid
             }
             let bonus = st > 0.0 && self.rng.chance(st.min(1.0));
-            let bonus_mult = if bonus { content::TRADE_BONUS_MULT } else { 1.0 };
+            let bonus_mult = if bonus {
+                content::TRADE_BONUS_MULT
+            } else {
+                1.0
+            };
             for sell in def.sells {
                 if penpal < sell.min_penpal || !self.rng.chance(sell.chance) {
                     continue;
@@ -858,7 +904,10 @@ impl GameState {
                 }
             }
         }
-        Ok(vec![Event::TradeReturned { colony, caravans: count }])
+        Ok(vec![Event::TradeReturned {
+            colony,
+            caravans: count,
+        }])
     }
 
     /// Deepen a Pen Pal correspondence: charm base × 1.15^level. Star Whales
@@ -875,7 +924,10 @@ impl GameState {
         let cost = content::PENPAL_BASE_CHARM * content::PENPAL_CHARM_RATIO.powi(level as i32);
         self.spend(&[(ResourceId::Charm, cost)])?;
         self.penpal[colony.ix()] += 1;
-        Ok(vec![Event::PenPalSent { colony, level: self.penpal[colony.ix()] }])
+        Ok(vec![Event::PenPalSent {
+            colony,
+            level: self.penpal[colony.ix()],
+        }])
     }
 
     /// Spend 1000 pep to scout the next colony; a quiet day refunds 950.
@@ -885,7 +937,11 @@ impl GameState {
             return Err(CommandError::Locked);
         }
         self.spend(&[(ResourceId::Pep, content::SCOUT_PEP_COST)])?;
-        let found = self.rng.chance(content::SCOUT_FIND_CHANCE).then(|| self.scout_target()).flatten();
+        let found = self
+            .rng
+            .chance(content::SCOUT_FIND_CHANCE)
+            .then(|| self.scout_target())
+            .flatten();
         match found {
             Some(colony) => {
                 self.discovered.insert(colony);
@@ -918,7 +974,8 @@ impl GameState {
         let charm = self.stock(ResourceId::Charm);
         let kites = self.stock(ResourceId::Kites);
         let curiosity_cap = self.cap(ResourceId::Curiosity);
-        if !self.discovered.contains(&ColonyId::Foxes) && charm + EPSILON >= content::SCOUT_FOX_CHARM
+        if !self.discovered.contains(&ColonyId::Foxes)
+            && charm + EPSILON >= content::SCOUT_FOX_CHARM
         {
             return Some(ColonyId::Foxes);
         }
@@ -954,7 +1011,9 @@ impl GameState {
         if roster_len < content::MEADOW_MOVE_MIN_KITTENS {
             // A Move needs a real clowder (Home and Away both count). Nothing
             // is mutated on rejection.
-            return Err(CommandError::InsufficientResources { missing: Vec::new() });
+            return Err(CommandError::InsufficientResources {
+                missing: Vec::new(),
+            });
         }
 
         // ---- 1. Snapshot everything the reset would erase ----
@@ -1085,14 +1144,18 @@ impl GameState {
             self.structures[StructureId::CozyCushion.ix()] += 1;
         }
 
-        Ok(vec![Event::MeadowMoved { generation: self.generation }])
+        Ok(vec![Event::MeadowMoved {
+            generation: self.generation,
+        }])
     }
 
     /// Convert all Elder Wisdom into Passed-Down Wisdom (one-way). @spec SIM-MOVE-009
     fn pass_it_down(&mut self) -> Result<Vec<Event>, CommandError> {
         self.passed_down_wisdom += self.elder_wisdom;
         self.elder_wisdom = 0.0;
-        Ok(vec![Event::Passed { passed_down_wisdom: self.passed_down_wisdom }])
+        Ok(vec![Event::Passed {
+            passed_down_wisdom: self.passed_down_wisdom,
+        }])
     }
 
     /// Buy a Tradition once with Elder Wisdom: AlreadyResearched on a re-buy,
@@ -1104,7 +1167,9 @@ impl GameState {
         }
         let cost = content::tradition_def(t).cost_wisdom;
         if self.elder_wisdom + EPSILON < cost {
-            return Err(CommandError::InsufficientResources { missing: Vec::new() });
+            return Err(CommandError::InsufficientResources {
+                missing: Vec::new(),
+            });
         }
         self.elder_wisdom -= cost;
         self.traditions.insert(t);
@@ -1114,10 +1179,7 @@ impl GameState {
     /// Arm (or disarm, with None) an Adventure for the next Move — once the
     /// Adventures surface is open (the Adventurous Spirit tradition or idea).
     /// @spec SIM-ADV-001
-    fn declare_adventure(
-        &mut self,
-        id: Option<AdventureId>,
-    ) -> Result<Vec<Event>, CommandError> {
+    fn declare_adventure(&mut self, id: Option<AdventureId>) -> Result<Vec<Event>, CommandError> {
         let unlocked = self.traditions.contains(&TraditionId::AdventurousSpirit)
             || self.ideas.contains(&IdeaId::AdventurousSpirit);
         if !unlocked {
@@ -1170,7 +1232,9 @@ impl GameState {
         self.spend(&[(ResourceId::Dreamcorns, content::WHALE_LULLABY_DREAMCORNS)])?;
         self.whale_contentment += 1;
         self.whale_visit_years += 1;
-        Ok(vec![Event::WhaleFed { contentment: self.whale_contentment }])
+        Ok(vec![Event::WhaleFed {
+            contentment: self.whale_contentment,
+        }])
     }
 
     /// The visit-gated hushfelt exchange: spend hushfelt for cosmic goods
@@ -1182,15 +1246,22 @@ impl GameState {
             return Err(CommandError::Locked);
         }
         let n = count as f64;
-        self.spend(&[(ResourceId::Hushfelt, content::WHALE_HUSHFELT_PER_CARAVAN * n)])?;
+        self.spend(&[(
+            ResourceId::Hushfelt,
+            content::WHALE_HUSHFELT_PER_CARAVAN * n,
+        )])?;
         let scale = n * (1.0 + self.whale_contentment as f64);
         let skymaps = ResourceId::Skymaps.ix();
         self.resources[skymaps] = (self.resources[skymaps]
             + content::WHALE_SKYMAPS_PER_CARAVAN * scale)
             .min(self.cap(ResourceId::Skymaps));
-        self.resources[ResourceId::Starshards.ix()] += content::WHALE_STARSHARDS_PER_CARAVAN * scale;
+        self.resources[ResourceId::Starshards.ix()] +=
+            content::WHALE_STARSHARDS_PER_CARAVAN * scale;
         self.resources[ResourceId::Echoes.ix()] += content::WHALE_ECHOES_PER_CARAVAN * scale;
-        Ok(vec![Event::TradeReturned { colony: ColonyId::StarWhales, caravans: count }])
+        Ok(vec![Event::TradeReturned {
+            colony: ColonyId::StarWhales,
+            caravans: count,
+        }])
     }
 
     // ---- Wave 6: dreamtime (SIM-DREAM) ----
@@ -1206,7 +1277,9 @@ impl GameState {
             return Err(CommandError::Locked);
         }
         if years < 1 || years > self.max_nap_length() {
-            return Err(CommandError::InsufficientResources { missing: Vec::new() });
+            return Err(CommandError::InsufficientResources {
+                missing: Vec::new(),
+            });
         }
         // Affordability is checked (and the cost spent) before any tick draw.
         let cost = self.starshard_cost(years);
@@ -1243,15 +1316,17 @@ impl GameState {
         // Heat accrues after the replay so it survives dissipation (a nap warms
         // the dream-space by years × heat_per_year × (1 − heat efficiency)).
         let heat_eff = self.effect(crate::effects::Effect::HeatEfficiency);
-        self.stirred_dreams +=
-            years as f64 * content::HEAT_PER_YEAR * (1.0 - heat_eff).max(0.0);
+        self.stirred_dreams += years as f64 * content::HEAT_PER_YEAR * (1.0 - heat_eff).max(0.0);
 
         // Retained in the journal by the same route offline absence uses, so
         // the returned summary and the retained one are one report.
         // @spec SIM-DREAM-008
         self.journal.record_away(self.ticks, &report);
 
-        let mut events = vec![Event::Napped { years, report: Box::new(report) }];
+        let mut events = vec![Event::Napped {
+            years,
+            report: Box::new(report),
+        }];
         if self.distant_dawn && !was_dawn {
             events.push(Event::DistantDawn);
         }

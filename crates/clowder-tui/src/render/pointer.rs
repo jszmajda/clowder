@@ -28,7 +28,10 @@ fn within(r: &Rect, x: u16, y: u16) -> bool {
 impl PointerRecord {
     /// A record of a frame that drew nothing a pointer can address.
     pub(crate) fn blank(size: (u16, u16)) -> Self {
-        PointerRecord { size, ..Self::default() }
+        PointerRecord {
+            size,
+            ..Self::default()
+        }
     }
 
     pub(crate) fn record_tabs(&mut self, tabs: Vec<(Section, Rect)>) {
@@ -51,22 +54,34 @@ impl PointerRecord {
 
     /// Whether the frame drew nothing a pointer can address.
     pub fn is_empty(&self) -> bool {
-        self.tabs.is_empty() && self.rows.is_empty() && self.list.is_none() && self.journal.is_none()
+        self.tabs.is_empty()
+            && self.rows.is_empty()
+            && self.list.is_none()
+            && self.journal.is_none()
     }
 
     /// The section whose tab label stands over this cell.
     pub fn tab_at(&self, x: u16, y: u16) -> Option<Section> {
-        self.tabs.iter().find(|(_, r)| within(r, x, y)).map(|(s, _)| *s)
+        self.tabs
+            .iter()
+            .find(|(_, r)| within(r, x, y))
+            .map(|(s, _)| *s)
     }
 
     /// The section and identity of the row whose line this cell is on.
     pub fn row_at(&self, x: u16, y: u16) -> Option<(Section, RowKey)> {
-        self.rows.iter().find(|(r, _, _)| within(r, x, y)).map(|(_, s, k)| (*s, k.clone()))
+        self.rows
+            .iter()
+            .find(|(r, _, _)| within(r, x, y))
+            .map(|(_, s, k)| (*s, k.clone()))
     }
 
     /// The section whose list's space this cell is in.
     pub fn list_at(&self, x: u16, y: u16) -> Option<Section> {
-        self.list.as_ref().filter(|(r, _)| within(r, x, y)).map(|(_, s)| *s)
+        self.list
+            .as_ref()
+            .filter(|(r, _)| within(r, x, y))
+            .map(|(_, s)| *s)
     }
 
     /// Whether this cell is in the Journal's region.

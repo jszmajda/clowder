@@ -86,7 +86,8 @@ fn scratch(name: &str) -> PathBuf {
 fn meadow(seed: u64, speed: f64) -> GameState {
     let mut s = GameState::new(seed);
     s.resources[ResourceId::Catnip.ix()] = 40.0;
-    s.apply(Command::SetSpeed(speed)).expect("a speed on the ladder");
+    s.apply(Command::SetSpeed(speed))
+        .expect("a speed on the ladder");
     s
 }
 
@@ -104,12 +105,18 @@ fn term(w: u16, h: u16) -> Terminal<TestBackend> {
 }
 
 fn still() -> Reading {
-    Reading { monotonic: Duration::ZERO, wall: Duration::ZERO }
+    Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::ZERO,
+    }
 }
 
 fn elapsed(secs: f64) -> Reading {
     let d = Duration::from_secs_f64(secs);
-    Reading { monotonic: d, wall: d }
+    Reading {
+        monotonic: d,
+        wall: d,
+    }
 }
 
 fn press(code: KeyCode, modifiers: KeyModifiers) -> TermEvent {
@@ -132,13 +139,18 @@ fn awake(w: Wake) -> App {
     match w {
         Wake::Awake(app) => app,
         Wake::Waking(w) => {
-            panic!("still waking with {} of {} ticks to replay", w.remaining_ticks(), w.total_ticks())
+            panic!(
+                "still waking with {} of {} ticks to replay",
+                w.remaining_ticks(),
+                w.total_ticks()
+            )
         }
     }
 }
 
 fn step(w: Waking, t: &mut Terminal<TestBackend>, reading: Reading, input: &[TermEvent]) -> Wake {
-    w.step(t, reading, input).expect("a waking step against a TestBackend does not fail")
+    w.step(t, reading, input)
+        .expect("a waking step against a TestBackend does not fail")
 }
 
 fn state_bytes(s: &GameState) -> String {
@@ -172,11 +184,18 @@ fn set_down_after(json: &str, now: u64, replayed: u64) -> SetDown {
 /// What a save the shell wrote carries: (state, owed count, report so far).
 fn decode_save(path: &std::path::Path) -> SetDown {
     let contents = std::fs::read_to_string(path).expect("the shutdown wrote a save");
-    begin_load(&contents, 0).expect("the shell's save loads").set_down()
+    begin_load(&contents, 0)
+        .expect("the shell's save loads")
+        .set_down()
 }
 
 fn away_entries(state: &GameState) -> usize {
-    state.journal.iter_chronological().iter().filter(|e| matches!(e.item, JournalItem::Away(_))).count()
+    state
+        .journal
+        .iter_chronological()
+        .iter()
+        .filter(|e| matches!(e.item, JournalItem::Away(_)))
+        .count()
 }
 
 // ---------------------------------------------------------------------------
@@ -186,11 +205,18 @@ fn away_entries(state: &GameState) -> usize {
 fn screen_rows(t: &Terminal<TestBackend>) -> Vec<String> {
     let buf = t.backend().buffer();
     let w = buf.area.width as usize;
-    buf.content().chunks(w).map(|row| row.iter().map(|c| c.symbol()).collect()).collect()
+    buf.content()
+        .chunks(w)
+        .map(|row| row.iter().map(|c| c.symbol()).collect())
+        .collect()
 }
 
 fn blank(t: &Terminal<TestBackend>) -> bool {
-    t.backend().buffer().content().iter().all(|c| c.symbol() == " ")
+    t.backend()
+        .buffer()
+        .content()
+        .iter()
+        .all(|c| c.symbol() == " ")
 }
 
 /// The waking screen as drawn: where its three lines sit, how many of the
@@ -206,8 +232,11 @@ struct WakingScreen {
 
 fn read_waking_screen(t: &Terminal<TestBackend>) -> WakingScreen {
     let rows = screen_rows(t);
-    let drawn: Vec<(usize, &String)> =
-        rows.iter().enumerate().filter(|(_, r)| !r.trim().is_empty()).collect();
+    let drawn: Vec<(usize, &String)> = rows
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| !r.trim().is_empty())
+        .collect();
     let dump = rows.join("\n");
     assert_eq!(
         drawn.len(),
@@ -216,10 +245,17 @@ fn read_waking_screen(t: &Terminal<TestBackend>) -> WakingScreen {
     );
 
     let is_cell = |c: char| c == '█' || c == '░';
-    let bar_rows: Vec<&(usize, &String)> = drawn.iter().filter(|(_, r)| r.chars().any(is_cell)).collect();
+    let bar_rows: Vec<&(usize, &String)> = drawn
+        .iter()
+        .filter(|(_, r)| r.chars().any(is_cell))
+        .collect();
     assert_eq!(bar_rows.len(), 1, "one bar:\n{dump}");
     let (bar, bar_text) = *bar_rows[0];
-    let cells: Vec<char> = bar_text.chars().skip_while(|c| !is_cell(*c)).take_while(|c| is_cell(*c)).collect();
+    let cells: Vec<char> = bar_text
+        .chars()
+        .skip_while(|c| !is_cell(*c))
+        .take_while(|c| is_cell(*c))
+        .collect();
     assert_eq!(cells.len(), 40, "the bar is forty cells wide:\n{dump}");
     assert_eq!(
         bar_text.chars().filter(|c| is_cell(*c)).count(),
@@ -232,18 +268,31 @@ fn read_waking_screen(t: &Terminal<TestBackend>) -> WakingScreen {
         "the bar fills from its start: {}",
         cells.iter().collect::<String>()
     );
-    let after: String = bar_text.chars().skip_while(|c| !is_cell(*c)).skip(40).collect();
-    let pct_at = after.find('%').unwrap_or_else(|| panic!("a percent figure beside the bar:\n{dump}"));
-    let digits: String = after[..pct_at].chars().rev().take_while(|c| c.is_ascii_digit()).collect();
+    let after: String = bar_text
+        .chars()
+        .skip_while(|c| !is_cell(*c))
+        .skip(40)
+        .collect();
+    let pct_at = after
+        .find('%')
+        .unwrap_or_else(|| panic!("a percent figure beside the bar:\n{dump}"));
+    let digits: String = after[..pct_at]
+        .chars()
+        .rev()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
     let digits: String = digits.chars().rev().collect();
-    let percent: u64 = digits.parse().unwrap_or_else(|_| panic!("a whole-percent figure:\n{dump}"));
+    let percent: u64 = digits
+        .parse()
+        .unwrap_or_else(|_| panic!("a whole-percent figure:\n{dump}"));
 
     let others: Vec<&(usize, &String)> = drawn.iter().filter(|(i, _)| *i != bar).collect();
     let (calm, calm_text) = *others[0];
     let (hint, hint_text) = *others[1];
     let calm_lower = calm_text.to_lowercase();
     assert!(
-        calm_lower.contains("clowder") && (calm_lower.contains("waking") || calm_lower.contains("awake")),
+        calm_lower.contains("clowder")
+            && (calm_lower.contains("waking") || calm_lower.contains("awake")),
         "the first line says the clowder is waking: {calm_text:?}"
     );
     let hint_lower = hint_text.to_lowercase();
@@ -254,15 +303,32 @@ fn read_waking_screen(t: &Terminal<TestBackend>) -> WakingScreen {
             && hint_lower.contains("next time"),
         "the last line says q saves and quits with the rest left for next time: {hint_text:?}"
     );
-    WakingScreen { calm, bar, hint, filled, percent }
+    WakingScreen {
+        calm,
+        bar,
+        hint,
+        filled,
+        percent,
+    }
 }
 
 fn expect_progress(t: &Terminal<TestBackend>, total: u64, remaining: u64, ctx: &str) {
     let screen = read_waking_screen(t);
     let replayed = total - remaining;
-    assert_eq!(screen.filled as u64, 40 * replayed / total, "{ctx}: cells filled for {replayed}/{total}");
-    assert_eq!(screen.percent, 100 * replayed / total, "{ctx}: percent for {replayed}/{total}");
-    assert!(screen.calm < screen.bar && screen.bar < screen.hint, "{ctx}: line, bar, hint, in that order");
+    assert_eq!(
+        screen.filled as u64,
+        40 * replayed / total,
+        "{ctx}: cells filled for {replayed}/{total}"
+    );
+    assert_eq!(
+        screen.percent,
+        100 * replayed / total,
+        "{ctx}: percent for {replayed}/{total}"
+    );
+    assert!(
+        screen.calm < screen.bar && screen.bar < screen.hint,
+        "{ctx}: line, bar, hint, in that order"
+    );
 }
 
 /// What the frame draws below the floor, whatever it is drawing for.
@@ -290,14 +356,20 @@ fn the_first_waking_frame_has_replayed_at_most_one_bound_and_each_frame_one_more
     let mut w = waking(begin(&json, SAVED_AT + 300, bound, &mut t, "first-frame"));
     let total = w.total_ticks();
     assert_eq!(total, 1_200, "fixture: five minutes away at speed 1");
-    assert!(total - w.remaining_ticks() <= bound, "the first frame replayed more than one bound");
+    assert!(
+        total - w.remaining_ticks() <= bound,
+        "the first frame replayed more than one bound"
+    );
     expect_progress(&t, total, w.remaining_ticks(), "first frame");
 
     for frame in 1.. {
         let before = w.remaining_ticks();
         match step(w, &mut t, still(), &[]) {
             Wake::Waking(next) => {
-                assert!(before - next.remaining_ticks() <= bound, "frame {frame} replayed more than a bound");
+                assert!(
+                    before - next.remaining_ticks() <= bound,
+                    "frame {frame} replayed more than a bound"
+                );
                 w = next;
             }
             Wake::Awake(_) => {
@@ -330,9 +402,13 @@ fn waking_replays_by_its_own_count_and_not_live_plays() {
         save_failed: false,
     };
     let before = live.state.ticks;
-    live.step(&mut term(100, 30), elapsed(86_400.0), &[]).unwrap();
+    live.step(&mut term(100, 30), elapsed(86_400.0), &[])
+        .unwrap();
     let live_bound = live.state.ticks - before;
-    assert!(live_bound > 0 && live_bound < 86_400 * 4, "fixture: live play drained a bounded count");
+    assert!(
+        live_bound > 0 && live_bound < 86_400 * 4,
+        "fixture: live play drained a bounded count"
+    );
     assert!(
         WAKE_TICKS_PER_FRAME > live_bound,
         "waking's bound ({WAKE_TICKS_PER_FRAME}) is its own count, larger than live play's ({live_bound})"
@@ -341,13 +417,23 @@ fn waking_replays_by_its_own_count_and_not_live_plays() {
     let away = WAKE_TICKS_PER_FRAME / 4 + 60;
     let json = save_of(&meadow(33_003, 1.0));
     let mut t = term(100, 30);
-    let w = Wake::begin(catch_up(&json, SAVED_AT + away), scratch("own-bound"), &mut t).unwrap();
+    let w = Wake::begin(
+        catch_up(&json, SAVED_AT + away),
+        scratch("own-bound"),
+        &mut t,
+    )
+    .unwrap();
     let w = waking(w);
     assert!(
         w.total_ticks() - w.remaining_ticks() <= WAKE_TICKS_PER_FRAME,
         "the first frame replayed more than one of waking's bounds"
     );
-    expect_progress(&t, w.total_ticks(), w.remaining_ticks(), "first frame at the production bound");
+    expect_progress(
+        &t,
+        w.total_ticks(),
+        w.remaining_ticks(),
+        "first frame at the production bound",
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -367,8 +453,15 @@ fn a_catch_up_the_first_bound_finishes_opens_the_game_with_no_waking_screen() {
     ] {
         let mut t = term(100, 30);
         let app = awake(Wake::begin(catch_up(&json, now), scratch("direct"), &mut t).unwrap());
-        assert!(blank(&t), "{why}: the game opened directly, so nothing was drawn before play");
-        assert_eq!(state_bytes(&app.state), state_bytes(&load_string(&json, now).unwrap().state), "{why}");
+        assert!(
+            blank(&t),
+            "{why}: the game opened directly, so nothing was drawn before play"
+        );
+        assert_eq!(
+            state_bytes(&app.state),
+            state_bytes(&load_string(&json, now).unwrap().state),
+            "{why}"
+        );
     }
 
     // The boundary, exactly: a bound equal to the whole catch-up finishes it
@@ -376,9 +469,18 @@ fn a_catch_up_the_first_bound_finishes_opens_the_game_with_no_waking_screen() {
     let mut t = term(100, 30);
     let total = catch_up(&json, SAVED_AT + 300).total_ticks();
     let _ = awake(begin(&json, SAVED_AT + 300, total, &mut t, "exact"));
-    assert!(blank(&t), "a first bound that finishes the catch-up draws no waking screen");
+    assert!(
+        blank(&t),
+        "a first bound that finishes the catch-up draws no waking screen"
+    );
     let mut t = term(100, 30);
-    let w = waking(begin(&json, SAVED_AT + 300, total - 1, &mut t, "short-by-one"));
+    let w = waking(begin(
+        &json,
+        SAVED_AT + 300,
+        total - 1,
+        &mut t,
+        "short-by-one",
+    ));
     assert_eq!(w.remaining_ticks(), 1);
     expect_progress(&t, total, 1, "one tick short");
 }
@@ -395,10 +497,18 @@ fn a_longer_catch_up_draws_the_waking_screen_on_every_frame_until_it_finishes() 
     let mut frames = 0;
     while let Wake::Waking(next) = step(w, &mut t, elapsed(0.06), &[]) {
         frames += 1;
-        expect_progress(&t, total, next.remaining_ticks(), &format!("frame {frames}"));
+        expect_progress(
+            &t,
+            total,
+            next.remaining_ticks(),
+            &format!("frame {frames}"),
+        );
         w = next;
     }
-    assert!(frames >= 9, "fixture: 800 ticks at 75 a frame is a wake of many frames");
+    assert!(
+        frames >= 9,
+        "fixture: 800 ticks at 75 a frame is a wake of many frames"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -466,15 +576,26 @@ fn time_spent_waking_is_banked_at_the_saves_speed_and_runs_after_the_replay() {
         reference.observe(frame, speed);
         // A speed key pressed while waking is discarded (TUI-NAV-103), so it
         // cannot re-price the time spent waking either.
-        match step(w, &mut t, frame, &[press(KeyCode::Char('<'), KeyModifiers::NONE)]) {
+        match step(
+            w,
+            &mut t,
+            frame,
+            &[press(KeyCode::Char('<'), KeyModifiers::NONE)],
+        ) {
             Wake::Waking(next) => {
-                assert_eq!(next.clock, reference, "each waking frame's time is banked at the save's speed");
+                assert_eq!(
+                    next.clock, reference,
+                    "each waking frame's time is banked at the save's speed"
+                );
                 w = next;
             }
             Wake::Awake(app) => break app,
         }
     };
-    assert_eq!(app.clock, reference, "the opened game holds every interval waking observed");
+    assert_eq!(
+        app.clock, reference,
+        "the opened game holds every interval waking observed"
+    );
     let one_call = load_string(&json, now).unwrap();
     assert_eq!(
         state_bytes(&app.state),
@@ -483,7 +604,10 @@ fn time_spent_waking_is_banked_at_the_saves_speed_and_runs_after_the_replay() {
     );
 
     let banked = app.clock.backlog();
-    assert!(banked > 0 && banked < 2_000, "fixture: a small banked backlog, drained in one frame");
+    assert!(
+        banked > 0 && banked < 2_000,
+        "fixture: a small banked backlog, drained in one frame"
+    );
     let mut app = app;
     app.step(&mut t, still(), &[]).unwrap();
     let mut expected = one_call.state.clone();
@@ -505,9 +629,18 @@ fn waking_observes_suspend_excess_and_the_absence_cap() {
     let speed = 0.5;
     let json = save_of(&meadow(36_002, speed));
     for (reading, why) in [
-        (Reading { monotonic: Duration::from_millis(500), wall: Duration::from_secs(3_600) }, "suspend excess"),
         (
-            Reading { monotonic: Duration::ZERO, wall: Duration::from_secs(3 * CATCHUP_CAP_SECONDS) },
+            Reading {
+                monotonic: Duration::from_millis(500),
+                wall: Duration::from_secs(3_600),
+            },
+            "suspend excess",
+        ),
+        (
+            Reading {
+                monotonic: Duration::ZERO,
+                wall: Duration::from_secs(3 * CATCHUP_CAP_SECONDS),
+            },
             "the absence cap",
         ),
     ] {
@@ -516,7 +649,10 @@ fn waking_observes_suspend_excess_and_the_absence_cap() {
         let mut reference = TickAccumulator::default();
         reference.observe(reading, speed);
         let w = waking(step(w, &mut t, reading, &[]));
-        assert_eq!(w.clock, reference, "{why}: observed as the accumulator observes it, at the save's speed");
+        assert_eq!(
+            w.clock, reference,
+            "{why}: observed as the accumulator observes it, at the save's speed"
+        );
         assert!(w.clock.backlog() > 0, "{why}: and banked, not dropped");
     }
 }
@@ -552,7 +688,11 @@ fn no_autosave_is_taken_while_waking() {
             Wake::Awake(app) => break app,
         }
     };
-    assert_eq!(std::fs::read_to_string(&path).unwrap(), json, "nor did the frame that finished it");
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        json,
+        "nor did the frame that finished it"
+    );
     app.step(&mut t, still(), &[]).unwrap();
     assert_ne!(
         std::fs::read_to_string(&path).unwrap(),
@@ -593,7 +733,11 @@ fn the_frame_that_finishes_opens_the_game_against_the_one_call_state() {
             view_of(&opened_view(&one_call)),
             "away {away}s, bound {bound}: the opening taken and the report queued against it"
         );
-        assert_eq!(app.view.reports.len(), 1, "away {away}s: the absence's report is queued");
+        assert_eq!(
+            app.view.reports.len(),
+            1,
+            "away {away}s: the absence's report is queued"
+        );
         assert!(!app.quitting);
     }
 }
@@ -612,7 +756,10 @@ fn shutdown_while_waking_saves_the_set_down_catch_up_and_the_banked_time() {
     let now = SAVED_AT + 600; // 2400 ticks
     let quits: [(&str, Option<TermEvent>); 3] = [
         ("q", Some(press(KeyCode::Char('q'), KeyModifiers::NONE))),
-        ("Ctrl-C", Some(press(KeyCode::Char('c'), KeyModifiers::CONTROL))),
+        (
+            "Ctrl-C",
+            Some(press(KeyCode::Char('c'), KeyModifiers::CONTROL)),
+        ),
         ("a termination signal", None),
     ];
     for (how, key) in quits {
@@ -631,18 +778,28 @@ fn shutdown_while_waking_saves_the_set_down_catch_up_and_the_banked_time() {
         let remaining = w.remaining_ticks();
         let banked = w.clock.backlog();
         assert!(remaining > 0, "fixture: shutdown came mid-wake");
-        assert!(banked > 0, "fixture: some live time was banked while waking");
+        assert!(
+            banked > 0,
+            "fixture: some live time was banked while waking"
+        );
         w.shut_down().expect("the shutdown save is written");
 
         let saved = decode_save(&path);
         let reference = set_down_after(&json, now, replayed);
-        assert_eq!(saved.owed_ticks, remaining + banked, "{how}: the rest of the catch-up plus the banked time");
+        assert_eq!(
+            saved.owed_ticks,
+            remaining + banked,
+            "{how}: the rest of the catch-up plus the banked time"
+        );
         assert_eq!(
             state_bytes(&saved.state),
             state_bytes(&reference.state),
             "{how}: the state so far, not finished first"
         );
-        assert_eq!(saved.report_so_far, reference.report_so_far, "{how}: the core's report so far");
+        assert_eq!(
+            saved.report_so_far, reference.report_so_far,
+            "{how}: the core's report so far"
+        );
     }
 }
 
@@ -655,15 +812,25 @@ fn a_wake_quit_midway_tells_the_whole_absence_once_at_the_next_load() {
     let now = SAVED_AT + 300;
     let path = scratch("tell-once");
     let mut t = term(100, 30);
-    let mut w = waking(Wake::begin_bounded(catch_up(&json, now), path.clone(), &mut t, 200).unwrap());
+    let mut w =
+        waking(Wake::begin_bounded(catch_up(&json, now), path.clone(), &mut t, 200).unwrap());
     w = waking(step(w, &mut t, still(), &[]));
-    w = waking(step(w, &mut t, still(), &[press(KeyCode::Char('q'), KeyModifiers::NONE)]));
+    w = waking(step(
+        w,
+        &mut t,
+        still(),
+        &[press(KeyCode::Char('q'), KeyModifiers::NONE)],
+    ));
     assert!(w.quitting);
     w.shut_down().unwrap();
 
     let contents = std::fs::read_to_string(&path).unwrap();
     let saved = decode_save(&path);
-    assert_eq!(away_entries(&saved.state), away_entries(&meadow(39_002, 1.0)), "nothing recorded at the quit");
+    assert_eq!(
+        away_entries(&saved.state),
+        away_entries(&meadow(39_002, 1.0)),
+        "nothing recorded at the quit"
+    );
 
     let next = begin_load(&contents, 0).unwrap();
     let finished = match next.advance(u64::MAX) {
@@ -672,17 +839,29 @@ fn a_wake_quit_midway_tells_the_whole_absence_once_at_the_next_load() {
     };
     let whole = load_string(&json, now).unwrap();
     let r: &OfflineReport = &finished.report;
-    assert_eq!(r.elapsed_seconds, whole.report.elapsed_seconds, "the whole absence's span");
+    assert_eq!(
+        r.elapsed_seconds, whole.report.elapsed_seconds,
+        "the whole absence's span"
+    );
     assert_eq!(r.truncated, whole.report.truncated);
     assert_eq!(r.arrived, whole.report.arrived);
     assert_eq!(r.wandered, whole.report.wandered);
     assert_eq!(r.returned, whole.report.returned);
     assert_eq!(r.seasons_passed, whole.report.seasons_passed);
     for res in ResourceId::ALL {
-        let (a, b) = (r.resource_deltas[res.ix()], whole.report.resource_deltas[res.ix()]);
-        assert!((a - b).abs() <= 1e-9 * a.abs().max(b.abs()).max(1.0), "{res:?}: {a} vs {b}");
+        let (a, b) = (
+            r.resource_deltas[res.ix()],
+            whole.report.resource_deltas[res.ix()],
+        );
+        assert!(
+            (a - b).abs() <= 1e-9 * a.abs().max(b.abs()).max(1.0),
+            "{res:?}: {a} vs {b}"
+        );
     }
-    assert_eq!(finished.state.ticks, whole.state.ticks, "not one owed tick lost or doubled");
+    assert_eq!(
+        finished.state.ticks, whole.state.ticks,
+        "not one owed tick lost or doubled"
+    );
     assert_eq!(
         away_entries(&finished.state),
         away_entries(&whole.state),
@@ -702,7 +881,12 @@ fn the_waking_screen_is_three_lines_in_place_of_the_games_frame() {
     for (w, h) in [(80u16, 24u16), (100, 30), (160, 50)] {
         let mut t = term(w, h);
         let wk = waking(begin(&json, SAVED_AT + 300, 100, &mut t, "three-lines"));
-        expect_progress(&t, wk.total_ticks(), wk.remaining_ticks(), &format!("{w}x{h}"));
+        expect_progress(
+            &t,
+            wk.total_ticks(),
+            wk.remaining_ticks(),
+            &format!("{w}x{h}"),
+        );
     }
 }
 
@@ -720,7 +904,10 @@ fn the_bar_and_figure_are_the_share_replayed_rounded_down_on_every_frame() {
     expect_progress(&t, 97, w.remaining_ticks(), "frame 0");
     while let Wake::Waking(next) = step(w, &mut t, still(), &[]) {
         let screen = read_waking_screen(&t);
-        assert!(screen.filled < 40 && screen.percent < 100, "never full while waking");
+        assert!(
+            screen.filled < 40 && screen.percent < 100,
+            "never full while waking"
+        );
         expect_progress(&t, 97, next.remaining_ticks(), "a later frame");
         w = next;
     }
@@ -730,12 +917,20 @@ fn the_bar_and_figure_are_the_share_replayed_rounded_down_on_every_frame() {
     let mut t = term(100, 30);
     let w = waking(begin(&json, now, 999, &mut t, "nearly"));
     let screen = read_waking_screen(&t);
-    assert_eq!((screen.filled, screen.percent), (39, 99), "999 of 1000 reads 39 cells and 99%");
+    assert_eq!(
+        (screen.filled, screen.percent),
+        (39, 99),
+        "999 of 1000 reads 39 cells and 99%"
+    );
     drop(w);
     let mut t = term(100, 30);
     let _ = waking(begin(&json, now, 1, &mut t, "barely"));
     let screen = read_waking_screen(&t);
-    assert_eq!((screen.filled, screen.percent), (0, 0), "1 of 1000 reads empty and 0%");
+    assert_eq!(
+        (screen.filled, screen.percent),
+        (0, 0),
+        "1 of 1000 reads empty and 0%"
+    );
 }
 
 /// The screen is drawn from the catch-up's counts and the terminal size
@@ -752,10 +947,18 @@ fn the_waking_screen_is_drawn_from_the_counts_and_the_size_alone() {
     let mut tb = term(110, 32);
     let mut a = waking(begin(&a_json, SAVED_AT + 200, 90, &mut ta, "alone-a")); // 800 ticks
     let mut b = waking(begin(&b_json, SAVED_AT + 100, 90, &mut tb, "alone-b")); // 800 ticks
-    assert_eq!(a.total_ticks(), b.total_ticks(), "fixture: the same owed ticks");
+    assert_eq!(
+        a.total_ticks(),
+        b.total_ticks(),
+        "fixture: the same owed ticks"
+    );
     for frame in 0..5 {
         assert_eq!(a.remaining_ticks(), b.remaining_ticks());
-        assert_eq!(ta.backend().buffer(), tb.backend().buffer(), "frame {frame}: the same screen");
+        assert_eq!(
+            ta.backend().buffer(),
+            tb.backend().buffer(),
+            "frame {frame}: the same screen"
+        );
         a = waking(step(a, &mut ta, elapsed(0.06), &[]));
         b = waking(step(b, &mut tb, elapsed(0.06), &[]));
     }
@@ -770,15 +973,31 @@ fn below_the_floor_the_too_small_card_draws_and_the_replay_continues() {
     for (w, h) in [(79u16, 30u16), (100, 23), (40, 10)] {
         let mut t = term(w, h);
         let mut wk = waking(begin(&json, SAVED_AT + 300, 100, &mut t, "too-small"));
-        assert_eq!(*t.backend().buffer(), too_small_card(w, h), "{w}x{h}: the too-small card");
+        assert_eq!(
+            *t.backend().buffer(),
+            too_small_card(w, h),
+            "{w}x{h}: the too-small card"
+        );
         for _ in 0..3 {
             let before = wk.remaining_ticks();
             wk = waking(step(wk, &mut t, elapsed(0.06), &[]));
-            assert!(wk.remaining_ticks() < before, "{w}x{h}: the replay carries on under the card");
-            assert_eq!(*t.backend().buffer(), too_small_card(w, h), "{w}x{h}: still the card");
+            assert!(
+                wk.remaining_ticks() < before,
+                "{w}x{h}: the replay carries on under the card"
+            );
+            assert_eq!(
+                *t.backend().buffer(),
+                too_small_card(w, h),
+                "{w}x{h}: still the card"
+            );
         }
         t.backend_mut().resize(100, 30);
-        let wk = waking(step(wk, &mut t, elapsed(0.06), &[TermEvent::Resize(100, 30)]));
+        let wk = waking(step(
+            wk,
+            &mut t,
+            elapsed(0.06),
+            &[TermEvent::Resize(100, 30)],
+        ));
         expect_progress(&t, wk.total_ticks(), wk.remaining_ticks(), "back at size");
     }
 }
@@ -801,13 +1020,19 @@ fn q_and_ctrl_c_save_and_quit_while_waking() {
     {
         let path = scratch(&format!("nav-quit-{i}"));
         let mut t = term(100, 30);
-        let w = waking(Wake::begin_bounded(catch_up(&json, SAVED_AT + 300), path.clone(), &mut t, 50).unwrap());
+        let w = waking(
+            Wake::begin_bounded(catch_up(&json, SAVED_AT + 300), path.clone(), &mut t, 50).unwrap(),
+        );
         let w = waking(step(w, &mut t, still(), std::slice::from_ref(&key)));
         assert!(w.quitting, "{key:?} quits while waking");
         assert!(!path.exists(), "fixture: nothing saved before shutdown");
         let remaining = w.remaining_ticks();
         w.shut_down().unwrap();
-        assert_eq!(decode_save(&path).owed_ticks, remaining, "{key:?}: saved, owing the rest of the wake");
+        assert_eq!(
+            decode_save(&path).owed_ticks,
+            remaining,
+            "{key:?}: saved, owing the rest of the wake"
+        );
     }
 }
 
@@ -820,7 +1045,11 @@ fn every_other_key() -> Vec<KeyEvent> {
         if c == 'q' {
             continue;
         }
-        let m = if c.is_ascii_uppercase() { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
+        let m = if c.is_ascii_uppercase() {
+            KeyModifiers::SHIFT
+        } else {
+            KeyModifiers::NONE
+        };
         keys.push(KeyEvent::new(KeyCode::Char(c), m));
     }
     for code in [
@@ -867,7 +1096,10 @@ fn every_other_key_is_discarded_while_waking_and_none_is_held_for_the_game() {
     let keys = every_other_key();
     let mut t = term(100, 30);
     let mut w = waking(begin(&json, now, 1, &mut t, "discard"));
-    assert!(w.total_ticks() as usize > keys.len() + 1, "fixture: a frame for every key");
+    assert!(
+        w.total_ticks() as usize > keys.len() + 1,
+        "fixture: a frame for every key"
+    );
     for key in &keys {
         w = waking(step(w, &mut t, still(), &[TermEvent::Key(*key)]));
         assert!(!w.quitting, "{key:?} is not a quit key");
@@ -881,8 +1113,16 @@ fn every_other_key_is_discarded_while_waking_and_none_is_held_for_the_game() {
     assert!(!app.quitting);
 
     let one_call = load_string(&json, now).unwrap();
-    assert_eq!(state_bytes(&app.state), state_bytes(&one_call.state), "no key acted on the meadow");
-    assert_eq!(view_of(&app.view), view_of(&opened_view(&one_call)), "no key moved the view");
+    assert_eq!(
+        state_bytes(&app.state),
+        state_bytes(&one_call.state),
+        "no key acted on the meadow"
+    );
+    assert_eq!(
+        view_of(&app.view),
+        view_of(&opened_view(&one_call)),
+        "no key moved the view"
+    );
 
     let mut reference = App {
         state: one_call.state.clone(),
@@ -898,9 +1138,21 @@ fn every_other_key_is_discarded_while_waking_and_none_is_held_for_the_game() {
     let mut rt = term(100, 30);
     app.step(&mut t, still(), &[]).unwrap();
     reference.step(&mut rt, still(), &[]).unwrap();
-    assert_eq!(state_bytes(&app.state), state_bytes(&reference.state), "no key was held for play");
-    assert_eq!(view_of(&app.view), view_of(&reference.view), "the first frame of play acted on nothing");
-    assert_eq!(t.backend().buffer(), rt.backend().buffer(), "and draws as a load that never woke");
+    assert_eq!(
+        state_bytes(&app.state),
+        state_bytes(&reference.state),
+        "no key was held for play"
+    );
+    assert_eq!(
+        view_of(&app.view),
+        view_of(&reference.view),
+        "the first frame of play acted on nothing"
+    );
+    assert_eq!(
+        t.backend().buffer(),
+        rt.backend().buffer(),
+        "and draws as a load that never woke"
+    );
 }
 
 /// Every mouse event taken while waking does nothing and is not held for the
@@ -916,7 +1168,11 @@ fn every_mouse_event_is_discarded_while_waking_and_none_is_held_for_the_game() {
 
     let mut kinds = Vec::new();
     for b in [MouseButton::Left, MouseButton::Right, MouseButton::Middle] {
-        kinds.extend([MouseEventKind::Down(b), MouseEventKind::Up(b), MouseEventKind::Drag(b)]);
+        kinds.extend([
+            MouseEventKind::Down(b),
+            MouseEventKind::Up(b),
+            MouseEventKind::Drag(b),
+        ]);
     }
     kinds.extend([
         MouseEventKind::Moved,
@@ -940,7 +1196,12 @@ fn every_mouse_event_is_discarded_while_waking_and_none_is_held_for_the_game() {
             for x in 0..100u16 {
                 for kind in &kinds {
                     for modifiers in &modifier_sets {
-                        events.push(TermEvent::Mouse(MouseEvent { kind: *kind, column: x, row: y, modifiers: *modifiers }));
+                        events.push(TermEvent::Mouse(MouseEvent {
+                            kind: *kind,
+                            column: x,
+                            row: y,
+                            modifiers: *modifiers,
+                        }));
                     }
                 }
             }
@@ -952,7 +1213,10 @@ fn every_mouse_event_is_discarded_while_waking_and_none_is_held_for_the_game() {
     let now = SAVED_AT + 120; // 480 ticks, one a frame
     let mut t = term(100, 30);
     let mut w = waking(begin(&json, now, 1, &mut t, "mouse-discard"));
-    assert!(w.total_ticks() as usize > frames.len() + 1, "fixture: a waking frame for every line");
+    assert!(
+        w.total_ticks() as usize > frames.len() + 1,
+        "fixture: a waking frame for every line"
+    );
     for events in &frames {
         w = waking(step(w, &mut t, still(), events));
         assert!(!w.quitting, "a mouse event is not a quit key");
@@ -966,8 +1230,16 @@ fn every_mouse_event_is_discarded_while_waking_and_none_is_held_for_the_game() {
     assert!(!app.quitting);
 
     let one_call = load_string(&json, now).unwrap();
-    assert_eq!(state_bytes(&app.state), state_bytes(&one_call.state), "no mouse event acted on the meadow");
-    assert_eq!(view_of(&app.view), view_of(&opened_view(&one_call)), "no mouse event moved the view");
+    assert_eq!(
+        state_bytes(&app.state),
+        state_bytes(&one_call.state),
+        "no mouse event acted on the meadow"
+    );
+    assert_eq!(
+        view_of(&app.view),
+        view_of(&opened_view(&one_call)),
+        "no mouse event moved the view"
+    );
 
     let mut reference = App {
         state: one_call.state.clone(),
@@ -985,7 +1257,19 @@ fn every_mouse_event_is_discarded_while_waking_and_none_is_held_for_the_game() {
         app.step(&mut t, still(), &[]).unwrap();
         reference.step(&mut rt, still(), &[]).unwrap();
     }
-    assert_eq!(state_bytes(&app.state), state_bytes(&reference.state), "no mouse event was held for play");
-    assert_eq!(view_of(&app.view), view_of(&reference.view), "the first frames of play acted on nothing");
-    assert_eq!(t.backend().buffer(), rt.backend().buffer(), "and draw as a load that never woke");
+    assert_eq!(
+        state_bytes(&app.state),
+        state_bytes(&reference.state),
+        "no mouse event was held for play"
+    );
+    assert_eq!(
+        view_of(&app.view),
+        view_of(&reference.view),
+        "the first frames of play acted on nothing"
+    );
+    assert_eq!(
+        t.backend().buffer(),
+        rt.backend().buffer(),
+        "and draw as a load that never woke"
+    );
 }

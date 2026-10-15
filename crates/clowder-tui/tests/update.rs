@@ -22,7 +22,7 @@ use std::collections::BTreeSet;
 use clowder_core::content::MEADOW_MOVE_MIN_KITTENS;
 use clowder_core::{
     ArchId, Availability, ColonyId, Command, ContentId, CraftId, GameState, IdeaId, JobId, Kitten,
-    KittenTrait, LockReason, Location, ResourceId, RiteId, RuleId, SiteId, StructureId,
+    KittenTrait, Location, LockReason, ResourceId, RiteId, RuleId, SiteId, StructureId,
 };
 
 use clowder_tui::nav::keys::resolve;
@@ -123,7 +123,10 @@ fn fresh() -> GameState {
 /// A view sitting in `section` with `key` focused. Constructed rather than
 /// navigated to, so a test of arming is not also a test of the landing rule.
 fn focused(section: Section, key: RowKey) -> ViewState {
-    let mut v = ViewState { section: Some(section), ..Default::default() };
+    let mut v = ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     v.focus[section.index()] = Some(key);
     v
 }
@@ -142,7 +145,10 @@ fn find_row(
             _ => None,
         })
         .unwrap_or_else(|| {
-            panic!("fixture: no row in {} fires the wanted command", section.title())
+            panic!(
+                "fixture: no row in {} fires the wanted command",
+                section.title()
+            )
         })
 }
 
@@ -151,9 +157,10 @@ fn find_count_row(state: &GameState, section: Section) -> (RowKey, Command, Comm
     rows(state, section)
         .into_iter()
         .find_map(|r| match &r.kind {
-            RowKind::Count { increment, decrement } => {
-                Some((r.key.clone(), *increment, *decrement))
-            }
+            RowKind::Count {
+                increment,
+                decrement,
+            } => Some((r.key.clone(), *increment, *decrement)),
             _ => None,
         })
         .unwrap_or_else(|| panic!("fixture: no count row in {}", section.title()))
@@ -165,13 +172,17 @@ fn find_count_row(state: &GameState, section: Section) -> (RowKey, Command, Comm
 fn heavy_rows(state: &GameState) -> Vec<(&'static str, Section, RowKey, Command)> {
     let mut out = Vec::new();
 
-    let (key, command) = find_row(state, Section::Legacy, |c| matches!(c, Command::GreatMeadowMove));
+    let (key, command) = find_row(state, Section::Legacy, |c| {
+        matches!(c, Command::GreatMeadowMove)
+    });
     out.push(("GreatMeadowMove", Section::Legacy, key, command));
 
     let (key, command) = find_row(state, Section::Legacy, |c| matches!(c, Command::PassItDown));
     out.push(("PassItDown", Section::Legacy, key, command));
 
-    let (key, command) = find_row(state, Section::Ideas, |c| matches!(c, Command::AdoptRule(_)));
+    let (key, command) = find_row(state, Section::Ideas, |c| {
+        matches!(c, Command::AdoptRule(_))
+    });
     out.push(("AdoptRule", Section::Ideas, key, command));
 
     let (key, command) = find_row(state, Section::Dreams, |c| matches!(c, Command::DeepNap(_)));
@@ -182,7 +193,9 @@ fn heavy_rows(state: &GameState) -> Vec<(&'static str, Section, RowKey, Command)
 
 /// The Move row: heavy by every reading, and offered in every state.
 fn move_row(state: &GameState) -> (RowKey, Command) {
-    find_row(state, Section::Legacy, |c| matches!(c, Command::GreatMeadowMove))
+    find_row(state, Section::Legacy, |c| {
+        matches!(c, Command::GreatMeadowMove)
+    })
 }
 
 /// A deliberate second press: a real pause with no Enter in it, then one Enter.
@@ -247,8 +260,14 @@ fn the_first_enter_on_a_heavy_row_arms_it_and_fires_nothing() {
         "the first Enter on a heavy row reached the core; the confirm exists so that press \
          cannot be the one that acts"
     );
-    let armed = view.armed.as_ref().expect("the first Enter armed nothing at all");
-    assert_eq!(armed.key, key, "the armed row is not the row the cursor is on");
+    let armed = view
+        .armed
+        .as_ref()
+        .expect("the first Enter armed nothing at all");
+    assert_eq!(
+        armed.key, key,
+        "the armed row is not the row the cursor is on"
+    );
     assert_eq!(
         armed.command, command,
         "the armed row holds a different command than the row offers; the commit re-runs \
@@ -288,10 +307,18 @@ fn any_navigation_disarms_silently() {
     let state = rich();
     let (key, command) = move_row(&state);
 
-    for nav in [Action::CursorDown, Action::CursorUp, Action::SectionNext, Action::SectionPrev] {
+    for nav in [
+        Action::CursorDown,
+        Action::CursorUp,
+        Action::SectionNext,
+        Action::SectionPrev,
+    ] {
         let mut view = focused(Section::Legacy, key.clone());
         update(Action::Activate, &mut view, &state);
-        assert!(view.armed.is_some(), "fixture: the row must be armed before navigating away");
+        assert!(
+            view.armed.is_some(),
+            "fixture: the row must be armed before navigating away"
+        );
 
         let out = update(nav.clone(), &mut view, &state);
 
@@ -501,7 +528,11 @@ fn arming_reserves_nothing() {
 
     let out = update(Action::Activate, &mut view, &state);
 
-    assert_eq!(out, Outcome::Handled, "arming asked the core to do something");
+    assert_eq!(
+        out,
+        Outcome::Handled,
+        "arming asked the core to do something"
+    );
     assert_eq!(state, before, "arming changed the game state");
     let mut probe = state.clone();
     assert!(
@@ -520,8 +551,9 @@ fn arming_reserves_nothing() {
 fn arming_a_heavy_row_disarms_any_row_already_armed() {
     let state = rich();
     let (move_key, move_command) = move_row(&state);
-    let (pass_key, pass_command) =
-        find_row(&state, Section::Legacy, |c| matches!(c, Command::PassItDown));
+    let (pass_key, pass_command) = find_row(&state, Section::Legacy, |c| {
+        matches!(c, Command::PassItDown)
+    });
     assert_ne!(move_key, pass_key, "fixture: two distinct heavy rows");
 
     let mut view = focused(Section::Legacy, move_key.clone());
@@ -547,7 +579,10 @@ fn arming_a_heavy_row_disarms_any_row_already_armed() {
         armed.key, move_key,
         "the previously-armed row survived; arming disarms whatever came before"
     );
-    assert_eq!(armed.command, move_command, "the armed command is the wrong row's");
+    assert_eq!(
+        armed.command, move_command,
+        "the armed command is the wrong row's"
+    );
 }
 
 /// The commit re-runs the *real* command, so the core re-validates it against
@@ -598,11 +633,19 @@ fn the_commit_re_runs_the_real_command_for_the_core_to_re_validate() {
 #[test]
 fn the_deep_nap_count_prompts_enter_arms_and_a_second_enter_commits() {
     let state = rich();
-    let (key, _) = find_row(&state, Section::Dreams, |c| matches!(c, Command::DeepNap(_)));
+    let (key, _) = find_row(&state, Section::Dreams, |c| {
+        matches!(c, Command::DeepNap(_))
+    });
     let mut view = focused(Section::Dreams, key);
 
-    assert_eq!(update(Action::CountPrompt, &mut view, &state), Outcome::Handled);
-    assert!(view.prompt.is_some(), "x on the nap row opened no count prompt");
+    assert_eq!(
+        update(Action::CountPrompt, &mut view, &state),
+        Outcome::Handled
+    );
+    assert!(
+        view.prompt.is_some(),
+        "x on the nap row opened no count prompt"
+    );
 
     update(Action::Type('3'), &mut view, &state);
     assert_eq!(
@@ -618,8 +661,14 @@ fn the_deep_nap_count_prompts_enter_arms_and_a_second_enter_commits() {
         "the count prompt's Enter fired the nap; TUI-NAV-036 says that press sets the count \
          and *arms*, and a second Enter commits"
     );
-    assert!(view.prompt.is_none(), "the count prompt is still open after accepting it");
-    let armed = view.armed.as_ref().expect("the count prompt's Enter armed nothing");
+    assert!(
+        view.prompt.is_none(),
+        "the count prompt is still open after accepting it"
+    );
+    let armed = view
+        .armed
+        .as_ref()
+        .expect("the count prompt's Enter armed nothing");
     assert_eq!(
         armed.command,
         Command::DeepNap(3),
@@ -645,7 +694,10 @@ fn nap_view(state: &GameState) -> (RowKey, ViewState) {
 /// `x`, the digits, then the prompt's Enter — one whole count-prompt acceptance.
 fn accept_count(digits: &str, view: &mut ViewState, state: &GameState) -> Outcome {
     assert_eq!(update(Action::CountPrompt, view, state), Outcome::Handled);
-    assert!(view.prompt.is_some(), "fixture: x on the nap row opened no count prompt");
+    assert!(
+        view.prompt.is_some(),
+        "fixture: x on the nap row opened no count prompt"
+    );
     for c in digits.chars() {
         update(Action::Type(c), view, state);
     }
@@ -664,9 +716,19 @@ fn a_plain_enter_on_the_unarmed_counted_heavy_row_arms_one_unit() {
 
     let out = update(Action::Activate, &mut view, &state);
 
-    assert_eq!(out, Outcome::Handled, "a plain Enter on the unarmed nap row reached the core");
-    assert!(view.prompt.is_none(), "a plain Enter on the nap row opened a count prompt");
-    let armed = view.armed.as_ref().expect("a plain Enter on the nap row armed nothing");
+    assert_eq!(
+        out,
+        Outcome::Handled,
+        "a plain Enter on the unarmed nap row reached the core"
+    );
+    assert!(
+        view.prompt.is_none(),
+        "a plain Enter on the nap row opened a count prompt"
+    );
+    let armed = view
+        .armed
+        .as_ref()
+        .expect("a plain Enter on the nap row armed nothing");
     assert_eq!(armed.key, key, "the armed row is not the nap row");
     assert_eq!(
         armed.command,
@@ -686,15 +748,25 @@ fn a_new_count_on_an_armed_counted_row_re_arms_it_with_that_count_and_a_fresh_ex
     let (key, mut view) = nap_view(&state);
 
     assert_eq!(accept_count("3", &mut view, &state), Outcome::Handled);
-    assert_eq!(view.armed.as_ref().map(|a| a.command), Some(Command::DeepNap(3)));
+    assert_eq!(
+        view.armed.as_ref().map(|a| a.command),
+        Some(Command::DeepNap(3))
+    );
     // Age the first arming so a renewed expiry is distinguishable from it.
     view.armed.as_mut().expect("armed").expires_at = Instant::now() + Duration::from_secs(1);
 
     std::thread::sleep(Duration::from_millis(300));
     let out = accept_count("7", &mut view, &state);
 
-    assert_eq!(out, Outcome::Handled, "re-accepting a count over an armed nap fired it");
-    let armed = view.armed.as_ref().expect("re-accepting a count left the nap row unarmed");
+    assert_eq!(
+        out,
+        Outcome::Handled,
+        "re-accepting a count over an armed nap fired it"
+    );
+    let armed = view
+        .armed
+        .as_ref()
+        .expect("re-accepting a count left the nap row unarmed");
     assert_eq!(armed.key, key);
     assert_eq!(
         armed.command,
@@ -728,15 +800,25 @@ fn an_empty_or_zero_count_arms_nothing_and_leaves_any_arming_as_it_stood() {
         let (_, mut view) = nap_view(&state);
         let out = accept_count(digits, &mut view, &state);
         assert_eq!(out, Outcome::Handled, "a count of {digits:?} fired the nap");
-        assert!(view.armed.is_none(), "a count of {digits:?} armed the unarmed nap row");
+        assert!(
+            view.armed.is_none(),
+            "a count of {digits:?} armed the unarmed nap row"
+        );
 
         let (_, mut view) = nap_view(&state);
         assert_eq!(accept_count("5", &mut view, &state), Outcome::Handled);
-        let before = view.armed.clone().expect("fixture: a count of 5 arms the nap");
+        let before = view
+            .armed
+            .clone()
+            .expect("fixture: a count of 5 arms the nap");
         std::thread::sleep(Duration::from_millis(20));
 
         let out = accept_count(digits, &mut view, &state);
-        assert_eq!(out, Outcome::Handled, "a count of {digits:?} over an armed nap fired it");
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "a count of {digits:?} over an armed nap fired it"
+        );
         assert_eq!(
             view.armed.as_ref(),
             Some(&before),
@@ -788,7 +870,10 @@ fn the_arming_expiry_is_wall_clock_time_at_every_game_speed() {
         for (name, section, key, _) in heavy_rows(&state) {
             let mut view = focused(section, key);
             update(Action::Activate, &mut view, &state);
-            let armed = view.armed.as_ref().unwrap_or_else(|| panic!("{name} did not arm"));
+            let armed = view
+                .armed
+                .as_ref()
+                .unwrap_or_else(|| panic!("{name} did not arm"));
             let left = armed.expires_at.saturating_duration_since(Instant::now());
             assert!(
                 left >= Duration::from_secs(7) && left <= Duration::from_secs(9),
@@ -810,8 +895,12 @@ fn every_navigation_key_ends_an_arming_silently_whether_or_not_it_moves_anything
     let state = rich();
     let (row_key, command) = move_row(&state);
     assert_eq!(
-        rows(&state, Section::Legacy).iter().position(|r| r.selectable()),
-        rows(&state, Section::Legacy).iter().position(|r| r.key == row_key),
+        rows(&state, Section::Legacy)
+            .iter()
+            .position(|r| r.selectable()),
+        rows(&state, Section::Legacy)
+            .iter()
+            .position(|r| r.key == row_key),
         "fixture: the armed row must be the first selectable row, so an ↑ moves nothing"
     );
     let revealed = clowder_tui::nav::rows::revealed_sections(&state);
@@ -836,12 +925,18 @@ fn every_navigation_key_ends_an_arming_silently_whether_or_not_it_moves_anything
     for k in nav_keys {
         let mut view = focused(Section::Legacy, row_key.clone());
         update(Action::Activate, &mut view, &state);
-        assert!(view.armed.is_some(), "fixture: the row must be armed before {k:?}");
+        assert!(
+            view.armed.is_some(),
+            "fixture: the row must be armed before {k:?}"
+        );
 
         let action = resolve(k, &view);
         let out = update(action.clone(), &mut view, &state);
 
-        assert!(!would_fire(&out, command), "{k:?} ({action:?}) committed the armed row");
+        assert!(
+            !would_fire(&out, command),
+            "{k:?} ({action:?}) committed the armed row"
+        );
         assert!(
             view.armed.is_none(),
             "{k:?} ({action:?}) left the row armed; any navigation key ends an arming, whether \
@@ -871,7 +966,10 @@ fn the_palettes_jump_ends_an_arming() {
     assert!(view.armed.is_some(), "fixture: armed");
 
     press_char('/', &mut view, &state);
-    assert!(matches!(view.overlay, Some(Overlay::Palette { .. })), "fixture: palette open");
+    assert!(
+        matches!(view.overlay, Some(Overlay::Palette { .. })),
+        "fixture: palette open"
+    );
     assert!(view.armed.is_some(), "opening the palette ended the arming");
     let query = "a";
     assert!(
@@ -882,9 +980,18 @@ fn the_palettes_jump_ends_an_arming() {
 
     let out = press(key(KeyCode::Enter), &mut view, &state);
 
-    assert!(!would_fire(&out, command), "the palette's jump committed the armed row");
-    assert!(view.overlay.is_none(), "fixture: the palette's Enter did not jump");
-    assert!(view.armed.is_none(), "the palette's jump left the row armed; the jump is navigation");
+    assert!(
+        !would_fire(&out, command),
+        "the palette's jump committed the armed row"
+    );
+    assert!(
+        view.overlay.is_none(),
+        "fixture: the palette's Enter did not jump"
+    );
+    assert!(
+        view.armed.is_none(),
+        "the palette's jump left the row armed; the jump is navigation"
+    );
 }
 
 /// Esc with nothing above the armed row closes the arming, silently.
@@ -900,9 +1007,15 @@ fn esc_closing_an_arming_ends_it_silently() {
 
         let out = press(key(KeyCode::Esc), &mut view, &state);
 
-        assert!(!would_fire(&out, command), "Esc committed the armed {name} row");
+        assert!(
+            !would_fire(&out, command),
+            "Esc committed the armed {name} row"
+        );
         assert!(view.armed.is_none(), "Esc left the {name} row armed");
-        assert!(view.footer.is_none(), "Esc on the armed {name} row left a footer note");
+        assert!(
+            view.footer.is_none(),
+            "Esc on the armed {name} row left a footer note"
+        );
     }
 }
 
@@ -917,14 +1030,24 @@ fn a_commit_ends_the_arming_whether_the_core_accepts_or_refuses_it() {
 
     let mut lapsed = state.clone();
     lapsed.kittens.truncate(1);
-    assert!(lapsed.clone().apply(command).is_err(), "fixture: the Move is refused now");
-    assert!(state.clone().apply(command).is_ok(), "fixture: the Move is accepted here");
+    assert!(
+        lapsed.clone().apply(command).is_err(),
+        "fixture: the Move is refused now"
+    );
+    assert!(
+        state.clone().apply(command).is_ok(),
+        "fixture: the Move is accepted here"
+    );
 
     for (which, world) in [("accepted", &state), ("refused", &lapsed)] {
         let mut view = focused(Section::Legacy, key.clone());
         update(Action::Activate, &mut view, world);
         let out = commit_deliberately(&mut view, world);
-        assert_eq!(out, Outcome::Apply(command), "fixture: the {which} commit reached the core");
+        assert_eq!(
+            out,
+            Outcome::Apply(command),
+            "fixture: the {which} commit reached the core"
+        );
         assert!(view.armed.is_none(), "an {which} commit left the row armed");
 
         std::thread::sleep(Duration::from_millis(300));
@@ -933,7 +1056,10 @@ fn a_commit_ends_the_arming_whether_the_core_accepts_or_refuses_it() {
             !would_fire(&out, command),
             "the Enter after an {which} commit committed again; that press is a first press"
         );
-        assert!(view.armed.is_some(), "the Enter after an {which} commit did not arm afresh");
+        assert!(
+            view.armed.is_some(),
+            "the Enter after an {which} commit did not arm afresh"
+        );
     }
 }
 
@@ -945,7 +1071,9 @@ fn a_commit_ends_the_arming_whether_the_core_accepts_or_refuses_it() {
 fn arming_another_row_ends_the_first_arming() {
     let state = rich();
     let (move_key, move_command) = move_row(&state);
-    let (nap_key, _) = find_row(&state, Section::Dreams, |c| matches!(c, Command::DeepNap(_)));
+    let (nap_key, _) = find_row(&state, Section::Dreams, |c| {
+        matches!(c, Command::DeepNap(_))
+    });
 
     let mut view = focused(Section::Dreams, nap_key.clone());
     view.armed = Some(ArmedRow {
@@ -955,8 +1083,14 @@ fn arming_another_row_ends_the_first_arming() {
     });
     assert_eq!(accept_count("2", &mut view, &state), Outcome::Handled);
 
-    let armed = view.armed.as_ref().expect("the nap prompt's Enter armed nothing");
-    assert_eq!(armed.key, nap_key, "arming the nap row left another row's arming standing");
+    let armed = view
+        .armed
+        .as_ref()
+        .expect("the nap prompt's Enter armed nothing");
+    assert_eq!(
+        armed.key, nap_key,
+        "arming the nap row left another row's arming standing"
+    );
     assert_eq!(armed.command, Command::DeepNap(2));
 }
 
@@ -969,7 +1103,9 @@ fn arming_another_row_ends_the_first_arming() {
 #[test]
 fn opening_things_and_the_speed_keys_leave_an_arming_running() {
     let state = rich();
-    let (nap_key, _) = find_row(&state, Section::Dreams, |c| matches!(c, Command::DeepNap(_)));
+    let (nap_key, _) = find_row(&state, Section::Dreams, |c| {
+        matches!(c, Command::DeepNap(_))
+    });
 
     let armed_view = || {
         let mut view = focused(Section::Dreams, nap_key.clone());
@@ -1001,7 +1137,10 @@ fn opening_things_and_the_speed_keys_leave_an_arming_running() {
              another arming, the expiry, or the row leaving its list may"
         );
         if c == 'x' {
-            assert!(view.prompt.is_some(), "fixture: x on the armed nap row opened no prompt");
+            assert!(
+                view.prompt.is_some(),
+                "fixture: x on the armed nap row opened no prompt"
+            );
         }
 
         if then_esc {
@@ -1069,7 +1208,9 @@ fn scrolling_an_open_journal_or_help_overlay_leaves_the_row_beneath_armed() {
 #[test]
 fn held_enter_fires_no_faster_than_ten_times_a_second() {
     let state = rich();
-    let (key, command) = find_row(&state, Section::Meadow, |c| matches!(c, Command::GatherCatnip));
+    let (key, command) = find_row(&state, Section::Meadow, |c| {
+        matches!(c, Command::GatherCatnip)
+    });
     let mut view = focused(Section::Meadow, key);
 
     let start = Instant::now();
@@ -1215,9 +1356,15 @@ fn mnemonic_contexts(state: &GameState) -> Vec<(Section, Option<RowKey>)> {
 /// banner up and the inspector asked for, so "the press is not navigation and
 /// leaves the banner and the layout as they stood" has something to leave.
 fn mnemonic_view(section: Section, focus: Option<RowKey>) -> ViewState {
-    let mut v = ViewState { section: Some(section), ..Default::default() };
+    let mut v = ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     v.focus[section.index()] = focus;
-    v.reports = vec![PendingReport { entry: 0, dismissed: false }];
+    v.reports = vec![PendingReport {
+        entry: 0,
+        dismissed: false,
+    }];
     v.inspector_wanted = true;
     v
 }
@@ -1263,11 +1410,15 @@ fn assert_mnemonic_fixture(state: &GameState) {
         );
     }
     assert!(
-        rows(state, Section::Clowder).iter().any(|r| matches!(r.key, RowKey::Kitten(..))),
+        rows(state, Section::Clowder)
+            .iter()
+            .any(|r| matches!(r.key, RowKey::Kitten(..))),
         "fixture: no kitten rows are listed on the Clowder screen"
     );
     assert!(
-        rows(state, Section::Friends).iter().any(|r| matches!(r.key, RowKey::Colony(..))),
+        rows(state, Section::Friends)
+            .iter()
+            .any(|r| matches!(r.key, RowKey::Colony(..))),
         "fixture: no colony rows are listed on the Friends screen"
     );
     for (section, focus) in mnemonic_contexts(state) {
@@ -1305,7 +1456,9 @@ fn a_letter_acts_exactly_where_it_is_a_live_mnemonic_and_is_silent_everywhere_el
             assert_mnemonic_fixture(&state);
         } else {
             assert!(
-                !rows(&state, Section::Meadow).iter().any(|r| r.key == RowKey::Fixed("Rummage")),
+                !rows(&state, Section::Meadow)
+                    .iter()
+                    .any(|r| r.key == RowKey::Fixed("Rummage")),
                 "fixture: a new meadow does not yet list the rummage row"
             );
         }
@@ -1363,7 +1516,10 @@ fn a_letter_acts_exactly_where_it_is_a_live_mnemonic_and_is_silent_everywhere_el
             }
         }
     }
-    assert!(live_seen > 0, "fixture: the sweep never met a live mnemonic");
+    assert!(
+        live_seen > 0,
+        "fixture: the sweep never met a live mnemonic"
+    );
 }
 
 /// A mnemonic is bound only where the global key table is. An open field takes
@@ -1382,11 +1538,21 @@ fn a_mnemonic_never_acts_while_a_field_or_full_screen_overlay_holds_the_keyboard
 
     type Holder = (&'static str, fn(&mut ViewState, RowKey));
     let holders: [Holder; 4] = [
-        ("the palette", |v, _| v.overlay = Some(Overlay::Palette { query: String::new(), selected: 0 })),
-        ("the count prompt", |v, row| {
-            v.prompt = Some(clowder_tui::nav::CountPrompt { digits: String::new(), row: Some(row) })
+        ("the palette", |v, _| {
+            v.overlay = Some(Overlay::Palette {
+                query: String::new(),
+                selected: 0,
+            })
         }),
-        ("the Journal", |v, _| v.overlay = Some(Overlay::Journal { anchor: 0 })),
+        ("the count prompt", |v, row| {
+            v.prompt = Some(clowder_tui::nav::CountPrompt {
+                digits: String::new(),
+                row: Some(row),
+            })
+        }),
+        ("the Journal", |v, _| {
+            v.overlay = Some(Overlay::Journal { anchor: 0 })
+        }),
         ("the help overlay", |v, _| v.overlay = Some(Overlay::Help)),
     ];
 
@@ -1417,7 +1583,11 @@ fn a_mnemonic_never_acts_while_a_field_or_full_screen_overlay_holds_the_keyboard
                      the letter: the palette takes it as query text, and the count prompt and \
                      a full-screen overlay leave it unbound"
                 );
-                assert_eq!(footer_text(&view), None, "{whr}, the letter {c:?} earned a footer note");
+                assert_eq!(
+                    footer_text(&view),
+                    None,
+                    "{whr}, the letter {c:?} earned a footer note"
+                );
                 checked += 1;
             }
         }
@@ -1456,7 +1626,11 @@ fn a_mnemonic_press_acts_in_place_and_leaves_cursor_section_banner_and_layout_as
                 "fixture: {whr}, Enter on {target:?} asks the core for nothing, so this press \
                  proves nothing about acting in place"
             );
-            assert_eq!(view.section, Some(section), "{whr}, the mnemonic {c:?} changed the focused section");
+            assert_eq!(
+                view.section,
+                Some(section),
+                "{whr}, the mnemonic {c:?} changed the focused section"
+            );
             assert_eq!(
                 view.focus, before.focus,
                 "{whr}, the mnemonic {c:?} moved the cursor; a mnemonic acts on its row in place"
@@ -1501,10 +1675,18 @@ fn one_context_per_mnemonic(state: &GameState) -> Vec<(char, Section, RowKey, Ro
             _ => None,
         })
         .expect("fixture: a colony is listed on the Friends screen");
-    out.push(('p', Section::Friends, RowKey::Colony(colony, "trade"), RowKey::Colony(colony, "penpal")));
+    out.push((
+        'p',
+        Section::Friends,
+        RowKey::Colony(colony, "trade"),
+        RowKey::Colony(colony, "penpal"),
+    ));
     for (c, section, focus, target) in &out {
         assert_eq!(
-            live_mnemonics(state, *section, Some(focus)).iter().find(|(m, _)| m == c).map(|(_, t)| t),
+            live_mnemonics(state, *section, Some(focus))
+                .iter()
+                .find(|(m, _)| m == c)
+                .map(|(_, t)| t),
             Some(target),
             "fixture: `{c}` is not live for {target:?} with {focus:?} focused"
         );
@@ -1524,7 +1706,8 @@ fn hold_mnemonic(
 ) -> (u32, Vec<Instant>) {
     let mut view = focused(section, focus.clone());
     let (primary, _) = enter_on(&view, target, state);
-    let primary = commands_of(&primary).expect("fixture: Enter on the mnemonic's row asks for a command");
+    let primary =
+        commands_of(&primary).expect("fixture: Enter on the mnemonic's row asks for a command");
     let start = Instant::now();
     let mut presses = 0u32;
     let mut fired = Vec::new();
@@ -1600,13 +1783,28 @@ fn a_held_mnemonics_pace_does_not_depend_on_the_key_repeat_rate() {
         .next()
         .expect("fixture: the table has a mnemonic");
     for rate_ms in [15u64, 40] {
-        let (presses, fired) =
-            hold_mnemonic(c, section, &focus, &target, Some(Duration::from_millis(rate_ms)), &state);
-        assert!(presses > 11, "fixture: only {presses} presses at one per {rate_ms}ms");
+        let (presses, fired) = hold_mnemonic(
+            c,
+            section,
+            &focus,
+            &target,
+            Some(Duration::from_millis(rate_ms)),
+            &state,
+        );
+        assert!(
+            presses > 11,
+            "fixture: only {presses} presses at one per {rate_ms}ms"
+        );
         assert_no_faster_than_ten_a_second(&fired, &format!("`{c}` repeating every {rate_ms}ms"));
     }
-    let (presses, fired) =
-        hold_mnemonic(c, section, &focus, &target, Some(Duration::from_millis(150)), &state);
+    let (presses, fired) = hold_mnemonic(
+        c,
+        section,
+        &focus,
+        &target,
+        Some(Duration::from_millis(150)),
+        &state,
+    );
     assert_eq!(
         fired.len() as u32,
         presses,
@@ -1649,7 +1847,10 @@ fn kitten_rows(state: &GameState) -> Vec<(usize, RowKey)> {
 /// long roster with an Elder standing — so the sweeps meet both.
 fn small_clowder() -> GameState {
     let mut s = fresh();
-    s.kittens = ["Biscuit", "Clover", "Dumpling"].iter().map(|n| kitten(n, None)).collect();
+    s.kittens = ["Biscuit", "Clover", "Dumpling"]
+        .iter()
+        .map(|n| kitten(n, None))
+        .collect();
     s.roster_high_water = s.kittens.len();
     s.elder = None;
     s
@@ -1665,7 +1866,10 @@ fn small_clowder() -> GameState {
 #[test]
 fn every_kitten_rows_enter_promotes_it_and_the_clowder_p_answers_as_that_enter_does() {
     let mut checked = 0u32;
-    for (label, state) in [("a meadow far along", rich()), ("a small clowder", small_clowder())] {
+    for (label, state) in [
+        ("a meadow far along", rich()),
+        ("a small clowder", small_clowder()),
+    ] {
         let kittens = kitten_rows(&state);
         assert!(!kittens.is_empty(), "fixture: {label} lists kitten rows");
         for (ix, key) in kittens {
@@ -1673,7 +1877,11 @@ fn every_kitten_rows_enter_promotes_it_and_the_clowder_p_answers_as_that_enter_d
             let whr = format!("in {label}, with the kitten row {key:?} focused");
 
             let mut on_enter = before.clone();
-            let entered = press(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE), &mut on_enter, &state);
+            let entered = press(
+                KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+                &mut on_enter,
+                &state,
+            );
             assert_eq!(
                 entered,
                 Outcome::Apply(Command::Promote(ix)),
@@ -1713,7 +1921,10 @@ fn every_kitten_rows_enter_promotes_it_and_the_clowder_p_answers_as_that_enter_d
 #[test]
 fn n_on_every_kitten_row_appoints_that_kitten_once_and_in_place() {
     let mut checked = 0u32;
-    for (label, state) in [("a meadow far along", rich()), ("a small clowder", small_clowder())] {
+    for (label, state) in [
+        ("a meadow far along", rich()),
+        ("a small clowder", small_clowder()),
+    ] {
         let kittens = kitten_rows(&state);
         assert!(!kittens.is_empty(), "fixture: {label} lists kitten rows");
         for (ix, key) in kittens {
@@ -1733,8 +1944,15 @@ fn n_on_every_kitten_row_appoints_that_kitten_once_and_in_place() {
                 "{whr}, `n` answered {out:?}; it issues AppointElder for the kitten the row is \
                  about, once, for the core to arbitrate"
             );
-            assert_eq!(view.section, Some(Section::Clowder), "{whr}, `n` changed the focused section");
-            assert_eq!(view.focus, before.focus, "{whr}, `n` moved the cursor; it is an act, not navigation");
+            assert_eq!(
+                view.section,
+                Some(Section::Clowder),
+                "{whr}, `n` changed the focused section"
+            );
+            assert_eq!(
+                view.focus, before.focus,
+                "{whr}, `n` moved the cursor; it is an act, not navigation"
+            );
             assert_eq!(
                 view.reports, before.reports,
                 "{whr}, `n` dismissed the report banner; the press is an act, not navigation"
@@ -1743,7 +1961,11 @@ fn n_on_every_kitten_row_appoints_that_kitten_once_and_in_place() {
                 view.inspector_wanted, before.inspector_wanted,
                 "{whr}, `n` changed the inspector call, and with it the narrow layout's swap"
             );
-            assert_eq!(footer_text(&view), None, "{whr}, `n` left a footer note of its own");
+            assert_eq!(
+                footer_text(&view),
+                None,
+                "{whr}, `n` left a footer note of its own"
+            );
             assert_eq!(
                 observable_but_footer(&view),
                 observable_but_footer(&before),
@@ -1758,14 +1980,22 @@ fn n_on_every_kitten_row_appoints_that_kitten_once_and_in_place() {
 /// Hold `n` on `key` for a second, one press every `pace` (or as fast as the
 /// loop runs), and return how many presses there were and the instants the
 /// press asked the core for AppointElder.
-fn hold_n(state: &GameState, ix: usize, key: &RowKey, pace: Option<Duration>) -> (u32, Vec<Instant>) {
+fn hold_n(
+    state: &GameState,
+    ix: usize,
+    key: &RowKey,
+    pace: Option<Duration>,
+) -> (u32, Vec<Instant>) {
     let mut view = focused(Section::Clowder, key.clone());
     let start = Instant::now();
     let mut presses = 0u32;
     let mut fired = Vec::new();
     while start.elapsed() < Duration::from_secs(1) {
         presses += 1;
-        if would_fire(&press_char('n', &mut view, state), Command::AppointElder(ix)) {
+        if would_fire(
+            &press_char('n', &mut view, state),
+            Command::AppointElder(ix),
+        ) {
             fired.push(Instant::now());
         }
         if let Some(p) = pace {
@@ -1784,12 +2014,22 @@ fn hold_n(state: &GameState, ix: usize, key: &RowKey, pace: Option<Duration>) ->
 #[test]
 fn a_held_n_acts_no_more_than_ten_times_a_second_whatever_the_repeat_rate() {
     let state = small_clowder();
-    let (ix, key) = kitten_rows(&state).into_iter().next().expect("fixture: a kitten row is listed");
+    let (ix, key) = kitten_rows(&state)
+        .into_iter()
+        .next()
+        .expect("fixture: a kitten row is listed");
 
-    for pace in [None, Some(Duration::from_millis(15)), Some(Duration::from_millis(40))] {
+    for pace in [
+        None,
+        Some(Duration::from_millis(15)),
+        Some(Duration::from_millis(40)),
+    ] {
         let (presses, fired) = hold_n(&state, ix, &key, pace);
         let what = format!("`n` held on {key:?}, one press every {pace:?}");
-        assert!(presses > 11, "fixture: {what} made only {presses} presses in a second");
+        assert!(
+            presses > 11,
+            "fixture: {what} made only {presses} presses in a second"
+        );
         assert!(
             fired.len() >= 2,
             "{what} acted {} times in a second; held, it still repeats, as a held Enter does",
@@ -1834,11 +2074,21 @@ fn n_never_acts_while_a_field_or_full_screen_overlay_holds_the_keyboard() {
 
     type Holder = (&'static str, fn(&mut ViewState, RowKey));
     let holders: [Holder; 4] = [
-        ("the palette", |v, _| v.overlay = Some(Overlay::Palette { query: String::new(), selected: 0 })),
-        ("the count prompt", |v, row| {
-            v.prompt = Some(clowder_tui::nav::CountPrompt { digits: String::new(), row: Some(row) })
+        ("the palette", |v, _| {
+            v.overlay = Some(Overlay::Palette {
+                query: String::new(),
+                selected: 0,
+            })
         }),
-        ("the Journal", |v, _| v.overlay = Some(Overlay::Journal { anchor: 0 })),
+        ("the count prompt", |v, row| {
+            v.prompt = Some(clowder_tui::nav::CountPrompt {
+                digits: String::new(),
+                row: Some(row),
+            })
+        }),
+        ("the Journal", |v, _| {
+            v.overlay = Some(Overlay::Journal { anchor: 0 })
+        }),
         ("the help overlay", |v, _| v.overlay = Some(Overlay::Help)),
     ];
 
@@ -1883,12 +2133,23 @@ fn n_is_an_unbound_key_everywhere_but_a_kitten_row_whose_gate_is_open() {
     for (label, state) in [("a meadow far along", rich()), ("a new meadow", fresh())] {
         for (section, focus) in mnemonic_contexts(&state) {
             let view = mnemonic_view(section, focus.clone());
-            contexts.push((format!("in {label}, {}", describe(section, &focus)), state.clone(), view));
+            contexts.push((
+                format!("in {label}, {}", describe(section, &focus)),
+                state.clone(),
+                view,
+            ));
         }
     }
     let new_meadow = fresh();
-    assert!(rows(&new_meadow, Section::Clowder).is_empty(), "fixture: a new meadow's Clowder lists nothing");
-    for memory in [None, Some(RowKey::Kitten(0, "")), Some(RowKey::Kitten(0, "promote"))] {
+    assert!(
+        rows(&new_meadow, Section::Clowder).is_empty(),
+        "fixture: a new meadow's Clowder lists nothing"
+    );
+    for memory in [
+        None,
+        Some(RowKey::Kitten(0, "")),
+        Some(RowKey::Kitten(0, "promote")),
+    ] {
         let view = mnemonic_view(Section::Clowder, memory.clone());
         contexts.push((
             format!("in a new meadow, on an empty Clowder remembering {memory:?}"),
@@ -1915,7 +2176,11 @@ fn n_is_an_unbound_key_everywhere_but_a_kitten_row_whose_gate_is_open() {
         }
         let mut view = before.clone();
         let out = press_char('n', &mut view, &state);
-        assert_eq!(out, Outcome::Handled, "{whr}, `n` is unbound here and yet told the core {out:?}");
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "{whr}, `n` is unbound here and yet told the core {out:?}"
+        );
         assert_eq!(
             footer_text(&view),
             None,
@@ -1929,8 +2194,14 @@ fn n_is_an_unbound_key_everywhere_but_a_kitten_row_whose_gate_is_open() {
         );
         silent += 1;
     }
-    assert!(silent > 0, "fixture: no context where `n` is unbound was checked");
-    assert!(live > 0, "fixture: the sweep met no kitten row, so it told nothing apart");
+    assert!(
+        silent > 0,
+        "fixture: no context where `n` is unbound was checked"
+    );
+    assert!(
+        live > 0,
+        "fixture: the sweep met no kitten row, so it told nothing apart"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1948,9 +2219,15 @@ fn x_opens_a_count_prompt_that_captures_digits() {
     let (key, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
     let mut view = focused(Section::Meadow, key);
 
-    assert_eq!(update(Action::CountPrompt, &mut view, &state), Outcome::Handled);
+    assert_eq!(
+        update(Action::CountPrompt, &mut view, &state),
+        Outcome::Handled
+    );
     let prompt = view.prompt.as_ref().expect("x opened no count prompt");
-    assert_eq!(prompt.digits, "", "the count prompt opened with something already typed");
+    assert_eq!(
+        prompt.digits, "",
+        "the count prompt opened with something already typed"
+    );
 
     update(Action::Type('1'), &mut view, &state);
     update(Action::Type('2'), &mut view, &state);
@@ -1966,7 +2243,11 @@ fn x_opens_a_count_prompt_that_captures_digits() {
     // A letter is not part of a count. Whatever the field does with it, the
     // count must stay a number — and it must certainly not quit the game.
     let out = update(Action::Type('q'), &mut view, &state);
-    assert_ne!(out, Outcome::Quit, "a letter typed into the count prompt quit the game");
+    assert_ne!(
+        out,
+        Outcome::Quit,
+        "a letter typed into the count prompt quit the game"
+    );
     let digits = &view.prompt.as_ref().expect("prompt").digits;
     assert!(
         digits.chars().all(|c| c.is_ascii_digit()),
@@ -1996,7 +2277,10 @@ fn the_count_prompts_enter_repeat_calls_a_repeat_n_command() {
         "×7 on a repeat-N row did not ask for seven calls; passing 7 into a command that has \
          nowhere to put it would silently build one"
     );
-    assert!(view.prompt.is_none(), "the count prompt stayed open after firing");
+    assert!(
+        view.prompt.is_none(),
+        "the count prompt stayed open after firing"
+    );
 }
 
 /// For a count-taking command the count is a real argument — squads, caravans,
@@ -2007,7 +2291,9 @@ fn the_count_prompts_enter_repeat_calls_a_repeat_n_command() {
 #[test]
 fn the_count_prompts_enter_passes_the_count_to_a_count_taking_command() {
     let state = rich();
-    let (key, _) = find_row(&state, Section::Clowder, |c| matches!(c, Command::Pounce(_)));
+    let (key, _) = find_row(&state, Section::Clowder, |c| {
+        matches!(c, Command::Pounce(_))
+    });
     let mut view = focused(Section::Clowder, key);
 
     update(Action::CountPrompt, &mut view, &state);
@@ -2019,7 +2305,10 @@ fn the_count_prompts_enter_passes_the_count_to_a_count_taking_command() {
         Outcome::Apply(Command::Pounce(4)),
         "×4 on a count-taking row did not pass the count into the command"
     );
-    assert!(view.prompt.is_none(), "the count prompt stayed open after firing");
+    assert!(
+        view.prompt.is_none(),
+        "the count prompt stayed open after firing"
+    );
 }
 
 /// An empty count, or a zero one, cancels. "I typed x by accident" and "×0"
@@ -2062,20 +2351,35 @@ fn enter_on_every_unarmed_count_taking_row_takes_one_unit() {
     let state = rich();
     let (mut ordinary, mut heavy, mut trade) = (0, 0, 0);
 
-    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| is_count_taking(r)) {
+    for (section, row) in every_row(&state)
+        .into_iter()
+        .filter(|(_, r)| is_count_taking(r))
+    {
         let command = row_command(&row).expect("a count-taking row has a command");
         let mut view = focused(section, row.key.clone());
         let out = update(Action::Activate, &mut view, &state);
-        assert!(view.prompt.is_none(), "Enter on {:?} opened a count prompt", row.key);
+        assert!(
+            view.prompt.is_none(),
+            "Enter on {:?} opened a count prompt",
+            row.key
+        );
 
         if row.heavy {
             heavy += 1;
-            assert_eq!(out, Outcome::Handled, "Enter on the unarmed heavy {:?} fired", row.key);
-            let armed = view
-                .armed
-                .as_ref()
-                .unwrap_or_else(|| panic!("Enter on the unarmed heavy {:?} armed nothing", row.key));
-            assert_eq!(armed.key, row.key, "Enter on {:?} armed a different row", row.key);
+            assert_eq!(
+                out,
+                Outcome::Handled,
+                "Enter on the unarmed heavy {:?} fired",
+                row.key
+            );
+            let armed = view.armed.as_ref().unwrap_or_else(|| {
+                panic!("Enter on the unarmed heavy {:?} armed nothing", row.key)
+            });
+            assert_eq!(
+                armed.key, row.key,
+                "Enter on {:?} armed a different row",
+                row.key
+            );
             assert_eq!(
                 armed.command,
                 with_count(command, 1),
@@ -2094,7 +2398,11 @@ fn enter_on_every_unarmed_count_taking_row_takes_one_unit() {
                 "Enter on {:?} did not pass a count of one; Enter is the row's action ×1",
                 row.key
             );
-            assert!(view.armed.is_none(), "Enter on the ordinary {:?} armed it", row.key);
+            assert!(
+                view.armed.is_none(),
+                "Enter on the ordinary {:?} armed it",
+                row.key
+            );
         }
     }
 
@@ -2116,19 +2424,30 @@ fn an_empty_or_zero_count_closes_the_prompt_with_no_command_and_no_footer_on_eve
     let gone = fresh();
     let (mut seen, mut armed_rows, mut vanished) = (0, 0, 0);
 
-    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| opens_prompt(&state, r)) {
+    for (section, row) in every_row(&state)
+        .into_iter()
+        .filter(|(_, r)| opens_prompt(&state, r))
+    {
         seen += 1;
         for typed in ["", "0", "00"] {
             let mut view = focused(section, row.key.clone());
             if row.heavy {
                 // Arm the row first, so the cancel has an arming to leave be.
                 update(Action::Activate, &mut view, &state);
-                assert!(view.armed.is_some(), "fixture: Enter on the heavy {:?} did not arm", row.key);
+                assert!(
+                    view.armed.is_some(),
+                    "fixture: Enter on the heavy {:?} did not arm",
+                    row.key
+                );
                 armed_rows += 1;
             }
             let before = view.armed.clone();
             update(Action::CountPrompt, &mut view, &state);
-            assert!(view.prompt.is_some(), "fixture: x on {:?} opened no prompt", row.key);
+            assert!(
+                view.prompt.is_some(),
+                "fixture: x on {:?} opened no prompt",
+                row.key
+            );
             for c in typed.chars() {
                 update(Action::Type(c), &mut view, &state);
             }
@@ -2140,7 +2459,11 @@ fn an_empty_or_zero_count_closes_the_prompt_with_no_command_and_no_footer_on_eve
                 "a count of {typed:?} on {:?} asked the core for {out:?}",
                 row.key
             );
-            assert!(view.prompt.is_none(), "a count of {typed:?} left the prompt over {:?} open", row.key);
+            assert!(
+                view.prompt.is_none(),
+                "a count of {typed:?} left the prompt over {:?} open",
+                row.key
+            );
             assert_eq!(
                 footer_text(&view),
                 None,
@@ -2165,18 +2488,31 @@ fn an_empty_or_zero_count_closes_the_prompt_with_no_command_and_no_footer_on_eve
                     "a count of {typed:?} on the vanished {:?} asked the core for something",
                     row.key
                 );
-                assert!(view.prompt.is_none(), "the prompt over the vanished {:?} stayed open", row.key);
+                assert!(
+                    view.prompt.is_none(),
+                    "the prompt over the vanished {:?} stayed open",
+                    row.key
+                );
                 assert_footer_says_something_plain(
                     &view,
-                    &format!("a count of {typed:?} on a prompt whose row {:?} has gone", row.key),
+                    &format!(
+                        "a count of {typed:?} on a prompt whose row {:?} has gone",
+                        row.key
+                    ),
                 );
             }
         }
     }
 
     assert!(seen > 0, "fixture: no row opens the count prompt");
-    assert!(armed_rows > 0, "fixture: the heavy nap row opens the count prompt");
-    assert!(vanished > 0, "fixture: no prompt row leaves its list in a fresh meadow");
+    assert!(
+        armed_rows > 0,
+        "fixture: the heavy nap row opens the count prompt"
+    );
+    assert!(
+        vanished > 0,
+        "fixture: no prompt row leaves its list in a fresh meadow"
+    );
 }
 
 /// Esc cancels the count prompt and nothing happened. Esc only ever closes the
@@ -2193,7 +2529,10 @@ fn esc_cancels_the_count_prompt_with_no_effect() {
     update(Action::Type('9'), &mut view, &state);
     let out = update(Action::Dismiss, &mut view, &state);
 
-    assert!(!would_fire(&out, command), "Esc on the count prompt fired the command");
+    assert!(
+        !would_fire(&out, command),
+        "Esc on the count prompt fired the command"
+    );
     assert!(view.prompt.is_none(), "Esc left the count prompt open");
     assert_eq!(
         view.focus[Section::Meadow.index()].as_ref(),
@@ -2329,7 +2668,10 @@ fn opens_prompt(state: &GameState, row: &Row) -> bool {
     !owned(state, row)
         && match &row.kind {
             RowKind::Act { semantics, .. } => {
-                matches!(semantics, CountSemantics::CountTaking | CountSemantics::RepeatN)
+                matches!(
+                    semantics,
+                    CountSemantics::CountTaking | CountSemantics::RepeatN
+                )
             }
             RowKind::Count { .. } => true,
             RowKind::Display | RowKind::Group => false,
@@ -2338,7 +2680,13 @@ fn opens_prompt(state: &GameState, row: &Row) -> bool {
 
 /// Whether the row is count-taking.
 fn is_count_taking(row: &Row) -> bool {
-    matches!(row.kind, RowKind::Act { semantics: CountSemantics::CountTaking, .. })
+    matches!(
+        row.kind,
+        RowKind::Act {
+            semantics: CountSemantics::CountTaking,
+            ..
+        }
+    )
 }
 
 /// What a count prompt's Enter with a count of `n` asks of the core on a row
@@ -2346,12 +2694,19 @@ fn is_count_taking(row: &Row) -> bool {
 /// repeat-N command or a count row's assign called `n` times. @spec TUI-NAV-070
 fn accepted(row: &Row, n: u32) -> Outcome {
     match &row.kind {
-        RowKind::Act { command, semantics: CountSemantics::CountTaking } => {
-            Outcome::Apply(with_count(*command, n))
-        }
-        RowKind::Act { command, semantics: CountSemantics::RepeatN } => Outcome::Repeat(*command, n),
+        RowKind::Act {
+            command,
+            semantics: CountSemantics::CountTaking,
+        } => Outcome::Apply(with_count(*command, n)),
+        RowKind::Act {
+            command,
+            semantics: CountSemantics::RepeatN,
+        } => Outcome::Repeat(*command, n),
         RowKind::Count { increment, .. } => Outcome::Repeat(*increment, n),
-        other => panic!("fixture: {:?} is not a row the count prompt opens on ({other:?})", row.key),
+        other => panic!(
+            "fixture: {:?} is not a row the count prompt opens on ({other:?})",
+            row.key
+        ),
     }
 }
 
@@ -2359,7 +2714,10 @@ fn accepted(row: &Row, n: u32) -> Outcome {
 /// @spec TUI-NAV-012
 fn one_unit(row: &Row) -> Command {
     match &row.kind {
-        RowKind::Act { command, semantics: CountSemantics::CountTaking } => with_count(*command, 1),
+        RowKind::Act {
+            command,
+            semantics: CountSemantics::CountTaking,
+        } => with_count(*command, 1),
         RowKind::Act { command, .. } => *command,
         RowKind::Count { increment, .. } => *increment,
         other => panic!("fixture: {:?} has no action to scale ({other:?})", row.key),
@@ -2376,16 +2734,20 @@ fn row_command(row: &Row) -> Option<Command> {
 }
 
 /// Open the count prompt on `row` the way a player does, and type `digits`.
-fn open_and_type(
-    section: Section,
-    row: &Row,
-    digits: &str,
-    state: &GameState,
-) -> ViewState {
+fn open_and_type(section: Section, row: &Row, digits: &str, state: &GameState) -> ViewState {
     let mut view = focused(section, row.key.clone());
     let out = update(Action::CountPrompt, &mut view, state);
-    assert_eq!(out, Outcome::Handled, "x on {:?} asked the core for something", row.key);
-    assert!(view.prompt.is_some(), "x on {:?} opened no count prompt", row.key);
+    assert_eq!(
+        out,
+        Outcome::Handled,
+        "x on {:?} asked the core for something",
+        row.key
+    );
+    assert!(
+        view.prompt.is_some(),
+        "x on {:?} opened no count prompt",
+        row.key
+    );
     for c in digits.chars() {
         update(Action::Type(c), &mut view, state);
     }
@@ -2468,9 +2830,22 @@ fn x_opens_the_count_prompt_on_exactly_the_rows_that_take_a_count() {
         // Esc closes it, and nothing else changes.
         update(Action::Type('5'), &mut view, &state);
         let out = update(Action::Dismiss, &mut view, &state);
-        assert_eq!(out, Outcome::Handled, "Esc on the count prompt over {:?} acted", row.key);
-        assert!(view.prompt.is_none(), "Esc left the count prompt over {:?} open", row.key);
-        assert!(view.armed.is_none(), "Esc on the count prompt over {:?} armed it", row.key);
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "Esc on the count prompt over {:?} acted",
+            row.key
+        );
+        assert!(
+            view.prompt.is_none(),
+            "Esc left the count prompt over {:?} open",
+            row.key
+        );
+        assert!(
+            view.armed.is_none(),
+            "Esc on the count prompt over {:?} armed it",
+            row.key
+        );
         assert!(
             view.footer.is_none(),
             "Esc on the count prompt over {:?} left a footer note; closing is no effect",
@@ -2485,7 +2860,10 @@ fn x_opens_the_count_prompt_on_exactly_the_rows_that_take_a_count() {
     }
 
     assert!(repeat_n > 0, "fixture: no repeat-N row was listed");
-    assert!(count_taking > 0, "fixture: no ordinary count-taking row was listed");
+    assert!(
+        count_taking > 0,
+        "fixture: no ordinary count-taking row was listed"
+    );
     assert!(count_rows > 0, "fixture: no count row was listed");
     assert!(heavy > 0, "fixture: the heavy DeepNap row was not listed");
 }
@@ -2501,11 +2879,18 @@ fn the_count_prompts_enter_does_what_each_row_takes_a_count_as() {
     let state = rich();
     let mut seen = 0;
 
-    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| opens_prompt(&state, r)) {
+    for (section, row) in every_row(&state)
+        .into_iter()
+        .filter(|(_, r)| opens_prompt(&state, r))
+    {
         seen += 1;
         let mut view = open_and_type(section, &row, "6", &state);
         let out = update(Action::Activate, &mut view, &state);
-        assert!(view.prompt.is_none(), "the count prompt over {:?} stayed open", row.key);
+        assert!(
+            view.prompt.is_none(),
+            "the count prompt over {:?} stayed open",
+            row.key
+        );
 
         if row.heavy {
             assert_eq!(
@@ -2515,9 +2900,15 @@ fn the_count_prompts_enter_does_what_each_row_takes_a_count_as() {
                 row.key
             );
             let armed = view.armed.as_ref().unwrap_or_else(|| {
-                panic!("the prompt's Enter on the heavy {:?} armed nothing", row.key)
+                panic!(
+                    "the prompt's Enter on the heavy {:?} armed nothing",
+                    row.key
+                )
             });
-            assert_eq!(armed.key, row.key, "the prompt's Enter armed a different row");
+            assert_eq!(
+                armed.key, row.key,
+                "the prompt's Enter armed a different row"
+            );
             assert_eq!(
                 Some(armed.command),
                 row_command(&row).map(|c| with_count(c, 6)),
@@ -2531,7 +2922,11 @@ fn the_count_prompts_enter_does_what_each_row_takes_a_count_as() {
                 "×6 on {:?} did not ask the core for what that row takes a count as",
                 row.key
             );
-            assert!(view.armed.is_none(), "×6 on the ordinary {:?} armed it", row.key);
+            assert!(
+                view.armed.is_none(),
+                "×6 on the ordinary {:?} armed it",
+                row.key
+            );
         }
     }
     assert!(seen > 0, "fixture: no row opens the count prompt");
@@ -2554,10 +2949,16 @@ fn the_count_prompt_opens_and_attempts_on_rows_the_stock_cannot_cover() {
         RowKey::Content(id, _) => state.availability(*id) == Availability::Teased,
         _ => false,
     });
-    assert!(teased, "fixture: with the stores empty, some listed row should be Teased");
+    assert!(
+        teased,
+        "fixture: with the stores empty, some listed row should be Teased"
+    );
 
     let mut seen = 0;
-    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| opens_prompt(&state, r)) {
+    for (section, row) in every_row(&state)
+        .into_iter()
+        .filter(|(_, r)| opens_prompt(&state, r))
+    {
         seen += 1;
         let mut view = focused(section, row.key.clone());
         update(Action::CountPrompt, &mut view, &state);
@@ -2605,7 +3006,10 @@ fn an_open_count_prompt_acts_only_on_the_row_it_was_opened_on() {
     let state = rich();
     let mut seen = 0;
 
-    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| opens_prompt(&state, r)) {
+    for (section, row) in every_row(&state)
+        .into_iter()
+        .filter(|(_, r)| opens_prompt(&state, r))
+    {
         let Some(other) = rows(&state, section)
             .into_iter()
             .find(|r| r.selectable() && r.key != row.key && row_command(r) != row_command(&row))
@@ -2645,7 +3049,10 @@ fn an_open_count_prompt_acts_only_on_the_row_it_was_opened_on() {
             );
         }
     }
-    assert!(seen > 0, "fixture: no section holds a prompt row beside another row");
+    assert!(
+        seen > 0,
+        "fixture: no section holds a prompt row beside another row"
+    );
 }
 
 /// The sim keeps ticking under an open prompt, and a section's rows are
@@ -2661,7 +3068,10 @@ fn a_count_prompt_whose_row_has_left_its_list_closes_with_no_effect_and_says_so(
     let gone = fresh();
     let (mut repeat_n, mut count_taking, mut count_rows, mut heavy) = (0, 0, 0, 0);
 
-    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| opens_prompt(&state, r)) {
+    for (section, row) in every_row(&state)
+        .into_iter()
+        .filter(|(_, r)| opens_prompt(&state, r))
+    {
         if rows(&gone, section).iter().any(|r| r.key == row.key) {
             continue;
         }
@@ -2681,18 +3091,41 @@ fn a_count_prompt_whose_row_has_left_its_list_closes_with_no_effect_and_says_so(
             "Enter on a prompt whose row {:?} is no longer listed asked the core for something",
             row.key
         );
-        assert!(view.prompt.is_none(), "the prompt over the vanished {:?} stayed open", row.key);
-        assert!(view.armed.is_none(), "the prompt over the vanished {:?} armed a row", row.key);
+        assert!(
+            view.prompt.is_none(),
+            "the prompt over the vanished {:?} stayed open",
+            row.key
+        );
+        assert!(
+            view.armed.is_none(),
+            "the prompt over the vanished {:?} armed a row",
+            row.key
+        );
         assert_footer_says_something_plain(
             &view,
-            &format!("Enter on a prompt whose row {:?} has left its list", row.key),
+            &format!(
+                "Enter on a prompt whose row {:?} has left its list",
+                row.key
+            ),
         );
     }
 
-    assert!(repeat_n > 0, "fixture: no repeat-N row leaves its list in a fresh meadow");
-    assert!(count_taking > 0, "fixture: no count-taking row leaves its list in a fresh meadow");
-    assert!(count_rows > 0, "fixture: no count row leaves its list in a fresh meadow");
-    assert!(heavy > 0, "fixture: the DeepNap row does not leave its list in a fresh meadow");
+    assert!(
+        repeat_n > 0,
+        "fixture: no repeat-N row leaves its list in a fresh meadow"
+    );
+    assert!(
+        count_taking > 0,
+        "fixture: no count-taking row leaves its list in a fresh meadow"
+    );
+    assert!(
+        count_rows > 0,
+        "fixture: no count row leaves its list in a fresh meadow"
+    );
+    assert!(
+        heavy > 0,
+        "fixture: the DeepNap row does not leave its list in a fresh meadow"
+    );
 }
 
 /// `X` runs on every row that is not heavy, not already the player's, and
@@ -2730,10 +3163,17 @@ fn x_max_runs_every_row_that_takes_a_count_one_unit_per_call() {
              rejects it or the cap is reached",
             row.key
         );
-        assert!(view.prompt.is_none() && view.armed.is_none(), "X on {:?} opened or armed", row.key);
+        assert!(
+            view.prompt.is_none() && view.armed.is_none(),
+            "X on {:?} opened or armed",
+            row.key
+        );
     }
     assert!(seen > 0, "fixture: no row X runs on is listed");
-    assert!(count_taking > 0, "fixture: no count-taking row X runs on is listed");
+    assert!(
+        count_taking > 0,
+        "fixture: no count-taking row X runs on is listed"
+    );
 }
 
 /// Whether `X` runs on this row: a row `x` opens the prompt on that is not
@@ -2749,11 +3189,17 @@ fn x_runs_on(state: &GameState, row: &Row) -> bool {
 /// @spec TUI-NAV-012
 #[test]
 fn x_max_asks_for_exactly_ten_thousand_calls_on_every_row_it_runs_on() {
-    assert_eq!(MAX_AFFORDABLE_CAP, 10_000, "the shell-side cap is ten thousand calls");
+    assert_eq!(
+        MAX_AFFORDABLE_CAP, 10_000,
+        "the shell-side cap is ten thousand calls"
+    );
     let state = rich();
     let mut seen = 0;
 
-    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| x_runs_on(&state, r)) {
+    for (section, row) in every_row(&state)
+        .into_iter()
+        .filter(|(_, r)| x_runs_on(&state, r))
+    {
         seen += 1;
         let mut view = focused(section, row.key.clone());
         let out = update(Action::MaxAffordable, &mut view, &state);
@@ -2780,13 +3226,21 @@ fn x_max_runs_on_rows_the_stock_cannot_cover() {
         state.resources[r.ix()] = 0.0;
     }
     let teased = every_row(&state).into_iter().any(|(_, r)| match &r.key {
-        RowKey::Content(id, _) => x_runs_on(&state, &r) && state.availability(*id) == Availability::Teased,
+        RowKey::Content(id, _) => {
+            x_runs_on(&state, &r) && state.availability(*id) == Availability::Teased
+        }
         _ => false,
     });
-    assert!(teased, "fixture: with the stores empty, some row X runs on should be Teased");
+    assert!(
+        teased,
+        "fixture: with the stores empty, some row X runs on should be Teased"
+    );
 
     let mut seen = 0;
-    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| x_runs_on(&state, r)) {
+    for (section, row) in every_row(&state)
+        .into_iter()
+        .filter(|(_, r)| x_runs_on(&state, r))
+    {
         seen += 1;
         let mut view = focused(section, row.key.clone());
         let out = update(Action::MaxAffordable, &mut view, &state);
@@ -2810,15 +3264,28 @@ fn x_max_runs_on_rows_the_stock_cannot_cover() {
 /// One row of each kind `X` runs on: a repeat-N row, a count-taking row, and a
 /// count row.
 fn one_x_row_of_each_kind(state: &GameState) -> Vec<(Section, Row)> {
-    let rows: Vec<(Section, Row)> =
-        every_row(state).into_iter().filter(|(_, r)| x_runs_on(state, r)).collect();
+    let rows: Vec<(Section, Row)> = every_row(state)
+        .into_iter()
+        .filter(|(_, r)| x_runs_on(state, r))
+        .collect();
     let repeat_n = rows
         .iter()
-        .find(|(_, r)| matches!(r.kind, RowKind::Act { semantics: CountSemantics::RepeatN, .. }))
+        .find(|(_, r)| {
+            matches!(
+                r.kind,
+                RowKind::Act {
+                    semantics: CountSemantics::RepeatN,
+                    ..
+                }
+            )
+        })
         .cloned()
         .expect("fixture: a repeat-N row X runs on");
-    let count_taking =
-        rows.iter().find(|(_, r)| is_count_taking(r)).cloned().expect("fixture: a count-taking row X runs on");
+    let count_taking = rows
+        .iter()
+        .find(|(_, r)| is_count_taking(r))
+        .cloned()
+        .expect("fixture: a count-taking row X runs on");
     let count_row = rows
         .iter()
         .find(|(_, r)| matches!(r.kind, RowKind::Count { .. }))
@@ -2831,7 +3298,12 @@ fn one_x_row_of_each_kind(state: &GameState) -> Vec<(Section, Row)> {
 /// loop runs), and return how many presses there were and the instants a run
 /// was asked for. Every press is checked on the way: a run is a whole run, and
 /// a dropped press leaves no footer note.
-fn hold_x(section: Section, row: &Row, pace: Option<Duration>, state: &GameState) -> (u32, Vec<Instant>) {
+fn hold_x(
+    section: Section,
+    row: &Row,
+    pace: Option<Duration>,
+    state: &GameState,
+) -> (u32, Vec<Instant>) {
     let mut view = focused(section, row.key.clone());
     let whole = Outcome::Repeat(one_unit(row), MAX_AFFORDABLE_CAP);
     let start = Instant::now();
@@ -2841,10 +3313,19 @@ fn hold_x(section: Section, row: &Row, pace: Option<Duration>, state: &GameState
         presses += 1;
         let out = update(Action::MaxAffordable, &mut view, state);
         if commands_of(&out).is_some() {
-            assert_eq!(out, whole, "a held X on {:?} made a run that was not a whole run", row.key);
+            assert_eq!(
+                out, whole,
+                "a held X on {:?} made a run that was not a whole run",
+                row.key
+            );
             ran.push(Instant::now());
         } else {
-            assert_eq!(out, Outcome::Handled, "a held X on {:?} yielded {out:?}", row.key);
+            assert_eq!(
+                out,
+                Outcome::Handled,
+                "a held X on {:?} yielded {out:?}",
+                row.key
+            );
             assert_eq!(
                 footer_text(&view),
                 None,
@@ -2852,7 +3333,11 @@ fn hold_x(section: Section, row: &Row, pace: Option<Duration>, state: &GameState
                 row.key
             );
         }
-        assert!(view.prompt.is_none() && view.armed.is_none(), "a held X on {:?} opened or armed", row.key);
+        assert!(
+            view.prompt.is_none() && view.armed.is_none(),
+            "a held X on {:?} opened or armed",
+            row.key
+        );
         if let Some(p) = pace {
             std::thread::sleep(p);
         }
@@ -2910,10 +3395,16 @@ fn a_held_x_makes_no_more_than_ten_runs_a_second() {
 #[test]
 fn a_held_xs_pace_does_not_depend_on_the_key_repeat_rate() {
     let state = rich();
-    let (section, row) = one_x_row_of_each_kind(&state).into_iter().next().expect("fixture");
+    let (section, row) = one_x_row_of_each_kind(&state)
+        .into_iter()
+        .next()
+        .expect("fixture");
     for rate_ms in [15u64, 40] {
         let (presses, ran) = hold_x(section, &row, Some(Duration::from_millis(rate_ms)), &state);
-        assert!(presses > 11, "fixture: only {presses} presses at one per {rate_ms}ms");
+        assert!(
+            presses > 11,
+            "fixture: only {presses} presses at one per {rate_ms}ms"
+        );
         assert_x_no_faster_than_ten_a_second(&ran, &format!("X repeating every {rate_ms}ms"));
     }
     let (presses, ran) = hold_x(section, &row, Some(Duration::from_millis(150)), &state);
@@ -2950,8 +3441,9 @@ fn enter_x_and_x_max_are_all_no_ops_on_an_owned_one_shot() {
         "fixture: an owned one-shot is still a row — that is where the ✓ lives"
     );
 
-    let (key, command) =
-        find_row(&state, Section::Wonders, |c| matches!(c, Command::BuyArch(ArchId::EverdreamArch)));
+    let (key, command) = find_row(&state, Section::Wonders, |c| {
+        matches!(c, Command::BuyArch(ArchId::EverdreamArch))
+    });
 
     for action in [Action::Activate, Action::CountPrompt, Action::MaxAffordable] {
         let mut view = focused(Section::Wonders, key.clone());
@@ -2961,7 +3453,10 @@ fn enter_x_and_x_max_are_all_no_ops_on_an_owned_one_shot() {
             !would_fire(&out, command),
             "{action:?} on an owned one-shot asked the core to buy it again"
         );
-        assert!(view.armed.is_none(), "{action:?} on an owned one-shot armed a row");
+        assert!(
+            view.armed.is_none(),
+            "{action:?} on an owned one-shot armed a row"
+        );
         assert!(
             view.prompt.is_none(),
             "{action:?} on an owned one-shot opened a count prompt for a thing there is no \
@@ -2979,7 +3474,9 @@ fn enter_x_and_x_max_are_all_no_ops_on_an_owned_one_shot() {
 #[test]
 fn x_and_x_max_are_no_ops_on_a_row_that_is_neither_counted_nor_repeatable() {
     let state = rich();
-    let (key, command) = find_row(&state, Section::Meadow, |c| matches!(c, Command::GatherCatnip));
+    let (key, command) = find_row(&state, Section::Meadow, |c| {
+        matches!(c, Command::GatherCatnip)
+    });
 
     for action in [Action::CountPrompt, Action::MaxAffordable] {
         let mut view = focused(Section::Meadow, key.clone());
@@ -3029,7 +3526,10 @@ fn a_footer_note_never_swallows_the_next_key() {
         "a footer note on screen swallowed the next Enter; a note that has to be dismissed is \
          a dialog wearing a footer's clothes"
     );
-    assert!(view.overlay.is_none(), "a footer note put an overlay on screen");
+    assert!(
+        view.overlay.is_none(),
+        "a footer note put an overlay on screen"
+    );
 }
 
 /// Every row `x` or `X` does not act on says why, and the three reasons are
@@ -3057,7 +3557,12 @@ fn x_and_x_max_say_why_on_every_row_they_do_not_act_on() {
     let mut deliberate_notes: BTreeSet<String> = BTreeSet::new();
     let (mut owned_heavy, mut display, mut heavy_single, mut heavy_counted) = (0, 0, 0, 0);
 
-    let note = |view: &ViewState| view.footer.as_ref().map(|(m, _)| m.clone()).unwrap_or_default();
+    let note = |view: &ViewState| {
+        view.footer
+            .as_ref()
+            .map(|(m, _)| m.clone())
+            .unwrap_or_default()
+    };
 
     for (section, row) in every_row(&state) {
         let what = format!("{:?}", row.key);
@@ -3078,9 +3583,18 @@ fn x_and_x_max_say_why_on_every_row_they_do_not_act_on() {
                     "{action:?} on {what}, which the core reports as already the player's, put a \
                      command through the core"
                 );
-                assert!(view.armed.is_none(), "{action:?} on the owned {what} armed it");
-                assert!(view.prompt.is_none(), "{action:?} on the owned {what} opened a prompt");
-                assert_footer_says_something_plain(&view, &format!("{action:?} on the owned {what}"));
+                assert!(
+                    view.armed.is_none(),
+                    "{action:?} on the owned {what} armed it"
+                );
+                assert!(
+                    view.prompt.is_none(),
+                    "{action:?} on the owned {what} opened a prompt"
+                );
+                assert_footer_says_something_plain(
+                    &view,
+                    &format!("{action:?} on the owned {what}"),
+                );
                 owned_notes.insert(note(&view));
             }
             continue;
@@ -3088,7 +3602,10 @@ fn x_and_x_max_say_why_on_every_row_they_do_not_act_on() {
 
         let nothing_to_count = matches!(
             row.kind,
-            RowKind::Act { semantics: CountSemantics::Single, .. } | RowKind::Display
+            RowKind::Act {
+                semantics: CountSemantics::Single,
+                ..
+            } | RowKind::Display
         );
         if matches!(row.kind, RowKind::Display) {
             display += 1;
@@ -3100,7 +3617,11 @@ fn x_and_x_max_say_why_on_every_row_they_do_not_act_on() {
             // (TUI-NAV-113).
             unfold_focus(&state, &mut view);
             let out = update(Action::CountPrompt, &mut view, &state);
-            assert_eq!(commands_of(&out), None, "x on {what}, which has nothing to count, acted");
+            assert_eq!(
+                commands_of(&out),
+                None,
+                "x on {what}, which has nothing to count, acted"
+            );
             assert!(view.prompt.is_none(), "x on {what} opened a count prompt");
             assert!(view.armed.is_none(), "x on {what} armed it");
             assert_footer_says_something_plain(&view, &format!("x on {what}"));
@@ -3118,9 +3639,16 @@ fn x_and_x_max_say_why_on_every_row_they_do_not_act_on() {
             } else {
                 heavy_counted += 1;
             }
-            assert_eq!(commands_of(&out), None, "X on the heavy {what} put a command through");
+            assert_eq!(
+                commands_of(&out),
+                None,
+                "X on the heavy {what} put a command through"
+            );
             assert!(view.armed.is_none(), "X on the heavy {what} armed it");
-            assert!(view.prompt.is_none(), "X on the heavy {what} opened a prompt");
+            assert!(
+                view.prompt.is_none(),
+                "X on the heavy {what} opened a prompt"
+            );
             assert_footer_says_something_plain(&view, &format!("X on the heavy {what}"));
             let said = note(&view);
             assert!(
@@ -3130,8 +3658,15 @@ fn x_and_x_max_say_why_on_every_row_they_do_not_act_on() {
             );
             deliberate_notes.insert(said);
         } else if nothing_to_count {
-            assert_eq!(commands_of(&out), None, "X on {what}, which has nothing to count, acted");
-            assert!(view.prompt.is_none() && view.armed.is_none(), "X on {what} opened or armed");
+            assert_eq!(
+                commands_of(&out),
+                None,
+                "X on {what}, which has nothing to count, acted"
+            );
+            assert!(
+                view.prompt.is_none() && view.armed.is_none(),
+                "X on {what} opened or armed"
+            );
             assert_footer_says_something_plain(&view, &format!("X on {what}"));
             nothing_notes.insert(note(&view));
         }
@@ -3140,12 +3675,30 @@ fn x_and_x_max_say_why_on_every_row_they_do_not_act_on() {
     assert!(owned_heavy > 0, "fixture: no owned heavy row is listed");
     assert!(display > 0, "fixture: no display-only row is listed");
     assert!(heavy_single > 0, "fixture: no heavy single row is listed");
-    assert!(heavy_counted > 0, "fixture: the heavy DeepNap row is not listed");
+    assert!(
+        heavy_counted > 0,
+        "fixture: the heavy DeepNap row is not listed"
+    );
 
     for (a_name, a, b_name, b) in [
-        ("already the player's", &owned_notes, "nothing to count", &nothing_notes),
-        ("already the player's", &owned_notes, "takes a deliberate Enter", &deliberate_notes),
-        ("nothing to count", &nothing_notes, "takes a deliberate Enter", &deliberate_notes),
+        (
+            "already the player's",
+            &owned_notes,
+            "nothing to count",
+            &nothing_notes,
+        ),
+        (
+            "already the player's",
+            &owned_notes,
+            "takes a deliberate Enter",
+            &deliberate_notes,
+        ),
+        (
+            "nothing to count",
+            &nothing_notes,
+            "takes a deliberate Enter",
+            &deliberate_notes,
+        ),
     ] {
         let shared: Vec<&String> = a.intersection(b).collect();
         assert!(
@@ -3157,13 +3710,17 @@ fn x_and_x_max_say_why_on_every_row_they_do_not_act_on() {
 }
 
 fn assert_footer_says_something_plain(view: &ViewState, context: &str) {
-    let (message, until) = view
-        .footer
-        .as_ref()
-        .unwrap_or_else(|| panic!("{context} did nothing and said nothing — a bound key that \
-             is not meaningful right now earns a footer note (TUI-NAV-041)"));
+    let (message, until) = view.footer.as_ref().unwrap_or_else(|| {
+        panic!(
+            "{context} did nothing and said nothing — a bound key that \
+             is not meaningful right now earns a footer note (TUI-NAV-041)"
+        )
+    });
 
-    assert!(!message.trim().is_empty(), "{context} left an empty footer note");
+    assert!(
+        !message.trim().is_empty(),
+        "{context} left an empty footer note"
+    );
     assert!(
         message.contains(' '),
         "{context} left the footer note {message:?}; it is shown to a player, in words"
@@ -3209,10 +3766,16 @@ fn standing_in_an_empty_sky() -> Vec<(String, ViewState)> {
     for memory in [Some(RowKey::Site(SiteId::ALL[0])), None] {
         for banner in [false, true] {
             for inspector in [false, true] {
-                let mut v = ViewState { section: Some(Section::Sky), ..Default::default() };
+                let mut v = ViewState {
+                    section: Some(Section::Sky),
+                    ..Default::default()
+                };
                 v.focus[Section::Sky.index()] = memory.clone();
                 if banner {
-                    v.reports = vec![PendingReport { entry: 0, dismissed: false }];
+                    v.reports = vec![PendingReport {
+                        entry: 0,
+                        dismissed: false,
+                    }];
                 }
                 v.inspector_wanted = inspector;
                 out.push((
@@ -3301,7 +3864,11 @@ fn the_empty_focused_sections_own_digit_is_a_visit_not_a_refusal() {
         let mut v = view.clone();
         let out = press_char(Section::Sky.digit(), &mut v, &state);
 
-        assert_eq!(out, Outcome::Handled, "the Sky's digit asked the core for {out:?} ({context})");
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "the Sky's digit asked the core for {out:?} ({context})"
+        );
         assert_eq!(
             v.section,
             Some(Section::Sky),
@@ -3414,7 +3981,11 @@ fn returning_to_a_section_restores_the_item_even_after_reveals_insert_rows_above
 
     update(Action::SectionJump(Section::Meadow), &mut view, &after);
 
-    assert_eq!(view.section, Some(Section::Meadow), "the jump did not change section");
+    assert_eq!(
+        view.section,
+        Some(Section::Meadow),
+        "the jump did not change section"
+    );
     assert_eq!(
         view.focus[Section::Meadow.index()],
         Some(RowKey::Content(landmark, "")),
@@ -3575,13 +4146,12 @@ fn the_cursor_never_lands_on_an_unselectable_row() {
             let Some(landed) = view.focus[section.index()].clone() else {
                 continue;
             };
-            let row = list
-                .iter()
-                .find(|r| r.key == landed)
-                .unwrap_or_else(|| panic!(
+            let row = list.iter().find(|r| r.key == landed).unwrap_or_else(|| {
+                panic!(
                     "in {label}, entering {} focused {landed:?}, which is not a row on that list",
                     section.title()
-                ));
+                )
+            });
             assert!(
                 row.selectable(),
                 "in {label}, entering {} landed the cursor on {landed:?}, a row the cursor \
@@ -3621,13 +4191,18 @@ fn a_first_visit_lands_beneath_the_header_that_opens_a_sections_list() {
 
             let mut view = ViewState::default();
             update(Action::SectionJump(section), &mut view, &state);
-            let landed = view.focus[section.index()]
-                .clone()
-                .unwrap_or_else(|| panic!("in {label}, entering {} left no cursor", section.title()));
+            let landed = view.focus[section.index()].clone().unwrap_or_else(|| {
+                panic!("in {label}, entering {} left no cursor", section.title())
+            });
             let at = list
                 .iter()
                 .position(|r| r.key == landed)
-                .unwrap_or_else(|| panic!("in {label}, entering {} focused {landed:?}, not a row of it", section.title()));
+                .unwrap_or_else(|| {
+                    panic!(
+                        "in {label}, entering {} focused {landed:?}, not a row of it",
+                        section.title()
+                    )
+                });
             assert!(
                 at >= 1 && list[at].selectable(),
                 "in {label}, entering {} landed on the header line itself",
@@ -3649,7 +4224,10 @@ fn a_first_visit_lands_beneath_the_header_that_opens_a_sections_list() {
         list.get(1).map(|r| &r.key),
         "a first visit to a new meadow's home must land on the row directly beneath its header"
     );
-    assert!(checked >= 2, "fixture: too few sections listed anything to check");
+    assert!(
+        checked >= 2,
+        "fixture: too few sections listed anything to check"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -3709,7 +4287,9 @@ fn observable(view: &ViewState) -> String {
 
 /// A name the palette is certain to find: a revealed structure's own.
 fn structure_name(ix: usize) -> String {
-    clowder_core::content::structure_def(StructureId::ALL[ix]).name.to_string()
+    clowder_core::content::structure_def(StructureId::ALL[ix])
+        .name
+        .to_string()
 }
 
 /// A query no name in the game contains.
@@ -3742,18 +4322,65 @@ struct Countable {
 fn countable_rows(state: &GameState) -> Vec<Countable> {
     let mut out = Vec::new();
     for (what, section, count_taking, heavy, pred) in [
-        ("a repeat-N build row", Section::Meadow, false, false, (|c: &Command| matches!(c, Command::Build(_))) as fn(&Command) -> bool),
-        ("a repeat-N craft row", Section::Crafts, false, false, |c: &Command| matches!(c, Command::Craft(_))),
-        ("a count-taking row", Section::Clowder, true, false, |c: &Command| matches!(c, Command::Pounce(_))),
-        ("a count-taking trade row", Section::Friends, true, false, |c: &Command| matches!(c, Command::Trade(..))),
-        ("the heavy count-taking nap row", Section::Dreams, true, true, |c: &Command| matches!(c, Command::DeepNap(_))),
+        (
+            "a repeat-N build row",
+            Section::Meadow,
+            false,
+            false,
+            (|c: &Command| matches!(c, Command::Build(_))) as fn(&Command) -> bool,
+        ),
+        (
+            "a repeat-N craft row",
+            Section::Crafts,
+            false,
+            false,
+            |c: &Command| matches!(c, Command::Craft(_)),
+        ),
+        (
+            "a count-taking row",
+            Section::Clowder,
+            true,
+            false,
+            |c: &Command| matches!(c, Command::Pounce(_)),
+        ),
+        (
+            "a count-taking trade row",
+            Section::Friends,
+            true,
+            false,
+            |c: &Command| matches!(c, Command::Trade(..)),
+        ),
+        (
+            "the heavy count-taking nap row",
+            Section::Dreams,
+            true,
+            true,
+            |c: &Command| matches!(c, Command::DeepNap(_)),
+        ),
     ] {
         let (key, primary) = find_row(state, section, pred);
-        out.push(Countable { what, section, key, primary, count_taking, heavy });
+        out.push(Countable {
+            what,
+            section,
+            key,
+            primary,
+            count_taking,
+            heavy,
+        });
     }
-    for (what, section) in [("a job count row", Section::Clowder), ("a tinkerer count row", Section::Crafts)] {
+    for (what, section) in [
+        ("a job count row", Section::Clowder),
+        ("a tinkerer count row", Section::Crafts),
+    ] {
         let (key, increment, _) = find_count_row(state, section);
-        out.push(Countable { what, section, key, primary: increment, count_taking: false, heavy: false });
+        out.push(Countable {
+            what,
+            section,
+            key,
+            primary: increment,
+            count_taking: false,
+            heavy: false,
+        });
     }
     out
 }
@@ -3808,20 +4435,42 @@ fn the_palette_takes_every_printable_character_into_its_query() {
     for c in ' '..='~' {
         let mut view = focused(Section::Meadow, row.clone());
         press_char('/', &mut view, &state);
-        assert_eq!(palette_query(&view).as_deref(), Some(""), "fixture: / opens an empty palette");
+        assert_eq!(
+            palette_query(&view).as_deref(),
+            Some(""),
+            "fixture: / opens an empty palette"
+        );
 
         let out = press_char(c, &mut view, &state);
-        assert_eq!(out, Outcome::Handled, "typing {c:?} into the palette told the core {out:?}");
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "typing {c:?} into the palette told the core {out:?}"
+        );
         assert_eq!(
             palette_query(&view),
             Some(c.to_string()),
             "{c:?} typed into the palette did not land in its query; the palette takes every \
              printable character, digits and Space included, as query text"
         );
-        assert_eq!(view.section, Some(Section::Meadow), "{c:?} typed into the palette moved the section");
-        assert_eq!(view.focus[Section::Meadow.index()].as_ref(), Some(&row), "{c:?} moved the cursor");
-        assert!(view.prompt.is_none(), "{c:?} typed into the palette opened a count prompt");
-        assert!(view.footer.is_none(), "{c:?} typed into the palette earned a footer note");
+        assert_eq!(
+            view.section,
+            Some(Section::Meadow),
+            "{c:?} typed into the palette moved the section"
+        );
+        assert_eq!(
+            view.focus[Section::Meadow.index()].as_ref(),
+            Some(&row),
+            "{c:?} moved the cursor"
+        );
+        assert!(
+            view.prompt.is_none(),
+            "{c:?} typed into the palette opened a count prompt"
+        );
+        assert!(
+            view.footer.is_none(),
+            "{c:?} typed into the palette earned a footer note"
+        );
     }
 
     let everything: String = (' '..='~').collect();
@@ -3871,13 +4520,21 @@ fn the_count_prompt_takes_the_digits_and_silently_ignores_every_other_printable(
             let out = press_char(c, &mut view, &state);
             if c.is_ascii_digit() && !past_cap {
                 let candidate = format!("{expected}{c}");
-                if candidate.parse::<u64>().is_ok_and(|n| n <= MAX_AFFORDABLE_CAP as u64) {
+                if candidate
+                    .parse::<u64>()
+                    .is_ok_and(|n| n <= MAX_AFFORDABLE_CAP as u64)
+                {
                     expected = candidate;
                 } else {
                     past_cap = true;
                 }
             }
-            assert_eq!(out, Outcome::Handled, "on {}, {c:?} in the count prompt told the core {out:?}", row.what);
+            assert_eq!(
+                out,
+                Outcome::Handled,
+                "on {}, {c:?} in the count prompt told the core {out:?}",
+                row.what
+            );
             assert_eq!(
                 prompt_digits(&view),
                 Some(expected.clone()),
@@ -3901,9 +4558,23 @@ fn the_count_prompt_takes_the_digits_and_silently_ignores_every_other_printable(
                     row.what
                 );
             }
-            assert!(view.overlay.is_none(), "on {}, {c:?} in the count prompt opened an overlay", row.what);
-            assert_eq!(view.section, Some(row.section), "on {}, {c:?} in the count prompt moved the section", row.what);
-            assert_eq!(view.focus[row.section.index()].as_ref(), Some(&row.key), "on {}, {c:?} moved the cursor", row.what);
+            assert!(
+                view.overlay.is_none(),
+                "on {}, {c:?} in the count prompt opened an overlay",
+                row.what
+            );
+            assert_eq!(
+                view.section,
+                Some(row.section),
+                "on {}, {c:?} in the count prompt moved the section",
+                row.what
+            );
+            assert_eq!(
+                view.focus[row.section.index()].as_ref(),
+                Some(&row.key),
+                "on {}, {c:?} moved the cursor",
+                row.what
+            );
         }
     }
 }
@@ -3958,9 +4629,15 @@ fn enter_in_a_field_never_commits_an_armed_row_beneath_it() {
         for query in ["", "   ", NO_MATCH, aimed.as_str()] {
             let mut view = focused(section, key_.clone());
             update(Action::Activate, &mut view, &state);
-            assert!(view.armed.is_some(), "fixture: the first Enter arms the {name} row");
+            assert!(
+                view.armed.is_some(),
+                "fixture: the first Enter arms the {name} row"
+            );
             press_char('/', &mut view, &state);
-            assert!(palette_query(&view).is_some(), "fixture: / opens the palette over an armed row");
+            assert!(
+                palette_query(&view).is_some(),
+                "fixture: / opens the palette over an armed row"
+            );
             type_text(query, &mut view, &state);
             view.last_repeat = None;
 
@@ -3975,13 +4652,21 @@ fn enter_in_a_field_never_commits_an_armed_row_beneath_it() {
     }
 
     // The nap row is the one heavy row `x` opens a count prompt on.
-    let (nap, _) = find_row(&state, Section::Dreams, |c| matches!(c, Command::DeepNap(_)));
+    let (nap, _) = find_row(&state, Section::Dreams, |c| {
+        matches!(c, Command::DeepNap(_))
+    });
     for typed in ["", "0", "3"] {
         let mut view = focused(Section::Dreams, nap.clone());
         update(Action::Activate, &mut view, &state);
-        assert!(view.armed.is_some(), "fixture: the first Enter arms the nap row");
+        assert!(
+            view.armed.is_some(),
+            "fixture: the first Enter arms the nap row"
+        );
         press_char('x', &mut view, &state);
-        assert!(view.prompt.is_some(), "fixture: x opens a count prompt over the armed nap row");
+        assert!(
+            view.prompt.is_some(),
+            "fixture: x opens a count prompt over the armed nap row"
+        );
         type_text(typed, &mut view, &state);
         view.last_repeat = None;
 
@@ -4005,12 +4690,17 @@ fn esc_closes_a_field_and_leaves_everything_as_it_was() {
     let state = rich();
     let (build, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
 
-    let mut beneath: Vec<(String, ViewState)> =
-        vec![("an ordinary row".to_string(), focused(Section::Meadow, build))];
+    let mut beneath: Vec<(String, ViewState)> = vec![(
+        "an ordinary row".to_string(),
+        focused(Section::Meadow, build),
+    )];
     for (name, section, key_, _) in heavy_rows(&state) {
         let mut v = focused(section, key_);
         update(Action::Activate, &mut v, &state);
-        assert!(v.armed.is_some(), "fixture: the first Enter arms the {name} row");
+        assert!(
+            v.armed.is_some(),
+            "fixture: the first Enter arms the {name} row"
+        );
         beneath.push((format!("the armed {name} row"), v));
     }
 
@@ -4019,7 +4709,11 @@ fn esc_closes_a_field_and_leaves_everything_as_it_was() {
         press_char('/', &mut view, &state);
         type_text("ab 1q", &mut view, &state);
         let out = press(key(KeyCode::Esc), &mut view, &state);
-        assert_eq!(out, Outcome::Handled, "Esc on the palette over {what} told the core {out:?}");
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "Esc on the palette over {what} told the core {out:?}"
+        );
         assert_eq!(
             observable(&view),
             observable(before),
@@ -4034,7 +4728,12 @@ fn esc_closes_a_field_and_leaves_everything_as_it_was() {
         press_char('x', &mut view, &state);
         type_text("12", &mut view, &state);
         let out = press(key(KeyCode::Esc), &mut view, &state);
-        assert_eq!(out, Outcome::Handled, "Esc on the count prompt over {} told the core {out:?}", row.what);
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "Esc on the count prompt over {} told the core {out:?}",
+            row.what
+        );
         assert_eq!(
             observable(&view),
             observable(&before),
@@ -4043,7 +4742,9 @@ fn esc_closes_a_field_and_leaves_everything_as_it_was() {
         );
     }
 
-    let (nap, _) = find_row(&state, Section::Dreams, |c| matches!(c, Command::DeepNap(_)));
+    let (nap, _) = find_row(&state, Section::Dreams, |c| {
+        matches!(c, Command::DeepNap(_))
+    });
     let mut before = focused(Section::Dreams, nap);
     update(Action::Activate, &mut before, &state);
     let mut view = before.clone();
@@ -4071,11 +4772,22 @@ fn backspace_in_a_field_deletes_its_last_character_and_never_decrements() {
     let mut view = focused(Section::Clowder, count_key.clone());
     press_char('x', &mut view, &state);
     type_text("123", &mut view, &state);
-    assert_eq!(prompt_digits(&view).as_deref(), Some("123"), "fixture: the count reads 123");
+    assert_eq!(
+        prompt_digits(&view).as_deref(),
+        Some("123"),
+        "fixture: the count reads 123"
+    );
     for expected in ["12", "1", "", ""] {
         let out = press(key(KeyCode::Backspace), &mut view, &state);
-        assert!(!would_fire(&out, decrement), "Backspace in the count prompt unassigned a worker");
-        assert_eq!(out, Outcome::Handled, "Backspace in the count prompt told the core {out:?}");
+        assert!(
+            !would_fire(&out, decrement),
+            "Backspace in the count prompt unassigned a worker"
+        );
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "Backspace in the count prompt told the core {out:?}"
+        );
         assert_eq!(
             prompt_digits(&view).as_deref(),
             Some(expected),
@@ -4094,8 +4806,15 @@ fn backspace_in_a_field_deletes_its_last_character_and_never_decrements() {
     );
     for expected in ["ab ", "ab", "a", "", ""] {
         let out = press(key(KeyCode::Backspace), &mut view, &state);
-        assert!(!would_fire(&out, decrement), "Backspace in the palette unassigned a worker");
-        assert_eq!(out, Outcome::Handled, "Backspace in the palette told the core {out:?}");
+        assert!(
+            !would_fire(&out, decrement),
+            "Backspace in the palette unassigned a worker"
+        );
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "Backspace in the palette told the core {out:?}"
+        );
         assert_eq!(
             palette_query(&view).as_deref(),
             Some(expected),
@@ -4129,10 +4848,21 @@ fn arrows_tab_and_backtab_move_nothing_beneath_a_field() {
     let state = rich();
     let builds: Vec<RowKey> = rows(&state, Section::Meadow)
         .into_iter()
-        .filter(|r| matches!(r.kind, RowKind::Act { command: Command::Build(_), .. }))
+        .filter(|r| {
+            matches!(
+                r.kind,
+                RowKind::Act {
+                    command: Command::Build(_),
+                    ..
+                }
+            )
+        })
         .map(|r| r.key)
         .collect();
-    assert!(builds.len() > 4, "fixture: the Meadow lists rows above and below the cursor");
+    assert!(
+        builds.len() > 4,
+        "fixture: the Meadow lists rows above and below the cursor"
+    );
     let middle = builds[builds.len() / 2].clone();
 
     for (field, opener, typed) in [("the count prompt", 'x', "4"), ("the palette", '/', "ab")] {
@@ -4143,17 +4873,39 @@ fn arrows_tab_and_backtab_move_nothing_beneath_a_field() {
         let before = text(&view);
         assert!(before.is_some(), "fixture: {field} is open");
 
-        for code in [KeyCode::Up, KeyCode::Down, KeyCode::Left, KeyCode::Right, KeyCode::Tab, KeyCode::BackTab] {
+        for code in [
+            KeyCode::Up,
+            KeyCode::Down,
+            KeyCode::Left,
+            KeyCode::Right,
+            KeyCode::Tab,
+            KeyCode::BackTab,
+        ] {
             let out = press(key(code), &mut view, &state);
-            assert_eq!(out, Outcome::Handled, "{code:?} with {field} open told the core {out:?}");
-            assert_eq!(view.section, Some(Section::Meadow), "{code:?} with {field} open moved the section");
+            assert_eq!(
+                out,
+                Outcome::Handled,
+                "{code:?} with {field} open told the core {out:?}"
+            );
+            assert_eq!(
+                view.section,
+                Some(Section::Meadow),
+                "{code:?} with {field} open moved the section"
+            );
             assert_eq!(
                 view.focus[Section::Meadow.index()].as_ref(),
                 Some(&middle),
                 "{code:?} with {field} open moved the list cursor beneath it"
             );
-            assert_eq!(text(&view), before, "{code:?} with {field} open changed or closed the field");
-            assert!(view.footer.is_none(), "{code:?} with {field} open earned a footer note");
+            assert_eq!(
+                text(&view),
+                before,
+                "{code:?} with {field} open changed or closed the field"
+            );
+            assert!(
+                view.footer.is_none(),
+                "{code:?} with {field} open earned a footer note"
+            );
         }
     }
 }
@@ -4230,8 +4982,14 @@ fn the_palettes_enter_with_nothing_aimed_at_does_nothing() {
     let (count_key, _, _) = find_count_row(&state, Section::Clowder);
 
     let mut beneath: Vec<(String, ViewState)> = vec![
-        ("an ordinary row".to_string(), focused(Section::Meadow, build)),
-        ("a count row".to_string(), focused(Section::Clowder, count_key)),
+        (
+            "an ordinary row".to_string(),
+            focused(Section::Meadow, build),
+        ),
+        (
+            "a count row".to_string(),
+            focused(Section::Clowder, count_key),
+        ),
     ];
     for (name, section, key_, _) in heavy_rows(&state) {
         let mut v = focused(section, key_);
@@ -4281,7 +5039,10 @@ fn a_held_enter_after_a_field_accepts_never_acts_on_the_row_beneath() {
         press_char('x', &mut view, &state);
         type_text("3", &mut view, &state);
         press(key(KeyCode::Enter), &mut view, &state);
-        assert!(view.prompt.is_none(), "fixture: the count prompt's Enter accepted the count");
+        assert!(
+            view.prompt.is_none(),
+            "fixture: the count prompt's Enter accepted the count"
+        );
 
         hold_enter(&mut view, &state, &format!("after ×3 on {}", row.what));
 
@@ -4305,11 +5066,20 @@ fn a_held_enter_after_a_field_accepts_never_acts_on_the_row_beneath() {
     press_char('/', &mut view, &state);
     type_text(&structure_name(3), &mut view, &state);
     let out = press(key(KeyCode::Enter), &mut view, &state);
-    assert_eq!(out, Outcome::Handled, "the palette's Enter asked the core for {out:?}");
-    assert!(view.overlay.is_none(), "the palette's Enter did not jump (TUI-NAV-038)");
+    assert_eq!(
+        out,
+        Outcome::Handled,
+        "the palette's Enter asked the core for {out:?}"
+    );
+    assert!(
+        view.overlay.is_none(),
+        "the palette's Enter did not jump (TUI-NAV-038)"
+    );
 
     let section = view.section.expect("the jump landed in a section");
-    let landed_key = view.focus[section.index()].clone().expect("the jump focused a row");
+    let landed_key = view.focus[section.index()]
+        .clone()
+        .expect("the jump focused a row");
     let landed = rows(&state, section)
         .into_iter()
         .find(|r| r.key == landed_key)
@@ -4345,16 +5115,26 @@ fn the_palettes_jump_is_navigation_and_leaves_the_layout_alone() {
         let (move_key, _) = move_row(&state);
         let mut view = focused(Section::Legacy, move_key);
         view.inspector_wanted = inspector_wanted;
-        view.reports = vec![PendingReport { entry: 0, dismissed: false }];
+        view.reports = vec![PendingReport {
+            entry: 0,
+            dismissed: false,
+        }];
         update(Action::Activate, &mut view, &state);
         assert!(view.armed.is_some(), "fixture: the Move row is armed");
 
         press_char('/', &mut view, &state);
         type_text(&aimed, &mut view, &state);
         press(key(KeyCode::Enter), &mut view, &state);
-        assert!(view.overlay.is_none(), "the palette's Enter did not jump (TUI-NAV-038)");
+        assert!(
+            view.overlay.is_none(),
+            "the palette's Enter did not jump (TUI-NAV-038)"
+        );
         let landed = view.section.expect("the jump landed in a section");
-        assert_ne!(landed, Section::Legacy, "fixture: a structure's name lands outside Legacy");
+        assert_ne!(
+            landed,
+            Section::Legacy,
+            "fixture: a structure's name lands outside Legacy"
+        );
 
         assert!(
             view.armed.is_none(),
@@ -4399,25 +5179,44 @@ fn slash_opens_the_palette_only_where_no_prompt_or_overlay_is_open() {
     let mut view = focused(Section::Meadow, build.clone());
     let out = press_char('/', &mut view, &state);
     assert_eq!(out, Outcome::Handled);
-    assert_eq!(palette_query(&view).as_deref(), Some(""), "/ on a bare screen must open an empty palette");
+    assert_eq!(
+        palette_query(&view).as_deref(),
+        Some(""),
+        "/ on a bare screen must open an empty palette"
+    );
 
     let (move_key, _) = move_row(&state);
     let mut view = focused(Section::Legacy, move_key);
     update(Action::Activate, &mut view, &state);
     press_char('/', &mut view, &state);
-    assert_eq!(palette_query(&view).as_deref(), Some(""), "/ beside an armed row must open the palette");
+    assert_eq!(
+        palette_query(&view).as_deref(),
+        Some(""),
+        "/ beside an armed row must open the palette"
+    );
 
     let mut view = focused(Section::Meadow, build.clone());
     press_char('x', &mut view, &state);
     press_char('/', &mut view, &state);
-    assert!(view.overlay.is_none(), "/ inside a count prompt opened the palette");
-    assert_eq!(prompt_digits(&view).as_deref(), Some(""), "/ inside a count prompt changed or closed it");
+    assert!(
+        view.overlay.is_none(),
+        "/ inside a count prompt opened the palette"
+    );
+    assert_eq!(
+        prompt_digits(&view).as_deref(),
+        Some(""),
+        "/ inside a count prompt changed or closed it"
+    );
 
     for overlay in [Overlay::Journal { anchor: 0 }, Overlay::Help] {
         let mut view = focused(Section::Meadow, build.clone());
         view.overlay = Some(overlay.clone());
         press_char('/', &mut view, &state);
-        assert_eq!(view.overlay, Some(overlay.clone()), "/ inside {overlay:?} replaced it");
+        assert_eq!(
+            view.overlay,
+            Some(overlay.clone()),
+            "/ inside {overlay:?} replaced it"
+        );
     }
 
     let mut view = focused(Section::Meadow, build);
@@ -4474,7 +5273,11 @@ fn drawn(state: &GameState, view: &ViewState) -> Vec<Row> {
 
 /// The drawn Ideas rows the cursor can land on, in order.
 fn drawn_selectable(state: &GameState, view: &ViewState) -> Vec<RowKey> {
-    drawn(state, view).into_iter().filter(|r| r.selectable()).map(|r| r.key).collect()
+    drawn(state, view)
+        .into_iter()
+        .filter(|r| r.selectable())
+        .map(|r| r.key)
+        .collect()
 }
 
 /// Whether the done group is drawn open: some finished row is drawn.
@@ -4506,8 +5309,12 @@ fn press_d(view: &mut ViewState, state: &GameState) -> Outcome {
 /// reaches such a row (TUI-NAV-113).
 fn unfold_focus(state: &GameState, view: &mut ViewState) {
     let Some(section) = view.section else { return };
-    let Some(key) = view.focus[section.index()].clone() else { return };
-    if drawn_rows(state, section, view).iter().any(|r| r.key == key)
+    let Some(key) = view.focus[section.index()].clone() else {
+        return;
+    };
+    if drawn_rows(state, section, view)
+        .iter()
+        .any(|r| r.key == key)
         || !rows(state, section).iter().any(|r| r.key == key)
     {
         return;
@@ -4538,11 +5345,15 @@ fn ideas_rank(row: &Row) -> usize {
 /// kind's group — its kind's rank, then the order the core lists that kind.
 fn ideas_place(key: &RowKey) -> (usize, usize) {
     fn at<T: PartialEq>(all: &[T], x: &T) -> usize {
-        all.iter().position(|y| y == x).expect("in its kind's table")
+        all.iter()
+            .position(|y| y == x)
+            .expect("in its kind's table")
     }
     match key {
         RowKey::Content(ContentId::Idea(i), _) => (0, at(&IdeaId::ALL, i)),
-        RowKey::Content(ContentId::Refinement(r), _) => (1, at(&clowder_core::RefinementId::ALL, r)),
+        RowKey::Content(ContentId::Refinement(r), _) => {
+            (1, at(&clowder_core::RefinementId::ALL, r))
+        }
         RowKey::Content(ContentId::Rule(r), _) => (2, at(&RuleId::ALL, r)),
         other => panic!("{other:?} is not an Ideas row"),
     }
@@ -4644,7 +5455,10 @@ fn mid_game() -> GameState {
     }
     let list = rows(&s, Section::Ideas);
     for rank in 0..3 {
-        let of_kind: Vec<&Row> = list.iter().filter(|r| r.selectable() && ideas_rank(r) == rank).collect();
+        let of_kind: Vec<&Row> = list
+            .iter()
+            .filter(|r| r.selectable() && ideas_rank(r) == rank)
+            .collect();
         let done = of_kind.iter().filter(|r| finished(&s, r)).count();
         let ready = of_kind.iter().filter(|r| actionable(&s, r)).count();
         assert!(
@@ -4672,9 +5486,14 @@ fn all_ideas_done() -> GameState {
         }
     }
     let list = rows(&s, Section::Ideas);
-    assert!(list.iter().any(|r| r.selectable()), "fixture: the Ideas section lists rows");
     assert!(
-        list.iter().filter(|r| r.selectable()).all(|r| finished(&s, r)),
+        list.iter().any(|r| r.selectable()),
+        "fixture: the Ideas section lists rows"
+    );
+    assert!(
+        list.iter()
+            .filter(|r| r.selectable())
+            .all(|r| finished(&s, r)),
         "fixture: every row the Ideas section lists is finished"
     );
     s
@@ -4688,8 +5507,14 @@ fn no_ideas_done() -> GameState {
     s.refinements = BTreeSet::new();
     s.rules = BTreeSet::new();
     let list = rows(&s, Section::Ideas);
-    assert!(list.iter().any(|r| r.selectable()), "fixture: the Ideas section lists rows");
-    assert!(!list.iter().any(|r| finished(&s, r)), "fixture: no Ideas row is finished");
+    assert!(
+        list.iter().any(|r| r.selectable()),
+        "fixture: the Ideas section lists rows"
+    );
+    assert!(
+        !list.iter().any(|r| finished(&s, r)),
+        "fixture: no Ideas row is finished"
+    );
     s
 }
 
@@ -4705,7 +5530,10 @@ fn dg_scratch(name: &str) -> std::path::PathBuf {
 }
 
 fn still() -> Reading {
-    Reading { monotonic: Duration::ZERO, wall: Duration::ZERO }
+    Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::ZERO,
+    }
 }
 
 fn ev(code: KeyCode) -> Event {
@@ -4717,7 +5545,8 @@ fn ev_char(c: char) -> Event {
 }
 
 fn step(a: &mut App, t: &mut Terminal<TestBackend>, input: &[Event]) {
-    a.step(t, still(), input).expect("a step against a TestBackend does not fail");
+    a.step(t, still(), input)
+        .expect("a step against a TestBackend does not fail");
 }
 
 /// A session opened on `state` at a three-pane size, its first frame drawn,
@@ -4739,7 +5568,11 @@ fn ideas_session(state: GameState, name: &str) -> (App, Terminal<TestBackend>) {
     let mut t = Terminal::new(TestBackend::new(130, 40)).expect("TestBackend is infallible");
     step(&mut a, &mut t, &[]);
     step(&mut a, &mut t, &[ev_char('3')]);
-    assert_eq!(a.view.section, Some(Section::Ideas), "fixture: 3 entered the Ideas screen");
+    assert_eq!(
+        a.view.section,
+        Some(Section::Ideas),
+        "fixture: 3 entered the Ideas screen"
+    );
     (a, t)
 }
 
@@ -4769,7 +5602,10 @@ fn every_sitting_opens_with_the_done_group_folded_and_the_save_holds_nothing_of_
             rows(s, Section::Ideas).iter().any(|r| finished(s, r)),
             "fixture: {label} lists finished Ideas rows"
         );
-        assert!(!is_open(s, &v), "{label} opened with the done group open; every sitting opens it folded");
+        assert!(
+            !is_open(s, &v),
+            "{label} opened with the done group open; every sitting opens it folded"
+        );
     }
 
     let (mut a, mut t) = ideas_session(state, "save");
@@ -4777,11 +5613,16 @@ fn every_sitting_opens_with_the_done_group_folded_and_the_save_holds_nothing_of_
     a.save().expect("fixture: the save is written");
     let folded_save = std::fs::read_to_string(&path).expect("fixture: the save is read back");
     session_d(&mut a, &mut t);
-    assert!(is_open(&a.state, &a.view), "d did not open the done group (TUI-NAV-115)");
+    assert!(
+        is_open(&a.state, &a.view),
+        "d did not open the done group (TUI-NAV-115)"
+    );
     a.save().expect("fixture: the save is written");
     let open_save = std::fs::read_to_string(&path).expect("fixture: the save is read back");
     let as_game = |text: &str| {
-        let g = clowder_core::load_string(text, 0).expect("the save loads").state;
+        let g = clowder_core::load_string(text, 0)
+            .expect("the save loads")
+            .state;
         clowder_core::save_string(&g, 0)
     };
     assert_eq!(
@@ -4790,7 +5631,9 @@ fn every_sitting_opens_with_the_done_group_folded_and_the_save_holds_nothing_of_
         "a save written with the done group open loads as a different game from one written with \
          it folded; the shell saves nothing of the fold"
     );
-    let reopened = clowder_core::load_string(&open_save, 0).expect("the save loads").state;
+    let reopened = clowder_core::load_string(&open_save, 0)
+        .expect("the save loads")
+        .state;
     assert!(
         !is_open(&reopened, &in_ideas(&reopened)),
         "a sitting opened from a save written with the group open opened it open"
@@ -4808,7 +5651,11 @@ fn within_a_sitting_the_done_group_stays_as_the_player_left_it() {
     for want_open in [true, false] {
         gap();
         session_d(&mut a, &mut t);
-        assert_eq!(is_open(&a.state, &a.view), want_open, "d did not set the done group open={want_open} (TUI-NAV-115)");
+        assert_eq!(
+            is_open(&a.state, &a.view),
+            want_open,
+            "d did not set the done group open={want_open} (TUI-NAV-115)"
+        );
 
         let check = |a: &App, what: &str| {
             assert_eq!(
@@ -4834,11 +5681,22 @@ fn within_a_sitting_the_done_group_stays_as_the_player_left_it() {
             check(&a, &format!("a resize to {w}x{h}"));
         }
         let ticks = a.state.ticks;
-        a.step(&mut t, Reading { monotonic: Duration::from_secs(3), wall: Duration::from_secs(3) }, &[])
-            .expect("a step against a TestBackend does not fail");
+        a.step(
+            &mut t,
+            Reading {
+                monotonic: Duration::from_secs(3),
+                wall: Duration::from_secs(3),
+            },
+            &[],
+        )
+        .expect("a step against a TestBackend does not fail");
         assert!(a.state.ticks > ticks, "fixture: the simulation advanced");
         check(&a, "the simulation advancing");
-        assert_eq!(a.view.section, Some(Section::Ideas), "fixture: the sweep ends on the Ideas screen");
+        assert_eq!(
+            a.view.section,
+            Some(Section::Ideas),
+            "fixture: the sweep ends on the Ideas screen"
+        );
     }
 }
 
@@ -4852,7 +5710,10 @@ fn a_done_group_that_stops_being_listed_comes_back_folded() {
     for stay in [true, false] {
         let (mut a, mut t) = ideas_session(mid_game(), "relisted");
         session_d(&mut a, &mut t);
-        assert!(is_open(&a.state, &a.view), "d did not open the done group (TUI-NAV-115)");
+        assert!(
+            is_open(&a.state, &a.view),
+            "d did not open the done group (TUI-NAV-115)"
+        );
         if !stay {
             step(&mut a, &mut t, &[ev_char('1')]);
         }
@@ -4885,13 +5746,18 @@ fn ready_rows_all_folded() -> GameState {
         .copied()
         .find(|i| {
             !IdeaId::ALL.iter().any(|j| idea_def(*j).prereqs.contains(i))
-                && !clowder_core::RefinementId::ALL.iter().any(|r| refinement_def(*r).gate == *i)
+                && !clowder_core::RefinementId::ALL
+                    .iter()
+                    .any(|r| refinement_def(*r).gate == *i)
         })
         .expect("fixture: some idea gates nothing");
     s.ideas.remove(&leaf);
     s.resources[ResourceId::Curiosity.ix()] = 0.0;
     let list = rows(&s, Section::Ideas);
-    let unfinished: Vec<&Row> = list.iter().filter(|r| r.selectable() && !finished(&s, r)).collect();
+    let unfinished: Vec<&Row> = list
+        .iter()
+        .filter(|r| r.selectable() && !finished(&s, r))
+        .collect();
     assert!(
         !unfinished.is_empty()
             && unfinished.iter().all(|r| match r.key {
@@ -4960,27 +5826,45 @@ fn the_cursor_never_lands_on_a_folded_row_and_reaches_every_open_one() {
     };
     let mut w = v.clone();
     w.focus[Section::Ideas.index()] = folded.first().cloned();
-    assert_eq!(sweep(w, folded.len() + 2), folded, "a sweep down the folded list does not visit exactly the drawn rows");
+    assert_eq!(
+        sweep(w, folded.len() + 2),
+        folded,
+        "a sweep down the folded list does not visit exactly the drawn rows"
+    );
 
     let mut o = v.clone();
     press_d(&mut o, &state);
-    let listed: Vec<RowKey> =
-        rows(&state, Section::Ideas).into_iter().filter(|r| r.selectable()).map(|r| r.key).collect();
+    let listed: Vec<RowKey> = rows(&state, Section::Ideas)
+        .into_iter()
+        .filter(|r| r.selectable())
+        .map(|r| r.key)
+        .collect();
     o.focus[Section::Ideas.index()] = listed.first().cloned();
     assert_eq!(
         sweep(o.clone(), listed.len() + 2),
         listed,
         "a sweep down the open list does not visit every listed row, the done group's included"
     );
-    let last_above = folded.last().cloned().expect("fixture: rows are drawn above the done header");
+    let last_above = folded
+        .last()
+        .cloned()
+        .expect("fixture: rows are drawn above the done header");
     let first_done = listed
         .iter()
-        .find(|k| rows(&state, Section::Ideas).iter().any(|r| &r.key == *k && finished(&state, r)))
+        .find(|k| {
+            rows(&state, Section::Ideas)
+                .iter()
+                .any(|r| &r.key == *k && finished(&state, r))
+        })
         .cloned()
         .expect("fixture: the done group holds rows");
     o.focus[Section::Ideas.index()] = Some(last_above);
     press(key(KeyCode::Char(']')), &mut o, &state);
-    assert_eq!(ideas_cursor(&o), Some(first_done), "] from the last row above the open done group does not jump to its first row");
+    assert_eq!(
+        ideas_cursor(&o),
+        Some(first_done),
+        "] from the last row above the open done group does not jump to its first row"
+    );
 
     let poor = ready_rows_all_folded();
     let entered = in_ideas(&poor);
@@ -5001,7 +5885,9 @@ fn the_cursor_never_lands_on_a_folded_row_and_reaches_every_open_one() {
 #[test]
 fn an_open_done_rows_keys_answer_as_any_owned_rows_do() {
     let state = mid_game();
-    let (arch, _) = find_row(&state, Section::Wonders, |c| matches!(c, Command::BuyArch(ArchId::EverdreamArch)));
+    let (arch, _) = find_row(&state, Section::Wonders, |c| {
+        matches!(c, Command::BuyArch(ArchId::EverdreamArch))
+    });
     let mut o = in_ideas(&state);
     press_d(&mut o, &state);
     let done: Vec<RowKey> = rows(&state, Section::Ideas)
@@ -5010,21 +5896,33 @@ fn an_open_done_rows_keys_answer_as_any_owned_rows_do() {
         .map(|r| r.key)
         .collect();
     assert!(!done.is_empty(), "fixture: the done group holds rows");
-    for k in [key(KeyCode::Enter), key(KeyCode::Char('x')), key(KeyCode::Char('X'))] {
+    for k in [
+        key(KeyCode::Enter),
+        key(KeyCode::Char('x')),
+        key(KeyCode::Char('X')),
+    ] {
         let mut owned_view = focused(Section::Wonders, arch.clone());
         let owned_out = press(k, &mut owned_view, &state);
         for row in &done {
             let mut w = o.clone();
             w.focus[Section::Ideas.index()] = Some(row.clone());
             let out = press(k, &mut w, &state);
-            assert_eq!(out, owned_out, "{:?} on the open done row {row:?} answered {out:?}", k.code);
+            assert_eq!(
+                out, owned_out,
+                "{:?} on the open done row {row:?} answered {out:?}",
+                k.code
+            );
             assert_eq!(
                 footer_text(&w),
                 footer_text(&owned_view),
                 "{:?} on the open done row {row:?} left a different note than on an owned row",
                 k.code
             );
-            assert!(w.armed.is_none() && w.prompt.is_none(), "{:?} on {row:?} armed or prompted", k.code);
+            assert!(
+                w.armed.is_none() && w.prompt.is_none(),
+                "{:?} on {row:?} armed or prompted",
+                k.code
+            );
         }
     }
 }
@@ -5049,21 +5947,35 @@ fn d_opens_and_folds_the_done_group_and_is_no_command_and_no_navigation() {
     v.focus[Section::Ideas.index()] = Some(rule.key.clone());
     press(key(KeyCode::Enter), &mut v, &state);
     assert!(v.armed.is_some(), "fixture: Enter armed the rule");
-    v.reports = vec![PendingReport { entry: 0, dismissed: false }];
+    v.reports = vec![PendingReport {
+        entry: 0,
+        dismissed: false,
+    }];
     v.inspector_wanted = true;
     v.last_repeat = None;
 
     for want_open in [true, false, true] {
         let before = v.clone();
         let out = press_char('d', &mut v, &state);
-        assert_eq!(out, Outcome::Handled, "d asked the core for {out:?}; it issues no command");
-        assert_eq!(is_open(&state, &v), want_open, "d did not turn the done group open={want_open}");
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "d asked the core for {out:?}; it issues no command"
+        );
+        assert_eq!(
+            is_open(&state, &v),
+            want_open,
+            "d did not turn the done group open={want_open}"
+        );
         assert_eq!(v.armed, before.armed, "d ended or changed the arming");
         assert_eq!(v.reports, before.reports, "d retired the report banner");
         assert_eq!(v.seen, before.seen, "d counted as a visit");
         assert_eq!(v.section, before.section, "d moved the focused section");
         assert_eq!(v.focus, before.focus, "d moved a cursor");
-        assert_eq!(v.inspector_wanted, before.inspector_wanted, "d changed the layout");
+        assert_eq!(
+            v.inspector_wanted, before.inspector_wanted,
+            "d changed the layout"
+        );
         assert!(v.footer.is_none(), "d left a footer note");
         gap();
     }
@@ -5110,15 +6022,37 @@ fn d_is_ignored_wherever_it_is_not_live_and_held_by_whatever_holds_the_keyboard(
             continue;
         }
         let mut contexts: Vec<Option<RowKey>> = vec![None];
-        contexts.extend(listed.iter().filter(|r| r.selectable()).map(|r| Some(r.key.clone())));
+        contexts.extend(
+            listed
+                .iter()
+                .filter(|r| r.selectable())
+                .map(|r| Some(r.key.clone())),
+        );
         for focus in contexts {
-            let mut before = ViewState { section: Some(section), ..Default::default() };
+            let mut before = ViewState {
+                section: Some(section),
+                ..Default::default()
+            };
             before.focus[section.index()] = focus.clone();
             let mut w = before.clone();
             let out = press_char('d', &mut w, &state);
-            assert_eq!(out, Outcome::Handled, "{}: d told the core {out:?}", describe(section, &focus));
-            assert_eq!(observable(&w), observable(&before), "{}: d changed the view", describe(section, &focus));
-            assert!(w.footer.is_none(), "{}: d left a footer note", describe(section, &focus));
+            assert_eq!(
+                out,
+                Outcome::Handled,
+                "{}: d told the core {out:?}",
+                describe(section, &focus)
+            );
+            assert_eq!(
+                observable(&w),
+                observable(&before),
+                "{}: d changed the view",
+                describe(section, &focus)
+            );
+            assert!(
+                w.footer.is_none(),
+                "{}: d left a footer note",
+                describe(section, &focus)
+            );
         }
     }
 
@@ -5126,22 +6060,44 @@ fn d_is_ignored_wherever_it_is_not_live_and_held_by_whatever_holds_the_keyboard(
     let before = in_ideas(&none_done);
     let mut w = before.clone();
     assert_eq!(press_char('d', &mut w, &none_done), Outcome::Handled);
-    assert_eq!(observable(&w), observable(&before), "d changed the view on an Ideas screen with nothing finished");
-    assert!(w.footer.is_none(), "d left a note on an Ideas screen with nothing finished");
+    assert_eq!(
+        observable(&w),
+        observable(&before),
+        "d changed the view on an Ideas screen with nothing finished"
+    );
+    assert!(
+        w.footer.is_none(),
+        "d left a note on an Ideas screen with nothing finished"
+    );
 
     let before = in_ideas(&state);
     let mut w = before.clone();
-    press(KeyEvent::new(KeyCode::Char('D'), KeyModifiers::SHIFT), &mut w, &state);
-    assert_eq!(observable(&w), observable(&before), "uppercase D changed the view; it is unbound");
+    press(
+        KeyEvent::new(KeyCode::Char('D'), KeyModifiers::SHIFT),
+        &mut w,
+        &state,
+    );
+    assert_eq!(
+        observable(&w),
+        observable(&before),
+        "uppercase D changed the view; it is unbound"
+    );
     assert!(w.footer.is_none(), "uppercase D left a note");
 
     // A field takes it.
     let mut w = in_ideas(&state);
     press_char('/', &mut w, &state);
     press_char('d', &mut w, &state);
-    assert_eq!(palette_query(&w).as_deref(), Some("d"), "the palette did not take d into its query");
+    assert_eq!(
+        palette_query(&w).as_deref(),
+        Some("d"),
+        "the palette did not take d into its query"
+    );
     clowder_tui::nav::dismiss(&mut w, false);
-    assert!(!is_open(&state, &w), "d typed into the palette changed the done group");
+    assert!(
+        !is_open(&state, &w),
+        "d typed into the palette changed the done group"
+    );
 
     let mut w = in_ideas(&state);
     let refinement = drawn(&state, &w)
@@ -5152,20 +6108,33 @@ fn d_is_ignored_wherever_it_is_not_live_and_held_by_whatever_holds_the_keyboard(
     press_char('x', &mut w, &state);
     assert!(w.prompt.is_some(), "fixture: x opened the count prompt");
     press_char('d', &mut w, &state);
-    assert_eq!(prompt_digits(&w).as_deref(), Some(""), "the count prompt took d");
+    assert_eq!(
+        prompt_digits(&w).as_deref(),
+        Some(""),
+        "the count prompt took d"
+    );
     clowder_tui::nav::dismiss(&mut w, false);
-    assert!(!is_open(&state, &w), "d pressed into the count prompt changed the done group");
+    assert!(
+        !is_open(&state, &w),
+        "d pressed into the count prompt changed the done group"
+    );
 
     // A full-screen overlay suspends it.
     for opener in ['?', 'e'] {
         let mut w = in_ideas(&state);
         press_char(opener, &mut w, &state);
         let overlay = w.overlay.clone();
-        assert!(overlay.is_some(), "fixture: {opener} opened a full-screen overlay");
+        assert!(
+            overlay.is_some(),
+            "fixture: {opener} opened a full-screen overlay"
+        );
         press_char('d', &mut w, &state);
         assert_eq!(w.overlay, overlay, "d under the overlay changed it");
         clowder_tui::nav::dismiss(&mut w, false);
-        assert!(!is_open(&state, &w), "d under a full-screen overlay changed the done group");
+        assert!(
+            !is_open(&state, &w),
+            "d under a full-screen overlay changed the done group"
+        );
     }
 }
 
@@ -5184,13 +6153,23 @@ fn opening_the_done_group_leaves_the_cursor_on_its_row() {
         let mut w = v.clone();
         w.focus[Section::Ideas.index()] = Some(start.clone());
         press_d(&mut w, &state);
-        assert!(is_open(&state, &w), "d did not open the done group (TUI-NAV-115)");
-        assert_eq!(ideas_cursor(&w), Some(start.clone()), "opening the done group moved the cursor off {start:?}");
+        assert!(
+            is_open(&state, &w),
+            "d did not open the done group (TUI-NAV-115)"
+        );
+        assert_eq!(
+            ideas_cursor(&w),
+            Some(start.clone()),
+            "opening the done group moved the cursor off {start:?}"
+        );
     }
 
     let all = all_ideas_done();
     let mut w = in_ideas(&all);
-    assert!(drawn_selectable(&all, &w).is_empty(), "with every row finished and the group folded, a row is still drawn (TUI-NAV-113)");
+    assert!(
+        drawn_selectable(&all, &w).is_empty(),
+        "with every row finished and the group folded, a row is still drawn (TUI-NAV-113)"
+    );
     press_d(&mut w, &all);
     let open = drawn_selectable(&all, &w);
     assert_eq!(
@@ -5207,7 +6186,10 @@ fn opening_the_done_group_leaves_the_cursor_on_its_row() {
 /// @spec TUI-NAV-116
 #[test]
 fn folding_the_done_group_from_one_of_its_rows_moves_the_cursor_above_its_header() {
-    for (label, state) in [("mid-game", mid_game()), ("every row done", all_ideas_done())] {
+    for (label, state) in [
+        ("mid-game", mid_game()),
+        ("every row done", all_ideas_done()),
+    ] {
         let mut template = in_ideas(&state);
         let above = drawn_selectable(&state, &template).last().cloned();
         press_d(&mut template, &state);
@@ -5221,7 +6203,10 @@ fn folding_the_done_group_from_one_of_its_rows_moves_the_cursor_above_its_header
             let mut w = template.clone();
             w.focus[Section::Ideas.index()] = Some(row.clone());
             press_char('d', &mut w, &state);
-            assert!(!is_open(&state, &w), "d did not fold the done group (TUI-NAV-115)");
+            assert!(
+                !is_open(&state, &w),
+                "d did not fold the done group (TUI-NAV-115)"
+            );
             match &above {
                 Some(k) => assert_eq!(
                     ideas_cursor(&w).as_ref(),
@@ -5259,19 +6244,29 @@ fn folding_the_done_group_from_one_of_its_rows_moves_the_cursor_above_its_header
 fn a_row_finishing_under_the_cursor_hands_it_to_the_row_that_closes_up() {
     let base = mid_game();
     let start = in_ideas(&base);
-    let ready: Vec<Row> = drawn(&base, &start).into_iter().filter(|r| actionable(&base, r)).collect();
+    let ready: Vec<Row> = drawn(&base, &start)
+        .into_iter()
+        .filter(|r| actionable(&base, r))
+        .collect();
     let (mut after_seen, mut before_seen) = (0, 0);
     for row in &ready {
         let (mut a, mut t) = ideas_session(base.clone(), "closes-up");
         a.view.focus[Section::Ideas.index()] = Some(row.key.clone());
-        a.view.reports = vec![PendingReport { entry: 0, dismissed: false }];
+        a.view.reports = vec![PendingReport {
+            entry: 0,
+            dismissed: false,
+        }];
         let seen = a.view.seen;
         step(&mut a, &mut t, &[ev(KeyCode::Enter)]);
         if row.heavy {
             gap();
             step(&mut a, &mut t, &[ev(KeyCode::Enter)]);
         }
-        assert!(finished(&a.state, row), "fixture: the core took {:?}", row.key);
+        assert!(
+            finished(&a.state, row),
+            "fixture: the core took {:?}",
+            row.key
+        );
         let expected = closes_up(&drawn_selectable(&a.state, &a.view), &row.key);
         assert_eq!(
             ideas_cursor(&a.view),
@@ -5285,11 +6280,24 @@ fn a_row_finishing_under_the_cursor_hands_it_to_the_row_that_closes_up() {
             Some(_) => before_seen += 1,
             None => {}
         }
-        assert_eq!(a.view.reports, vec![PendingReport { entry: 0, dismissed: false }], "the move retired the banner");
+        assert_eq!(
+            a.view.reports,
+            vec![PendingReport {
+                entry: 0,
+                dismissed: false
+            }],
+            "the move retired the banner"
+        );
         assert_eq!(a.view.seen, seen, "the move counted as a visit");
     }
-    assert!(after_seen > 0, "fixture: no finished row was followed by a drawn row");
-    assert!(before_seen > 0, "fixture: no finished row was the last drawn row");
+    assert!(
+        after_seen > 0,
+        "fixture: no finished row was followed by a drawn row"
+    );
+    assert!(
+        before_seen > 0,
+        "fixture: no finished row was the last drawn row"
+    );
 
     // Neither: the one row still to take finishes, and nothing is left drawn.
     let mut last = all_ideas_done();
@@ -5305,9 +6313,16 @@ fn a_row_finishing_under_the_cursor_hands_it_to_the_row_that_closes_up() {
     last.refinements.remove(&only);
     let (mut a, mut t) = ideas_session(last, "neither");
     let key_ = RowKey::Content(ContentId::Refinement(only), "");
-    assert_eq!(ideas_cursor(&a.view), Some(key_.clone()), "fixture: the cursor is on the one row left to take");
+    assert_eq!(
+        ideas_cursor(&a.view),
+        Some(key_.clone()),
+        "fixture: the cursor is on the one row left to take"
+    );
     step(&mut a, &mut t, &[ev(KeyCode::Enter)]);
-    assert!(a.state.refinements.contains(&only), "fixture: the core took it");
+    assert!(
+        a.state.refinements.contains(&only),
+        "fixture: the core took it"
+    );
     let mut w = a.view.clone();
     w.last_repeat = None;
     w.field_guard = false;
@@ -5350,7 +6365,10 @@ fn returning_to_a_remembered_row_that_finished_meanwhile_places_the_cursor_where
         );
         checked += 1;
     }
-    assert!(checked > 10, "fixture: too few remembered rows were checked");
+    assert!(
+        checked > 10,
+        "fixture: too few remembered rows were checked"
+    );
 }
 
 // ---- TUI-NAV-118 -----------------------------------------------------------
@@ -5363,19 +6381,36 @@ fn returning_to_a_remembered_row_that_finished_meanwhile_places_the_cursor_where
 fn with_the_group_open_a_row_finishing_under_the_cursor_keeps_it() {
     let base = mid_game();
     let start = in_ideas(&base);
-    let ready: Vec<Row> =
-        drawn(&base, &start).into_iter().filter(|r| actionable(&base, r) && !r.heavy).collect();
+    let ready: Vec<Row> = drawn(&base, &start)
+        .into_iter()
+        .filter(|r| actionable(&base, r) && !r.heavy)
+        .collect();
     assert!(ready.len() > 4, "fixture: several rows are ready to take");
     for row in &ready {
         let (mut a, mut t) = ideas_session(base.clone(), "open-keeps");
         session_d(&mut a, &mut t);
-        assert!(is_open(&a.state, &a.view), "d did not open the done group (TUI-NAV-115)");
+        assert!(
+            is_open(&a.state, &a.view),
+            "d did not open the done group (TUI-NAV-115)"
+        );
         a.view.focus[Section::Ideas.index()] = Some(row.key.clone());
         step(&mut a, &mut t, &[ev(KeyCode::Enter)]);
-        assert!(finished(&a.state, row), "fixture: the core took {:?}", row.key);
-        assert_eq!(ideas_cursor(&a.view), Some(row.key.clone()), "the cursor left {:?} as it finished", row.key);
+        assert!(
+            finished(&a.state, row),
+            "fixture: the core took {:?}",
+            row.key
+        );
+        assert_eq!(
+            ideas_cursor(&a.view),
+            Some(row.key.clone()),
+            "the cursor left {:?} as it finished",
+            row.key
+        );
         let list = drawn(&a.state, &a.view);
-        let header = list.iter().rposition(|r| matches!(r.kind, RowKind::Group)).expect("a header");
+        let header = list
+            .iter()
+            .rposition(|r| matches!(r.kind, RowKind::Group))
+            .expect("a header");
         assert!(
             list[header + 1..].iter().any(|r| r.key == row.key),
             "{:?} finished with the group open but is not drawn in the done group",
@@ -5418,9 +6453,17 @@ fn a_held_enter_never_acts_on_the_row_a_folded_row_hands_the_cursor_to() {
             gap();
             step(&mut a, &mut t, &[ev(KeyCode::Enter)]);
         }
-        assert!(finished(&a.state, &first), "fixture: the core took {:?}", first.key);
-        let next = ideas_cursor(&a.view).expect("the cursor rests on no row after the row folded away (TUI-NAV-117)");
-        let next_row = rows(&a.state, Section::Ideas).into_iter().find(|r| r.key == next).expect("listed");
+        assert!(
+            finished(&a.state, &first),
+            "fixture: the core took {:?}",
+            first.key
+        );
+        let next = ideas_cursor(&a.view)
+            .expect("the cursor rests on no row after the row folded away (TUI-NAV-117)");
+        let next_row = rows(&a.state, Section::Ideas)
+            .into_iter()
+            .find(|r| r.key == next)
+            .expect("listed");
         assert!(
             actionable(&a.state, &next_row) && ideas_rank(&next_row) == rank,
             "when {:?} folded away the cursor did not move to the next row of its kind ready to take \
@@ -5434,12 +6477,20 @@ fn a_held_enter_never_acts_on_the_row_a_folded_row_hands_the_cursor_to() {
             "a held Enter took {next:?}, the row the cursor landed on when {:?} folded away",
             first.key
         );
-        assert!(a.view.armed.is_none(), "a held Enter armed {next:?} after {:?} folded away", first.key);
+        assert!(
+            a.view.armed.is_none(),
+            "a held Enter armed {next:?} after {:?} folded away",
+            first.key
+        );
 
         gap();
         step(&mut a, &mut t, &[ev(KeyCode::Enter)]);
-        let acted = finished(&a.state, &next_row) || a.view.armed.as_ref().is_some_and(|x| x.key == next);
-        assert!(acted, "a distinct Enter after the hold did not act on {next:?}");
+        let acted =
+            finished(&a.state, &next_row) || a.view.armed.as_ref().is_some_and(|x| x.key == next);
+        assert!(
+            acted,
+            "a distinct Enter after the hold did not act on {next:?}"
+        );
     }
 }
 
@@ -5465,8 +6516,13 @@ fn a_held_x_never_acts_on_the_row_a_folded_row_hands_the_cursor_to() {
         if !finished(&a.state, &first) {
             continue;
         }
-        let Some(next) = ideas_cursor(&a.view) else { continue };
-        let next_row = rows(&a.state, Section::Ideas).into_iter().find(|r| r.key == next).expect("listed");
+        let Some(next) = ideas_cursor(&a.view) else {
+            continue;
+        };
+        let next_row = rows(&a.state, Section::Ideas)
+            .into_iter()
+            .find(|r| r.key == next)
+            .expect("listed");
         for _ in 0..15 {
             step(&mut a, &mut t, &[ev(KeyCode::Char('X'))]);
             std::thread::sleep(Duration::from_millis(30));
@@ -5516,12 +6572,27 @@ fn with_every_row_folded_the_header_stands_alone_and_every_row_key_finds_nothing
     ] {
         let mut w = v.clone();
         let out = press(k, &mut w, &state);
-        assert_eq!(out, Outcome::Handled, "{:?} with every row folded told the core {out:?}", k.code);
-        assert_eq!(footer_text(&w), Some(note.clone()), "{:?} with every row folded left another note", k.code);
+        assert_eq!(
+            out,
+            Outcome::Handled,
+            "{:?} with every row folded told the core {out:?}",
+            k.code
+        );
+        assert_eq!(
+            footer_text(&w),
+            Some(note.clone()),
+            "{:?} with every row folded left another note",
+            k.code
+        );
         let (mut a, mut b) = (w.clone(), v.clone());
         a.last_repeat = None;
         b.last_repeat = None;
-        assert_eq!(all_but_the_footer(&a), all_but_the_footer(&b), "{:?} with every row folded changed the view", k.code);
+        assert_eq!(
+            all_but_the_footer(&a),
+            all_but_the_footer(&b),
+            "{:?} with every row folded changed the view",
+            k.code
+        );
     }
 }
 
@@ -5534,7 +6605,10 @@ fn with_every_row_folded_the_header_stands_alone_and_every_row_key_finds_nothing
 fn when_a_row_is_next_drawn_the_cursor_lands_on_the_first_available_one() {
     use clowder_core::content::{idea_def, refinement_def};
     let (mut a, mut t) = ideas_session(all_ideas_done(), "next-drawn");
-    assert!(drawn_selectable(&a.state, &a.view).is_empty(), "with every row finished and the group folded, a row is still drawn (TUI-NAV-113)");
+    assert!(
+        drawn_selectable(&a.state, &a.view).is_empty(),
+        "with every row finished and the group folded, a row is still drawn (TUI-NAV-113)"
+    );
 
     let mut s = all_ideas_done();
     let leaf = IdeaId::ALL
@@ -5542,12 +6616,18 @@ fn when_a_row_is_next_drawn_the_cursor_lands_on_the_first_available_one() {
         .copied()
         .find(|i| {
             !IdeaId::ALL.iter().any(|j| idea_def(*j).prereqs.contains(i))
-                && !clowder_core::RefinementId::ALL.iter().any(|r| refinement_def(*r).gate == *i)
+                && !clowder_core::RefinementId::ALL
+                    .iter()
+                    .any(|r| refinement_def(*r).gate == *i)
         })
         .expect("fixture: some idea gates nothing");
     s.ideas.remove(&leaf);
     s.resources[ResourceId::Curiosity.ix()] = 0.0;
-    let back = *s.refinements.iter().next().expect("fixture: a refinement is held");
+    let back = *s
+        .refinements
+        .iter()
+        .next()
+        .expect("fixture: a refinement is held");
     s.refinements.remove(&back);
     a.state = s;
     step(&mut a, &mut t, &[]);
@@ -5584,31 +6664,72 @@ fn the_palettes_jump_to_a_folded_row_opens_the_done_group_and_focuses_it() {
     let all = clowder_tui::nav::palette::results(&state, "");
     let mut jumped = 0;
     for target in &finished_rows {
-        let name = all.iter().find(|r| &r.key == target).expect("a finished row is a palette result").name.clone();
-        if clowder_tui::nav::palette::results(&state, &name).first().map(|r| &r.key) != Some(target) {
+        let name = all
+            .iter()
+            .find(|r| &r.key == target)
+            .expect("a finished row is a palette result")
+            .name
+            .clone();
+        if clowder_tui::nav::palette::results(&state, &name)
+            .first()
+            .map(|r| &r.key)
+            != Some(target)
+        {
             continue;
         }
         let mut v = ViewState::default();
         clowder_tui::nav::opening(&mut v, &state);
-        v.reports = vec![PendingReport { entry: 0, dismissed: false }];
-        v.overlay = Some(Overlay::Palette { query: name.clone(), selected: 0 });
+        v.reports = vec![PendingReport {
+            entry: 0,
+            dismissed: false,
+        }];
+        v.overlay = Some(Overlay::Palette {
+            query: name.clone(),
+            selected: 0,
+        });
         let out = press(key(KeyCode::Enter), &mut v, &state);
         assert_eq!(out, Outcome::Handled);
-        assert!(v.overlay.is_none(), "the jump to {target:?} left the palette open");
-        assert_eq!(v.section, Some(Section::Ideas), "the jump to {target:?} did not land on the Ideas screen");
-        assert_eq!(ideas_cursor(&v).as_ref(), Some(target), "the jump did not focus {target:?}");
-        assert!(is_open(&state, &v), "the jump to the folded {target:?} did not open the done group");
-        assert!(drawn_selectable(&state, &v).contains(target), "the jump focused {target:?}, which is not drawn");
+        assert!(
+            v.overlay.is_none(),
+            "the jump to {target:?} left the palette open"
+        );
+        assert_eq!(
+            v.section,
+            Some(Section::Ideas),
+            "the jump to {target:?} did not land on the Ideas screen"
+        );
+        assert_eq!(
+            ideas_cursor(&v).as_ref(),
+            Some(target),
+            "the jump did not focus {target:?}"
+        );
+        assert!(
+            is_open(&state, &v),
+            "the jump to the folded {target:?} did not open the done group"
+        );
+        assert!(
+            drawn_selectable(&state, &v).contains(target),
+            "the jump focused {target:?}, which is not drawn"
+        );
         assert!(v.reports[0].dismissed, "the jump did not retire the banner");
-        assert!(v.seen[Section::Ideas.index()].visited, "the jump did not count as a visit");
+        assert!(
+            v.seen[Section::Ideas.index()].visited,
+            "the jump did not count as a visit"
+        );
 
         v.field_guard = false;
         press_char('1', &mut v, &state);
         press_char('3', &mut v, &state);
-        assert!(is_open(&state, &v), "the group the jump opened did not stay open");
+        assert!(
+            is_open(&state, &v),
+            "the group the jump opened did not stay open"
+        );
         jumped += 1;
     }
-    assert!(jumped * 2 > finished_rows.len(), "fixture: the palette could aim at too few finished items alone");
+    assert!(
+        jumped * 2 > finished_rows.len(),
+        "fixture: the palette could aim at too few finished items alone"
+    );
 }
 
 // ---- TUI-NAV-123 -----------------------------------------------------------
@@ -5630,18 +6751,37 @@ fn d_is_no_screens_mnemonic_nor_row_bound_key_and_asks_the_core_for_nothing() {
         );
     }
     let mut pressed = 0;
-    for (label, state) in [("mid-game", mid_game()), ("far along", rich()), ("new", fresh()), ("all done", all_ideas_done())] {
+    for (label, state) in [
+        ("mid-game", mid_game()),
+        ("far along", rich()),
+        ("new", fresh()),
+        ("all done", all_ideas_done()),
+    ] {
         for section in Section::ALL {
-            let mut base = ViewState { section: Some(section), ..Default::default() };
+            let mut base = ViewState {
+                section: Some(section),
+                ..Default::default()
+            };
             let mut views = vec![base.clone()];
-            for k in drawn_rows(&state, section, &base).into_iter().filter(|r| r.selectable()).map(|r| r.key) {
+            for k in drawn_rows(&state, section, &base)
+                .into_iter()
+                .filter(|r| r.selectable())
+                .map(|r| r.key)
+            {
                 base.focus[section.index()] = Some(k);
                 views.push(base.clone());
             }
             if section == Section::Ideas {
-                let mut open = ViewState { section: Some(section), ..Default::default() };
+                let mut open = ViewState {
+                    section: Some(section),
+                    ..Default::default()
+                };
                 press_d(&mut open, &state);
-                for k in drawn_rows(&state, section, &open).into_iter().filter(|r| r.selectable()).map(|r| r.key) {
+                for k in drawn_rows(&state, section, &open)
+                    .into_iter()
+                    .filter(|r| r.selectable())
+                    .map(|r| r.key)
+                {
                     let mut w = open.clone();
                     w.focus[section.index()] = Some(k);
                     views.push(w);
@@ -5650,7 +6790,9 @@ fn d_is_no_screens_mnemonic_nor_row_bound_key_and_asks_the_core_for_nothing() {
             for before in views {
                 let focus = before.focus[section.index()].clone();
                 assert!(
-                    !mnemonics::live(&state, section, focus.as_ref()).iter().any(|(c, _, _)| *c == 'd'),
+                    !mnemonics::live(&state, section, focus.as_ref())
+                        .iter()
+                        .any(|(c, _, _)| *c == 'd'),
                     "in {label}, {} d is a live mnemonic",
                     describe(section, &focus)
                 );
@@ -5662,7 +6804,12 @@ fn d_is_no_screens_mnemonic_nor_row_bound_key_and_asks_the_core_for_nothing() {
                     describe(section, &focus)
                 );
                 if section != Section::Ideas {
-                    assert_eq!(observable(&w), observable(&before), "in {label}, {} d changed the view", describe(section, &focus));
+                    assert_eq!(
+                        observable(&w),
+                        observable(&before),
+                        "in {label}, {} d changed the view",
+                        describe(section, &focus)
+                    );
                 }
                 pressed += 1;
             }

@@ -119,7 +119,10 @@ pub fn resolve(key: KeyEvent, view: &ViewState) -> Action {
         // or an unbound key. @spec TUI-NAV-046
         KeyCode::Char(c) => match Section::from_digit(c) {
             Some(section) => Action::SectionJump(section),
-            None if view.section.is_some_and(|s| mnemonics::section_letters(s).contains(&c)) => {
+            None if view
+                .section
+                .is_some_and(|s| mnemonics::section_letters(s).contains(&c)) =>
+            {
                 Action::Mnemonic(c)
             }
             None => Action::Ignored,

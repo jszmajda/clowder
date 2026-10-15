@@ -96,7 +96,9 @@ fn kitten(job: Option<JobId>, location: Location) -> Kitten {
 
 /// Kittens with work, at home: nobody the idle chip could be about.
 fn employed(n: usize) -> Vec<Kitten> {
-    (0..n).map(|_| kitten(Some(JobId::Gardener), Location::Home)).collect()
+    (0..n)
+        .map(|_| kitten(Some(JobId::Gardener), Location::Home))
+        .collect()
 }
 
 /// Jobless kittens in the meadow: exactly what `◦N idle` counts.
@@ -107,7 +109,9 @@ fn idle_here(n: usize) -> Vec<Kitten> {
 /// Jobless kittens visiting the neighbour's yard. Just as jobless, and not
 /// assignable by anyone — TUI-NAV-054's whole subject.
 fn idle_away(n: usize) -> Vec<Kitten> {
-    (0..n).map(|_| kitten(None, Location::NeighborsYard)).collect()
+    (0..n)
+        .map(|_| kitten(None, Location::NeighborsYard))
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -160,8 +164,10 @@ fn every_section_revealed() -> GameState {
 fn all_caught_up(state: &GameState) -> [SeenMark; 10] {
     let mut marks = [SeenMark::default(); 10];
     for section in Section::ALL {
-        marks[section.index()] =
-            SeenMark { visited: true, revealed_at_last_visit: rows(state, section).len() };
+        marks[section.index()] = SeenMark {
+            visited: true,
+            revealed_at_last_visit: rows(state, section).len(),
+        };
     }
     marks
 }
@@ -169,7 +175,11 @@ fn all_caught_up(state: &GameState) -> [SeenMark; 10] {
 /// A view over a state with nothing outstanding: every section seen, no report
 /// unread, no prompt, no overlay, no armed row.
 fn calm_view(state: &GameState) -> ViewState {
-    ViewState { section: Some(Section::Meadow), seen: all_caught_up(state), ..Default::default() }
+    ViewState {
+        section: Some(Section::Meadow),
+        seen: all_caught_up(state),
+        ..Default::default()
+    }
 }
 
 /// A view focused on one row of one section, with nothing else outstanding.
@@ -184,7 +194,10 @@ fn focus_on(state: &GameState, section: Section, key: RowKey) -> ViewState {
 /// `d` pressed as the player presses it, the repeat clock cleared after.
 fn press_done_key(state: &GameState, view: &mut ViewState) {
     let d = clowder_tui::nav::keys::resolve(
-        crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Char('d'), crossterm::event::KeyModifiers::NONE),
+        crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Char('d'),
+            crossterm::event::KeyModifiers::NONE,
+        ),
         view,
     );
     update(d, view, state);
@@ -196,8 +209,12 @@ fn press_done_key(state: &GameState, view: &mut ViewState) {
 /// a row (TUI-NAV-113) — keeping the focus on that row.
 fn unfold_focus(state: &GameState, view: &mut ViewState) {
     let Some(section) = view.section else { return };
-    let Some(key) = view.focus[section.index()].clone() else { return };
-    if drawn_rows(state, section, view).iter().any(|r| r.key == key)
+    let Some(key) = view.focus[section.index()].clone() else {
+        return;
+    };
+    if drawn_rows(state, section, view)
+        .iter()
+        .any(|r| r.key == key)
         || !rows(state, section).iter().any(|r| r.key == key)
     {
         return;
@@ -217,26 +234,48 @@ fn first_row_where(
         .into_iter()
         .find(|r| pred(r))
         .unwrap_or_else(|| {
-            panic!("fixture: the {} section should have {what}", section.title())
+            panic!(
+                "fixture: the {} section should have {what}",
+                section.title()
+            )
         })
         .key
 }
 
 fn single_row(state: &GameState) -> RowKey {
     first_row_where(state, Section::Meadow, "a plain one-shot row", |r| {
-        !r.heavy && matches!(r.kind, RowKind::Act { semantics: CountSemantics::Single, .. })
+        !r.heavy
+            && matches!(
+                r.kind,
+                RowKind::Act {
+                    semantics: CountSemantics::Single,
+                    ..
+                }
+            )
     })
 }
 
 fn repeatable_row(state: &GameState) -> RowKey {
     first_row_where(state, Section::Meadow, "a repeat-N row", |r| {
-        matches!(r.kind, RowKind::Act { semantics: CountSemantics::RepeatN, .. })
+        matches!(
+            r.kind,
+            RowKind::Act {
+                semantics: CountSemantics::RepeatN,
+                ..
+            }
+        )
     })
 }
 
 fn count_taking_row(state: &GameState) -> RowKey {
     first_row_where(state, Section::Clowder, "a count-taking row", |r| {
-        matches!(r.kind, RowKind::Act { semantics: CountSemantics::CountTaking, .. })
+        matches!(
+            r.kind,
+            RowKind::Act {
+                semantics: CountSemantics::CountTaking,
+                ..
+            }
+        )
     })
 }
 
@@ -354,7 +393,8 @@ fn hint_line(state: &GameState, view: &ViewState, w: u16) -> String {
 fn sidebar_lines(state: &GameState, w: u16, h: u16) -> Vec<String> {
     let (_, _, side, _) = regions(w, h);
     let mut term = terminal(w, h);
-    term.draw(|f| chrome::sidebar(f, side, state)).expect("TestBackend is infallible");
+    term.draw(|f| chrome::sidebar(f, side, state))
+        .expect("TestBackend is infallible");
     region_lines(term.backend().buffer(), side)
 }
 
@@ -383,7 +423,8 @@ fn has_key(line: &str, key: &str) -> bool {
 }
 
 fn says(line: &str, word: &str) -> bool {
-    line.to_ascii_lowercase().contains(&word.to_ascii_lowercase())
+    line.to_ascii_lowercase()
+        .contains(&word.to_ascii_lowercase())
 }
 
 // ---------------------------------------------------------------------------
@@ -423,21 +464,31 @@ fn chip_count(line: &str, chip: (char, &str)) -> Option<u64> {
 }
 
 fn live_chips(line: &str) -> Vec<&'static str> {
-    CHIPS.iter().filter(|c| chip_shown(line, **c)).map(|c| c.1).collect()
+    CHIPS
+        .iter()
+        .filter(|c| chip_shown(line, **c))
+        .map(|c| c.1)
+        .collect()
 }
 
 /// How many tabs the bar draws wearing `★`, read from what `chrome::tabs`
 /// draws at a width where every tab is named — never from the view's own
 /// bookkeeping, since the chip is defined by the bar.
 fn badged_tab_count(state: &GameState, view: &ViewState) -> usize {
-    tab_line(state, view, WIDE_W).chars().filter(|c| *c == '★').count()
+    tab_line(state, view, WIDE_W)
+        .chars()
+        .filter(|c| *c == '★')
+        .count()
 }
 
 /// The sections with a tab on the bar other than the focused one, in digit
 /// order — the tabs a test may badge without contradicting the rule that the
 /// section in focus never wears `★`.
 fn unfocused_tabs(state: &GameState, view: &ViewState) -> Vec<Section> {
-    tab_sections(state, view.section).into_iter().filter(|s| Some(*s) != view.section).collect()
+    tab_sections(state, view.section)
+        .into_iter()
+        .filter(|s| Some(*s) != view.section)
+        .collect()
 }
 
 /// A settled meadow and a calm view with a chosen set of chips live, in the
@@ -454,13 +505,20 @@ fn live_chips_fixture(live: [bool; 4], idle: usize, new: usize) -> (GameState, V
     let mut view = calm_view(&state);
     if live[2] {
         let others = unfocused_tabs(&state, &view);
-        assert!(others.len() >= new, "fixture: {new} tabs to badge, only {} on the bar", others.len());
+        assert!(
+            others.len() >= new,
+            "fixture: {new} tabs to badge, only {} on the bar",
+            others.len()
+        );
         for section in &others[..new] {
             view.seen[section.index()].visited = false;
         }
     }
     if live[3] {
-        view.reports = vec![PendingReport { entry: 0, dismissed: false }];
+        view.reports = vec![PendingReport {
+            entry: 0,
+            dismissed: false,
+        }];
     }
     (state, view)
 }
@@ -474,7 +532,13 @@ fn chip_cluster(live: [bool; 4], counts: Option<(usize, usize)>) -> String {
         None => ("◦idle".to_string(), "★new".to_string()),
     };
     let forms = [idle, "!sky".to_string(), new, "~away".to_string()];
-    forms.iter().zip(live).filter(|(_, on)| *on).map(|(f, _)| f.clone()).collect::<Vec<_>>().join("  ")
+    forms
+        .iter()
+        .zip(live)
+        .filter(|(_, on)| *on)
+        .map(|(f, _)| f.clone())
+        .collect::<Vec<_>>()
+        .join("  ")
 }
 
 /// A meadow and a view in which all four opportunities are live at once — the
@@ -496,7 +560,10 @@ fn all_four_live() -> (GameState, ViewState) {
         1,
         "fixture: exactly the Clowder tab should wear ★ on the bar"
     );
-    view.reports = vec![PendingReport { entry: 0, dismissed: false }];
+    view.reports = vec![PendingReport {
+        entry: 0,
+        dismissed: false,
+    }];
 
     (state, view)
 }
@@ -527,9 +594,12 @@ fn every_piece_of_the_chrome_is_drawn_at_every_supported_size() {
         .expect("TestBackend is infallible");
         let buffer = term.backend().buffer().clone();
 
-        for (what, rect) in
-            [("header", header), ("tab bar", tabs), ("sidebar", sidebar), ("hint bar", hints)]
-        {
+        for (what, rect) in [
+            ("header", header),
+            ("tab bar", tabs),
+            ("sidebar", sidebar),
+            ("hint bar", hints),
+        ] {
             let lines = region_lines(&buffer, rect);
             assert!(
                 !blank(&lines),
@@ -639,7 +709,10 @@ fn the_sidebar_shows_the_stores_it_is_handed() {
     let little = sidebar_lines(&with_a_little, FLOOR_W, FLOOR_H);
     let lot = sidebar_lines(&with_a_lot, FLOOR_W, FLOOR_H);
 
-    assert!(!blank(&little), "a meadow with stores must have a sidebar that says so");
+    assert!(
+        !blank(&little),
+        "a meadow with stores must have a sidebar that says so"
+    );
     assert_ne!(
         little,
         lot,
@@ -664,9 +737,9 @@ fn an_empty_chip_cluster_is_what_nothing_needing_you_looks_like() {
     let settled = {
         let mut s = every_section_revealed();
         s.kittens = employed(6);
-    // Prestige reveals on having met the size it asks for, so the ratchet is
-    // what this fixture needs — not a roster it never had.
-    s.roster_high_water = 100;
+        // Prestige reveals on having met the size it asks for, so the ratchet is
+        // what this fixture needs — not a roster it never had.
+        s.roster_high_water = 100;
         s.pending_sky_event = None;
         s
     };
@@ -787,7 +860,11 @@ fn the_new_content_chip_counts_the_tabs_wearing_a_badge() {
         for section in &others[..k] {
             view.seen[section.index()].visited = false;
         }
-        assert_eq!(badged_tab_count(&state, &view), k, "fixture: {k} tabs should wear ★");
+        assert_eq!(
+            badged_tab_count(&state, &view),
+            k,
+            "fixture: {k} tabs should wear ★"
+        );
 
         let line = header_line(&state, &view, WIDE_W);
         if k == 0 {
@@ -812,7 +889,10 @@ fn the_new_content_chip_counts_the_tabs_wearing_a_badge() {
     // bookkeeping reads: a badge that is not drawn marks nothing, and a chip
     // counting it would point at no place on screen.
     let fresh = GameState::new(3);
-    let mut view = ViewState { section: Some(Section::Meadow), ..Default::default() };
+    let mut view = ViewState {
+        section: Some(Section::Meadow),
+        ..Default::default()
+    };
     view.seen[Section::Meadow.index()].visited = true;
     assert_eq!(
         badged_tab_count(&fresh, &view),
@@ -839,7 +919,12 @@ fn each_chip_is_its_glyph_and_word_with_a_count_on_the_two_that_count() {
     for (idle, new) in [(1usize, 1usize), (4, 3), (12, 9)] {
         let (state, view) = live_chips_fixture([true, true, true, true], idle, new);
         let line = header_line(&state, &view, WIDE_W);
-        for form in [format!("◦{idle} idle"), "!sky".to_string(), format!("★{new} new"), "~away".to_string()] {
+        for form in [
+            format!("◦{idle} idle"),
+            "!sky".to_string(),
+            format!("★{new} new"),
+            "~away".to_string(),
+        ] {
             assert!(
                 line.contains(&form),
                 "with {idle} idle kittens and {new} badged tabs the header should carry the chip \
@@ -921,16 +1006,49 @@ fn the_sky_chip_shows_exactly_until_the_tick_reaches_the_recorded_expiry() {
 #[test]
 fn the_away_chip_shows_exactly_while_any_queued_report_is_unread() {
     let state = every_section_revealed();
-    let report = |entry: usize, read: bool| PendingReport { entry, dismissed: read };
+    let report = |entry: usize, read: bool| PendingReport {
+        entry,
+        dismissed: read,
+    };
     type Case = (&'static str, Vec<PendingReport>, Vec<(usize, u32)>, bool);
     let cases: Vec<Case> = vec![
         ("an empty queue", vec![], vec![], false),
-        ("one unread absence report", vec![report(0, false)], vec![], true),
-        ("one unread nap report", vec![report(0, false)], vec![(0, 3)], true),
-        ("one read nap report", vec![report(0, true)], vec![(0, 3)], false),
-        ("every report read", vec![report(2, true), report(1, true), report(0, true)], vec![], false),
-        ("only the newest unread", vec![report(2, false), report(1, true), report(0, true)], vec![], true),
-        ("only the oldest unread", vec![report(2, true), report(1, true), report(0, false)], vec![], true),
+        (
+            "one unread absence report",
+            vec![report(0, false)],
+            vec![],
+            true,
+        ),
+        (
+            "one unread nap report",
+            vec![report(0, false)],
+            vec![(0, 3)],
+            true,
+        ),
+        (
+            "one read nap report",
+            vec![report(0, true)],
+            vec![(0, 3)],
+            false,
+        ),
+        (
+            "every report read",
+            vec![report(2, true), report(1, true), report(0, true)],
+            vec![],
+            false,
+        ),
+        (
+            "only the newest unread",
+            vec![report(2, false), report(1, true), report(0, true)],
+            vec![],
+            true,
+        ),
+        (
+            "only the oldest unread",
+            vec![report(2, true), report(1, true), report(0, false)],
+            vec![],
+            true,
+        ),
         (
             "an unread nap behind a read absence",
             vec![report(1, true), report(0, false)],
@@ -989,7 +1107,10 @@ fn the_away_chip_shows_while_a_report_is_unread() {
     let state = every_section_revealed();
 
     let mut unread = calm_view(&state);
-    unread.reports = vec![PendingReport { entry: 0, dismissed: false }];
+    unread.reports = vec![PendingReport {
+        entry: 0,
+        dismissed: false,
+    }];
     let line = header_line(&state, &unread, WIDE_W);
     assert!(
         chip_shown(&line, AWAY),
@@ -998,7 +1119,10 @@ fn the_away_chip_shows_while_a_report_is_unread() {
     );
 
     let mut read = calm_view(&state);
-    read.reports = vec![PendingReport { entry: 0, dismissed: true }];
+    read.reports = vec![PendingReport {
+        entry: 0,
+        dismissed: true,
+    }];
     let line = header_line(&state, &read, WIDE_W);
     assert!(
         !chip_shown(&line, AWAY),
@@ -1139,7 +1263,13 @@ fn each_chip_clears_on_its_own_signal_and_leaves_the_others_alone() {
 /// countdown is measured against.
 fn countdown_fixture(unread: usize) -> (GameState, ViewState, Vec<Section>) {
     let (state, mut view) = live_chips_fixture([true, true, true, false], 4, 4);
-    view.reports = (0..unread).rev().map(|entry| PendingReport { entry, dismissed: false }).collect();
+    view.reports = (0..unread)
+        .rev()
+        .map(|entry| PendingReport {
+            entry,
+            dismissed: false,
+        })
+        .collect();
     let badged: Vec<Section> = unfocused_tabs(&state, &view)
         .into_iter()
         .filter(|s| !view.seen[s.index()].visited)
@@ -1182,7 +1312,12 @@ fn each_visit_to_a_badged_tab_lowers_the_new_chip_by_one_and_no_other_chip() {
         update(Action::SectionJump(section), &mut view, &state);
         expected -= 1;
         let line = header_line(&state, &view, WIDE_W);
-        assert_eq!(badged_tab_count(&state, &view), expected, "fixture: the visit should clear {}'s badge", section.title());
+        assert_eq!(
+            badged_tab_count(&state, &view),
+            expected,
+            "fixture: the visit should clear {}'s badge",
+            section.title()
+        );
         if expected == 0 {
             assert!(
                 !chip_shown(&line, NEW),
@@ -1197,8 +1332,15 @@ fn each_visit_to_a_badged_tab_lowers_the_new_chip_by_one_and_no_other_chip() {
                 section.title()
             );
         }
-        assert_eq!(chip_count(&line, IDLE), Some(4), "a visit changed the idle chip: {line:?}");
-        assert!(chip_shown(&line, SKY), "a visit cleared the sky chip: {line:?}");
+        assert_eq!(
+            chip_count(&line, IDLE),
+            Some(4),
+            "a visit changed the idle chip: {line:?}"
+        );
+        assert!(
+            chip_shown(&line, SKY),
+            "a visit cleared the sky chip: {line:?}"
+        );
         assert!(
             chip_shown(&line, AWAY),
             "a report is still unread, yet the away chip is gone after a visit: {line:?}"
@@ -1226,8 +1368,14 @@ fn a_badged_tab_leaving_the_bar_lowers_the_new_chip_by_one() {
         .into_iter()
         .filter(|s| Some(*s) != focus)
         .collect();
-    assert!(!leaving.is_empty(), "fixture: quieting the sky should take a tab off the bar");
-    assert!(!staying.is_empty(), "fixture: some unfocused tab should stay on the bar");
+    assert!(
+        !leaving.is_empty(),
+        "fixture: quieting the sky should take a tab off the bar"
+    );
+    assert!(
+        !staying.is_empty(),
+        "fixture: some unfocused tab should stay on the bar"
+    );
 
     let prepare = |state: &GameState| {
         let mut st = state.clone();
@@ -1242,9 +1390,16 @@ fn a_badged_tab_leaving_the_bar_lowers_the_new_chip_by_one() {
     let mut view = calm_view(&before_state);
     view.seen[leaving[0].index()].visited = false;
     view.seen[staying[0].index()].visited = false;
-    view.reports = vec![PendingReport { entry: 0, dismissed: false }];
+    view.reports = vec![PendingReport {
+        entry: 0,
+        dismissed: false,
+    }];
 
-    assert_eq!(badged_tab_count(&before_state, &view), 2, "fixture: two tabs should wear ★");
+    assert_eq!(
+        badged_tab_count(&before_state, &view),
+        2,
+        "fixture: two tabs should wear ★"
+    );
     let before = header_line(&before_state, &view, WIDE_W);
     assert_eq!(
         chip_count(&before, NEW),
@@ -1263,14 +1418,22 @@ fn a_badged_tab_leaving_the_bar_lowers_the_new_chip_by_one() {
         leaving[0].title()
     );
     for other in [IDLE, SKY, AWAY] {
-        assert!(chip_shown(&after, other), "a tab leaving cleared the {} chip: {after:?}", chip_name(other));
+        assert!(
+            chip_shown(&after, other),
+            "a tab leaving cleared the {} chip: {after:?}",
+            chip_name(other)
+        );
     }
 
     // And the per-frame bookkeeping that follows a tab leaving keeps it so.
     let mut kept = view.clone();
     reset_hidden_tabs(&mut kept, &after_state);
     let line = header_line(&after_state, &kept, WIDE_W);
-    assert_eq!(chip_count(&line, NEW), Some(1), "after the frame's bookkeeping: {line:?}");
+    assert_eq!(
+        chip_count(&line, NEW),
+        Some(1),
+        "after the frame's bookkeeping: {line:?}"
+    );
 }
 
 /// `~away` clears once no report in the queue stays unread, and not before:
@@ -1297,18 +1460,39 @@ fn the_away_chip_clears_only_once_no_report_stays_unread() {
             Some(badged.len() as u64),
             "reading a report changed the new-content chip: {line:?}"
         );
-        assert_eq!(chip_count(&line, IDLE), Some(4), "reading a report changed the idle chip: {line:?}");
-        assert!(chip_shown(&line, SKY), "reading a report cleared the sky chip: {line:?}");
+        assert_eq!(
+            chip_count(&line, IDLE),
+            Some(4),
+            "reading a report changed the idle chip: {line:?}"
+        );
+        assert!(
+            chip_shown(&line, SKY),
+            "reading a report cleared the sky chip: {line:?}"
+        );
     }
 
     // The Journal reads every unread report at once.
     let (state, mut view, badged) = countdown_fixture(3);
     update(Action::OpenJournal, &mut view, &state);
     let line = header_line(&state, &view, WIDE_W);
-    assert!(!chip_shown(&line, AWAY), "the Journal opened and the away chip stays: {line:?}");
-    assert_eq!(chip_count(&line, NEW), Some(badged.len() as u64), "the Journal changed ★N new: {line:?}");
-    assert_eq!(chip_count(&line, IDLE), Some(4), "the Journal changed the idle chip: {line:?}");
-    assert!(chip_shown(&line, SKY), "the Journal cleared the sky chip: {line:?}");
+    assert!(
+        !chip_shown(&line, AWAY),
+        "the Journal opened and the away chip stays: {line:?}"
+    );
+    assert_eq!(
+        chip_count(&line, NEW),
+        Some(badged.len() as u64),
+        "the Journal changed ★N new: {line:?}"
+    );
+    assert_eq!(
+        chip_count(&line, IDLE),
+        Some(4),
+        "the Journal changed the idle chip: {line:?}"
+    );
+    assert!(
+        chip_shown(&line, SKY),
+        "the Journal cleared the sky chip: {line:?}"
+    );
 }
 
 /// One press can carry two chips' signals: a digit landing in a badged section
@@ -1420,20 +1604,44 @@ fn the_header_draws_the_first_step_that_fits_at_every_width() {
         s.speed = 0.25;
         (s, v)
     };
-    type Case = (&'static str, [bool; 4], (usize, usize), (GameState, ViewState));
+    type Case = (
+        &'static str,
+        [bool; 4],
+        (usize, usize),
+        (GameState, ViewState),
+    );
     let cases: Vec<Case> = vec![
-        ("all four chips live", [true; 4], (12, 3), live_chips_fixture([true; 4], 12, 3)),
-        ("no chip live", [false; 4], (0, 0), live_chips_fixture([false; 4], 0, 0)),
-        ("idle and away live", [true, false, false, true], (7, 0), live_chips_fixture([true, false, false, true], 7, 0)),
+        (
+            "all four chips live",
+            [true; 4],
+            (12, 3),
+            live_chips_fixture([true; 4], 12, 3),
+        ),
+        (
+            "no chip live",
+            [false; 4],
+            (0, 0),
+            live_chips_fixture([false; 4], 0, 0),
+        ),
+        (
+            "idle and away live",
+            [true, false, false, true],
+            (7, 0),
+            live_chips_fixture([true, false, false, true], 7, 0),
+        ),
         ("long figures, all four live", [true; 4], (20, 9), big),
     ];
 
     for (what, live, counts, (state, view)) in cases {
-        let widest = pinned_header(&state, live, counts, 400).expect("the full line fits 400").1;
+        let widest = pinned_header(&state, live, counts, 400)
+            .expect("the full line fits 400")
+            .1;
         let full_w = widest.trim_end().chars().count();
         let mut steps_seen = BTreeSet::new();
         for w in 10..=(full_w + 3) {
-            let Some((step, expected)) = pinned_header(&state, live, counts, w) else { continue };
+            let Some((step, expected)) = pinned_header(&state, live, counts, w) else {
+                continue;
+            };
             steps_seen.insert(step);
             let drawn = header_line(&state, &view, w as u16);
             assert_eq!(
@@ -1442,8 +1650,11 @@ fn the_header_draws_the_first_step_that_fits_at_every_width() {
                  expected: {expected:?}\n   drawn: {drawn:?}"
             );
         }
-        let wanted: BTreeSet<usize> =
-            if live == [false; 4] { [1, 2, 4].into() } else { [1, 2, 3, 4].into() };
+        let wanted: BTreeSet<usize> = if live == [false; 4] {
+            [1, 2, 4].into()
+        } else {
+            [1, 2, 3, 4].into()
+        };
         assert!(
             wanted.is_subset(&steps_seen),
             "fixture: {what} should sweep through steps {wanted:?}, swept {steps_seen:?}"
@@ -1454,7 +1665,10 @@ fn the_header_draws_the_first_step_that_fits_at_every_width() {
         if what.starts_with("long") {
             let (step, _) = pinned_header(&state, live, counts, FLOOR_W as usize)
                 .expect("the floor width holds mood, speed and every chip");
-            assert_eq!(step, 4, "fixture: long figures should shed facts at the floor width");
+            assert_eq!(
+                step, 4,
+                "fixture: long figures should shed facts at the floor width"
+            );
         }
     }
 }
@@ -1483,7 +1697,10 @@ fn composed_frame(
     let mut layout = None;
     term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, view, None)))
         .expect("TestBackend is infallible");
-    (term.backend().buffer().clone(), layout.expect("frame returns the layout it used"))
+    (
+        term.backend().buffer().clone(),
+        layout.expect("frame returns the layout it used"),
+    )
 }
 
 /// Every cell of the header row wears the rule's underline — at the floor, on
@@ -1514,7 +1731,10 @@ fn the_header_rule_underlines_every_header_cell_at_every_width_step_and_changes_
     for (idle, new) in [(3usize, 2usize), (12, 3)] {
         for mask in 0u8..16 {
             let live = [mask & 1 != 0, mask & 2 != 0, mask & 4 != 0, mask & 8 != 0];
-            let counts = (if live[0] { idle } else { 0 }, if live[2] { new } else { 0 });
+            let counts = (
+                if live[0] { idle } else { 0 },
+                if live[2] { new } else { 0 },
+            );
             cases.push((live, counts, live_chips_fixture(live, idle, new)));
         }
     }
@@ -1686,7 +1906,10 @@ fn every_symbol_the_chrome_draws_is_a_single_width_character() {
             }
         }
     }
-    assert!(checked > 0, "fixture: this sweep should have read some cells");
+    assert!(
+        checked > 0,
+        "fixture: this sweep should have read some cells"
+    );
 
     // And the grapheme test, which the character sweep above cannot make: a
     // buffer cell holding more than one code point is a cluster the terminal
@@ -1704,7 +1927,10 @@ fn every_symbol_the_chrome_draws_is_a_single_width_character() {
     for rect in [header, tabs, sidebar, hints] {
         for y in rect.y..rect.bottom() {
             for x in rect.x..rect.right() {
-                let symbol = buffer.cell((x, y)).expect("every cell of the area exists").symbol();
+                let symbol = buffer
+                    .cell((x, y))
+                    .expect("every cell of the area exists")
+                    .symbol();
                 assert_eq!(
                     symbol.chars().count(),
                     1,
@@ -1770,7 +1996,10 @@ fn the_mood_is_a_word_that_survives_the_colour_being_stripped() {
 fn a_capped_store_says_so_in_words_and_not_only_in_colour() {
     let mut capped = GameState::new(11);
     let cap = capped.cap(ResourceId::Catnip);
-    assert!(cap > 0.0, "fixture: catnip needs a finite cap for this test to mean anything");
+    assert!(
+        cap > 0.0,
+        "fixture: catnip needs a finite cap for this test to mean anything"
+    );
     capped.resources[ResourceId::Catnip.ix()] = cap;
 
     let mut room_to_spare = GameState::new(11);
@@ -1793,8 +2022,7 @@ fn a_capped_store_says_so_in_words_and_not_only_in_colour() {
         half.join("\n")
     );
     assert_ne!(
-        full,
-        half,
+        full, half,
         "a full store and a half-full one drew the same sidebar text, so the fill is being told \
          by colour alone"
     );
@@ -1858,7 +2086,12 @@ fn a_store_wears_full_exactly_where_a_cap_above_zero_is_reached() {
                          draws its fill bar.\n{}",
                         lines.join("\n")
                     );
-                    assert_eq!(tagged.len(), 1, "{r:?} {what}: `full` on one line only.\n{}", lines.join("\n"));
+                    assert_eq!(
+                        tagged.len(),
+                        1,
+                        "{r:?} {what}: `full` on one line only.\n{}",
+                        lines.join("\n")
+                    );
                 } else {
                     assert!(
                         tagged.is_empty(),
@@ -1915,7 +2148,9 @@ fn affordability_colour_stands_only_on_a_line_carrying_its_marker() {
         .expect("TestBackend is infallible");
         let buf = term.backend().buffer().clone();
         for y in 0..WIDE_H {
-            let cells: Vec<_> = (0..WIDE_W).map(|x| buf.cell((x, y)).expect("cell").clone()).collect();
+            let cells: Vec<_> = (0..WIDE_W)
+                .map(|x| buf.cell((x, y)).expect("cell").clone())
+                .collect();
             let text: String = cells.iter().map(|c| c.symbol().to_string()).collect();
             if cells.iter().any(|c| c.fg == ready) {
                 saw_ready = true;
@@ -1937,7 +2172,10 @@ fn affordability_colour_stands_only_on_a_line_carrying_its_marker() {
             }
         }
     }
-    assert!(saw_ready && saw_partial, "fixture: the sweep should draw both colours (ready {saw_ready}, partial {saw_partial})");
+    assert!(
+        saw_ready && saw_partial,
+        "fixture: the sweep should draw both colours (ready {saw_ready}, partial {saw_partial})"
+    );
 }
 
 /// Attention reaches the player by each chip's glyph and word at every width
@@ -2059,7 +2297,10 @@ fn no_attention_channel_is_ever_the_affordable_or_partial_marker() {
     for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE_W, WIDE_H)] {
         let lines = sidebar_lines(&capped, w, h);
         let tagged: Vec<&String> = lines.iter().filter(|l| has_key(l, "full")).collect();
-        assert!(!tagged.is_empty(), "fixture: at {w}x{h} some capped store wears `full`");
+        assert!(
+            !tagged.is_empty(),
+            "fixture: at {w}x{h} some capped store wears `full`"
+        );
         for line in tagged {
             for m in MARKERS {
                 assert!(
@@ -2096,7 +2337,10 @@ fn compressed_run_meadows() -> Vec<(&'static str, GameState, ViewState)> {
     mixed.pending_sky_event = Some(mixed.ticks + 5);
     let mut view = calm_view(&mixed);
     view.seen[Section::Clowder.index()].visited = false;
-    view.reports = vec![PendingReport { entry: 0, dismissed: false }];
+    view.reports = vec![PendingReport {
+        entry: 0,
+        dismissed: false,
+    }];
     out.push(("a mixed meadow with every chip live", mixed, view));
 
     // The rich meadow, every chip live: mostly `●` and `✓`.
@@ -2172,31 +2416,56 @@ fn among_the_compressed_run_each_glyph_wears_only_its_own_colour() {
         type ChromeView = (String, ViewState, Vec<(u16, u16)>);
         let mut views: Vec<ChromeView> = Vec::new();
         for section in Section::ALL {
-            for key in rows(&state, section).into_iter().filter(|r| r.selectable()).map(|r| r.key) {
+            for key in rows(&state, section)
+                .into_iter()
+                .filter(|r| r.selectable())
+                .map(|r| r.key)
+            {
                 let mut v = base.clone();
                 v.section = Some(section);
                 v.focus[section.index()] = Some(key.clone());
                 unfold_focus(&state, &mut v);
                 v.inspector_wanted = true;
-                views.push((format!("{} section, cursor on {key:?}", section.title()), v, vec![pane]));
+                views.push((
+                    format!("{} section, cursor on {key:?}", section.title()),
+                    v,
+                    vec![pane],
+                ));
             }
             for inspector in [false, true] {
                 let mut v = base.clone();
                 v.section = Some(section);
                 v.inspector_wanted = inspector;
-                views.push((format!("{} section, inspector {inspector}", section.title()), v, sizes.to_vec()));
+                views.push((
+                    format!("{} section, inspector {inspector}", section.title()),
+                    v,
+                    sizes.to_vec(),
+                ));
             }
             let mut v = base.clone();
             v.section = Some(section);
-            v.footer = Some(("a footer note".to_string(), Instant::now() + Duration::from_secs(600)));
-            views.push((format!("{} section with a footer note", section.title()), v, sizes.to_vec()));
+            v.footer = Some((
+                "a footer note".to_string(),
+                Instant::now() + Duration::from_secs(600),
+            ));
+            views.push((
+                format!("{} section with a footer note", section.title()),
+                v,
+                sizes.to_vec(),
+            ));
         }
         for overlay in [
             Overlay::Help,
             Overlay::Journal { anchor: 0 },
-            Overlay::Palette { query: String::new(), selected: 0 },
+            Overlay::Palette {
+                query: String::new(),
+                selected: 0,
+            },
         ] {
-            let v = ViewState { overlay: Some(overlay.clone()), ..base.clone() };
+            let v = ViewState {
+                overlay: Some(overlay.clone()),
+                ..base.clone()
+            };
             views.push((format!("overlay {overlay:?}"), v, sizes.to_vec()));
         }
 
@@ -2211,23 +2480,24 @@ fn among_the_compressed_run_each_glyph_wears_only_its_own_colour() {
                 for y in 0..h {
                     for x in 0..w {
                         let cell = buf.cell((x, y)).expect("cell");
-                        let (forbidden, glyph): (&[ratatui::style::Color], &str) = match cell.symbol() {
-                            "●" => {
-                                saw_filled += 1;
-                                (&[partial, attention], "●")
-                            }
-                            "◐" => {
-                                saw_half += 1;
-                                (&[ready, attention], "◐")
-                            }
-                            s if header.contains(ratatui::layout::Position { x, y })
-                                && CHIPS.iter().any(|c| s.starts_with(c.0)) =>
-                            {
-                                saw_chip += 1;
-                                (&[ready, partial], "an attention chip's glyph")
-                            }
-                            _ => continue,
-                        };
+                        let (forbidden, glyph): (&[ratatui::style::Color], &str) =
+                            match cell.symbol() {
+                                "●" => {
+                                    saw_filled += 1;
+                                    (&[partial, attention], "●")
+                                }
+                                "◐" => {
+                                    saw_half += 1;
+                                    (&[ready, attention], "◐")
+                                }
+                                s if header.contains(ratatui::layout::Position { x, y })
+                                    && CHIPS.iter().any(|c| s.starts_with(c.0)) =>
+                                {
+                                    saw_chip += 1;
+                                    (&[ready, partial], "an attention chip's glyph")
+                                }
+                                _ => continue,
+                            };
                         assert!(
                             !forbidden.contains(&cell.fg),
                             "in {label}, {what}, at {w}x{h}: {glyph} at ({x}, {y}) is drawn in \
@@ -2235,7 +2505,9 @@ fn among_the_compressed_run_each_glyph_wears_only_its_own_colour() {
                              only its own state's colour, or two states become one appearance \
                              once the hues compress.\nline: {:?}",
                             colour_name(cell.fg),
-                            (0..w).map(|x| buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" ")).collect::<String>()
+                            (0..w)
+                                .map(|x| buf.cell((x, y)).map(|c| c.symbol()).unwrap_or(" "))
+                                .collect::<String>()
                         );
                     }
                 }
@@ -2265,7 +2537,9 @@ fn among_the_compressed_run_each_glyph_wears_only_its_own_colour() {
 // ---------------------------------------------------------------------------
 
 fn attention_colour() -> ratatui::style::Color {
-    clowder_tui::theme::Role::Attention.color().expect("Attention carries a colour")
+    clowder_tui::theme::Role::Attention
+        .color()
+        .expect("Attention carries a colour")
 }
 
 /// The chips drawn on one line of cells, each as the columns it spans and the
@@ -2282,7 +2556,10 @@ fn chip_spans(symbols: &[String]) -> Vec<(std::ops::Range<usize>, &'static str)>
         };
         let mut j = i + 1;
         let mut counted = false;
-        while j < symbols.len() && symbols[j].chars().all(|c| c.is_ascii_digit()) && !symbols[j].is_empty() {
+        while j < symbols.len()
+            && symbols[j].chars().all(|c| c.is_ascii_digit())
+            && !symbols[j].is_empty()
+        {
             j += 1;
             counted = true;
         }
@@ -2290,7 +2567,10 @@ fn chip_spans(symbols: &[String]) -> Vec<(std::ops::Range<usize>, &'static str)>
             j += 1;
         }
         let word_len = chip.1.chars().count();
-        let word: String = symbols.get(j..j + word_len).map(|s| s.concat()).unwrap_or_default();
+        let word: String = symbols
+            .get(j..j + word_len)
+            .map(|s| s.concat())
+            .unwrap_or_default();
         if word == chip.1 {
             out.push((i..j + word_len, chip.1));
             i = j + word_len;
@@ -2326,14 +2606,17 @@ fn clipped_word_span(symbols: &[String], word: &str) -> Option<std::ops::Range<u
     (1..word.len()).rev().find_map(|k| {
         let start = symbols.len().checked_sub(k)?;
         let fragment: String = word[..k].iter().collect();
-        (symbols[start..].concat() == fragment && (start == 0 || symbols[start - 1].trim().is_empty()))
-            .then_some(start..symbols.len())
+        (symbols[start..].concat() == fragment
+            && (start == 0 || symbols[start - 1].trim().is_empty()))
+        .then_some(start..symbols.len())
     })
 }
 
 /// One row of a buffer as its cells, clipped to `rect`'s columns.
 fn row_cells(buf: &Buffer, rect: Rect, y: u16) -> Vec<ratatui::buffer::Cell> {
-    (rect.x..rect.right()).map(|x| buf.cell((x, y)).expect("cell").clone()).collect()
+    (rect.x..rect.right())
+        .map(|x| buf.cell((x, y)).expect("cell").clone())
+        .collect()
 }
 
 fn symbols_of(cells: &[ratatui::buffer::Cell]) -> Vec<String> {
@@ -2375,8 +2658,12 @@ fn every_attention_chip_is_drawn_whole_in_attention_and_nothing_else_on_the_head
 
                 let spans = chip_spans(&symbols);
                 let drawn: Vec<&str> = spans.iter().map(|(_, word)| *word).collect();
-                let wanted: Vec<&str> =
-                    CHIPS.iter().zip(live).filter(|(_, on)| *on).map(|(c, _)| c.1).collect();
+                let wanted: Vec<&str> = CHIPS
+                    .iter()
+                    .zip(live)
+                    .filter(|(_, on)| *on)
+                    .map(|(c, _)| c.1)
+                    .collect();
                 assert_eq!(
                     drawn, wanted,
                     "fixture: at width {w} with chips {live:?} live, the header's chips should \
@@ -2385,7 +2672,9 @@ fn every_attention_chip_is_drawn_whole_in_attention_and_nothing_else_on_the_head
 
                 let mut in_chip = vec![false; cells.len()];
                 for (span, word) in &spans {
-                    let counted = symbols[span.clone()].iter().any(|s| s.chars().all(|c| c.is_ascii_digit()));
+                    let counted = symbols[span.clone()]
+                        .iter()
+                        .any(|s| s.chars().all(|c| c.is_ascii_digit()));
                     forms_seen.insert((word, counted));
                     for x in span.clone() {
                         in_chip[x] = true;
@@ -2418,7 +2707,14 @@ fn every_attention_chip_is_drawn_whole_in_attention_and_nothing_else_on_the_head
         }
     }
 
-    for form in [("idle", true), ("idle", false), ("new", true), ("new", false), ("sky", false), ("away", false)] {
+    for form in [
+        ("idle", true),
+        ("idle", false),
+        ("new", true),
+        ("new", false),
+        ("sky", false),
+        ("away", false),
+    ] {
         assert!(
             forms_seen.contains(&form),
             "fixture: the sweep should draw the `{}` chip {} its count (saw {forms_seen:?})",
@@ -2477,8 +2773,11 @@ fn a_capped_store_wears_attention_on_its_full_tag_and_nowhere_else() {
                     }
                 }
                 let rate = probe.net_rate(r);
-                let sig_figs =
-                    fmt::rate(rate).trim_start_matches(['+', '-']).chars().filter(char::is_ascii_digit).count();
+                let sig_figs = fmt::rate(rate)
+                    .trim_start_matches(['+', '-'])
+                    .chars()
+                    .filter(char::is_ascii_digit)
+                    .count();
                 (sig_figs, rate != 0.0)
             })
             .unwrap_or(CREW_SIZES[0]);
@@ -2518,14 +2817,21 @@ fn a_capped_store_wears_attention_on_its_full_tag_and_nowhere_else() {
                     saw_nonzero_rate_capped = true;
                 }
                 let compact_stock = fmt::compact(stock);
-                let integer_digits =
-                    compact_stock.trim_start_matches('-').split(['.', 'K', 'M', 'B', 'T', 'Q']).next().unwrap_or("").len();
+                let integer_digits = compact_stock
+                    .trim_start_matches('-')
+                    .split(['.', 'K', 'M', 'B', 'T', 'Q'])
+                    .next()
+                    .unwrap_or("")
+                    .len();
                 if integer_digits >= 3 {
                     saw_three_digit_stock_capped = true;
                 }
                 let compact_rate = fmt::rate(rate);
-                let sig_figs =
-                    compact_rate.trim_start_matches(['+', '-']).chars().filter(char::is_ascii_digit).count();
+                let sig_figs = compact_rate
+                    .trim_start_matches(['+', '-'])
+                    .chars()
+                    .filter(char::is_ascii_digit)
+                    .count();
                 if sig_figs >= 4 {
                     saw_four_sig_fig_rate_capped = true;
                 }
@@ -2533,7 +2839,8 @@ fn a_capped_store_wears_attention_on_its_full_tag_and_nowhere_else() {
             for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE_W, WIDE_H)] {
                 let (_, _, side, _) = regions(w, h);
                 let mut term = terminal(w, h);
-                term.draw(|f| chrome::sidebar(f, side, &state)).expect("TestBackend is infallible");
+                term.draw(|f| chrome::sidebar(f, side, &state))
+                    .expect("TestBackend is infallible");
                 let buf = term.backend().buffer();
                 let lines = region_lines(buf, side);
 
@@ -2587,7 +2894,10 @@ fn a_capped_store_wears_attention_on_its_full_tag_and_nowhere_else() {
             }
         }
     }
-    assert!(tagged_stores > 0, "fixture: some store should be drawn capped");
+    assert!(
+        tagged_stores > 0,
+        "fixture: some store should be drawn capped"
+    );
     assert!(
         bar_full_below_cap,
         "fixture: some store just under its cap should draw a bar that already reads full"
@@ -2634,8 +2944,10 @@ fn a_footer_note_is_drawn_in_the_inherited_foreground() {
                     view.footer = Some((note.clone(), Instant::now() + Duration::from_secs(600)));
                     let mut term = terminal(w, h);
                     let mut layout = None;
-                    term.draw(|f| layout = Some(clowder_tui::render::frame(f, &state, &view, None)))
-                        .expect("TestBackend is infallible");
+                    term.draw(|f| {
+                        layout = Some(clowder_tui::render::frame(f, &state, &view, None))
+                    })
+                    .expect("TestBackend is infallible");
                     let hints = layout.expect("frame returns its layout").hints;
                     let buf = term.backend().buffer();
                     let cells = row_cells(buf, hints, hints.y);
@@ -2670,7 +2982,11 @@ fn calm_meadow() -> (GameState, ViewState) {
     let mut state = every_section_revealed();
     for r in ResourceId::ALL {
         let cap = state.cap(r);
-        state.resources[r.ix()] = if cap.is_finite() && cap > 0.0 { cap * 0.5 } else { 40.0 };
+        state.resources[r.ix()] = if cap.is_finite() && cap > 0.0 {
+            cap * 0.5
+        } else {
+            40.0
+        };
     }
     state.kittens = employed(6);
     state.pending_sky_event = None;
@@ -2712,13 +3028,21 @@ fn nothing_but_a_chip_or_a_full_tag_wears_attention_in_a_frame_with_nothing_arme
         type FrameView = (String, ViewState, Vec<(u16, u16)>);
         let mut views: Vec<FrameView> = Vec::new();
         for section in Section::ALL {
-            for key in rows(state, section).into_iter().filter(|r| r.selectable()).map(|r| r.key) {
+            for key in rows(state, section)
+                .into_iter()
+                .filter(|r| r.selectable())
+                .map(|r| r.key)
+            {
                 let mut v = base.clone();
                 v.section = Some(section);
                 v.focus[section.index()] = Some(key.clone());
                 unfold_focus(state, &mut v);
                 v.inspector_wanted = true;
-                views.push((format!("{} section, cursor on {key:?}", section.title()), v, vec![pane]));
+                views.push((
+                    format!("{} section, cursor on {key:?}", section.title()),
+                    v,
+                    vec![pane],
+                ));
             }
             for inspector in [false, true] {
                 for footer in [false, true] {
@@ -2726,10 +3050,16 @@ fn nothing_but_a_chip_or_a_full_tag_wears_attention_in_a_frame_with_nothing_arme
                     v.section = Some(section);
                     v.inspector_wanted = inspector;
                     if footer {
-                        v.footer = Some(("a footer note".to_string(), Instant::now() + Duration::from_secs(600)));
+                        v.footer = Some((
+                            "a footer note".to_string(),
+                            Instant::now() + Duration::from_secs(600),
+                        ));
                     }
                     views.push((
-                        format!("{} section, inspector {inspector}, footer {footer}", section.title()),
+                        format!(
+                            "{} section, inspector {inspector}, footer {footer}",
+                            section.title()
+                        ),
                         v,
                         sizes.to_vec(),
                     ));
@@ -2739,9 +3069,15 @@ fn nothing_but_a_chip_or_a_full_tag_wears_attention_in_a_frame_with_nothing_arme
         for overlay in [
             Overlay::Help,
             Overlay::Journal { anchor: 0 },
-            Overlay::Palette { query: String::new(), selected: 0 },
+            Overlay::Palette {
+                query: String::new(),
+                selected: 0,
+            },
         ] {
-            let v = ViewState { overlay: Some(overlay.clone()), ..base.clone() };
+            let v = ViewState {
+                overlay: Some(overlay.clone()),
+                ..base.clone()
+            };
             views.push((format!("overlay {overlay:?}"), v, sizes.to_vec()));
         }
 
@@ -2755,7 +3091,9 @@ fn nothing_but_a_chip_or_a_full_tag_wears_attention_in_a_frame_with_nothing_arme
                 let buf = term.backend().buffer();
                 let whole = Rect::new(0, 0, w, h);
                 let sidebar = match (&view.overlay, layout.body) {
-                    (None, Body::Narrow { sidebar, .. } | Body::Wide { sidebar, .. }) => Some(sidebar),
+                    (None, Body::Narrow { sidebar, .. } | Body::Wide { sidebar, .. }) => {
+                        Some(sidebar)
+                    }
                     _ => None,
                 };
 
@@ -2776,7 +3114,9 @@ fn nothing_but_a_chip_or_a_full_tag_wears_attention_in_a_frame_with_nothing_arme
                         let side_symbols = symbols_of(&row_cells(buf, side, y));
                         let whole_spans = word_spans(&side_symbols, "full");
                         let spans: Vec<std::ops::Range<usize>> = if whole_spans.is_empty() {
-                            clipped_word_span(&side_symbols, "full").into_iter().collect()
+                            clipped_word_span(&side_symbols, "full")
+                                .into_iter()
+                                .collect()
                         } else {
                             whole_spans
                         };
@@ -2837,7 +3177,10 @@ fn nothing_but_a_chip_or_a_full_tag_wears_attention_in_a_frame_with_nothing_arme
 /// The digits the tab bar draws, in the order drawn. Section names hold no
 /// digits, so every digit on the bar is a tab.
 fn tab_digits(state: &GameState, view: &ViewState) -> Vec<char> {
-    tab_line(state, view, WIDE_W).chars().filter(char::is_ascii_digit).collect()
+    tab_line(state, view, WIDE_W)
+        .chars()
+        .filter(char::is_ascii_digit)
+        .collect()
 }
 
 /// Meadows spanning the reveal: a new game, where every section but home
@@ -2910,8 +3253,14 @@ fn a_section_has_its_tab_exactly_while_it_lists_a_selectable_row_or_holds_focus(
         }
     }
 
-    assert!(focus_kept_an_empty_tab, "fixture: some case focuses a section that lists nothing");
-    assert!(an_unfocused_section_had_none, "fixture: some case has a section with no tab");
+    assert!(
+        focus_kept_an_empty_tab,
+        "fixture: some case focuses a section that lists nothing"
+    );
+    assert!(
+        an_unfocused_section_had_none,
+        "fixture: some case has a section with no tab"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -2927,7 +3276,10 @@ fn name_head(section: Section) -> String {
         .into_iter()
         .filter(|o| *o != section && o.title().starts_with(&head))
         .count();
-    assert_eq!(clashes, 0, "fixture: {head:?} does not identify one section");
+    assert_eq!(
+        clashes, 0,
+        "fixture: {head:?} does not identify one section"
+    );
     head
 }
 
@@ -2975,7 +3327,10 @@ fn a_narrow_tab_bar_compacts_to_digits_and_still_reaches_every_tab() {
 
     let mut view = calm_view(&state);
     view.section = Some(focused);
-    view.seen[badged.index()] = SeenMark { visited: false, revealed_at_last_visit: 0 };
+    view.seen[badged.index()] = SeenMark {
+        visited: false,
+        revealed_at_last_visit: 0,
+    };
 
     let widest: usize = Section::ALL.into_iter().map(|s| s.title().len() + 2).sum();
     assert!(
@@ -3005,7 +3360,10 @@ fn a_narrow_tab_bar_compacts_to_digits_and_still_reaches_every_tab() {
         );
     }
 
-    let named = Section::ALL.into_iter().filter(|s| line.contains(s.title())).count();
+    let named = Section::ALL
+        .into_iter()
+        .filter(|s| line.contains(s.title()))
+        .count();
     assert!(
         named < Section::ALL.len(),
         "every tab is still named at {FLOOR_W} columns, which cannot fit — so something has been \
@@ -3023,7 +3381,10 @@ fn no_tab_name_is_ever_cut_mid_word() {
     let state = every_section_revealed();
     let mut view = calm_view(&state);
     view.section = Some(Section::Ideas);
-    view.seen[Section::Dreams.index()] = SeenMark { visited: false, revealed_at_last_visit: 0 };
+    view.seen[Section::Dreams.index()] = SeenMark {
+        visited: false,
+        revealed_at_last_visit: 0,
+    };
 
     for w in FLOOR_W..=WIDE_W {
         let line = tab_line(&state, &view, w);
@@ -3112,7 +3473,10 @@ fn reversed_runs(cells: &[ratatui::buffer::Cell]) -> Vec<(usize, String)> {
                 runs.push((x, String::new()));
                 open = true;
             }
-            runs.last_mut().expect("a run is open").1.push_str(cell.symbol());
+            runs.last_mut()
+                .expect("a run is open")
+                .1
+                .push_str(cell.symbol());
         } else {
             open = false;
         }
@@ -3141,8 +3505,7 @@ fn assert_only_focus_reversed(cells: &[ratatui::buffer::Cell], focus: Section, w
     );
     let (at, text) = &runs[0];
     assert_eq!(
-        text,
-        &label,
+        text, &label,
         "{what}, the tab bar reverses {text:?} at column {at}, where the focused tab's label is \
          {label:?} — its digit and its name, no more and no less: no other tab's label and no \
          column between tabs is reversed.\ntab bar: {line:?}"
@@ -3190,7 +3553,9 @@ fn next_tab(state: &GameState, focus: Section) -> Option<Section> {
 
 /// Whether a drawn bar is in its full form: every tab on it named.
 fn in_full_form(state: &GameState, focus: Section, line: &str) -> bool {
-    tab_sections(state, Some(focus)).into_iter().all(|s| line.contains(s.title()))
+    tab_sections(state, Some(focus))
+        .into_iter()
+        .all(|s| line.contains(s.title()))
 }
 
 /// The focused tab's label — digit and name — is the one run of reversed
@@ -3230,12 +3595,18 @@ fn only_the_focused_tabs_label_is_reversed_in_the_full_form_and_the_compact_stri
                         full_seen = true;
                     } else {
                         compact_seen = true;
-                        if Section::ALL.into_iter().any(|s| s != focus && line.contains(s.title())) {
+                        if Section::ALL
+                            .into_iter()
+                            .any(|s| s != focus && line.contains(s.title()))
+                        {
                             compact_named_another = true;
                         }
                     }
-                    let badges =
-                        if badge_neighbour { "the next tab badged" } else { "no tab badged" };
+                    let badges = if badge_neighbour {
+                        "the next tab badged"
+                    } else {
+                        "no tab badged"
+                    };
                     assert_only_focus_reversed(
                         &cells,
                         focus,
@@ -3246,10 +3617,22 @@ fn only_the_focused_tabs_label_is_reversed_in_the_full_form_and_the_compact_stri
         }
     }
 
-    assert!(full_seen, "fixture: some case draws the bar in its full form");
-    assert!(compact_seen, "fixture: some case draws the bar as its compact strip");
-    assert!(compact_named_another, "fixture: some compact strip names a tab besides the focused one");
-    assert!(empty_focus_seen, "fixture: some case focuses a section that lists nothing");
+    assert!(
+        full_seen,
+        "fixture: some case draws the bar in its full form"
+    );
+    assert!(
+        compact_seen,
+        "fixture: some case draws the bar as its compact strip"
+    );
+    assert!(
+        compact_named_another,
+        "fixture: some compact strip names a tab besides the focused one"
+    );
+    assert!(
+        empty_focus_seen,
+        "fixture: some case focuses a section that lists nothing"
+    );
 }
 
 /// The reversal adds no column: over one set of tabs, the widths at which the
@@ -3328,23 +3711,35 @@ fn the_focused_tabs_reversal_adds_no_column_to_the_bar() {
 fn focus_contexts(state: &GameState, focus: Section) -> Vec<(&'static str, ViewState)> {
     let mut base = calm_view(state);
     base.section = Some(focus);
-    let first_row = rows(state, focus).into_iter().find(|r| r.selectable()).map(|r| r.key);
+    let first_row = rows(state, focus)
+        .into_iter()
+        .find(|r| r.selectable())
+        .map(|r| r.key);
     base.focus[focus.index()] = first_row.clone();
 
     let mut out: Vec<(&'static str, ViewState)> = vec![("nothing open", base.clone())];
 
     if let Some(key) = first_row {
         let mut prompt = base.clone();
-        prompt.prompt = Some(CountPrompt { digits: "3".to_string(), row: Some(key) });
+        prompt.prompt = Some(CountPrompt {
+            digits: "3".to_string(),
+            row: Some(key),
+        });
         out.push(("a count prompt open", prompt));
     }
 
     let mut palette = base.clone();
-    palette.overlay = Some(Overlay::Palette { query: String::new(), selected: 0 });
+    palette.overlay = Some(Overlay::Palette {
+        query: String::new(),
+        selected: 0,
+    });
     out.push(("the palette open and empty", palette));
 
     let mut typed = base.clone();
-    typed.overlay = Some(Overlay::Palette { query: "e".to_string(), selected: 0 });
+    typed.overlay = Some(Overlay::Palette {
+        query: "e".to_string(),
+        selected: 0,
+    });
     out.push(("the palette open with a query typed", typed));
 
     let mut journal = base.clone();
@@ -3360,7 +3755,10 @@ fn focus_contexts(state: &GameState, focus: Section) -> Vec<(&'static str, ViewS
     out.push(("the inspector called for", inspector));
 
     let mut banner = base.clone();
-    banner.reports = vec![PendingReport { entry: 0, dismissed: false }];
+    banner.reports = vec![PendingReport {
+        entry: 0,
+        dismissed: false,
+    }];
     out.push(("a report banner showing", banner));
 
     if let Some(s) = next_tab(state, focus) {
@@ -3420,7 +3818,10 @@ fn every_frame_reverses_the_section_in_focus_even_beneath_a_field_or_full_screen
         "help open",
         "a heavy row armed",
     ] {
-        assert!(contexts_seen.contains(context), "fixture: the sweep draws a frame with {context}");
+        assert!(
+            contexts_seen.contains(context),
+            "fixture: the sweep draws a frame with {context}"
+        );
     }
 }
 
@@ -3441,7 +3842,11 @@ fn the_reversal_moves_on_the_frame_a_digit_a_cycle_or_the_palettes_jump_moves_fo
         for (w, h) in sizes {
             let (buf, layout) = composed_frame(&state, view, w, h);
             let cells = row_cells(&buf, layout.tabs, layout.tabs.y);
-            assert_only_focus_reversed(&cells, expected, &format!("after {step}, in a {w}x{h} frame"));
+            assert_only_focus_reversed(
+                &cells,
+                expected,
+                &format!("after {step}, in a {w}x{h} frame"),
+            );
         }
     };
 
@@ -3458,17 +3863,31 @@ fn the_reversal_moves_on_the_frame_a_digit_a_cycle_or_the_palettes_jump_moves_fo
 
     let ring = tab_sections(&state, Some(current));
     for _ in 0..=ring.len() {
-        let at = ring.iter().position(|s| *s == current).expect("the focused section has a tab");
+        let at = ring
+            .iter()
+            .position(|s| *s == current)
+            .expect("the focused section has a tab");
         let next = ring[(at + 1) % ring.len()];
         update(Action::SectionNext, &mut view, &state);
-        check(&view, next, &format!("cycling forward from {}", current.digit()));
+        check(
+            &view,
+            next,
+            &format!("cycling forward from {}", current.digit()),
+        );
         current = next;
     }
     for _ in 0..=ring.len() {
-        let at = ring.iter().position(|s| *s == current).expect("the focused section has a tab");
+        let at = ring
+            .iter()
+            .position(|s| *s == current)
+            .expect("the focused section has a tab");
         let prev = ring[(at + ring.len() - 1) % ring.len()];
         update(Action::SectionPrev, &mut view, &state);
-        check(&view, prev, &format!("cycling back from {}", current.digit()));
+        check(
+            &view,
+            prev,
+            &format!("cycling back from {}", current.digit()),
+        );
         current = prev;
     }
 
@@ -3493,13 +3912,25 @@ fn the_reversal_moves_on_the_frame_a_digit_a_cycle_or_the_palettes_jump_moves_fo
         for c in query.chars() {
             update(Action::Type(c), &mut view, &state);
         }
-        check(&view, current, &format!("typing a query for {} into the palette", target.digit()));
+        check(
+            &view,
+            current,
+            &format!("typing a query for {} into the palette", target.digit()),
+        );
         update(Action::Activate, &mut view, &state);
-        check(&view, target, &format!("the palette's jump to {}", target.digit()));
+        check(
+            &view,
+            target,
+            &format!("the palette's jump to {}", target.digit()),
+        );
         landed.insert(target);
         current = target;
     }
-    assert!(landed.len() >= 5, "fixture: the palette's jump reaches most sections ({} reached)", landed.len());
+    assert!(
+        landed.len() >= 5,
+        "fixture: the palette's jump reaches most sections ({} reached)",
+        landed.len()
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -3508,8 +3939,9 @@ fn the_reversal_moves_on_the_frame_a_digit_a_cycle_or_the_palettes_jump_moves_fo
 
 /// The keys a hint bar can name, as whole tokens. Matching tokens rather than
 /// substrings is what stops `Tab next` from reading as an offer of `x`.
-const PROBE_KEYS: [&str; 11] =
-    ["↑↓", "Enter", "Space", "Tab", "Esc", "x", "X", "+", "-", "i", "?"];
+const PROBE_KEYS: [&str; 11] = [
+    "↑↓", "Enter", "Space", "Tab", "Esc", "x", "X", "+", "-", "i", "?",
+];
 
 /// The keys a line advertises, in the order it advertises them.
 fn keys_in_order(line: &str) -> Vec<String> {
@@ -3528,7 +3960,9 @@ fn ends_with_help_key(line: &str) -> bool {
     let trimmed = line.trim_end();
     match trimmed.rfind('?') {
         None => false,
-        Some(at) => trimmed[at + 1..].chars().all(|c| c.is_alphabetic() || c.is_whitespace()),
+        Some(at) => trimmed[at + 1..]
+            .chars()
+            .all(|c| c.is_alphabetic() || c.is_whitespace()),
     }
 }
 
@@ -3543,13 +3977,28 @@ fn hint_contexts(state: &GameState) -> Vec<(&'static str, ViewState)> {
     });
 
     let mut prompt = focus_on(state, Section::Meadow, repeatable_row(state));
-    prompt.prompt = Some(CountPrompt { digits: "12".to_string(), ..Default::default() });
+    prompt.prompt = Some(CountPrompt {
+        digits: "12".to_string(),
+        ..Default::default()
+    });
 
     vec![
-        ("a plain one-shot row", focus_on(state, Section::Meadow, single_row(state))),
-        ("a buildable row", focus_on(state, Section::Meadow, repeatable_row(state))),
-        ("a count row", focus_on(state, Section::Clowder, count_row(state))),
-        ("a count-taking row", focus_on(state, Section::Clowder, count_taking_row(state))),
+        (
+            "a plain one-shot row",
+            focus_on(state, Section::Meadow, single_row(state)),
+        ),
+        (
+            "a buildable row",
+            focus_on(state, Section::Meadow, repeatable_row(state)),
+        ),
+        (
+            "a count row",
+            focus_on(state, Section::Clowder, count_row(state)),
+        ),
+        (
+            "a count-taking row",
+            focus_on(state, Section::Clowder, count_taking_row(state)),
+        ),
         ("an armed heavy row", armed),
         ("an open count prompt", prompt),
     ]
@@ -3613,7 +4062,11 @@ fn the_hint_bar_changes_with_the_focused_context() {
 fn the_hint_bar_names_the_keys_the_focused_row_actually_offers() {
     let state = every_section_revealed();
 
-    let counting = hint_line(&state, &focus_on(&state, Section::Clowder, count_row(&state)), WIDE_W);
+    let counting = hint_line(
+        &state,
+        &focus_on(&state, Section::Clowder, count_row(&state)),
+        WIDE_W,
+    );
     for key in ["+", "-"] {
         assert!(
             has_key(&counting, key),
@@ -3622,7 +4075,11 @@ fn the_hint_bar_names_the_keys_the_focused_row_actually_offers() {
     }
 
     for (what, section, key) in [
-        ("a count-taking row", Section::Clowder, count_taking_row(&state)),
+        (
+            "a count-taking row",
+            Section::Clowder,
+            count_taking_row(&state),
+        ),
         ("a buildable row", Section::Meadow, repeatable_row(&state)),
     ] {
         let line = hint_line(&state, &focus_on(&state, section, key), WIDE_W);
@@ -3634,7 +4091,11 @@ fn the_hint_bar_names_the_keys_the_focused_row_actually_offers() {
         );
     }
 
-    let plain = hint_line(&state, &focus_on(&state, Section::Meadow, single_row(&state)), WIDE_W);
+    let plain = hint_line(
+        &state,
+        &focus_on(&state, Section::Meadow, single_row(&state)),
+        WIDE_W,
+    );
     assert!(
         !has_key(&plain, "x"),
         "the focused row's command is neither count-taking nor usefully repeatable, so `x` there \
@@ -3675,7 +4136,10 @@ fn the_hint_bar_names_x_and_x_max_exactly_beside_the_rows_they_act_on() {
             };
             let tagged = match &row.kind {
                 RowKind::Act { semantics, .. } => {
-                    matches!(semantics, CountSemantics::CountTaking | CountSemantics::RepeatN)
+                    matches!(
+                        semantics,
+                        CountSemantics::CountTaking | CountSemantics::RepeatN
+                    )
                 }
                 RowKind::Count { .. } => true,
                 RowKind::Display | RowKind::Group => false,
@@ -3700,7 +4164,11 @@ fn the_hint_bar_names_x_and_x_max_exactly_beside_the_rows_they_act_on() {
                  prompt there.\nhint bar: {line:?}",
                 row.key,
                 section.title(),
-                if has_key(&line, "x") { "names" } else { "does not name" },
+                if has_key(&line, "x") {
+                    "names"
+                } else {
+                    "does not name"
+                },
                 if x_opens { "opens" } else { "does not open" },
             );
             assert_eq!(
@@ -3710,15 +4178,25 @@ fn the_hint_bar_names_x_and_x_max_exactly_beside_the_rows_they_act_on() {
                  never on a heavy row.\nhint bar: {line:?}",
                 row.key,
                 section.title(),
-                if has_key(&line, "X") { "names" } else { "does not name" },
+                if has_key(&line, "X") {
+                    "names"
+                } else {
+                    "does not name"
+                },
                 if max_runs { "runs" } else { "does not run" },
             );
         }
     }
 
     assert!(count_rows > 0, "fixture: no count row is listed");
-    assert!(heavy_counted > 0, "fixture: the heavy DeepNap row is not listed");
-    assert!(owned_rows > 0, "fixture: no row the core reports as the player's is listed");
+    assert!(
+        heavy_counted > 0,
+        "fixture: the heavy DeepNap row is not listed"
+    );
+    assert!(
+        owned_rows > 0,
+        "fixture: no row the core reports as the player's is listed"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -3832,7 +4310,10 @@ fn is_later_row(state: &GameState, section: Section, target: &RowKey) -> bool {
         (RowKey::Colony(a, _), RowKey::Colony(b, _)) => a == b,
         _ => k == target,
     };
-    rows(state, section).iter().find(|r| same_item(&r.key)).is_some_and(|first| &first.key != target)
+    rows(state, section)
+        .iter()
+        .find(|r| same_item(&r.key))
+        .is_some_and(|first| &first.key != target)
 }
 
 /// The word naming the item a focused-item mnemonic acts on.
@@ -3873,7 +4354,8 @@ fn the_hint_bar_words_a_later_rows_letter_by_that_rows_label() {
                         panic!("fixture: {target:?} is a later row with no label TUI-NAV-089 names")
                     });
                     let lead = format!("{c} ");
-                    let mine: Vec<&String> = entries.iter().filter(|e| e.starts_with(&lead)).collect();
+                    let mine: Vec<&String> =
+                        entries.iter().filter(|e| e.starts_with(&lead)).collect();
                     let whr = format!(
                         "at {w} columns on the {} screen with {:?} focused",
                         section.title(),
@@ -3938,7 +4420,9 @@ fn the_help_overlay_words_a_later_rows_letter_by_its_label_and_names_its_item() 
         }
     }
     assert!(
-        later.iter().any(|(s, c, _, _)| *s == Section::Friends && *c == 'p'),
+        later
+            .iter()
+            .any(|(s, c, _, _)| *s == Section::Friends && *c == 'p'),
         "fixture: the later-row letter was found; found {later:?}"
     );
 
@@ -3956,7 +4440,10 @@ fn the_help_overlay_words_a_later_rows_letter_by_its_label_and_names_its_item() 
             .iter()
             .find(|l| l.trim_start().starts_with(section.title()))
             .unwrap_or_else(|| {
-                panic!("the help overlay has no line for the {} screen's letters", section.title())
+                panic!(
+                    "the help overlay has no line for the {} screen's letters",
+                    section.title()
+                )
             });
         let worded = format!("{c} {label} (");
         let at = line.find(&worded).unwrap_or_else(|| {
@@ -3967,9 +4454,13 @@ fn the_help_overlay_words_a_later_rows_letter_by_its_label_and_names_its_item() 
             )
         });
         let rest = &line[at + worded.len()..];
-        let inside = rest.split(')').next().filter(|_| rest.contains(')')).unwrap_or_else(|| {
-            panic!("the help overlay's `{c} {label} (` is never closed.\nline: {line:?}")
-        });
+        let inside = rest
+            .split(')')
+            .next()
+            .filter(|_| rest.contains(')'))
+            .unwrap_or_else(|| {
+                panic!("the help overlay's `{c} {label} (` is never closed.\nline: {line:?}")
+            });
         assert!(
             inside.split_whitespace().any(|word| word == item),
             "the help overlay follows `{c} {label}` with ({inside}), which does not name the \
@@ -3994,11 +4485,15 @@ fn the_hint_bar_names_every_live_mnemonic_but_the_focused_rows_own_in_its_place(
     let far = every_section_revealed();
     let fresh = GameState::new(3);
     assert!(
-        rows(&far, Section::Meadow).iter().any(|r| r.key == RowKey::Fixed("Rummage")),
+        rows(&far, Section::Meadow)
+            .iter()
+            .any(|r| r.key == RowKey::Fixed("Rummage")),
         "fixture: the meadow far along lists the rummage row"
     );
     assert!(
-        !rows(&fresh, Section::Meadow).iter().any(|r| r.key == RowKey::Fixed("Rummage")),
+        !rows(&fresh, Section::Meadow)
+            .iter()
+            .any(|r| r.key == RowKey::Fixed("Rummage")),
         "fixture: a new meadow does not yet list the rummage row"
     );
 
@@ -4010,19 +4505,33 @@ fn the_hint_bar_names_every_live_mnemonic_but_the_focused_rows_own_in_its_place(
                 continue;
             }
             let mut contexts: Vec<Option<RowKey>> = vec![None];
-            contexts.extend(listed.iter().filter(|r| r.selectable()).map(|r| Some(r.key.clone())));
+            contexts.extend(
+                listed
+                    .iter()
+                    .filter(|r| r.selectable())
+                    .map(|r| Some(r.key.clone())),
+            );
 
             for focus in contexts {
                 let view = match &focus {
                     Some(k) => focus_on(state, section, k.clone()),
                     None => calm_view(state),
                 };
-                let view = ViewState { section: Some(section), ..view };
+                let view = ViewState {
+                    section: Some(section),
+                    ..view
+                };
                 let line = hint_line(state, &view, WIDE_W);
                 let keys = named_keys(&line);
                 let whr = match &focus {
-                    Some(k) => format!("in {label}, on the {} screen with {k:?} focused", section.title()),
-                    None => format!("in {label}, on the {} screen with no row focused", section.title()),
+                    Some(k) => format!(
+                        "in {label}, on the {} screen with {k:?} focused",
+                        section.title()
+                    ),
+                    None => format!(
+                        "in {label}, on the {} screen with no row focused",
+                        section.title()
+                    ),
                 };
 
                 let live = live_mnemonics(state, section, focus.as_ref());
@@ -4064,7 +4573,10 @@ fn the_hint_bar_names_every_live_mnemonic_but_the_focused_rows_own_in_its_place(
                 );
 
                 // A focused-item letter sits directly after the key naming Enter.
-                for (c, _) in expected.iter().filter(|(_, k)| *k == MnemonicKind::FocusedItem) {
+                for (c, _) in expected
+                    .iter()
+                    .filter(|(_, k)| *k == MnemonicKind::FocusedItem)
+                {
                     let at = keys.iter().position(|k| k == "Enter").unwrap_or_else(|| {
                         panic!("fixture: {whr}, the hint bar names no Enter key: {line:?}")
                     });
@@ -4107,9 +4619,18 @@ fn the_hint_bar_names_every_live_mnemonic_but_the_focused_rows_own_in_its_place(
         }
     }
 
-    assert!(fixed_named > 0, "fixture: no fixed mnemonic was ever expected on the bar");
-    assert!(item_named > 0, "fixture: no focused-item mnemonic was ever expected on the bar");
-    assert!(own_unnamed > 0, "fixture: no context focused a mnemonic's own row");
+    assert!(
+        fixed_named > 0,
+        "fixture: no fixed mnemonic was ever expected on the bar"
+    );
+    assert!(
+        item_named > 0,
+        "fixture: no focused-item mnemonic was ever expected on the bar"
+    );
+    assert!(
+        own_unnamed > 0,
+        "fixture: no context focused a mnemonic's own row"
+    );
 
     // A full-screen overlay suspends every mnemonic the same way it suspends
     // the rest of the global table, so no letter it would otherwise name is
@@ -4155,7 +4676,9 @@ fn the_cold_open_names_the_other_fixed_letter_after_the_backbone_and_not_the_foc
     let keys = named_keys(&line);
     assert_eq!(
         keys,
-        ["↑↓", "Enter", "Space", "Tab", "f", "?"].map(String::from).to_vec(),
+        ["↑↓", "Enter", "Space", "Tab", "f", "?"]
+            .map(String::from)
+            .to_vec(),
         "the cold-open hint bar names the backbone, then the forage mnemonic, then the help key — \
          and not the gather mnemonic, whose row is the focused row.\nhint bar: {line:?}"
     );
@@ -4181,14 +4704,24 @@ fn an_open_field_owns_the_hint_bar_whatever_lies_beneath_it() {
         beneath.iter().any(|(_, v)| v.armed.is_some()),
         "fixture: one of the contexts beneath the field is an armed heavy row"
     );
-    let bare_lines: Vec<(&str, String)> =
-        beneath.iter().map(|(what, v)| (*what, hint_line(&state, v, WIDE_W))).collect();
+    let bare_lines: Vec<(&str, String)> = beneath
+        .iter()
+        .map(|(what, v)| (*what, hint_line(&state, v, WIDE_W)))
+        .collect();
 
     type Opener = fn(&mut ViewState);
     let fields: [(&str, Opener); 2] = [
-        ("the count prompt", |v| v.prompt = Some(CountPrompt { digits: "12".to_string(), ..Default::default() })),
+        ("the count prompt", |v| {
+            v.prompt = Some(CountPrompt {
+                digits: "12".to_string(),
+                ..Default::default()
+            })
+        }),
         ("the palette", |v| {
-            v.overlay = Some(Overlay::Palette { query: "ab".to_string(), selected: 0 })
+            v.overlay = Some(Overlay::Palette {
+                query: "ab".to_string(),
+                selected: 0,
+            })
         }),
     ];
 
@@ -4218,8 +4751,14 @@ fn an_open_field_owns_the_hint_bar_whatever_lies_beneath_it() {
                  open; the field's keys replace the context's"
             );
         }
-        assert!(has_key(first, "Enter"), "with {field} open, the hint bar does not name Enter: {first:?}");
-        assert!(has_key(first, "Esc"), "with {field} open, the hint bar does not name Esc: {first:?}");
+        assert!(
+            has_key(first, "Enter"),
+            "with {field} open, the hint bar does not name Enter: {first:?}"
+        );
+        assert!(
+            has_key(first, "Esc"),
+            "with {field} open, the hint bar does not name Esc: {first:?}"
+        );
         if field == "the palette" {
             assert!(
                 says(first, "type") && says(first, "find"),
@@ -4257,8 +4796,10 @@ fn the_hint_bar_drops_the_least_relevant_key_first_and_never_the_help_key() {
             "at {w} columns the hint bar lost the help key: {line:?}"
         );
 
-        let keys: Vec<String> =
-            keys_in_order(&line).into_iter().filter(|k| k != "?").collect();
+        let keys: Vec<String> = keys_in_order(&line)
+            .into_iter()
+            .filter(|k| k != "?")
+            .collect();
 
         if let Some((wider_w, wider)) = &previous {
             assert!(
@@ -4312,7 +4853,11 @@ fn every_heavy_row(state: &GameState) -> Vec<(Section, RowKey, Command)> {
 
 fn armed_on(state: &GameState, section: Section, key: RowKey, command: Command) -> ViewState {
     let mut v = focus_on(state, section, key.clone());
-    v.armed = Some(ArmedRow { key, command, expires_at: Instant::now() + Duration::from_secs(8) });
+    v.armed = Some(ArmedRow {
+        key,
+        command,
+        expires_at: Instant::now() + Duration::from_secs(8),
+    });
     v
 }
 
@@ -4326,19 +4871,34 @@ fn armed_on(state: &GameState, section: Section, key: RowKey, command: Command) 
 fn the_armed_rows_keys_show_wherever_nothing_holds_the_keyboard() {
     let state = every_section_revealed();
     let heavy = every_heavy_row(&state);
-    let kinds: BTreeSet<String> =
-        heavy.iter().map(|(_, _, c)| format!("{c:?}").split('(').next().unwrap().to_string()).collect();
-    assert_eq!(kinds.len(), 4, "fixture: all four heavy actions are listed ({kinds:?})");
+    let kinds: BTreeSet<String> = heavy
+        .iter()
+        .map(|(_, _, c)| format!("{c:?}").split('(').next().unwrap().to_string())
+        .collect();
+    assert_eq!(
+        kinds.len(),
+        4,
+        "fixture: all four heavy actions are listed ({kinds:?})"
+    );
 
     for (section, key, command) in heavy {
         let armed = armed_on(&state, section, key.clone(), command);
         let contexts: Vec<(&str, ViewState)> = vec![
             ("nothing else", armed.clone()),
-            ("the inspector asked for", ViewState { inspector_wanted: true, ..armed.clone() }),
+            (
+                "the inspector asked for",
+                ViewState {
+                    inspector_wanted: true,
+                    ..armed.clone()
+                },
+            ),
             (
                 "a report banner showing",
                 ViewState {
-                    reports: vec![PendingReport { entry: 0, dismissed: false }],
+                    reports: vec![PendingReport {
+                        entry: 0,
+                        dismissed: false,
+                    }],
                     ..armed.clone()
                 },
             ),
@@ -4389,7 +4949,9 @@ fn a_full_screen_overlay_shows_no_armed_keys() {
 #[test]
 fn an_ended_arming_leaves_no_armed_keys_on_the_hint_bar() {
     let state = every_section_revealed();
-    let past = Instant::now().checked_sub(Duration::from_secs(1)).expect("clock has a past");
+    let past = Instant::now()
+        .checked_sub(Duration::from_secs(1))
+        .expect("clock has a past");
 
     for (section, key, command) in every_heavy_row(&state) {
         let mut view = armed_on(&state, section, key, command);
@@ -4412,7 +4974,9 @@ fn an_ended_arming_leaves_no_armed_keys_on_the_hint_bar() {
     let mut gone = state.clone();
     gone.ideas.remove(&IdeaId::DeepNapTheory);
     assert!(
-        Section::ALL.iter().all(|s| rows(&gone, *s).iter().all(|r| r.key != nap_key)),
+        Section::ALL
+            .iter()
+            .all(|s| rows(&gone, *s).iter().all(|r| r.key != nap_key)),
         "fixture: the nap row must be listed nowhere"
     );
     let mut view = focus_on(&gone, Section::Legacy, heavy_row(&gone));
@@ -4466,7 +5030,10 @@ fn a_cold_open_teaches_the_backbone() {
              the tutorial.\nhint bar: {line:?}"
         );
     }
-    assert!(ends_with_help_key(&line), "and it ends with the key to everything else: {line:?}");
+    assert!(
+        ends_with_help_key(&line),
+        "and it ends with the key to everything else: {line:?}"
+    );
 }
 
 /// On a new game the Meadow is the only section there is. Tab names are content
@@ -4482,7 +5049,10 @@ fn on_a_new_game_the_meadow_is_the_only_section_with_a_tab() {
     // The first row the cursor can land on: a group header above it is a
     // signpost, not a row (TUI-NAV-099).
     assert_eq!(
-        rows(&state, Section::Meadow).into_iter().find(|r| r.selectable()).map(|r| r.key),
+        rows(&state, Section::Meadow)
+            .into_iter()
+            .find(|r| r.selectable())
+            .map(|r| r.key),
         Some(RowKey::Fixed("GatherCatnip")),
         "a new game's first row is the gather action — the one thing a cold player can do"
     );
@@ -4651,7 +5221,9 @@ fn the_hint_bar_names_n_appoint_elder_directly_after_enter_on_every_kitten_row_b
 
     let widths = [WIDE_W, 120, 100, FLOOR_W, 60, 44, 32, 24, 16];
     let (mut named_wide, mut shed_after_n, mut beside_an_elder) = (0u32, 0u32, 0u32);
-    let elders: Vec<Option<usize>> = std::iter::once(None).chain(kittens.iter().map(|(ix, _)| Some(*ix))).collect();
+    let elders: Vec<Option<usize>> = std::iter::once(None)
+        .chain(kittens.iter().map(|(ix, _)| Some(*ix)))
+        .collect();
     for elder in elders {
         let mut state = base.clone();
         state.elder = elder;
@@ -4669,10 +5241,22 @@ fn the_hint_bar_names_n_appoint_elder_directly_after_enter_on_every_kitten_row_b
             let bare = focus_on(&state, Section::Clowder, key.clone());
             let contexts: [(&str, ViewState); 3] = [
                 ("nothing else", bare.clone()),
-                ("the inspector asked for", ViewState { inspector_wanted: true, ..bare.clone() }),
+                (
+                    "the inspector asked for",
+                    ViewState {
+                        inspector_wanted: true,
+                        ..bare.clone()
+                    },
+                ),
                 (
                     "a report banner up",
-                    ViewState { reports: vec![PendingReport { entry: 0, dismissed: false }], ..bare.clone() },
+                    ViewState {
+                        reports: vec![PendingReport {
+                            entry: 0,
+                            dismissed: false,
+                        }],
+                        ..bare.clone()
+                    },
                 ),
             ];
             for (what, view) in contexts {
@@ -4687,8 +5271,10 @@ fn the_hint_bar_names_n_appoint_elder_directly_after_enter_on_every_kitten_row_b
                             None => "nobody the Elder".to_string(),
                         }
                     );
-                    let n_entries: Vec<String> =
-                        hint_entries(&line).into_iter().filter(|e| e.split_whitespace().next() == Some("n")).collect();
+                    let n_entries: Vec<String> = hint_entries(&line)
+                        .into_iter()
+                        .filter(|e| e.split_whitespace().next() == Some("n"))
+                        .collect();
 
                     for entry in &n_entries {
                         assert_eq!(
@@ -4719,7 +5305,10 @@ fn the_hint_bar_names_n_appoint_elder_directly_after_enter_on_every_kitten_row_b
                             widest = Some(keys.clone());
                         }
                         Some(wide) => {
-                            let n_at = wide.iter().position(|k| k == "n").expect("named at the widest");
+                            let n_at = wide
+                                .iter()
+                                .position(|k| k == "n")
+                                .expect("named at the widest");
                             let after_n = &wide[n_at + 1..];
                             let kept_after = keys.iter().any(|k| after_n.contains(k) && k != "?");
                             if kept_after {
@@ -4730,7 +5319,9 @@ fn the_hint_bar_names_n_appoint_elder_directly_after_enter_on_every_kitten_row_b
                                      every key after it, the inspector and section keys among them.\n\
                                      keys in order: {keys:?}\nat full width: {wide:?}\nhint bar: {line:?}"
                                 );
-                            } else if keys.iter().any(|k| k == "n") && after_n.iter().any(|k| k != "?") {
+                            } else if keys.iter().any(|k| k == "n")
+                                && after_n.iter().any(|k| k != "?")
+                            {
                                 shed_after_n += 1;
                             }
                         }
@@ -4740,7 +5331,10 @@ fn the_hint_bar_names_n_appoint_elder_directly_after_enter_on_every_kitten_row_b
         }
     }
     assert!(named_wide > 0, "fixture: no kitten row was checked");
-    assert!(beside_an_elder > 0, "fixture: no kitten row was checked while another kitten was the Elder");
+    assert!(
+        beside_an_elder > 0,
+        "fixture: no kitten row was checked while another kitten was the Elder"
+    );
     assert!(
         shed_after_n > 0,
         "fixture: no width shed the keys after `n` while keeping `n`, so its ranking was never \
@@ -4778,10 +5372,22 @@ fn the_hint_bar_leaves_n_unnamed_on_the_elders_own_row_where_the_key_stays_live(
         let bare = focus_on(&state, Section::Clowder, key.clone());
         let contexts: [(&str, ViewState); 3] = [
             ("nothing else", bare.clone()),
-            ("the inspector asked for", ViewState { inspector_wanted: true, ..bare.clone() }),
+            (
+                "the inspector asked for",
+                ViewState {
+                    inspector_wanted: true,
+                    ..bare.clone()
+                },
+            ),
             (
                 "a report banner up",
-                ViewState { reports: vec![PendingReport { entry: 0, dismissed: false }], ..bare.clone() },
+                ViewState {
+                    reports: vec![PendingReport {
+                        entry: 0,
+                        dismissed: false,
+                    }],
+                    ..bare.clone()
+                },
             ),
         ];
         for (what, view) in contexts {
@@ -4790,7 +5396,9 @@ fn the_hint_bar_leaves_n_unnamed_on_the_elders_own_row_where_the_key_stays_live(
                 let whr = format!("at {w} columns with the cursor on the row of the Elder, kitten {ix}, and {what}");
                 let n_entries: Vec<String> = hint_entries(&line)
                     .into_iter()
-                    .filter(|e| e.split_whitespace().next() == Some("n") || e.contains("appoint Elder"))
+                    .filter(|e| {
+                        e.split_whitespace().next() == Some("n") || e.contains("appoint Elder")
+                    })
                     .collect();
                 assert!(
                     n_entries.is_empty(),
@@ -4803,8 +5411,10 @@ fn the_hint_bar_leaves_n_unnamed_on_the_elders_own_row_where_the_key_stays_live(
             // Where nothing need be dropped, the bar is this row's bar with
             // `n` left out and nothing else changed.
             let on_the_elder = named_keys(&hint_line(&state, &view, WIDE_W));
-            let as_any_kitten: Vec<String> =
-                named_keys(&hint_line(&elsewhere, &view, WIDE_W)).into_iter().filter(|k| k != "n").collect();
+            let as_any_kitten: Vec<String> = named_keys(&hint_line(&elsewhere, &view, WIDE_W))
+                .into_iter()
+                .filter(|k| k != "n")
+                .collect();
             assert_eq!(
                 on_the_elder, as_any_kitten,
                 "at {WIDE_W} columns with the cursor on the row of the Elder, kitten {ix}, and \
@@ -4880,10 +5490,18 @@ fn the_help_overlays_glyph_legend_lists_the_elders_mark() {
     // How the legend sets out a glyph it already lists: the glyph heading its
     // line, blank columns, then the meaning.
     let legend_line = |glyph: char| -> Vec<String> {
-        lines.iter().filter(|l| l.trim_start().starts_with(glyph)).map(|l| l.trim().to_string()).collect()
+        lines
+            .iter()
+            .filter(|l| l.trim_start().starts_with(glyph))
+            .map(|l| l.trim().to_string())
+            .collect()
     };
     let cursor = legend_line('▸');
-    assert_eq!(cursor.len(), 1, "fixture: the legend lists the cursor's glyph on one line: {cursor:?}");
+    assert_eq!(
+        cursor.len(),
+        1,
+        "fixture: the legend lists the cursor's glyph on one line: {cursor:?}"
+    );
 
     let elder = legend_line('◆');
     assert_eq!(
@@ -4921,16 +5539,23 @@ fn stores_row_name(state: &GameState, r: ResourceId) -> String {
     use clowder_tui::render::widgets::inspector;
     let key = RowKey::Resource(r);
     assert!(
-        rows(state, Section::Meadow).iter().any(|row| row.key == key),
+        rows(state, Section::Meadow)
+            .iter()
+            .any(|row| row.key == key),
         "fixture: {r:?} must be listed in the stores group to be named"
     );
     let (w, h) = (160u16, 12u16);
-    let mut view = ViewState { section: Some(Section::Meadow), ..Default::default() };
+    let mut view = ViewState {
+        section: Some(Section::Meadow),
+        ..Default::default()
+    };
     view.focus[Section::Meadow.index()] = Some(key);
     let mut term = terminal(w, h);
     term.draw(|f| inspector::draw(f, Rect::new(0, 0, w, h), state, &view))
         .expect("TestBackend is infallible");
-    region_lines(term.backend().buffer(), Rect::new(0, 0, w, h))[0].trim().to_string()
+    region_lines(term.backend().buffer(), Rect::new(0, 0, w, h))[0]
+        .trim()
+        .to_string()
 }
 
 /// Every resource's stores-row spelling, in vocabulary order.
@@ -4939,7 +5564,10 @@ fn stores_row_names() -> Vec<(ResourceId, String)> {
     for r in ResourceId::ALL {
         state.resources[r.ix()] = 1.0;
     }
-    ResourceId::ALL.into_iter().map(|r| (r, stores_row_name(&state, r))).collect()
+    ResourceId::ALL
+        .into_iter()
+        .map(|r| (r, stores_row_name(&state, r)))
+        .collect()
 }
 
 /// The narrowest name column at which every two names in the resource
@@ -4948,7 +5576,10 @@ fn name_floor(names: &[String]) -> usize {
     (1..=64)
         .find(|w| {
             names.iter().enumerate().all(|(i, a)| {
-                names.iter().skip(i + 1).all(|b| a == b || fmt::fit(a, *w) != fmt::fit(b, *w))
+                names
+                    .iter()
+                    .skip(i + 1)
+                    .all(|b| a == b || fmt::fit(a, *w) != fmt::fit(b, *w))
             })
         })
         .expect("fixture: some width tells every name apart")
@@ -5013,7 +5644,9 @@ fn expected_store_lines(
 }
 
 /// Stocks that between them reach every width the compact form takes.
-const SIDEBAR_STOCKS: [f64; 10] = [0.0004, 3.0, 12.5, 999.95, 1234.5, 99_999.0, 1.0e7, 4.2e13, 1.0e20, 0.5];
+const SIDEBAR_STOCKS: [f64; 10] = [
+    0.0004, 3.0, 12.5, 999.95, 1234.5, 99_999.0, 1.0e7, 4.2e13, 1.0e20, 0.5,
+];
 
 /// Every resource held, at a spread of stocks: some capped stores at their
 /// cap, some not, uncapped stores large and small, and zero-cap stores with
@@ -5064,7 +5697,8 @@ fn the_sidebar_is_as_wide_as_its_bar_line_and_its_name_floor_beside_the_pair() {
 /// @spec TUI-RENDER-019, TUI-RENDER-012
 #[test]
 fn every_store_in_the_sidebar_stands_field_by_field_at_one_column() {
-    let names: std::collections::HashMap<ResourceId, String> = stores_row_names().into_iter().collect();
+    let names: std::collections::HashMap<ResourceId, String> =
+        stores_row_names().into_iter().collect();
     let mut signs = [false; 3];
     let mut uncapped_seen = false;
     let mut full_seen = false;
@@ -5074,7 +5708,11 @@ fn every_store_in_the_sidebar_stands_field_by_field_at_one_column() {
         state.kittens = employed(6);
         let rates = state.net_rates();
         let listed = listed_stores(&state);
-        assert_eq!(listed.len(), ResourceId::ALL.len(), "fixture: every store is listed");
+        assert_eq!(
+            listed.len(),
+            ResourceId::ALL.len(),
+            "fixture: every store is listed"
+        );
         for w in [FLOOR_W, 130, WIDE_W] {
             let (_, _, side, _) = regions(w, 24);
             let width = side.width as usize;
@@ -5082,7 +5720,13 @@ fn every_store_in_the_sidebar_stands_field_by_field_at_one_column() {
             let (lines, _) = sidebar_in(&state, side.width, height);
             for (i, r) in listed.iter().enumerate() {
                 let rate = rates[r.ix()];
-                signs[if fmt::rate(rate) == "0" { 0 } else if rate > 0.0 { 1 } else { 2 }] = true;
+                signs[if fmt::rate(rate) == "0" {
+                    0
+                } else if rate > 0.0 {
+                    1
+                } else {
+                    2
+                }] = true;
                 uncapped_seen |= state.cap(*r).is_infinite();
                 full_seen |= wears_full(&state, *r);
                 let bar: String = lines[2 * i + 1].chars().take(4).collect();
@@ -5092,7 +5736,8 @@ fn every_store_in_the_sidebar_stands_field_by_field_at_one_column() {
                      read {:?}",
                     lines[2 * i + 1]
                 );
-                let (first, second) = expected_store_lines(&state, *r, &names[r], rate, width, &bar);
+                let (first, second) =
+                    expected_store_lines(&state, *r, &names[r], rate, width, &bar);
                 assert_eq!(
                     lines[2 * i], first,
                     "{r:?} at {w} columns (sidebar {width} wide): the name at the left edge, then \
@@ -5111,8 +5756,14 @@ fn every_store_in_the_sidebar_stands_field_by_field_at_one_column() {
             }
         }
     }
-    assert!(signs.iter().all(|s| *s), "fixture: rates of every sign and none, got {signs:?}");
-    assert!(uncapped_seen && full_seen, "fixture: uncapped and full stores both drawn");
+    assert!(
+        signs.iter().all(|s| *s),
+        "fixture: rates of every sign and none, got {signs:?}"
+    );
+    assert!(
+        uncapped_seen && full_seen,
+        "fixture: uncapped and full stores both drawn"
+    );
 }
 
 /// The sidebar draws the stores the stores group lists, in its order, each
@@ -5125,7 +5776,8 @@ fn every_store_in_the_sidebar_stands_field_by_field_at_one_column() {
 /// @spec TUI-RENDER-022
 #[test]
 fn the_sidebar_draws_whole_stores_full_ones_first_and_counts_the_rest() {
-    let names: std::collections::HashMap<ResourceId, String> = stores_row_names().into_iter().collect();
+    let names: std::collections::HashMap<ResourceId, String> =
+        stores_row_names().into_iter().collect();
     let dim = clowder_tui::theme::Role::Dim.color();
     let (_, _, side, _) = regions(FLOOR_W, FLOOR_H);
     let width = side.width as usize;
@@ -5135,16 +5787,25 @@ fn the_sidebar_draws_whole_stores_full_ones_first_and_counts_the_rest() {
     // Only the last capped stores full, the rest held below their caps, and a
     // handful of stores held at all.
     let mut late = GameState::new(11);
-    let capped: Vec<ResourceId> =
-        ResourceId::ALL.into_iter().filter(|r| late.cap(*r).is_finite() && late.cap(*r) > 0.0).collect();
+    let capped: Vec<ResourceId> = ResourceId::ALL
+        .into_iter()
+        .filter(|r| late.cap(*r).is_finite() && late.cap(*r) > 0.0)
+        .collect();
     for r in ResourceId::ALL {
         late.resources[r.ix()] = 0.0;
     }
     for (i, r) in capped.iter().enumerate() {
-        late.resources[r.ix()] = if i + 2 >= capped.len() { late.cap(*r) } else { late.cap(*r) / 2.0 };
+        late.resources[r.ix()] = if i + 2 >= capped.len() {
+            late.cap(*r)
+        } else {
+            late.cap(*r) / 2.0
+        };
     }
-    let uncapped: Vec<ResourceId> =
-        ResourceId::ALL.into_iter().filter(|r| late.cap(*r).is_infinite()).take(5).collect();
+    let uncapped: Vec<ResourceId> = ResourceId::ALL
+        .into_iter()
+        .filter(|r| late.cap(*r).is_infinite())
+        .take(5)
+        .collect();
     for r in uncapped {
         late.resources[r.ix()] = 7.0;
     }
@@ -5153,23 +5814,44 @@ fn the_sidebar_draws_whole_stores_full_ones_first_and_counts_the_rest() {
     let mut none_full = GameState::new(11);
     for r in ResourceId::ALL {
         let cap = none_full.cap(r);
-        none_full.resources[r.ix()] = if cap.is_finite() && cap > 0.0 { cap / 3.0 } else { 2.0 };
+        none_full.resources[r.ix()] = if cap.is_finite() && cap > 0.0 {
+            cap / 3.0
+        } else {
+            2.0
+        };
     }
     meadows.push(none_full);
 
     for state in &meadows {
         let listed = listed_stores(state);
         let k = listed.len();
-        assert!(k >= 4, "fixture: enough stores listed to overflow a short sidebar");
+        assert!(
+            k >= 4,
+            "fixture: enough stores listed to overflow a short sidebar"
+        );
         for height in 1..=(2 * k + 3) {
             let (lines, buf) = sidebar_in(state, side.width, height as u16);
             let drawn_n = if 2 * k <= height { k } else { (height - 1) / 2 };
             let chosen: Vec<ResourceId> = {
-                let mut pick: Vec<ResourceId> =
-                    listed.iter().copied().filter(|r| wears_full(state, *r)).take(drawn_n).collect();
+                let mut pick: Vec<ResourceId> = listed
+                    .iter()
+                    .copied()
+                    .filter(|r| wears_full(state, *r))
+                    .take(drawn_n)
+                    .collect();
                 let room = drawn_n - pick.len();
-                pick.extend(listed.iter().copied().filter(|r| !wears_full(state, *r)).take(room));
-                listed.iter().copied().filter(|r| pick.contains(r)).collect()
+                pick.extend(
+                    listed
+                        .iter()
+                        .copied()
+                        .filter(|r| !wears_full(state, *r))
+                        .take(room),
+                );
+                listed
+                    .iter()
+                    .copied()
+                    .filter(|r| pick.contains(r))
+                    .collect()
             };
             for (i, r) in chosen.iter().enumerate() {
                 let head = fmt::fit(&names[r], name_col);
@@ -5207,7 +5889,9 @@ fn the_sidebar_draws_whole_stores_full_ones_first_and_counts_the_rest() {
                 lines.join("\n")
             );
             assert!(
-                below_stores[..below_stores.len() - 1].iter().all(|l| l.trim().is_empty()),
+                below_stores[..below_stores.len() - 1]
+                    .iter()
+                    .all(|l| l.trim().is_empty()),
                 "height {height}: only the note stands below the stores drawn — no store is drawn \
                  in part.\n{}",
                 lines.join("\n")
@@ -5255,7 +5939,11 @@ fn a_few_stores_met() -> GameState {
         content::FORAGE_COST,
         "fixture: nothing in a meadow this bare moves its stores"
     );
-    assert_eq!(listed_stores(&s).len(), 4, "fixture: four stores met, four listed");
+    assert_eq!(
+        listed_stores(&s).len(),
+        4,
+        "fixture: four stores met, four listed"
+    );
     s
 }
 
@@ -5269,7 +5957,10 @@ fn assert_every_listed_store_is_drawn(
     width: usize,
     what: &str,
 ) {
-    assert!(lines.len() >= 2 * listed.len(), "fixture: the sidebar holds every listed store ({what})");
+    assert!(
+        lines.len() >= 2 * listed.len(),
+        "fixture: the sidebar holds every listed store ({what})"
+    );
     let rates = state.net_rates();
     for (i, r) in listed.iter().enumerate() {
         let bar: String = lines[2 * i + 1].chars().take(4).collect();
@@ -5281,9 +5972,11 @@ fn assert_every_listed_store_is_drawn(
             2 * i + 1,
             lines.join("\n")
         );
-        let (first, second) = expected_store_lines(state, *r, &names[r], rates[r.ix()], width, &bar);
+        let (first, second) =
+            expected_store_lines(state, *r, &names[r], rates[r.ix()], width, &bar);
         assert_eq!(
-            lines[2 * i], first,
+            lines[2 * i],
+            first,
             "{what}: {r:?} (stock {}) should stand at line {} of the sidebar, reading its stock; \
              the sidebar read\n{}",
             state.stock(*r),
@@ -5305,21 +5998,39 @@ fn a_store_spent_to_exactly_nothing_stays_in_the_sidebar_where_it_stood() {
         let mut state = a_few_stores_met();
         let spent = ResourceId::Catnip;
         let listed = listed_stores(&state);
-        let names: std::collections::HashMap<ResourceId, String> =
-            listed.iter().map(|r| (*r, stores_row_name(&state, *r))).collect();
+        let names: std::collections::HashMap<ResourceId, String> = listed
+            .iter()
+            .map(|r| (*r, stores_row_name(&state, *r)))
+            .collect();
         let (_, _, side, _) = regions(w, h);
         let width = side.width as usize;
         assert!(
             2 * listed.len() <= side.height as usize,
             "fixture: at {w}x{h} the sidebar holds every listed store"
         );
-        assert!(listed.contains(&spent), "fixture: {spent:?} is listed before it is spent");
+        assert!(
+            listed.contains(&spent),
+            "fixture: {spent:?} is listed before it is spent"
+        );
 
         let before = sidebar_lines(&state, w, h);
-        assert_every_listed_store_is_drawn(&state, &listed, &names, &before, width, &format!("{w}x{h}, before the spend"));
+        assert_every_listed_store_is_drawn(
+            &state,
+            &listed,
+            &names,
+            &before,
+            width,
+            &format!("{w}x{h}, before the spend"),
+        );
 
-        state.apply(Command::Forage).expect("fixture: the meadow holds a forage's price");
-        assert_eq!(state.stock(spent), 0.0, "fixture: the forage spends {spent:?} to exactly nothing");
+        state
+            .apply(Command::Forage)
+            .expect("fixture: the meadow holds a forage's price");
+        assert_eq!(
+            state.stock(spent),
+            0.0,
+            "fixture: the forage spends {spent:?} to exactly nothing"
+        );
 
         assert_eq!(
             listed_stores(&state),
@@ -5327,7 +6038,14 @@ fn a_store_spent_to_exactly_nothing_stays_in_the_sidebar_where_it_stood() {
             "at {w}x{h}: spending {spent:?} to nothing changed the stores the sidebar draws from"
         );
         let after = sidebar_lines(&state, w, h);
-        assert_every_listed_store_is_drawn(&state, &listed, &names, &after, width, &format!("{w}x{h}, after the spend"));
+        assert_every_listed_store_is_drawn(
+            &state,
+            &listed,
+            &names,
+            &after,
+            width,
+            &format!("{w}x{h}, after the spend"),
+        );
         let at = listed.iter().position(|r| *r == spent).expect("listed");
         assert!(
             after[2 * at].contains(&format!("{:>6}", fmt::compact(0.0))),
@@ -5339,9 +6057,20 @@ fn a_store_spent_to_exactly_nothing_stays_in_the_sidebar_where_it_stood() {
         for _ in 0..20 {
             state.tick();
         }
-        assert_eq!(state.stock(spent), 0.0, "fixture: nothing refills {spent:?} here");
+        assert_eq!(
+            state.stock(spent),
+            0.0,
+            "fixture: nothing refills {spent:?} here"
+        );
         let later = sidebar_lines(&state, w, h);
-        assert_every_listed_store_is_drawn(&state, &listed, &names, &later, width, &format!("{w}x{h}, ticks later"));
+        assert_every_listed_store_is_drawn(
+            &state,
+            &listed,
+            &names,
+            &later,
+            width,
+            &format!("{w}x{h}, ticks later"),
+        );
     }
 }
 
@@ -5355,8 +6084,13 @@ fn stores_at_nothing_stay_among_the_stores_the_sidebar_chooses_from_and_counts()
     let mut met = every_store_held(0);
     met.tick();
     let listed = listed_stores(&met);
-    assert_eq!(listed, ResourceId::ALL.to_vec(), "fixture: every store is met, held, and listed");
-    let names: std::collections::HashMap<ResourceId, String> = stores_row_names().into_iter().collect();
+    assert_eq!(
+        listed,
+        ResourceId::ALL.to_vec(),
+        "fixture: every store is met, held, and listed"
+    );
+    let names: std::collections::HashMap<ResourceId, String> =
+        stores_row_names().into_iter().collect();
 
     let spent: Vec<ResourceId> = listed.iter().copied().step_by(3).collect();
     let mut state = met.clone();
@@ -5374,7 +6108,10 @@ fn stores_at_nothing_stay_among_the_stores_the_sidebar_chooses_from_and_counts()
         let (_, _, side, _) = regions(w, h);
         let height = side.height as usize;
         let k = listed.len();
-        assert!(2 * k > height, "fixture: at {w}x{h} the sidebar cannot hold every store");
+        assert!(
+            2 * k > height,
+            "fixture: at {w}x{h} the sidebar cannot hold every store"
+        );
         let lines = sidebar_lines(&state, w, h);
         let note = format!("+{} more", k - (height - 1) / 2);
         assert_eq!(
@@ -5428,7 +6165,10 @@ fn ideas_hint_views(state: &GameState) -> Vec<(bool, ViewState)> {
     for open in [false, true] {
         let base = on_ideas(state, open);
         out.push((open, base.clone()));
-        for row in drawn_rows(state, Section::Ideas, &base).into_iter().filter(|r| r.selectable()) {
+        for row in drawn_rows(state, Section::Ideas, &base)
+            .into_iter()
+            .filter(|r| r.selectable())
+        {
             let mut v = base.clone();
             v.focus[Section::Ideas.index()] = Some(row.key);
             out.push((open, v));
@@ -5450,7 +6190,10 @@ fn ideas_all_done(state: &GameState) -> GameState {
         }
     }
     assert!(
-        rows(&s, Section::Ideas).iter().filter(|r| r.selectable()).all(|r| is_done(&s, r)),
+        rows(&s, Section::Ideas)
+            .iter()
+            .filter(|r| r.selectable())
+            .all(|r| is_done(&s, r)),
         "fixture: every Ideas row is done"
     );
     s
@@ -5463,8 +6206,14 @@ fn ideas_none_done(state: &GameState) -> GameState {
     s.refinements = BTreeSet::new();
     s.rules = BTreeSet::new();
     let list = rows(&s, Section::Ideas);
-    assert!(list.iter().any(|r| r.selectable()), "fixture: the Ideas screen lists rows");
-    assert!(!list.iter().any(|r| is_done(&s, r)), "fixture: no Ideas row is done");
+    assert!(
+        list.iter().any(|r| r.selectable()),
+        "fixture: the Ideas screen lists rows"
+    );
+    assert!(
+        !list.iter().any(|r| is_done(&s, r)),
+        "fixture: no Ideas row is done"
+    );
     s
 }
 
@@ -5483,7 +6232,12 @@ fn the_hint_bar_names_the_done_key_last_before_help_wherever_it_is_live() {
     let all_done = ideas_all_done(&far);
     let mut checked = 0;
     for (label, state) in [("far along", &far), ("every Ideas row done", &all_done)] {
-        assert!(rows(state, Section::Ideas).iter().any(|r| is_done(state, r)), "fixture: {label} has a done group");
+        assert!(
+            rows(state, Section::Ideas)
+                .iter()
+                .any(|r| is_done(state, r)),
+            "fixture: {label} has a done group"
+        );
         for (open, view) in ideas_hint_views(state) {
             let want = if open { "d fold done" } else { "d show done" };
             let line = hint_line(state, &view, WIDE_W);
@@ -5510,7 +6264,9 @@ fn the_hint_bar_names_the_done_key_last_before_help_wherever_it_is_live() {
     }
     let rested = on_ideas(&all_done, false);
     assert!(
-        !drawn_rows(&all_done, Section::Ideas, &rested).iter().any(|r| r.selectable()),
+        !drawn_rows(&all_done, Section::Ideas, &rested)
+            .iter()
+            .any(|r| r.selectable()),
         "with every Ideas row done and the group folded, a row is still drawn (TUI-NAV-113)"
     );
     assert!(checked > 10, "fixture: too few Ideas views were checked");
@@ -5529,20 +6285,34 @@ fn the_hint_bar_names_the_done_key_nowhere_it_is_not_live() {
     for section in Section::ALL.into_iter().filter(|s| *s != Section::Ideas) {
         for row in rows(&far, section).into_iter().filter(|r| r.selectable()) {
             let line = hint_line(&far, &focus_on(&far, section, row.key.clone()), WIDE_W);
-            assert!(!named(&line), "on the {} screen with {:?} focused the hint bar names d: {line:?}", section.title(), row.key);
+            assert!(
+                !named(&line),
+                "on the {} screen with {:?} focused the hint bar names d: {line:?}",
+                section.title(),
+                row.key
+            );
         }
     }
     let none = ideas_none_done(&far);
     for (_, view) in ideas_hint_views(&none) {
         let line = hint_line(&none, &view, WIDE_W);
-        assert!(!named(&line), "with nothing done on the Ideas screen the hint bar names d: {line:?}");
+        assert!(
+            !named(&line),
+            "with nothing done on the Ideas screen the hint bar names d: {line:?}"
+        );
     }
 
     let base = on_ideas(&far, false);
     let mut palette = base.clone();
-    palette.overlay = Some(Overlay::Palette { query: String::new(), selected: 0 });
+    palette.overlay = Some(Overlay::Palette {
+        query: String::new(),
+        selected: 0,
+    });
     let mut prompt = base.clone();
-    prompt.prompt = Some(CountPrompt { digits: "3".to_string(), ..Default::default() });
+    prompt.prompt = Some(CountPrompt {
+        digits: "3".to_string(),
+        ..Default::default()
+    });
     let mut help = base.clone();
     help.overlay = Some(Overlay::Help);
     let mut journal = base.clone();
@@ -5561,9 +6331,18 @@ fn the_hint_bar_names_the_done_key_nowhere_it_is_not_live() {
         },
         expires_at: Instant::now() + Duration::from_secs(8),
     });
-    for (what, view) in [("the palette", palette), ("the count prompt", prompt), ("help", help), ("the Journal", journal), ("an armed row", armed)] {
+    for (what, view) in [
+        ("the palette", palette),
+        ("the count prompt", prompt),
+        ("help", help),
+        ("the Journal", journal),
+        ("an armed row", armed),
+    ] {
         let line = hint_line(&far, &view, WIDE_W);
-        assert!(!named(&line), "with {what} holding the hint bar on the Ideas screen it names d: {line:?}");
+        assert!(
+            !named(&line),
+            "with {what} holding the hint bar on the Ideas screen it names d: {line:?}"
+        );
     }
 }
 
@@ -5581,15 +6360,24 @@ fn the_help_overlay_lists_d_show_or_fold_done_among_the_ideas_keys_alone() {
     })
     .expect("TestBackend is infallible");
     let lines = region_lines(term.backend().buffer(), Rect::new(0, 0, w, h));
-    let screen_line = |s: Section| lines.iter().find(|l| l.trim_start().starts_with(s.title())).cloned();
-    let ideas = screen_line(Section::Ideas).unwrap_or_else(|| panic!("the help overlay has no line for the Ideas screen's keys"));
+    let screen_line = |s: Section| {
+        lines
+            .iter()
+            .find(|l| l.trim_start().starts_with(s.title()))
+            .cloned()
+    };
+    let ideas = screen_line(Section::Ideas)
+        .unwrap_or_else(|| panic!("the help overlay has no line for the Ideas screen's keys"));
     assert!(
         ideas.contains("d show or fold done"),
         "the help overlay's Ideas line does not list the done key as `d show or fold done`.\nline: {ideas:?}"
     );
     for section in Section::ALL.into_iter().filter(|s| *s != Section::Ideas) {
         if let Some(line) = screen_line(section) {
-            let rest = line.trim_start().strip_prefix(section.title()).unwrap_or("");
+            let rest = line
+                .trim_start()
+                .strip_prefix(section.title())
+                .unwrap_or("");
             assert!(
                 !rest.split('/').any(|e| e.trim_start().starts_with("d ")),
                 "the help overlay lists d among the {} screen's keys: {line:?}",
@@ -5607,7 +6395,8 @@ fn the_help_overlay_lists_d_show_or_fold_done_among_the_ideas_keys_alone() {
 /// position in the whole name: a kept character wears its own position's
 /// colour, and an ellipsis the colour of the character it stands in place of.
 fn coat_on(r: ResourceId, full: &str, drawn: &str) -> Vec<ratatui::style::Color> {
-    let colours = clowder_tui::theme::coat_colours(clowder_tui::theme::coat(r), full.chars().count());
+    let colours =
+        clowder_tui::theme::coat_colours(clowder_tui::theme::coat(r), full.chars().count());
     drawn.chars().enumerate().map(|(i, _)| colours[i]).collect()
 }
 
@@ -5625,7 +6414,11 @@ fn every_store_in_the_sidebar_wears_its_coat_on_its_name_and_nowhere_else() {
     use ratatui::style::Color;
     let state = every_store_held(0);
     let listed = listed_stores(&state);
-    assert_eq!(listed.len(), ResourceId::ALL.len(), "fixture: every store held, every store listed");
+    assert_eq!(
+        listed.len(),
+        ResourceId::ALL.len(),
+        "fixture: every store held, every store listed"
+    );
     let w = 40u16;
     let h = 2 * listed.len() as u16;
     let (lines, buf) = sidebar_in(&state, w, h);
@@ -5633,16 +6426,29 @@ fn every_store_in_the_sidebar_wears_its_coat_on_its_name_and_nowhere_else() {
 
     for (i, r) in listed.iter().enumerate() {
         let full = stores_row_name(&state, *r);
-        assert!(full.chars().count() <= name_col, "fixture: {full:?} fits the name column whole");
+        assert!(
+            full.chars().count() <= name_col,
+            "fixture: {full:?} fits the name column whole"
+        );
         let y = (2 * i) as u16;
         let line = &lines[2 * i];
-        assert!(line.starts_with(&full), "line {y} should begin with {full:?}: {line:?}");
+        assert!(
+            line.starts_with(&full),
+            "line {y} should begin with {full:?}: {line:?}"
+        );
 
         let expected = coat_on(*r, &full, &full);
         for (x, want) in expected.iter().enumerate() {
             let got = fg_at(&buf, x as u16, y);
-            assert_ne!(got, Color::Reset, "{full:?}: character {x} wears no colour at all");
-            assert_eq!(&got, want, "{full:?}: character {x} wears {got:?}, not its coat's {want:?}");
+            assert_ne!(
+                got,
+                Color::Reset,
+                "{full:?}: character {x} wears no colour at all"
+            );
+            assert_eq!(
+                &got, want,
+                "{full:?}: character {x} wears {got:?}, not its coat's {want:?}"
+            );
         }
         for x in expected.len()..w as usize {
             let got = fg_at(&buf, x as u16, y);
@@ -5662,7 +6468,11 @@ fn every_store_in_the_sidebar_wears_its_coat_on_its_name_and_nowhere_else() {
         for x in 0..w as usize {
             let got = fg_at(&buf, x as u16, y + 1);
             if tag.as_ref().is_some_and(|t| t.contains(&x)) {
-                assert_eq!(got, attention_colour(), "{full:?}: its `full` tag wears attention");
+                assert_eq!(
+                    got,
+                    attention_colour(),
+                    "{full:?}: its `full` tag wears attention"
+                );
             } else {
                 assert_eq!(
                     got,
@@ -5697,20 +6507,28 @@ fn a_store_cut_short_keeps_its_colours_by_position_and_the_ellipsis_wears_its_ow
             continue;
         }
         cut += 1;
-        assert!(drawn.ends_with('…'), "fixture: a cut name ends in the ellipsis: {drawn:?}");
+        assert!(
+            drawn.ends_with('…'),
+            "fixture: a cut name ends in the ellipsis: {drawn:?}"
+        );
         let y = (2 * i) as u16;
         let line = &lines[2 * i];
-        assert!(line.starts_with(&drawn), "line {y} should begin with {drawn:?}: {line:?}");
+        assert!(
+            line.starts_with(&drawn),
+            "line {y} should begin with {drawn:?}: {line:?}"
+        );
         let expected = coat_on(*r, &full, &drawn);
         for (x, want) in expected.iter().enumerate() {
             let got = fg_at(&buf, x as u16, y);
             assert_eq!(
-                &got,
-                want,
+                &got, want,
                 "{full:?} cut to {drawn:?}: cell {x} wears {got:?}, not the colour character {x} \
                  of the whole name wears"
             );
         }
     }
-    assert!(cut > 0, "fixture: some name is longer than {name_col} characters");
+    assert!(
+        cut > 0,
+        "fixture: some name is longer than {name_col} characters"
+    );
 }

@@ -188,13 +188,15 @@ fn scenario_child() {
         // The guard scenarios run with this child's standard streams on a
         // pseudo-terminal the parent reads (`guard_pty` below).
         "guard-drop" => {
-            let guard = term::TerminalGuard::enter().expect("entering the terminal on a pseudo-terminal");
+            let guard =
+                term::TerminalGuard::enter().expect("entering the terminal on a pseudo-terminal");
             drop(guard);
             mark("dropped");
             return;
         }
         "guard-panic" => {
-            let _guard = term::TerminalGuard::enter().expect("entering the terminal on a pseudo-terminal");
+            let _guard =
+                term::TerminalGuard::enter().expect("entering the terminal on a pseudo-terminal");
             panic!("a panic with the terminal taken");
         }
         "sigint" => {
@@ -409,10 +411,22 @@ mod guard_pty {
             assert_eq!(grantpt(fd), 0, "grantpt: {}", io::Error::last_os_error());
             assert_eq!(unlockpt(fd), 0, "unlockpt: {}", io::Error::last_os_error());
             let mut buf = [0 as c_char; 256];
-            assert_eq!(ptsname_r(fd, buf.as_mut_ptr(), buf.len()), 0, "ptsname_r: {}", io::Error::last_os_error());
+            assert_eq!(
+                ptsname_r(fd, buf.as_mut_ptr(), buf.len()),
+                0,
+                "ptsname_r: {}",
+                io::Error::last_os_error()
+            );
             let flags = fcntl(fd, F_GETFL);
-            assert!(fcntl(fd, F_SETFL, flags | O_NONBLOCK) >= 0, "F_SETFL: {}", io::Error::last_os_error());
-            (master, CStr::from_ptr(buf.as_ptr()).to_string_lossy().into_owned())
+            assert!(
+                fcntl(fd, F_SETFL, flags | O_NONBLOCK) >= 0,
+                "F_SETFL: {}",
+                io::Error::last_os_error()
+            );
+            (
+                master,
+                CStr::from_ptr(buf.as_ptr()).to_string_lossy().into_owned(),
+            )
         };
         let terminal = OpenOptions::new()
             .read(true)
@@ -423,7 +437,13 @@ mod guard_pty {
         let exe = std::env::current_exe().expect("path of this test binary");
         let mut command = Command::new(exe);
         command
-            .args(["--exact", "scenario_child", "--nocapture", "--test-threads", "1"])
+            .args([
+                "--exact",
+                "scenario_child",
+                "--nocapture",
+                "--test-threads",
+                "1",
+            ])
             .env(super::CHILD_ENV, scenario)
             .stdin(Stdio::from(terminal.try_clone().unwrap()))
             .stdout(Stdio::from(terminal.try_clone().unwrap()))
@@ -438,7 +458,11 @@ mod guard_pty {
                 Ok(())
             });
         }
-        let mut child = Reaped(command.spawn().expect("re-executing this test binary as a child"));
+        let mut child = Reaped(
+            command
+                .spawn()
+                .expect("re-executing this test binary as a child"),
+        );
         drop(command);
         drop(terminal);
 
@@ -494,11 +518,16 @@ mod guard_pty {
                     j += 1;
                 }
                 if j < out.len() && (out[j] == b'h' || out[j] == b'l') {
-                    let params = std::str::from_utf8(&out[i + 3..j]).expect("digits and semicolons");
+                    let params =
+                        std::str::from_utf8(&out[i + 3..j]).expect("digits and semicolons");
                     for p in params.split(';') {
                         if let Ok(mode) = p.parse::<u32>() {
                             if mode != 25 {
-                                changes.push(ModeChange { at: i, mode, on: out[j] == b'h' });
+                                changes.push(ModeChange {
+                                    at: i,
+                                    mode,
+                                    on: out[j] == b'h',
+                                });
                             }
                         }
                     }
@@ -528,7 +557,14 @@ fn expect_entered_and_restored_with_reporting(out: &[u8], before: usize, what: &
         .collect();
     assert_eq!(
         mouse_and_screen,
-        vec![(1049, true), (1000, true), (1006, true), (1006, false), (1000, false), (1049, false)],
+        vec![
+            (1049, true),
+            (1000, true),
+            (1006, true),
+            (1006, false),
+            (1000, false),
+            (1049, false)
+        ],
         "{what}: the guard should enter the alternate screen, turn on normal tracking and the SGR \
          encoding, and on the way out turn the SGR encoding then normal tracking off before it \
          leaves the alternate screen — and touch no other mouse mode.\n--- output ---\n{}",
@@ -554,7 +590,12 @@ fn letting_the_guard_go_turns_mouse_reporting_off_before_the_alternate_screen_is
     let mark = out
         .windows(b"[mark] dropped".len())
         .position(|w| w == b"[mark] dropped")
-        .unwrap_or_else(|| panic!("the guard-drop child never got past the guard\n{}", String::from_utf8_lossy(&out)));
+        .unwrap_or_else(|| {
+            panic!(
+                "the guard-drop child never got past the guard\n{}",
+                String::from_utf8_lossy(&out)
+            )
+        });
     expect_entered_and_restored_with_reporting(&out, mark, "the guard let go");
 }
 
@@ -569,6 +610,11 @@ fn a_panic_turns_mouse_reporting_off_before_the_panic_message() {
     let message = out
         .windows(b"panicked at".len())
         .position(|w| w == b"panicked at")
-        .unwrap_or_else(|| panic!("the guard-panic child printed no panic message\n{}", String::from_utf8_lossy(&out)));
+        .unwrap_or_else(|| {
+            panic!(
+                "the guard-panic child printed no panic message\n{}",
+                String::from_utf8_lossy(&out)
+            )
+        });
     expect_entered_and_restored_with_reporting(&out, message, "a panic");
 }

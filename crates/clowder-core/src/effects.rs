@@ -364,7 +364,10 @@ impl GameState {
         }
         // 10. The Elder's birth trait, active only from the chair.
         // @spec SIM-KIT-024
-        if let Some(trait_id) = self.elder.and_then(|ix| self.kittens.get(ix)).map(|k| k.trait_id)
+        if let Some(trait_id) = self
+            .elder
+            .and_then(|ix| self.kittens.get(ix))
+            .map(|k| k.trait_id)
         {
             sum += trait_effect(trait_id, key);
         }

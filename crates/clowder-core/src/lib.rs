@@ -4,12 +4,12 @@
 //! game *is* lives here. No terminal, no clocks, no threads — wall-clock time
 //! enters only through the persistence API's caller-supplied timestamps.
 
-pub mod content;
 mod command;
+pub mod content;
 mod effects;
 mod events;
-mod journal;
 mod gating;
+mod journal;
 mod query;
 mod rng;
 mod save;

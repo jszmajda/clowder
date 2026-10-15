@@ -89,6 +89,14 @@ pub fn live(
 /// The row the live mnemonic `c` stands for on `section` with `focus` under
 /// the cursor, or `None` if `c` names no live mnemonic there — an unbound
 /// letter, silently ignored. @spec TUI-NAV-046
-pub fn target(state: &GameState, section: Section, focus: Option<&RowKey>, c: char) -> Option<RowKey> {
-    live(state, section, focus).into_iter().find(|(m, _, _)| *m == c).map(|(_, key, _)| key)
+pub fn target(
+    state: &GameState,
+    section: Section,
+    focus: Option<&RowKey>,
+    c: char,
+) -> Option<RowKey> {
+    live(state, section, focus)
+        .into_iter()
+        .find(|(m, _, _)| *m == c)
+        .map(|(_, key, _)| key)
 }

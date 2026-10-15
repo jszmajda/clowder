@@ -15,7 +15,9 @@ use std::process::Command;
 #[derive(Debug)]
 pub enum LockError {
     /// Another live session holds the game.
-    Held { pid: u32 },
+    Held {
+        pid: u32,
+    },
     Io(std::io::Error),
 }
 

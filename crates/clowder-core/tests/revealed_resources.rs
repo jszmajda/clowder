@@ -74,7 +74,10 @@ fn roomy(seed: u64) -> GameState {
         s.structures[b.ix()] = 2;
     }
     for r in ResourceId::ALL {
-        assert!(s.cap(r) > 0.0, "fixture: the roomy meadow should have room for {r:?}");
+        assert!(
+            s.cap(r) > 0.0,
+            "fixture: the roomy meadow should have room for {r:?}"
+        );
     }
     s
 }
@@ -118,10 +121,19 @@ fn everything_in_view() -> GameState {
         );
     }
     for cmd in per_unit_commands() {
-        assert!(s.unit_price(&cmd).is_some(), "fixture: {cmd:?} should be priced here");
+        assert!(
+            s.unit_price(&cmd).is_some(),
+            "fixture: {cmd:?} should be priced here"
+        );
     }
-    assert!(s.command_gate_open(&Command::DeepNap(1)), "fixture: the deep nap's gate should be open");
-    assert!(held_resources(&s).is_empty(), "fixture: nothing is in store");
+    assert!(
+        s.command_gate_open(&Command::DeepNap(1)),
+        "fixture: the deep nap's gate should be open"
+    );
+    assert!(
+        held_resources(&s).is_empty(),
+        "fixture: nothing is in store"
+    );
     s
 }
 
@@ -146,7 +158,9 @@ fn rich_and_open() -> GameState {
     for r in ResourceId::ALL {
         s.resources[r.ix()] = 1.0e9;
     }
-    s.kittens = (0..6).map(|i| kitten(&format!("kitten-{i}"), None)).collect();
+    s.kittens = (0..6)
+        .map(|i| kitten(&format!("kitten-{i}"), None))
+        .collect();
     for k in s.kittens.iter_mut().take(2) {
         k.job = Some(JobId::Tinkerer);
         k.exp = 1.0e9;
@@ -162,13 +176,25 @@ fn rich_and_open() -> GameState {
 fn priced_meadows() -> Vec<(String, GameState)> {
     let mut out: Vec<(String, GameState)> = vec![
         ("a new meadow".into(), GameState::new(48)),
-        ("a meadow with everything in view".into(), everything_in_view()),
-        ("a meadow with everything already the player's".into(), everything_owned()),
+        (
+            "a meadow with everything in view".into(),
+            everything_in_view(),
+        ),
+        (
+            "a meadow with everything already the player's".into(),
+            everything_owned(),
+        ),
     ];
 
     let mut structures_only = GameState::new(48);
-    structures_only.revealed = StructureId::ALL.iter().map(|b| ContentId::Structure(*b)).collect();
-    out.push(("a meadow whose structures alone are revealed".into(), structures_only));
+    structures_only.revealed = StructureId::ALL
+        .iter()
+        .map(|b| ContentId::Structure(*b))
+        .collect();
+    out.push((
+        "a meadow whose structures alone are revealed".into(),
+        structures_only,
+    ));
 
     let mut ideas_only = GameState::new(48);
     ideas_only.revealed = IdeaId::ALL.iter().map(|i| ContentId::Idea(*i)).collect();
@@ -176,11 +202,17 @@ fn priced_meadows() -> Vec<(String, GameState)> {
 
     let mut pounce_only = GameState::new(48);
     pounce_only.ideas.insert(IdeaId::PouncingPractice);
-    out.push(("a meadow that has learnt only to pounce".into(), pounce_only));
+    out.push((
+        "a meadow that has learnt only to pounce".into(),
+        pounce_only,
+    ));
 
     let mut nap_only = GameState::new(48);
     nap_only.ideas.insert(IdeaId::DeepNapTheory);
-    out.push(("a meadow that has learnt only to nap deeply".into(), nap_only));
+    out.push((
+        "a meadow that has learnt only to nap deeply".into(),
+        nap_only,
+    ));
 
     for c in ColonyId::ALL {
         let mut one = GameState::new(48);
@@ -193,7 +225,10 @@ fn priced_meadows() -> Vec<(String, GameState)> {
     out.push(("a meadow with only a whale visiting".into(), whale));
 
     for (what, s) in &out {
-        assert!(held_resources(s).is_empty(), "fixture: {what} should hold nothing");
+        assert!(
+            held_resources(s).is_empty(),
+            "fixture: {what} should hold nothing"
+        );
     }
     out
 }
@@ -272,13 +307,17 @@ fn variants_of(cmds: &[Command]) -> Vec<std::mem::Discriminant<Command>> {
 const ANY_COMMAND: Command = Command::SetSpeed(1.0);
 
 fn apply_any(s: &mut GameState) {
-    s.apply(ANY_COMMAND).expect("fixture: setting the speed is always accepted");
+    s.apply(ANY_COMMAND)
+        .expect("fixture: setting the speed is always accepted");
 }
 
 /// The revealed resources as the core lists resources: `ResourceId::ALL`'s
 /// order.
 fn in_core_order(set: &BTreeSet<ResourceId>) -> Vec<ResourceId> {
-    ResourceId::ALL.into_iter().filter(|r| set.contains(r)).collect()
+    ResourceId::ALL
+        .into_iter()
+        .filter(|r| set.contains(r))
+        .collect()
 }
 
 fn union(a: &BTreeSet<ResourceId>, b: &BTreeSet<ResourceId>) -> BTreeSet<ResourceId> {
@@ -314,7 +353,10 @@ fn every_resource_is_revealed_the_first_time_a_tick_leaves_some_in_store() {
         let mut s = meadow_with_room_for(r, 480);
         let quiet = s.kittens.is_empty() && s.structures.iter().all(|n| *n == 0);
         let amount = if quiet { DUST } else { 3.0 };
-        assert!(recorded_set(&s).is_empty(), "fixture: a meadow just built has recorded nothing");
+        assert!(
+            recorded_set(&s).is_empty(),
+            "fixture: a meadow just built has recorded nothing"
+        );
         s.resources[r.ix()] = amount;
 
         s.tick();
@@ -325,7 +367,11 @@ fn every_resource_is_revealed_the_first_time_a_tick_leaves_some_in_store() {
         );
         if quiet {
             dust_holdings += 1;
-            assert_eq!(s.stock(r), DUST, "fixture: nothing in a bare meadow moves {r:?}");
+            assert_eq!(
+                s.stock(r),
+                DUST,
+                "fixture: nothing in a bare meadow moves {r:?}"
+            );
         }
         assert!(
             recorded_set(&s).contains(&r),
@@ -333,9 +379,15 @@ fn every_resource_is_revealed_the_first_time_a_tick_leaves_some_in_store() {
              is a holding, by any amount and with no dust guard",
             s.stock(r)
         );
-        assert!(s.resource_revealed(r), "{r:?} is held and recorded, and the query says it is not revealed");
+        assert!(
+            s.resource_revealed(r),
+            "{r:?} is held and recorded, and the query says it is not revealed"
+        );
     }
-    assert!(dust_holdings > 0, "fixture: some resource should be held as dust in a bare meadow");
+    assert!(
+        dust_holdings > 0,
+        "fixture: some resource should be held as dust in a bare meadow"
+    );
 }
 
 /// A command that leaves some in store reveals it before it returns: no tick
@@ -345,12 +397,19 @@ fn every_resource_is_revealed_the_first_time_a_tick_leaves_some_in_store() {
 #[test]
 fn a_resource_is_revealed_the_first_time_an_applied_command_leaves_some_in_store() {
     let mut s = GameState::new(481);
-    assert!(recorded_set(&s).is_empty(), "a new meadow has revealed nothing");
+    assert!(
+        recorded_set(&s).is_empty(),
+        "a new meadow has revealed nothing"
+    );
 
-    s.apply(Command::GatherCatnip).expect("gathering is always possible on an empty meadow");
+    s.apply(Command::GatherCatnip)
+        .expect("gathering is always possible on an empty meadow");
 
     let held = held_resources(&s);
-    assert!(!held.is_empty(), "fixture: gathering leaves something in store");
+    assert!(
+        !held.is_empty(),
+        "fixture: gathering leaves something in store"
+    );
     assert_eq!(s.ticks, 0, "fixture: no tick has run");
     assert_eq!(
         recorded_set(&s),
@@ -370,9 +429,19 @@ fn production_clamped_away_in_the_tick_that_made_it_is_no_holding() {
     let mut s = GameState::new(482);
     s.kittens = vec![kitten("Ember", Some(JobId::Sunwarden))];
     let made = ResourceId::Warmth;
-    assert!(s.net_rate(made) > 0.0, "fixture: the kitten's work should produce {made:?}");
-    assert_eq!(s.cap(made), 0.0, "fixture: and the meadow should have nowhere to keep it");
-    assert!(!priced_resources(&s).contains(&made), "fixture: no price in view names {made:?}");
+    assert!(
+        s.net_rate(made) > 0.0,
+        "fixture: the kitten's work should produce {made:?}"
+    );
+    assert_eq!(
+        s.cap(made),
+        0.0,
+        "fixture: and the meadow should have nowhere to keep it"
+    );
+    assert!(
+        !priced_resources(&s).contains(&made),
+        "fixture: no price in view names {made:?}"
+    );
 
     for _ in 0..50 {
         s.tick();
@@ -382,7 +451,10 @@ fn production_clamped_away_in_the_tick_that_made_it_is_no_holding() {
             "{made:?} was revealed by production the same tick's clamp took away: a tick reads \
              the stock after its clamp"
         );
-        assert!(!s.resource_revealed(made), "the query calls {made:?} revealed; the meadow never held any");
+        assert!(
+            !s.resource_revealed(made),
+            "the query calls {made:?} revealed; the meadow never held any"
+        );
     }
 }
 
@@ -393,8 +465,14 @@ fn production_clamped_away_in_the_tick_that_made_it_is_no_holding() {
 #[test]
 fn a_stock_the_clamp_takes_away_is_never_recorded_as_held() {
     let fresh = GameState::new(483);
-    let no_room: Vec<ResourceId> = ResourceId::ALL.into_iter().filter(|r| fresh.cap(*r) == 0.0).collect();
-    assert!(!no_room.is_empty(), "fixture: a new meadow should have stores it cannot keep anything in");
+    let no_room: Vec<ResourceId> = ResourceId::ALL
+        .into_iter()
+        .filter(|r| fresh.cap(*r) == 0.0)
+        .collect();
+    assert!(
+        !no_room.is_empty(),
+        "fixture: a new meadow should have stores it cannot keep anything in"
+    );
     for r in no_room {
         let mut s = fresh.clone();
         s.resources[r.ix()] = 5.0;
@@ -442,7 +520,10 @@ fn every_resource_a_stated_price_names_is_revealed_whatever_its_stock_and_no_oth
 
         apply_any(&mut s);
 
-        assert!(held_resources(&s).is_empty(), "fixture: {what} still holds nothing");
+        assert!(
+            held_resources(&s).is_empty(),
+            "fixture: {what} still holds nothing"
+        );
         assert_eq!(
             recorded_set(&s),
             priced,
@@ -465,14 +546,23 @@ fn every_resource_a_stated_price_names_is_revealed_whatever_its_stock_and_no_oth
     // per-unit command, and the nap.
     for id in every_content_id() {
         if !price_components(&everything_in_view(), id).is_empty() {
-            assert!(items_in_view.contains(&id), "fixture: no meadow put {id:?}'s price in view");
+            assert!(
+                items_in_view.contains(&id),
+                "fixture: no meadow put {id:?}'s price in view"
+            );
         }
     }
     for cmd in per_unit_commands() {
-        assert!(commands_priced.contains(&cmd), "fixture: no meadow priced {cmd:?}");
+        assert!(
+            commands_priced.contains(&cmd),
+            "fixture: no meadow priced {cmd:?}"
+        );
     }
     assert!(nap_open, "fixture: no meadow opened the deep nap's gate");
-    assert!(price_only_reveals > 0, "fixture: no price revealed anything");
+    assert!(
+        price_only_reveals > 0,
+        "fixture: no price revealed anything"
+    );
 }
 
 /// An item that is already the player's still states a price, and that price
@@ -490,7 +580,15 @@ fn the_price_of_an_item_already_the_players_still_reveals_what_it_names() {
             yours || built
         })
         .collect();
-    for kind in ["Structure", "Idea", "Refinement", "Rule", "Rite", "Arch", "DreamLoom"] {
+    for kind in [
+        "Structure",
+        "Idea",
+        "Refinement",
+        "Rule",
+        "Rite",
+        "Arch",
+        "DreamLoom",
+    ] {
         assert!(
             owned.iter().any(|id| format!("{id:?}").starts_with(kind)),
             "fixture: some {kind} should already be the player's"
@@ -525,11 +623,23 @@ fn an_item_a_ticks_scan_reveals_brings_the_stores_its_price_names_with_it() {
 
     let named = prices_revealed_by(&s, &events);
     assert!(
-        events.iter().any(|e| matches!(e, Event::Revealed { id: ContentId::Idea(_) })),
+        events.iter().any(|e| matches!(
+            e,
+            Event::Revealed {
+                id: ContentId::Idea(_)
+            }
+        )),
         "fixture: the tick's scan should reveal an idea; events: {events:?}"
     );
-    let unheld: Vec<ResourceId> = named.iter().copied().filter(|r| s.stock(*r) == 0.0).collect();
-    assert!(!unheld.is_empty(), "fixture: a revealed item's price should name a store standing at nothing");
+    let unheld: Vec<ResourceId> = named
+        .iter()
+        .copied()
+        .filter(|r| s.stock(*r) == 0.0)
+        .collect();
+    assert!(
+        !unheld.is_empty(),
+        "fixture: a revealed item's price should name a store standing at nothing"
+    );
 
     let recorded = recorded_set(&s);
     for r in &named {
@@ -543,7 +653,10 @@ fn an_item_a_ticks_scan_reveals_brings_the_stores_its_price_names_with_it() {
     // revealed items' prices name, and at most what other stated prices name.
     let allowed = union(&held_resources(&s), &priced_resources(&s));
     for r in &recorded {
-        assert!(allowed.contains(r), "{r:?} was revealed though neither held nor named in a price");
+        assert!(
+            allowed.contains(r),
+            "{r:?} was revealed though neither held nor named in a price"
+        );
     }
 }
 
@@ -559,11 +672,25 @@ fn an_item_a_ticks_scan_reveals_brings_the_stores_its_price_names_with_it() {
 fn a_resource_neither_held_nor_named_in_a_price_is_not_revealed() {
     let mut s = GameState::new(500);
     for step in 0..=200 {
-        assert!(held_resources(&s).is_empty() && priced_resources(&s).is_empty(), "fixture: an idle new meadow");
-        assert!(recorded_set(&s).is_empty(), "after {step} ticks a new meadow has recorded {:?}", recorded_set(&s));
-        assert!(s.resources_revealed().is_empty(), "after {step} ticks the query lists {:?}", s.resources_revealed());
+        assert!(
+            held_resources(&s).is_empty() && priced_resources(&s).is_empty(),
+            "fixture: an idle new meadow"
+        );
+        assert!(
+            recorded_set(&s).is_empty(),
+            "after {step} ticks a new meadow has recorded {:?}",
+            recorded_set(&s)
+        );
+        assert!(
+            s.resources_revealed().is_empty(),
+            "after {step} ticks the query lists {:?}",
+            s.resources_revealed()
+        );
         for r in ResourceId::ALL {
-            assert!(!s.resource_revealed(r), "after {step} ticks {r:?} is revealed in a meadow that never met it");
+            assert!(
+                !s.resource_revealed(r),
+                "after {step} ticks {r:?} is revealed in a meadow that never met it"
+            );
         }
         s.tick();
     }
@@ -594,7 +721,10 @@ fn a_refused_command_reveals_nothing_even_where_its_refusal_names_a_resource() {
     let meadows = [
         ("a new meadow", GameState::new(501)),
         ("a meadow that has gathered once", a_little),
-        ("a meadow with everything in view and nothing in store", recorded_prices),
+        (
+            "a meadow with everything in view and nothing in store",
+            recorded_prices,
+        ),
         ("a meadow built by hand, nothing of it recorded", unrecorded),
     ];
 
@@ -619,12 +749,26 @@ fn a_refused_command_reveals_nothing_even_where_its_refusal_names_a_resource() {
                     }
                 }
             }
-            assert_eq!(recorded_resources(&s), before, "in {what}, the refused {cmd:?} changed what is revealed");
-            assert_eq!(s.resources_revealed(), listed, "in {what}, the refused {cmd:?} changed what the query lists");
-            assert_eq!(s, meadow, "in {what}, the refused {cmd:?} changed the meadow");
+            assert_eq!(
+                recorded_resources(&s),
+                before,
+                "in {what}, the refused {cmd:?} changed what is revealed"
+            );
+            assert_eq!(
+                s.resources_revealed(),
+                listed,
+                "in {what}, the refused {cmd:?} changed what the query lists"
+            );
+            assert_eq!(
+                s, meadow,
+                "in {what}, the refused {cmd:?} changed the meadow"
+            );
         }
     }
-    assert!(refused > 100, "fixture: only {refused} commands were refused");
+    assert!(
+        refused > 100,
+        "fixture: only {refused} commands were refused"
+    );
     assert!(
         named_an_unrevealed_store > 0,
         "fixture: some refusal should name a resource its meadow has not revealed"
@@ -660,7 +804,10 @@ fn play_checking_every_step(start: GameState, rounds: usize) -> Played {
     // Growth first, so the meadow gets somewhere; then everything else the
     // game has, bar the commands that take work or time away.
     let grows = |c: &Command| {
-        matches!(c, Command::Build(_) | Command::ResearchIdea(_) | Command::AssignJob(_))
+        matches!(
+            c,
+            Command::Build(_) | Command::ResearchIdea(_) | Command::AssignJob(_)
+        )
     };
     let skipped = |c: &Command| {
         matches!(
@@ -675,7 +822,11 @@ fn play_checking_every_step(start: GameState, rounds: usize) -> Played {
         )
     };
     let mut script: Vec<Command> = every_command().into_iter().filter(|c| grows(c)).collect();
-    script.extend(every_command().into_iter().filter(|c| !grows(c) && !skipped(c)));
+    script.extend(
+        every_command()
+            .into_iter()
+            .filter(|c| !grows(c) && !skipped(c)),
+    );
     script.push(Command::Forage);
     script.push(Command::Forage);
 
@@ -695,7 +846,11 @@ fn play_checking_every_step(start: GameState, rounds: usize) -> Played {
                 s.ticks
             );
         }
-        assert_eq!(s.resources_revealed(), in_core_order(&recorded), "after {after}: the query's list");
+        assert_eq!(
+            s.resources_revealed(),
+            in_core_order(&recorded),
+            "after {after}: the query's list"
+        );
     };
 
     let mut spent_out = 0;
@@ -723,10 +878,18 @@ fn play_checking_every_step(start: GameState, rounds: usize) -> Played {
         }
         if round % 10 == 0 {
             spent_out += expected.iter().filter(|r| s.stock(**r) == 0.0).count();
-            shown_before_held += priced_resources(&s).iter().filter(|r| s.stock(**r) == 0.0).count();
+            shown_before_held += priced_resources(&s)
+                .iter()
+                .filter(|r| s.stock(**r) == 0.0)
+                .count();
         }
     }
-    Played { state: s, met: expected, spent_out, shown_before_held }
+    Played {
+        state: s,
+        met: expected,
+        spent_out,
+        shown_before_held,
+    }
 }
 
 /// Under play from a new meadow, the revealed resources are at every moment
@@ -740,10 +903,23 @@ fn under_play_from_a_new_game_the_revealed_resources_are_exactly_what_was_held_o
     let played = play_checking_every_step(GameState::new(502), 120);
 
     let s = &played.state;
-    assert!(played.met.len() >= 4, "fixture: the game should meet several stores, met {:?}", played.met);
-    assert!(played.met.len() < ResourceId::ALL.len(), "fixture: and should not have met them all");
-    assert!(!s.ideas.is_empty() && !s.kittens.is_empty(), "fixture: the meadow should have grown");
-    assert!(played.shown_before_held > 0, "fixture: some price should have named a store standing at nothing");
+    assert!(
+        played.met.len() >= 4,
+        "fixture: the game should meet several stores, met {:?}",
+        played.met
+    );
+    assert!(
+        played.met.len() < ResourceId::ALL.len(),
+        "fixture: and should not have met them all"
+    );
+    assert!(
+        !s.ideas.is_empty() && !s.kittens.is_empty(),
+        "fixture: the meadow should have grown"
+    );
+    assert!(
+        played.shown_before_held > 0,
+        "fixture: some price should have named a store standing at nothing"
+    );
 }
 
 /// The same, played on from a meadow part-way along — built by hand, its
@@ -753,12 +929,15 @@ fn under_play_from_a_new_game_the_revealed_resources_are_exactly_what_was_held_o
 ///
 /// @spec SIM-ENG-050, SIM-ENG-054
 #[test]
-fn under_play_from_a_game_part_way_along_the_revealed_resources_are_exactly_what_was_held_or_priced() {
+fn under_play_from_a_game_part_way_along_the_revealed_resources_are_exactly_what_was_held_or_priced(
+) {
     let mut s = GameState::new(503);
     for b in StructureId::ALL.into_iter().take(28) {
         s.structures[b.ix()] = 3;
     }
-    s.kittens = (0..12).map(|i| kitten(&format!("kitten-{i}"), None)).collect();
+    s.kittens = (0..12)
+        .map(|i| kitten(&format!("kitten-{i}"), None))
+        .collect();
     for r in ResourceId::ALL.into_iter().take(5) {
         s.resources[r.ix()] = s.cap(r).min(400.0);
     }
@@ -769,11 +948,26 @@ fn under_play_from_a_game_part_way_along_the_revealed_resources_are_exactly_what
     let played = play_checking_every_step(s, 80);
 
     let s = &played.state;
-    assert!(s.ideas.len() >= ideas_at_start + 5, "fixture: the meadow should have learnt several ideas");
-    assert!(played.met.len() > met_at_start, "fixture: and met stores it had not at the start");
-    assert!(played.met.len() < ResourceId::ALL.len(), "fixture: without meeting them all");
-    assert!(played.spent_out > 0, "fixture: some revealed store should have stood at nothing along the way");
-    assert!(played.shown_before_held > 0, "fixture: some price should have named a store standing at nothing");
+    assert!(
+        s.ideas.len() >= ideas_at_start + 5,
+        "fixture: the meadow should have learnt several ideas"
+    );
+    assert!(
+        played.met.len() > met_at_start,
+        "fixture: and met stores it had not at the start"
+    );
+    assert!(
+        played.met.len() < ResourceId::ALL.len(),
+        "fixture: without meeting them all"
+    );
+    assert!(
+        played.spent_out > 0,
+        "fixture: some revealed store should have stood at nothing along the way"
+    );
+    assert!(
+        played.shown_before_held > 0,
+        "fixture: some price should have named a store standing at nothing"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -803,15 +997,25 @@ fn every_revealed_resource_stays_revealed_when_its_stock_falls_to_zero() {
             "{r:?} was spent to nothing and the query no longer calls it revealed: a reveal that \
              can un-reveal takes the store's row out from under the cursor"
         );
-        assert!(s.resources_revealed().contains(&r), "{r:?} left the query's list when it was spent");
+        assert!(
+            s.resources_revealed().contains(&r),
+            "{r:?} left the query's list when it was spent"
+        );
 
         // Neither time nor a command takes it back out.
         for _ in 0..30 {
             s.tick();
-            assert!(recorded_set(&s).contains(&r), "{r:?} was un-revealed by a tick at tick {}", s.ticks);
+            assert!(
+                recorded_set(&s).contains(&r),
+                "{r:?} was un-revealed by a tick at tick {}",
+                s.ticks
+            );
         }
         apply_any(&mut s);
-        assert!(recorded_set(&s).contains(&r) && s.resource_revealed(r), "{r:?} was un-revealed by a command");
+        assert!(
+            recorded_set(&s).contains(&r) && s.resource_revealed(r),
+            "{r:?} was un-revealed by a command"
+        );
     }
 }
 
@@ -826,10 +1030,18 @@ fn a_store_gained_and_spent_to_nothing_between_two_ticks_stays_revealed() {
         s.apply(Command::GatherCatnip).unwrap();
     }
     let spent: Vec<ResourceId> = held_resources(&s).into_iter().collect();
-    s.apply(Command::Forage).expect("fixture: ten gathers should pay for one forage");
-    assert_eq!(s.ticks, 0, "fixture: no tick has run between the gain and the spend");
+    s.apply(Command::Forage)
+        .expect("fixture: ten gathers should pay for one forage");
+    assert_eq!(
+        s.ticks, 0,
+        "fixture: no tick has run between the gain and the spend"
+    );
     for r in &spent {
-        assert_eq!(s.stock(*r), 0.0, "fixture: the forage should spend {r:?} to exactly nothing");
+        assert_eq!(
+            s.stock(*r),
+            0.0,
+            "fixture: the forage should spend {r:?} to exactly nothing"
+        );
         assert!(
             recorded_set(&s).contains(r),
             "{r:?} was gained and spent before any tick, and was never recorded: a holding is \
@@ -838,14 +1050,23 @@ fn a_store_gained_and_spent_to_nothing_between_two_ticks_stays_revealed() {
         assert!(s.resource_revealed(*r));
     }
     let gained = held_resources(&s);
-    assert!(!gained.is_empty(), "fixture: the forage leaves something else in store");
-    assert_eq!(recorded_set(&s), union(&gained, &spent.iter().copied().collect()));
+    assert!(
+        !gained.is_empty(),
+        "fixture: the forage leaves something else in store"
+    );
+    assert_eq!(
+        recorded_set(&s),
+        union(&gained, &spent.iter().copied().collect())
+    );
 
     for _ in 0..100 {
         s.tick();
     }
     for r in &spent {
-        assert!(s.resource_revealed(*r), "{r:?} un-revealed while it stood at nothing");
+        assert!(
+            s.resource_revealed(*r),
+            "{r:?} un-revealed while it stood at nothing"
+        );
     }
 }
 
@@ -858,7 +1079,11 @@ fn a_resource_a_price_named_stays_revealed_when_the_price_is_no_longer_shown() {
     let mut s = everything_in_view();
     apply_any(&mut s);
     let once_named = recorded_set(&s);
-    assert_eq!(once_named, priced_resources(&s), "fixture: revealed by prices alone");
+    assert_eq!(
+        once_named,
+        priced_resources(&s),
+        "fixture: revealed by prices alone"
+    );
     assert!(once_named.len() > 10, "fixture: a good many stores named");
 
     // Every item and command that named them leaves the player's view.
@@ -870,10 +1095,17 @@ fn a_resource_a_price_named_stays_revealed_when_the_price_is_no_longer_shown() {
     s.generation = 0;
     s.peak_devotion = 0.0;
     s.kittens.clear();
-    assert!(priced_resources(&s).is_empty(), "fixture: no price is in view now: {:?}", priced_resources(&s));
+    assert!(
+        priced_resources(&s).is_empty(),
+        "fixture: no price is in view now: {:?}",
+        priced_resources(&s)
+    );
 
     for r in &once_named {
-        assert!(s.resource_revealed(*r), "{r:?} un-revealed the moment the price naming it left view");
+        assert!(
+            s.resource_revealed(*r),
+            "{r:?} un-revealed the moment the price naming it left view"
+        );
     }
     for _ in 0..40 {
         s.tick();
@@ -885,7 +1117,10 @@ fn a_resource_a_price_named_stays_revealed_when_the_price_is_no_longer_shown() {
         "resources a price once named left the record after the price stopped being shown"
     );
     for r in &once_named {
-        assert!(s.resource_revealed(*r), "{r:?} un-revealed after its price stopped being shown");
+        assert!(
+            s.resource_revealed(*r),
+            "{r:?} un-revealed after its price stopped being shown"
+        );
     }
 }
 
@@ -898,21 +1133,34 @@ fn a_per_unit_price_leaving_view_on_a_tick_leaves_the_store_it_named_revealed() 
     let mut s = GameState::new(512);
     s.whale_visit_years = 1;
     let exchange = Command::Trade(ColonyId::StarWhales, 1);
-    let named: Vec<ResourceId> =
-        s.unit_price(&exchange).expect("fixture: a visiting whale states a price").into_iter().map(|(r, _)| r).collect();
+    let named: Vec<ResourceId> = s
+        .unit_price(&exchange)
+        .expect("fixture: a visiting whale states a price")
+        .into_iter()
+        .map(|(r, _)| r)
+        .collect();
     apply_any(&mut s);
     for r in &named {
         assert_eq!(s.stock(*r), 0.0, "fixture: the meadow holds none of {r:?}");
-        assert!(s.resource_revealed(*r), "fixture: the whale's price reveals {r:?}");
+        assert!(
+            s.resource_revealed(*r),
+            "fixture: the whale's price reveals {r:?}"
+        );
     }
 
     let mut waited = 0;
     while s.whale_visit_years > 0 {
         s.tick();
         waited += 1;
-        assert!(waited < 5_000, "fixture: the whale's visit should end within its year");
+        assert!(
+            waited < 5_000,
+            "fixture: the whale's visit should end within its year"
+        );
     }
-    assert!(s.unit_price(&exchange).is_none(), "fixture: no whale, no price");
+    assert!(
+        s.unit_price(&exchange).is_none(),
+        "fixture: no whale, no price"
+    );
 
     for r in &named {
         assert!(
@@ -929,9 +1177,16 @@ fn a_per_unit_price_leaving_view_on_a_tick_leaves_the_store_it_named_revealed() 
 #[test]
 fn the_revealed_resources_are_persisted_as_a_set_in_id_order() {
     let mut s = GameState::new(513);
-    let meet: Vec<ResourceId> =
-        ResourceId::ALL.into_iter().rev().step_by(3).filter(|r| s.cap(*r) > 0.0).collect();
-    assert!(meet.len() >= 8, "fixture: several stores to meet, last id first");
+    let meet: Vec<ResourceId> = ResourceId::ALL
+        .into_iter()
+        .rev()
+        .step_by(3)
+        .filter(|r| s.cap(*r) > 0.0)
+        .collect();
+    assert!(
+        meet.len() >= 8,
+        "fixture: several stores to meet, last id first"
+    );
     for r in &meet {
         s.resources[r.ix()] = 2.0;
         s.tick();
@@ -943,7 +1198,10 @@ fn the_revealed_resources_are_persisted_as_a_set_in_id_order() {
     let mut sorted = written.clone();
     sorted.sort_by_key(|r| r.ix());
     sorted.dedup();
-    assert_eq!(written, sorted, "the revealed resources are written out of id order, or twice");
+    assert_eq!(
+        written, sorted,
+        "the revealed resources are written out of id order, or twice"
+    );
     assert_eq!(
         written.iter().copied().collect::<BTreeSet<_>>(),
         meet.iter().copied().collect::<BTreeSet<_>>(),
@@ -964,24 +1222,47 @@ fn the_revealed_resources_are_persisted_as_a_set_in_id_order() {
 #[test]
 fn a_reset_empties_the_revealed_resources_and_reveals_afresh_from_what_results() {
     let mut s = everything_in_view();
-    s.kittens = (0..MEADOW_MOVE_MIN_KITTENS + 3).map(|i| kitten(&format!("kitten-{i}"), None)).collect();
+    s.kittens = (0..MEADOW_MOVE_MIN_KITTENS + 3)
+        .map(|i| kitten(&format!("kitten-{i}"), None))
+        .collect();
     s.structures[StructureId::MemoryChest.ix()] = 6;
-    let carried = [ResourceId::ALL[0], ResourceId::ALL[1], ResourceId::ALL[4], ResourceId::Reverie];
+    let carried = [
+        ResourceId::ALL[0],
+        ResourceId::ALL[1],
+        ResourceId::ALL[4],
+        ResourceId::Reverie,
+    ];
     for r in carried {
         s.resources[r.ix()] = 4.0e5;
     }
-    assert!(s.memory_chest_ratio() > 0.0, "fixture: the chest carries something across");
+    assert!(
+        s.memory_chest_ratio() > 0.0,
+        "fixture: the chest carries something across"
+    );
     apply_any(&mut s);
     let old = recorded_set(&s);
-    assert!(old.len() > carried.len() + 5, "fixture: the old meadow has revealed a good many stores");
+    assert!(
+        old.len() > carried.len() + 5,
+        "fixture: the old meadow has revealed a good many stores"
+    );
 
-    let events = s.apply(Command::GreatMeadowMove).expect("fixture: a clowder this size can Move");
-    assert!(events.iter().any(|e| matches!(e, Event::MeadowMoved { .. })), "fixture: the Move happened");
+    let events = s
+        .apply(Command::GreatMeadowMove)
+        .expect("fixture: a clowder this size can Move");
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, Event::MeadowMoved { .. })),
+        "fixture: the Move happened"
+    );
     assert_eq!(s.ticks, 0, "fixture: no tick of the new meadow has run");
 
     let held = held_resources(&s);
     for r in carried {
-        assert!(held.contains(&r), "fixture: the new meadow should hold some {r:?}");
+        assert!(
+            held.contains(&r),
+            "fixture: the new meadow should hold some {r:?}"
+        );
     }
     let afresh = union(&held, &priced_resources(&s));
     let recorded = recorded_set(&s);
@@ -996,15 +1277,24 @@ fn a_reset_empties_the_revealed_resources_and_reveals_afresh_from_what_results()
         "fixture: the old meadow should have revealed stores the new one has not met"
     );
     for r in forgotten {
-        assert!(!s.resource_revealed(*r), "{r:?} is still revealed after the Move that reset the meadow");
+        assert!(
+            !s.resource_revealed(*r),
+            "{r:?} is still revealed after the Move that reset the meadow"
+        );
     }
-    assert!(s.revealed.is_empty(), "fixture: the content reveal set is emptied by the same Move");
+    assert!(
+        s.revealed.is_empty(),
+        "fixture: the content reveal set is emptied by the same Move"
+    );
     assert_eq!(s.resources_revealed(), in_core_order(&afresh));
 
     // The new meadow's reveals are as permanent as the old one's were.
     for r in carried {
         s.resources[r.ix()] = 0.0;
-        assert!(s.resource_revealed(r), "{r:?}, carried in the chest, un-revealed when the new meadow spent it");
+        assert!(
+            s.resource_revealed(r),
+            "{r:?}, carried in the chest, un-revealed when the new meadow spent it"
+        );
     }
 }
 
@@ -1030,14 +1320,27 @@ fn the_query_answers_revealed_for_a_holding_no_record_has_been_made_of() {
             "{r:?} stands above zero and the query calls it unrevealed: a state built or edited \
              by hand is judged on what it holds"
         );
-        assert_eq!(s.resources_revealed(), vec![r], "the query lists what is held and nothing else");
+        assert_eq!(
+            s.resources_revealed(),
+            vec![r],
+            "the query lists what is held and nothing else"
+        );
         for other in ResourceId::ALL {
             if other != r {
-                assert!(!s.resource_revealed(other), "{other:?} is revealed in a meadow holding only {r:?}");
+                assert!(
+                    !s.resource_revealed(other),
+                    "{other:?} is revealed in a meadow holding only {r:?}"
+                );
             }
         }
-        assert_eq!(s, snapshot, "asking changed the meadow: the queries are read-only");
-        assert!(recorded_set(&s).is_empty(), "and no record was made by asking");
+        assert_eq!(
+            s, snapshot,
+            "asking changed the meadow: the queries are read-only"
+        );
+        assert!(
+            recorded_set(&s).is_empty(),
+            "and no record was made by asking"
+        );
     }
 }
 
@@ -1072,8 +1375,14 @@ fn the_list_is_the_recorded_set_and_the_holdings_together_in_the_cores_order() {
     for r in ResourceId::ALL.into_iter().skip(1).step_by(5) {
         spent.resources[r.ix()] = 1.0;
     }
-    meadows.push(("held, recorded, spent, and holding other things".into(), spent));
-    meadows.push(("a brimming meadow nothing has recorded".into(), rich_and_open()));
+    meadows.push((
+        "held, recorded, spent, and holding other things".into(),
+        spent,
+    ));
+    meadows.push((
+        "a brimming meadow nothing has recorded".into(),
+        rich_and_open(),
+    ));
 
     let mut recorded_only = 0;
     let mut held_only = 0;
@@ -1097,11 +1406,21 @@ fn the_list_is_the_recorded_set_and_the_holdings_together_in_the_cores_order() {
                 both.contains(&r),
                 "in {what}, the query's answer for {r:?} disagrees with the record and the stock"
             );
-            assert_eq!(s.resource_revealed(r), list.contains(&r), "in {what}, the two queries disagree on {r:?}");
+            assert_eq!(
+                s.resource_revealed(r),
+                list.contains(&r),
+                "in {what}, the two queries disagree on {r:?}"
+            );
         }
     }
-    assert!(recorded_only > 0, "fixture: some revealed store should stand at nothing");
-    assert!(held_only > 0, "fixture: some held store should be unrecorded");
+    assert!(
+        recorded_only > 0,
+        "fixture: some revealed store should stand at nothing"
+    );
+    assert!(
+        held_only > 0,
+        "fixture: some held store should be unrecorded"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1115,12 +1434,17 @@ fn the_list_is_the_recorded_set_and_the_holdings_together_in_the_cores_order() {
 #[test]
 fn every_tick_live_or_replayed_records_the_holdings_its_clamp_leaves() {
     let mut live = roomy(540);
-    live.kittens = (0..4).map(|i| kitten(&format!("kitten-{i}"), Some(JobId::ALL[i]))).collect();
+    live.kittens = (0..4)
+        .map(|i| kitten(&format!("kitten-{i}"), Some(JobId::ALL[i])))
+        .collect();
     for r in ResourceId::ALL.into_iter().step_by(2) {
         live.resources[r.ix()] = 6.0;
     }
     let mut replayed = live.clone();
-    assert!(recorded_set(&live).is_empty(), "fixture: nothing recorded yet");
+    assert!(
+        recorded_set(&live).is_empty(),
+        "fixture: nothing recorded yet"
+    );
 
     for tick in 1..=30 {
         live.tick();
@@ -1152,7 +1476,10 @@ fn a_catch_up_records_the_holdings_of_the_ticks_it_replays() {
     let mut s = GameState::new(541);
     s.kittens = vec![kitten("Morsel", None)];
     apply_any(&mut s);
-    assert!(recorded_set(&s).is_empty(), "fixture: nothing revealed at the save");
+    assert!(
+        recorded_set(&s).is_empty(),
+        "fixture: nothing revealed at the save"
+    );
     let food = ResourceId::Catnip;
     let json = {
         let mut v: serde_json::Value = serde_json::from_str(&save_string(&s, 1_000)).unwrap();
@@ -1160,10 +1487,19 @@ fn a_catch_up_records_the_holdings_of_the_ticks_it_replays() {
         v.to_string()
     };
 
-    let loaded = load_string(&json, 1_000 + 600).expect("the save loads").state;
+    let loaded = load_string(&json, 1_000 + 600)
+        .expect("the save loads")
+        .state;
 
-    assert!(loaded.ticks > s.ticks, "fixture: the catch-up replayed ticks");
-    assert_eq!(loaded.stock(food), 0.0, "fixture: the morsel was eaten while away");
+    assert!(
+        loaded.ticks > s.ticks,
+        "fixture: the catch-up replayed ticks"
+    );
+    assert_eq!(
+        loaded.stock(food),
+        0.0,
+        "fixture: the morsel was eaten while away"
+    );
     assert!(
         recorded_set(&loaded).contains(&food),
         "{food:?} was held through replayed ticks and never recorded: a holding is recorded at \
@@ -1253,9 +1589,18 @@ fn a_command_that_opens_a_gate_reveals_the_prices_it_brings_into_view() {
 
     let mut learning = GameState::new(542);
     grant(&mut learning, StructureId::StudyNook, 1);
-    learning.ideas = IdeaId::ALL.into_iter().filter(|i| *i != IdeaId::PouncingPractice).collect();
-    learning.revealed.insert(ContentId::Idea(IdeaId::PouncingPractice));
-    cases.push(("researching an idea", learning, Command::ResearchIdea(IdeaId::PouncingPractice)));
+    learning.ideas = IdeaId::ALL
+        .into_iter()
+        .filter(|i| *i != IdeaId::PouncingPractice)
+        .collect();
+    learning
+        .revealed
+        .insert(ContentId::Idea(IdeaId::PouncingPractice));
+    cases.push((
+        "researching an idea",
+        learning,
+        Command::ResearchIdea(IdeaId::PouncingPractice),
+    ));
 
     let mut basking = GameState::new(542);
     grant(&mut basking, StructureId::SunRoom, 4);
@@ -1284,15 +1629,26 @@ fn a_command_that_opens_a_gate_reveals_the_prices_it_brings_into_view() {
         apply_any(&mut s);
         s.resources = stocked;
         let before = priced_resources(&s);
-        assert_eq!(recorded_set(&s), before, "fixture ({what}): only the stated prices are recorded");
-        assert!(stock_what_it_costs(&mut s, cmd), "fixture: {what} should be affordable");
+        assert_eq!(
+            recorded_set(&s),
+            before,
+            "fixture ({what}): only the stated prices are recorded"
+        );
+        assert!(
+            stock_what_it_costs(&mut s, cmd),
+            "fixture: {what} should be affordable"
+        );
 
-        s.apply(cmd).unwrap_or_else(|e| panic!("fixture: {what} should be accepted, got {e:?}"));
+        s.apply(cmd)
+            .unwrap_or_else(|e| panic!("fixture: {what} should be accepted, got {e:?}"));
 
         let after = priced_resources(&s);
         let brought: Vec<ResourceId> = after.difference(&before).copied().collect();
         if brought.is_empty() {
-            assert_eq!(what, "scouting a picnic", "fixture: {what} should bring a new price into view");
+            assert_eq!(
+                what, "scouting a picnic",
+                "fixture: {what} should bring a new price into view"
+            );
             continue;
         }
         opened.insert(what);
@@ -1304,12 +1660,23 @@ fn a_command_that_opens_a_gate_reveals_the_prices_it_brings_into_view() {
             );
             if s.stock(r) == 0.0 {
                 revealed_at_nothing += 1;
-                assert!(s.resource_revealed(r), "{what}: {r:?} is named in a stated price and is unrevealed");
+                assert!(
+                    s.resource_revealed(r),
+                    "{what}: {r:?} is named in a stated price and is unrevealed"
+                );
             }
         }
     }
-    for what in ["researching an idea", "basking to a peak of devotion", "summoning a whale", "scouting a picnic"] {
-        assert!(opened.contains(what), "fixture: {what} should have opened a gate that states a new price");
+    for what in [
+        "researching an idea",
+        "basking to a peak of devotion",
+        "summoning a whale",
+        "scouting a picnic",
+    ] {
+        assert!(
+            opened.contains(what),
+            "fixture: {what} should have opened a gate that states a new price"
+        );
     }
     assert!(
         revealed_at_nothing >= 4,
@@ -1335,7 +1702,10 @@ fn a_tick_whose_scan_reveals_nothing_checks_no_price() {
         s.ideas.insert(IdeaId::PouncingPractice);
         let priced = priced_resources(&s);
         assert!(!priced.is_empty(), "fixture: a price is in view");
-        assert!(held_resources(&s).is_empty(), "fixture: and nothing is held");
+        assert!(
+            held_resources(&s).is_empty(),
+            "fixture: and nothing is held"
+        );
 
         for _ in 0..25 {
             let events = if replay { s.tick_replay() } else { s.tick() };
@@ -1353,7 +1723,11 @@ fn a_tick_whose_scan_reveals_nothing_checks_no_price() {
 
         // The same price, and the command that would have recorded it.
         apply_any(&mut s);
-        assert_eq!(recorded_set(&s), priced, "fixture: an applied command records the price in view");
+        assert_eq!(
+            recorded_set(&s),
+            priced,
+            "fixture: an applied command records the price in view"
+        );
     }
 }
 
@@ -1367,11 +1741,22 @@ fn unrevealed_and_all_revealed(s: &GameState) -> (GameState, GameState) {
     let json = save_string(s, 0);
     let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
     v["state"]["revealed_resources"] = serde_json::json!([]);
-    let unrevealed = load_string(&v.to_string(), 0).expect("fixture: the save loads").state;
+    let unrevealed = load_string(&v.to_string(), 0)
+        .expect("fixture: the save loads")
+        .state;
     v["state"]["revealed_resources"] = serde_json::to_value(ResourceId::ALL.to_vec()).unwrap();
-    let all = load_string(&v.to_string(), 0).expect("fixture: the edited save loads").state;
-    assert!(recorded_set(&unrevealed).is_empty(), "fixture: one copy has revealed nothing");
-    assert_eq!(recorded_set(&all).len(), ResourceId::ALL.len(), "fixture: the other has revealed everything");
+    let all = load_string(&v.to_string(), 0)
+        .expect("fixture: the edited save loads")
+        .state;
+    assert!(
+        recorded_set(&unrevealed).is_empty(),
+        "fixture: one copy has revealed nothing"
+    );
+    assert_eq!(
+        recorded_set(&all).len(),
+        ResourceId::ALL.len(),
+        "fixture: the other has revealed everything"
+    );
     (unrevealed, all)
 }
 
@@ -1391,7 +1776,9 @@ fn a_resources_reveal_emits_no_event_and_enters_no_journal() {
 
     // A holding, by ticks: stores filling as the meadow works.
     let mut working = roomy(560);
-    working.kittens = (0..4).map(|i| kitten(&format!("kitten-{i}"), Some(JobId::ALL[i]))).collect();
+    working.kittens = (0..4)
+        .map(|i| kitten(&format!("kitten-{i}"), Some(JobId::ALL[i])))
+        .collect();
     for r in ResourceId::ALL.into_iter().step_by(2) {
         working.resources[r.ix()] = 6.0;
     }
@@ -1403,10 +1790,18 @@ fn a_resources_reveal_emits_no_event_and_enters_no_journal() {
     cases.push(("a tick whose scan reveals ideas", nook, Step::Ticks(1)));
 
     // A holding, by a command.
-    cases.push(("a gather", GameState::new(560), Step::Apply(Command::GatherCatnip)));
+    cases.push((
+        "a gather",
+        GameState::new(560),
+        Step::Apply(Command::GatherCatnip),
+    ));
 
     // A price, by a command: every price in view, recorded by the next one.
-    cases.push(("a command in a meadow with every price in view", everything_in_view(), Step::Apply(ANY_COMMAND)));
+    cases.push((
+        "a command in a meadow with every price in view",
+        everything_in_view(),
+        Step::Apply(ANY_COMMAND),
+    ));
 
     for (what, meadow, step) in cases {
         let (mut revealing, mut settled) = unrevealed_and_all_revealed(&meadow);
@@ -1416,17 +1811,30 @@ fn a_resources_reveal_emits_no_event_and_enters_no_journal() {
                 for _ in 0..n {
                     let a = revealing.tick();
                     let b = settled.tick();
-                    assert_eq!(a, b, "{what}: a tick that revealed resources returned different events");
+                    assert_eq!(
+                        a, b,
+                        "{what}: a tick that revealed resources returned different events"
+                    );
                 }
             }
             Step::Apply(cmd) => {
                 let a = revealing.apply(cmd).expect("fixture: accepted");
                 let b = settled.apply(cmd).expect("fixture: accepted");
-                assert_eq!(a, b, "{what}: a command that revealed resources returned different events");
+                assert_eq!(
+                    a, b,
+                    "{what}: a command that revealed resources returned different events"
+                );
             }
         }
-        assert!(!recorded_set(&revealing).is_empty(), "fixture: {what} should reveal a resource");
-        assert_eq!(recorded_resources(&settled), all, "fixture: the twin had nothing left to reveal");
+        assert!(
+            !recorded_set(&revealing).is_empty(),
+            "fixture: {what} should reveal a resource"
+        );
+        assert_eq!(
+            recorded_resources(&settled),
+            all,
+            "fixture: the twin had nothing left to reveal"
+        );
         assert_eq!(
             revealing.journal, settled.journal,
             "{what}: revealing a resource left an entry in the journal"

@@ -62,7 +62,10 @@ impl Journal {
             Event::Napped { .. } => return,
             _ => {}
         }
-        let entry = JournalEntry { tick, item: JournalItem::Happened(event.clone()) };
+        let entry = JournalEntry {
+            tick,
+            item: JournalItem::Happened(event.clone()),
+        };
         if event.class() == EventClass::Milestone {
             self.kept.push(entry);
         } else {
@@ -80,7 +83,10 @@ impl Journal {
         if report.elapsed_seconds < MIN_REPORTABLE_ABSENCE_SECONDS {
             return;
         }
-        self.kept.push(JournalEntry { tick, item: JournalItem::Away(report.clone()) });
+        self.kept.push(JournalEntry {
+            tick,
+            item: JournalItem::Away(report.clone()),
+        });
     }
 
     /// Every retained entry in occurrence order, rolling window and kept

@@ -93,8 +93,8 @@ impl TempDir {
     fn new(tag: &str) -> TempDir {
         static COUNTER: AtomicU32 = AtomicU32::new(0);
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir()
-            .join(format!("clowder-loop-{}-{}-{}", std::process::id(), tag, n));
+        let path =
+            std::env::temp_dir().join(format!("clowder-loop-{}-{}-{}", std::process::id(), tag, n));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).expect("a scratch directory should be creatable");
         TempDir { path }
@@ -140,7 +140,11 @@ impl fmt::Display for Run {
             f,
             "child status: {}{}\n--- child stdout ---\n{}\n--- child stderr ---\n{}",
             self.status,
-            if self.timed_out { " (killed at the deadline)" } else { "" },
+            if self.timed_out {
+                " (killed at the deadline)"
+            } else {
+                ""
+            },
             self.stdout.escape_debug(),
             self.stderr.escape_debug()
         )
@@ -240,7 +244,9 @@ fn run_clowder(home: &Path) -> Run {
         }
     }
 
-    let output = child.wait_with_output().expect("collecting the child's output");
+    let output = child
+        .wait_with_output()
+        .expect("collecting the child's output");
     Run {
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
@@ -377,7 +383,11 @@ fn a_startup_failure_does_not_take_the_terminal_over_in_any_other_way() {
 #[cfg(unix)]
 fn listing(dir: &Path) -> Vec<String> {
     let mut names: Vec<String> = fs::read_dir(dir)
-        .map(|rd| rd.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect())
+        .map(|rd| {
+            rd.flatten()
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .collect()
+        })
         .unwrap_or_default();
     names.sort();
     names
@@ -391,7 +401,10 @@ fn listing(dir: &Path) -> Vec<String> {
 fn no_save_at_all_starts_a_new_game_rather_than_reporting_a_failure() {
     let home = TempDir::new("no-save");
     let save = child_save_path(home.path());
-    assert!(!save.exists(), "fixture: this home must start without a save");
+    assert!(
+        !save.exists(),
+        "fixture: this home must start without a save"
+    );
 
     let run = run_clowder(home.path());
 
@@ -421,7 +434,10 @@ fn a_save_from_the_future_is_left_exactly_as_it_was_found() {
     let save = child_save_path(home.path());
     write_a_save_from_the_future(&save);
     let before = fs::read(&save).expect("reading the fixture back");
-    let dir = save.parent().expect("the save path has a parent").to_path_buf();
+    let dir = save
+        .parent()
+        .expect("the save path has a parent")
+        .to_path_buf();
     let listing_before = listing(&dir);
 
     let run = run_clowder(home.path());
@@ -452,7 +468,10 @@ fn a_save_that_cannot_be_read_is_never_moved_aside() {
     let home = TempDir::new("unreadable-untouched");
     let save = child_save_path(home.path());
     fs::create_dir_all(&save).expect("creating a directory where the save file belongs");
-    let dir = save.parent().expect("the save path has a parent").to_path_buf();
+    let dir = save
+        .parent()
+        .expect("the save path has a parent")
+        .to_path_buf();
     let listing_before = listing(&dir);
 
     let run = run_clowder(home.path());
@@ -499,7 +518,10 @@ fn run_clowder_until_deadline(home: &Path, budget: Duration) -> Run {
             Some(_) => break,
             None if Instant::now() >= deadline => {
                 timed_out = true;
-                let _ = Command::new("kill").arg("-TERM").arg(child.id().to_string()).status();
+                let _ = Command::new("kill")
+                    .arg("-TERM")
+                    .arg(child.id().to_string())
+                    .status();
                 let grace = Instant::now() + Duration::from_secs(5);
                 while child.try_wait().expect("polling the child").is_none() {
                     if Instant::now() >= grace {
@@ -514,7 +536,9 @@ fn run_clowder_until_deadline(home: &Path, budget: Duration) -> Run {
         }
     }
 
-    let output = child.wait_with_output().expect("collecting the child's output");
+    let output = child
+        .wait_with_output()
+        .expect("collecting the child's output");
     Run {
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&output.stderr).into_owned(),

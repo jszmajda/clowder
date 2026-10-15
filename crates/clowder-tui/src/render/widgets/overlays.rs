@@ -22,7 +22,7 @@ use crate::theme::Role;
 /// @spec TUI-NAV-057
 fn tier_mark(class: EventClass) -> &'static str {
     match class {
-        EventClass::Flavor => "\u{b7}",   // ·
+        EventClass::Flavor => "\u{b7}",       // ·
         EventClass::Mechanical => "\u{25aa}", // ▪
         EventClass::Milestone => "\u{2605}",  // ★
     }
@@ -50,9 +50,14 @@ fn event_words(event: &Event) -> String {
         E::SeasonChanged { season } => format!("{} arrived", format!("{season:?}").to_lowercase()),
         E::NewYear { year } => format!("a new year — {year}"),
         E::StructureBuilt { id, count } => {
-            format!("{} raised (×{count})", clowder_core::content::structure_def(*id).name)
+            format!(
+                "{} raised (×{count})",
+                clowder_core::content::structure_def(*id).name
+            )
         }
-        E::IdeaResearched { id } => format!("figured out {}", clowder_core::content::idea_def(*id).name),
+        E::IdeaResearched { id } => {
+            format!("figured out {}", clowder_core::content::idea_def(*id).name)
+        }
         E::ZoomiesStarted { .. } => "the zoomies!".into(),
         E::ZoomiesEnded => "the zoomies pass".into(),
         E::KittenMood { tier } => format!("the clowder is {}", format!("{tier:?}").to_lowercase()),
@@ -69,7 +74,11 @@ fn event_words(event: &Event) -> String {
         // occurrences whose wording nobody has settled.
         other => {
             let d = format!("{other:?}");
-            let head = d.split([' ', '{', '(']).next().unwrap_or("something").to_string();
+            let head = d
+                .split([' ', '{', '('])
+                .next()
+                .unwrap_or("something")
+                .to_string();
             spaced_words(&head)
         }
     }
@@ -134,7 +143,9 @@ fn span_clause(report: &OfflineReport) -> String {
 /// The gentle note appended where the core stopped counting — never on its
 /// own line, since it belongs to the span it qualifies. @spec TUI-NAV-027
 fn truncated_note(report: &OfflineReport) -> Option<&'static str> {
-    report.truncated.then_some(" \u{2014} the meadow stopped counting there")
+    report
+        .truncated
+        .then_some(" \u{2014} the meadow stopped counting there")
 }
 
 /// The largest positive resource gains in a report, curated to a handful so a
@@ -174,7 +185,11 @@ fn changed_resources(report: &OfflineReport) -> Vec<(ResourceId, f64)> {
         .collect();
     changed.sort_by(|a, b| {
         let group = |d: f64| if d > 0.0 { 0 } else { 1 };
-        group(a.1).cmp(&group(b.1)).then(b.1.abs().partial_cmp(&a.1.abs()).unwrap_or(std::cmp::Ordering::Equal))
+        group(a.1).cmp(&group(b.1)).then(
+            b.1.abs()
+                .partial_cmp(&a.1.abs())
+                .unwrap_or(std::cmp::Ordering::Equal),
+        )
     });
     changed
 }
@@ -206,11 +221,17 @@ pub fn ticker(f: &mut Frame, area: Rect, state: &GameState) {
     let text = match entries.last().map(|e| &e.item) {
         Some(JournalItem::Happened(event)) => event_line(event),
         Some(JournalItem::Away(report)) => {
-            format!("\u{2605} while you were away ({}): {}", format_span(report.elapsed_seconds), gains_text(report))
+            format!(
+                "\u{2605} while you were away ({}): {}",
+                format_span(report.elapsed_seconds),
+                gains_text(report)
+            )
         }
         None => String::new(),
     };
-    let style = Style::default().fg(Role::Dim.color().expect("Dim carries a colour")).add_modifier(Modifier::DIM);
+    let style = Style::default()
+        .fg(Role::Dim.color().expect("Dim carries a colour"))
+        .add_modifier(Modifier::DIM);
     f.render_widget(Paragraph::new(Line::styled(text, style)), area);
 }
 
@@ -256,13 +277,19 @@ fn journal_lines(state: &GameState, view: &ViewState) -> Vec<Line<'static>> {
     let pinned: Vec<usize> = if matches!(view.overlay, Some(Overlay::Journal { .. })) {
         view.journal_pinned.clone()
     } else {
-        view.reports.iter().filter(|r| !r.dismissed).map(|r| r.entry).collect()
+        view.reports
+            .iter()
+            .filter(|r| !r.dismissed)
+            .map(|r| r.entry)
+            .collect()
     };
     // Identified by their place in memory, since that is what a `kept` index
     // and a reference out of the merged, re-sorted list can be compared by in
     // common. @spec TUI-NAV-027, TUI-NAV-050
-    let pinned_ptrs: Vec<*const clowder_core::JournalEntry> =
-        pinned.iter().filter_map(|&idx| state.journal.kept.get(idx).map(|e| e as *const _)).collect();
+    let pinned_ptrs: Vec<*const clowder_core::JournalEntry> = pinned
+        .iter()
+        .filter_map(|&idx| state.journal.kept.get(idx).map(|e| e as *const _))
+        .collect();
 
     let mut lines: Vec<Line<'static>> = Vec::new();
     for &idx in &pinned {
@@ -341,7 +368,10 @@ fn away_report_lines(report: &OfflineReport) -> Vec<Line<'static>> {
         }));
     }
     if report.seasons_passed > 0 {
-        lines.push(Line::raw(format!("  {} seasons passed.", report.seasons_passed)));
+        lines.push(Line::raw(format!(
+            "  {} seasons passed.",
+            report.seasons_passed
+        )));
     }
     lines
 }
@@ -401,21 +431,42 @@ pub fn help(f: &mut Frame, area: Rect) {
 
     let width = area.width as usize;
     let keys_whole: Vec<String> = KEYS.iter().map(|(k, a)| format!("{k:<14} {a}")).collect();
-    let keys_packed = pack(&KEYS.iter().map(|(k, a)| format!("{k} {a}")).collect::<Vec<_>>(), width);
-    let screens: Vec<String> = MNEMONICS.iter().map(|(s, k)| format!("{s:<10} {k}")).collect();
+    let keys_packed = pack(
+        &KEYS
+            .iter()
+            .map(|(k, a)| format!("{k} {a}"))
+            .collect::<Vec<_>>(),
+        width,
+    );
+    let screens: Vec<String> = MNEMONICS
+        .iter()
+        .map(|(s, k)| format!("{s:<10} {k}"))
+        .collect();
     let legend_whole: Vec<String> = LEGEND.iter().map(|(g, m)| format!("{g}  {m}")).collect();
-    let legend_packed = pack(&LEGEND.iter().map(|(g, m)| format!("{g} {m}")).collect::<Vec<_>>(), width);
+    let legend_packed = pack(
+        &LEGEND
+            .iter()
+            .map(|(g, m)| format!("{g} {m}"))
+            .collect::<Vec<_>>(),
+        width,
+    );
 
     // Pack as little as fits, so nothing is cut at any supported size: the
     // legend before the key map, and at each step the blank lines between the
     // lists kept while the rows still hold them. The screens' keys are never
     // packed. @spec TUI-NAV-124
     let height = area.height as usize;
-    let steps = [(&keys_whole, &legend_whole), (&keys_whole, &legend_packed), (&keys_packed, &legend_packed)];
+    let steps = [
+        (&keys_whole, &legend_whole),
+        (&keys_whole, &legend_packed),
+        (&keys_packed, &legend_packed),
+    ];
     let (keys, legend, gaps) = steps
         .iter()
         .flat_map(|&(keys, legend)| [(keys, legend, true), (keys, legend, false)])
-        .find(|&(keys, legend, gaps)| keys.len() + screens.len() + legend.len() + if gaps { 2 } else { 0 } <= height)
+        .find(|&(keys, legend, gaps)| {
+            keys.len() + screens.len() + legend.len() + if gaps { 2 } else { 0 } <= height
+        })
         .unwrap_or((&keys_packed, &legend_packed, false));
 
     let mut lines: Vec<Line<'static>> = Vec::new();
@@ -488,7 +539,10 @@ fn active_report<'a>(state: &'a GameState, view: &ViewState) -> Option<(usize, &
 /// banner says passed). @spec TUI-NAV-055
 fn banner_time_clause(report: &OfflineReport, nap_years: Option<u32>) -> String {
     match nap_years {
-        Some(years) => format!("~ after a nap of {years} year{}", if years == 1 { "" } else { "s" }),
+        Some(years) => format!(
+            "~ after a nap of {years} year{}",
+            if years == 1 { "" } else { "s" }
+        ),
         None => format!("~ while you were away ({})", span_clause(report)),
     }
 }
@@ -501,9 +555,19 @@ pub fn banner(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     let Some((entry, report)) = active_report(state, view) else {
         return;
     };
-    let nap_years = view.nap_years.iter().find(|(e, _)| *e == entry).map(|(_, y)| *y);
+    let nap_years = view
+        .nap_years
+        .iter()
+        .find(|(e, _)| *e == entry)
+        .map(|(_, y)| *y);
     let line = banner_line(report, nap_years, area.width as usize);
-    f.render_widget(Paragraph::new(Line::styled(line, Style::default().add_modifier(Modifier::REVERSED))), area);
+    f.render_widget(
+        Paragraph::new(Line::styled(
+            line,
+            Style::default().add_modifier(Modifier::REVERSED),
+        )),
+        area,
+    );
 }
 
 /// Assemble the banner's line for a pane `width` columns wide. Nothing here
@@ -511,12 +575,19 @@ pub fn banner(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
 /// the pinned entry's to tell. @spec TUI-NAV-055, TUI-NAV-056
 fn banner_line(report: &OfflineReport, nap_years: Option<u32>, width: usize) -> String {
     let time = banner_time_clause(report, nap_years);
-    let gains: Vec<String> =
-        largest_gains(report).into_iter().map(|(r, d)| format!("+{} {}", fmt::compact(d), resource_label(r))).collect();
+    let gains: Vec<String> = largest_gains(report)
+        .into_iter()
+        .map(|(r, d)| format!("+{} {}", fmt::compact(d), resource_label(r)))
+        .collect();
     let arrivals_sum: u32 = report.arrived.iter().map(|(_, c)| *c).sum();
-    let arrivals = (arrivals_sum > 0)
-        .then(|| format!("{arrivals_sum} kitten{} arrived", if arrivals_sum == 1 { "" } else { "s" }));
-    let quiet_note = (gains.is_empty() && arrivals.is_none()).then(|| "the meadow kept quiet".to_string());
+    let arrivals = (arrivals_sum > 0).then(|| {
+        format!(
+            "{arrivals_sum} kitten{} arrived",
+            if arrivals_sum == 1 { "" } else { "s" }
+        )
+    });
+    let quiet_note =
+        (gains.is_empty() && arrivals.is_none()).then(|| "the meadow kept quiet".to_string());
 
     // Priority order — lowest dropped first — exactly TUI-NAV-055's list:
     // the dismiss hint, the third gain, the second gain, the tale hint, the
@@ -541,7 +612,13 @@ fn banner_line(report: &OfflineReport, nap_years: Option<u32>, width: usize) -> 
 
     for dropped in 0..=droppable.len() {
         let kept: std::collections::BTreeSet<u8> = droppable[dropped..].iter().copied().collect();
-        let line = assemble_banner_line(&time, &gains, arrivals.as_deref(), quiet_note.as_deref(), &kept);
+        let line = assemble_banner_line(
+            &time,
+            &gains,
+            arrivals.as_deref(),
+            quiet_note.as_deref(),
+            &kept,
+        );
         if line.chars().count() <= width || dropped == droppable.len() {
             return line;
         }

@@ -56,8 +56,10 @@ use ratatui::Terminal;
 fn scratch(name: &str) -> PathBuf {
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let dir = std::env::temp_dir()
-        .join(format!("clowder-transients-{}-{name}-{n}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "clowder-transients-{}-{name}-{n}",
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     dir.join("save.json")
@@ -71,7 +73,10 @@ fn meadow() -> GameState {
     for r in ResourceId::ALL {
         s.resources[r.ix()] = 1.0e9;
     }
-    s.revealed = StructureId::ALL.iter().map(|b| clowder_core::ContentId::Structure(*b)).collect();
+    s.revealed = StructureId::ALL
+        .iter()
+        .map(|b| clowder_core::ContentId::Structure(*b))
+        .collect();
     s.ideas.insert(IdeaId::DeepNapTheory);
     s.resources[ResourceId::Starshards.ix()] = 1.0e12;
     s.ticks = 5_000;
@@ -80,7 +85,10 @@ fn meadow() -> GameState {
 
 /// A report a load's catch-up would fold, so a banner is showing.
 fn away_report() -> OfflineReport {
-    let mut r = OfflineReport { elapsed_seconds: 3 * 86_400, ..OfflineReport::default() };
+    let mut r = OfflineReport {
+        elapsed_seconds: 3 * 86_400,
+        ..OfflineReport::default()
+    };
     r.resource_deltas[ResourceId::Feathers.ix()] = 4_800.0;
     r.arrived = vec![("Quenby".to_string(), 1)];
     r
@@ -90,11 +98,17 @@ fn away_report() -> OfflineReport {
 /// `banner` — one load's report queued, so its banner shows.
 fn session(focus: Option<(Section, RowKey)>, banner: bool, name: &str) -> App {
     let mut state = meadow();
-    let mut view = ViewState { section: Some(Section::Meadow), ..ViewState::default() };
+    let mut view = ViewState {
+        section: Some(Section::Meadow),
+        ..ViewState::default()
+    };
     if banner {
         let report = away_report();
         state.journal.record_away(state.ticks, &report);
-        let loaded = LoadedGame { state: state.clone(), report };
+        let loaded = LoadedGame {
+            state: state.clone(),
+            report,
+        };
         clowder_tui::nav::queue_load_report(&mut view, &loaded);
         assert!(
             view.reports.iter().any(|r| !r.dismissed),
@@ -121,17 +135,32 @@ fn session(focus: Option<(Section, RowKey)>, banner: bool, name: &str) -> App {
 fn nap_key(state: &GameState) -> RowKey {
     rows(state, Section::Dreams)
         .into_iter()
-        .find(|r| matches!(r.kind, RowKind::Act { command: Command::DeepNap(_), .. }))
+        .find(|r| {
+            matches!(
+                r.kind,
+                RowKind::Act {
+                    command: Command::DeepNap(_),
+                    ..
+                }
+            )
+        })
         .map(|r| r.key)
         .expect("fixture: the nap row is listed")
 }
 
 fn meadow_rows(state: &GameState) -> Vec<RowKey> {
-    rows(state, Section::Meadow).into_iter().filter(|r| r.selectable()).map(|r| r.key).collect()
+    rows(state, Section::Meadow)
+        .into_iter()
+        .filter(|r| r.selectable())
+        .map(|r| r.key)
+        .collect()
 }
 
 fn still() -> Reading {
-    Reading { monotonic: Duration::ZERO, wall: Duration::ZERO }
+    Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::ZERO,
+    }
 }
 
 fn term(w: u16, h: u16) -> Terminal<TestBackend> {
@@ -143,7 +172,11 @@ fn press(code: KeyCode) -> Event {
 }
 
 fn press_char(c: char) -> Event {
-    let modifiers = if c.is_ascii_uppercase() { KeyModifiers::SHIFT } else { KeyModifiers::NONE };
+    let modifiers = if c.is_ascii_uppercase() {
+        KeyModifiers::SHIFT
+    } else {
+        KeyModifiers::NONE
+    };
     Event::Key(KeyEvent::new(KeyCode::Char(c), modifiers))
 }
 
@@ -163,7 +196,8 @@ fn esc_repeat() -> Event {
 
 /// Step once with these keys and no time passing.
 fn keys(a: &mut App, t: &mut Terminal<TestBackend>, input: &[Event]) {
-    a.step(t, still(), input).expect("a step against a TestBackend does not fail");
+    a.step(t, still(), input)
+        .expect("a step against a TestBackend does not fail");
 }
 
 fn view_of(a: &App) -> String {
@@ -221,13 +255,17 @@ fn region(buf: &Buffer, rect: Rect) -> Vec<String> {
 /// The inspector widget drawn alone into `rect` of a terminal this size.
 fn inspector_alone(w: u16, h: u16, rect: Rect, state: &GameState, view: &ViewState) -> Vec<String> {
     let mut t = term(w, h);
-    t.draw(|f| inspector::draw(f, rect, state, view)).expect("TestBackend is infallible");
+    t.draw(|f| inspector::draw(f, rect, state, view))
+        .expect("TestBackend is infallible");
     region(t.backend().buffer(), rect)
 }
 
 /// A long-lived footer note, set the way a rejection leaves one.
 fn note(a: &mut App) {
-    a.view.footer = Some(("a note already showing".to_string(), Instant::now() + Duration::from_secs(600)));
+    a.view.footer = Some((
+        "a note already showing".to_string(),
+        Instant::now() + Duration::from_secs(600),
+    ));
 }
 
 // ---------------------------------------------------------------------------
@@ -272,7 +310,10 @@ fn stack(top: Layer, name: &str) -> (App, Terminal<TestBackend>, Vec<Layer>) {
     let mut t = term(80, 24);
     keys(&mut a, &mut t, &[]);
     keys(&mut a, &mut t, &[press_char(' ')]);
-    assert!(a.view.inspector_wanted, "fixture: Space swapped the inspector in");
+    assert!(
+        a.view.inspector_wanted,
+        "fixture: Space swapped the inspector in"
+    );
     keys(&mut a, &mut t, &[press(KeyCode::Enter)]);
     assert!(a.view.armed.is_some(), "fixture: Enter armed the nap row");
     let opener: Vec<Event> = match top {
@@ -291,14 +332,24 @@ fn stack(top: Layer, name: &str) -> (App, Terminal<TestBackend>, Vec<Layer>) {
         ),
         _ => assert!(a.view.overlay.is_some(), "fixture: {top:?} opened"),
     }
-    assert!(a.view.armed.is_some(), "fixture: opening {top:?} left the nap armed beneath");
-    assert!(a.view.inspector_wanted, "fixture: opening {top:?} left the swap in beneath");
+    assert!(
+        a.view.armed.is_some(),
+        "fixture: opening {top:?} left the nap armed beneath"
+    );
+    assert!(
+        a.view.inspector_wanted,
+        "fixture: opening {top:?} left the swap in beneath"
+    );
 
     let mut layers = vec![top, Layer::Armed, Layer::Swap];
     if showing_banner(&a) {
         layers.push(Layer::Banner);
     } else {
-        assert_eq!(top, Layer::Journal, "fixture: only opening the Journal reads the banner");
+        assert_eq!(
+            top,
+            Layer::Journal,
+            "fixture: only opening the Journal reads the banner"
+        );
     }
     (a, t, layers)
 }
@@ -331,7 +382,10 @@ fn each_esc_closes_exactly_the_topmost_transient_and_leaves_everything_beneath()
                 "with {layers:?} open under {top:?}, the Esc that should close only {layer:?} \
                  changed something else, or closed something other than {layer:?}"
             );
-            assert!(a.state == game_before, "an Esc closing {layer:?} changed the game");
+            assert!(
+                a.state == game_before,
+                "an Esc closing {layer:?} changed the game"
+            );
             assert!(!a.quitting, "an Esc closing {layer:?} quit the game");
         }
 
@@ -345,7 +399,10 @@ fn each_esc_closes_exactly_the_topmost_transient_and_leaves_everything_beneath()
             "with every transient closed ({top:?} stack), a further Esc changed the view; on a \
              bare screen Esc does nothing"
         );
-        assert!(a.state == game_before, "an Esc on a bare screen changed the game");
+        assert!(
+            a.state == game_before,
+            "an Esc on a bare screen changed the game"
+        );
         assert!(!a.quitting, "an Esc on a bare screen quit the game");
     }
 }
@@ -453,8 +510,16 @@ fn esc_judges_the_swap_by_the_layout_on_screen_with_the_dead_band_applied() {
                 format!("{expected:?}"),
                 "narrowed from a pane to {w} columns ({}), with the inspector asked for and {}, \
                  Esc {}",
-                if in_band { "inside the dead-band, the pane still on screen" } else { "past the dead-band, the swap on screen" },
-                if banner { "a banner showing" } else { "no banner" },
+                if in_band {
+                    "inside the dead-band, the pane still on screen"
+                } else {
+                    "past the dead-band, the swap on screen"
+                },
+                if banner {
+                    "a banner showing"
+                } else {
+                    "no banner"
+                },
                 if in_band {
                     if banner {
                         "must retire the banner and leave the inspector asked for: no swap is on screen"
@@ -513,8 +578,15 @@ fn esc_on_a_bare_screen_changes_nothing_at_all() {
             let before = view_of(&a);
             let game = a.state.clone();
             keys(&mut a, &mut t, &[esc(), esc_repeat(), esc_repeat()]);
-            assert_eq!(view_of(&a), before, "on a bare screen ({what}), Esc changed the view");
-            assert!(a.state == game, "on a bare screen ({what}), Esc changed the game");
+            assert_eq!(
+                view_of(&a),
+                before,
+                "on a bare screen ({what}), Esc changed the view"
+            );
+            assert!(
+                a.state == game,
+                "on a bare screen ({what}), Esc changed the game"
+            );
             assert!(!a.quitting, "on a bare screen ({what}), Esc quit");
         }
     }
@@ -564,7 +636,10 @@ fn fused_with_esc() -> Vec<KeyEvent> {
             out.push(KeyEvent::new(code, mods));
         }
     }
-    out.push(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL | KeyModifiers::ALT));
+    out.push(KeyEvent::new(
+        KeyCode::Char('c'),
+        KeyModifiers::CONTROL | KeyModifiers::ALT,
+    ));
     out
 }
 
@@ -693,14 +768,21 @@ fn in_the_swap_every_global_key_but_space_i_and_esc_keeps_its_list_view_meaning(
                     shape(&listing.view, base),
                     "{what} with the cursor on {key:?} ({}) did something different in the swap \
                      than in the list view",
-                    if banner { "a banner showing" } else { "no banner" }
+                    if banner {
+                        "a banner showing"
+                    } else {
+                        "no banner"
+                    }
                 );
                 assert!(
                     swapped.state == listing.state,
                     "{what} with the cursor on {key:?} acted differently on the game in the swap \
                      than in the list view"
                 );
-                assert_eq!(swapped.quitting, listing.quitting, "{what} quit in one view only");
+                assert_eq!(
+                    swapped.quitting, listing.quitting,
+                    "{what} quit in one view only"
+                );
             }
         }
     }
@@ -720,7 +802,11 @@ fn navigation_keys() -> Vec<(String, Event)> {
     .into_iter()
     .map(|k| (format!("{k:?}"), press(k)))
     .collect();
-    out.extend(['k', 'j', 'h', 'l', '[', ']'].into_iter().map(|c| (format!("{c:?}"), press_char(c))));
+    out.extend(
+        ['k', 'j', 'h', 'l', '[', ']']
+            .into_iter()
+            .map(|c| (format!("{c:?}"), press_char(c))),
+    );
     out.extend(('0'..='9').map(|c| (format!("digit {c}"), press_char(c))));
     out
 }
@@ -762,27 +848,45 @@ fn in_the_swap_navigation_moves_the_cursor_and_the_inspector_shows_where_it_land
 fn space_i_and_esc_return_the_list_view_at_the_row_the_cursor_is_on() {
     let (w, h) = (80u16, 24u16);
     let list = meadow_rows(&meadow());
-    for (what, event) in [("Space", press_char(' ')), ("i", press_char('i')), ("Esc", esc())] {
+    for (what, event) in [
+        ("Space", press_char(' ')),
+        ("i", press_char('i')),
+        ("Esc", esc()),
+    ] {
         let mut a = session(Some((Section::Meadow, list[0].clone())), false, "return");
         a.view.inspector_wanted = true;
         let mut t = term(w, h);
         keys(&mut a, &mut t, &[]);
         keys(&mut a, &mut t, &[press_char('j'), press_char('j')]);
         let moved = a.view.focus[Section::Meadow.index()].clone();
-        assert_ne!(moved, Some(list[0].clone()), "fixture: j moved the cursor in the swap");
+        assert_ne!(
+            moved,
+            Some(list[0].clone()),
+            "fixture: j moved the cursor in the swap"
+        );
         let swapped_frame = region(t.backend().buffer(), main_rect(&a));
 
         keys(&mut a, &mut t, &[event]);
-        assert!(!a.view.inspector_wanted, "{what} in the swap did not return the list view");
+        assert!(
+            !a.view.inspector_wanted,
+            "{what} in the swap did not return the list view"
+        );
         assert_eq!(
             a.view.focus[Section::Meadow.index()],
             moved,
             "{what} returned the list view but moved the cursor"
         );
-        assert_eq!(a.view.section, Some(Section::Meadow), "{what} moved the section");
+        assert_eq!(
+            a.view.section,
+            Some(Section::Meadow),
+            "{what} moved the section"
+        );
         let main = main_rect(&a);
         let drawn = region(t.backend().buffer(), main);
-        assert_ne!(drawn, swapped_frame, "{what} left the inspector in the list's space");
+        assert_ne!(
+            drawn, swapped_frame,
+            "{what} left the inspector in the list's space"
+        );
         assert_ne!(
             drawn,
             inspector_alone(w, h, main, &a.state, &a.view),
@@ -791,7 +895,11 @@ fn space_i_and_esc_return_the_list_view_at_the_row_the_cursor_is_on() {
 
         // The list back is the list at that row: the same frame a session
         // that never swapped draws with the cursor there.
-        let mut never = session(Some((Section::Meadow, moved.clone().unwrap())), false, "never");
+        let mut never = session(
+            Some((Section::Meadow, moved.clone().unwrap())),
+            false,
+            "never",
+        );
         let mut tn = term(w, h);
         keys(&mut never, &mut tn, &[]);
         assert_eq!(
@@ -831,7 +939,8 @@ fn space_and_i_set_and_clear_the_call_wherever_the_narrow_layout_is_on_screen() 
             }
             for (how, from) in approaches {
                 for (what, key) in inspector_keys() {
-                    let mut a = session(Some((Section::Meadow, first.clone())), false, "narrow-key");
+                    let mut a =
+                        session(Some((Section::Meadow, first.clone())), false, "narrow-key");
                     keys(&mut a, &mut term(from, h), &[]);
                     let mut t = term(w, h);
                     keys(&mut a, &mut t, &[]);
@@ -839,7 +948,10 @@ fn space_and_i_set_and_clear_the_call_wherever_the_narrow_layout_is_on_screen() 
                         matches!(a.prev_layout.map(|l| l.body), Some(Body::Narrow { .. })),
                         "fixture: {w}×{h} {how} draws the narrow layout"
                     );
-                    assert!(!a.view.inspector_wanted, "fixture: no inspector called for yet");
+                    assert!(
+                        !a.view.inspector_wanted,
+                        "fixture: no inspector called for yet"
+                    );
 
                     keys(&mut a, &mut t, std::slice::from_ref(&key));
                     assert!(
@@ -863,8 +975,10 @@ fn space_and_i_set_and_clear_the_call_wherever_the_narrow_layout_is_on_screen() 
 /// through the cap breakpoint and on to the widest walked here, reached
 /// cold, and every width inside the dead-band narrowed to from the pane.
 fn pane_widths(h: u16) -> Vec<(u16, Option<u16>)> {
-    let mut out: Vec<(u16, Option<u16>)> =
-        (100u16..=160).chain([200, 240]).map(|w| (w, None)).collect();
+    let mut out: Vec<(u16, Option<u16>)> = (100u16..=160)
+        .chain([200, 240])
+        .map(|w| (w, None))
+        .collect();
     out.extend(dead_band_widths(h).into_iter().map(|w| (w, Some(100))));
     out
 }
@@ -916,7 +1030,10 @@ fn while_the_pane_is_drawn_space_and_i_leave_the_call_and_leave_one_note() {
                              note; a bound key that cannot act says so"
                         )
                     });
-                    assert!(!text.trim().is_empty(), "{what} at {w} columns left an empty note");
+                    assert!(
+                        !text.trim().is_empty(),
+                        "{what} at {w} columns left an empty note"
+                    );
                     if earlier_note {
                         assert_ne!(
                             text, "a note already showing",
@@ -960,10 +1077,22 @@ fn while_the_pane_is_drawn_space_and_i_leave_the_call_and_leave_one_note() {
 #[test]
 fn under_the_too_small_card_space_and_i_leave_the_call_and_leave_no_note() {
     let first = meadow_rows(&meadow())[0].clone();
-    let cards: [(u16, u16); 9] =
-        [(79, 24), (79, 40), (60, 20), (40, 30), (1, 1), (80, 23), (160, 23), (240, 10), (80, 1)];
-    let approaches: [(&str, Option<(u16, u16)>); 3] =
-        [("opened on it", None), ("from the narrow layout", Some((80, 24))), ("from the pane", Some((160, 40)))];
+    let cards: [(u16, u16); 9] = [
+        (79, 24),
+        (79, 40),
+        (60, 20),
+        (40, 30),
+        (1, 1),
+        (80, 23),
+        (160, 23),
+        (240, 10),
+        (80, 1),
+    ];
+    let approaches: [(&str, Option<(u16, u16)>); 3] = [
+        ("opened on it", None),
+        ("from the narrow layout", Some((80, 24))),
+        ("from the pane", Some((160, 40))),
+    ];
     for (w, h) in cards {
         for (how, from) in approaches {
             for wanted in [false, true] {
@@ -1001,8 +1130,16 @@ fn under_the_too_small_card_space_and_i_leave_the_call_and_leave_no_note() {
                                 "{what} under the too-small card at {w}×{h} ({how}, {}, {}) \
                                  changed the view; it leaves the call as it stood and leaves no \
                                  note",
-                                if banner { "a banner queued" } else { "no banner" },
-                                if earlier_note { "a note already showing" } else { "no note" }
+                                if banner {
+                                    "a banner queued"
+                                } else {
+                                    "no banner"
+                                },
+                                if earlier_note {
+                                    "a note already showing"
+                                } else {
+                                    "no note"
+                                }
                             );
                             assert!(a.state == game, "{what} under the card changed the game");
                         }

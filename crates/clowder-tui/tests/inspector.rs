@@ -51,7 +51,7 @@ use std::collections::BTreeSet;
 
 use clowder_core::content::structure_def;
 use clowder_core::{
-    ContentId, GameState, JobId, Kitten, KittenTrait, LockReason, Location, ResourceId,
+    ContentId, GameState, JobId, Kitten, KittenTrait, Location, LockReason, ResourceId,
     StructureGate, StructureId, TraditionId,
 };
 use ratatui::backend::TestBackend;
@@ -144,14 +144,21 @@ fn render(state: &GameState, view: &ViewState, w: u16, h: u16, rect: Rect) -> Bu
 fn reachable(state: &GameState, view: &ViewState) -> ViewState {
     let mut v = view.clone();
     let Some(section) = v.section else { return v };
-    let Some(key) = v.focus[section.index()].clone() else { return v };
-    if clowder_tui::nav::rows::drawn_rows(state, section, &v).iter().any(|r| r.key == key)
+    let Some(key) = v.focus[section.index()].clone() else {
+        return v;
+    };
+    if clowder_tui::nav::rows::drawn_rows(state, section, &v)
+        .iter()
+        .any(|r| r.key == key)
         || !rows(state, section).iter().any(|r| r.key == key)
     {
         return v;
     }
     let d = clowder_tui::nav::keys::resolve(
-        crossterm::event::KeyEvent::new(crossterm::event::KeyCode::Char('d'), crossterm::event::KeyModifiers::NONE),
+        crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Char('d'),
+            crossterm::event::KeyModifiers::NONE,
+        ),
         &v,
     );
     clowder_tui::nav::update(d, &mut v, state);
@@ -162,13 +169,7 @@ fn reachable(state: &GameState, view: &ViewState) -> ViewState {
 
 /// Draw the inspector into `rect` of a terminal already covered in `SENTINEL`,
 /// so that the cells it does *not* own can be checked for damage.
-fn render_over_sentinel(
-    state: &GameState,
-    view: &ViewState,
-    w: u16,
-    h: u16,
-    rect: Rect,
-) -> Buffer {
+fn render_over_sentinel(state: &GameState, view: &ViewState, w: u16, h: u16, rect: Rect) -> Buffer {
     let mut term = terminal(w, h);
     term.draw(|f| {
         let full = f.area();
@@ -230,7 +231,10 @@ fn line_set(s: &str) -> BTreeSet<String> {
 /// What one drawing says that another does not.
 fn extra_lines(with: &str, without: &str) -> BTreeSet<String> {
     let base = line_set(without);
-    line_set(with).into_iter().filter(|l| !base.contains(l)).collect()
+    line_set(with)
+        .into_iter()
+        .filter(|l| !base.contains(l))
+        .collect()
 }
 
 /// Every number on screen, as a maximal run of digits and dots. Token-wise
@@ -327,7 +331,9 @@ fn producer() -> StructureId {
     StructureId::ALL
         .into_iter()
         .find(|s| {
-            ungated(*s) && !structure_def(*s).productions.is_empty() && structure_def(*s).housing == 0
+            ungated(*s)
+                && !structure_def(*s).productions.is_empty()
+                && structure_def(*s).housing == 0
         })
         .expect("fixture: some ungated structure produces something and houses nobody")
 }
@@ -412,7 +418,14 @@ fn open_job(state: &GameState) -> JobId {
 /// @spec TUI-NAV-017
 #[test]
 fn a_wide_terminal_shows_the_inspector_without_being_asked() {
-    for w in [PANE_BREAKPOINT, 110, CAP_BREAKPOINT - 1, CAP_BREAKPOINT, WIDE, WIDEST] {
+    for w in [
+        PANE_BREAKPOINT,
+        110,
+        CAP_BREAKPOINT - 1,
+        CAP_BREAKPOINT,
+        WIDE,
+        WIDEST,
+    ] {
         assert_eq!(
             inspector::placement(w, false),
             Placement::Pane,
@@ -520,7 +533,10 @@ fn the_inspector_is_never_a_popup_over_the_chrome() {
                 if rect.x <= x && x < rect.right() && rect.y <= y && y < rect.bottom() {
                     continue;
                 }
-                let cell = buf.cell((x, y)).map(|c| c.symbol().to_string()).unwrap_or_default();
+                let cell = buf
+                    .cell((x, y))
+                    .map(|c| c.symbol().to_string())
+                    .unwrap_or_default();
                 assert_eq!(
                     cell,
                     SENTINEL.to_string(),
@@ -543,8 +559,18 @@ fn the_inspector_follows_the_focused_row_and_the_moving_state() {
     assert_ne!(a, b, "fixture: two different structures");
 
     let state = meadow(&[a, b]);
-    let on_a = pane_text(&state, &looking_at(Section::Meadow, structure_row(a)), WIDE, TALL);
-    let on_b = pane_text(&state, &looking_at(Section::Meadow, structure_row(b)), WIDE, TALL);
+    let on_a = pane_text(
+        &state,
+        &looking_at(Section::Meadow, structure_row(a)),
+        WIDE,
+        TALL,
+    );
+    let on_b = pane_text(
+        &state,
+        &looking_at(Section::Meadow, structure_row(b)),
+        WIDE,
+        TALL,
+    );
 
     assert!(
         on_a.contains(structure_def(a).name),
@@ -668,7 +694,10 @@ fn the_inspector_shares_the_layouts_breakpoint_rather_than_keeping_its_own() {
                  one-column wobble the dead-band is for"
             );
         }
-        assert!(seen_pane, "some width in {FLOOR_W}..={WIDEST} must earn a pane");
+        assert!(
+            seen_pane,
+            "some width in {FLOOR_W}..={WIDEST} must earn a pane"
+        );
     }
 }
 
@@ -687,12 +716,18 @@ fn beyond_the_cap_the_surplus_width_is_the_inspectors_and_it_spends_it() {
     // time, while the list holds still.
     let at_cap = compute(area(CAP_BREAKPOINT, TALL), None, false).body;
     let (capped_list, cap_pane) = match at_cap {
-        Body::Wide { list, inspector, .. } => (list.width, inspector.width),
-        other => panic!("fixture: {CAP_BREAKPOINT} columns should lay out three panes, got {other:?}"),
+        Body::Wide {
+            list, inspector, ..
+        } => (list.width, inspector.width),
+        other => {
+            panic!("fixture: {CAP_BREAKPOINT} columns should lay out three panes, got {other:?}")
+        }
     };
     for w in CAP_BREAKPOINT..=WIDEST {
         match compute(area(w, TALL), None, false).body {
-            Body::Wide { list, inspector, .. } => {
+            Body::Wide {
+                list, inspector, ..
+            } => {
                 assert_eq!(list.width, capped_list, "fixture: {w}: the list is capped");
                 assert_eq!(
                     inspector.width,
@@ -794,21 +829,32 @@ fn is_later_row(state: &GameState, section: Section, key: &RowKey) -> bool {
         (RowKey::Colony(a, _), RowKey::Colony(b, _)) => a == b,
         _ => k == key,
     };
-    rows(state, section).iter().find(|r| same_item(&r.key)).is_some_and(|first| &first.key != key)
+    rows(state, section)
+        .iter()
+        .find(|r| same_item(&r.key))
+        .is_some_and(|first| &first.key != key)
 }
 
 /// The inspector's non-blank lines, trimmed, as the frame draws it at `w`
 /// columns with the player having called for it — the persistent pane at and
 /// past the breakpoint, the swap in the list's place below it.
 fn inspector_lines_in_frame(state: &GameState, view: &ViewState, w: u16, h: u16) -> Vec<String> {
-    let view = ViewState { inspector_wanted: true, ..view.clone() };
+    let view = ViewState {
+        inspector_wanted: true,
+        ..view.clone()
+    };
     let mut term = terminal(w, h);
     let mut layout = None;
     term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, &view, None)))
         .expect("TestBackend is infallible");
     let rect = match layout.expect("frame returns its layout").body {
         Body::Wide { inspector, .. } => inspector,
-        Body::Narrow { main, .. } => Rect::new(main.x + 1, main.y, main.width.saturating_sub(1), main.height),
+        Body::Narrow { main, .. } => Rect::new(
+            main.x + 1,
+            main.y,
+            main.width.saturating_sub(1),
+            main.height,
+        ),
         other => panic!("fixture: {w}x{h} lays out an inspector, not {other:?}"),
     };
     region_lines(term.backend().buffer(), rect)
@@ -833,7 +879,15 @@ fn the_inspector_states_a_later_rows_label_beneath_the_name_at_every_width() {
     let labels = ["tinkerers", "send a pen-pal"];
 
     let mut labelled = std::collections::BTreeMap::<&str, usize>::new();
-    for w in [FLOOR_W, 90, PANE_BREAKPOINT - 1, PANE_BREAKPOINT, CAP_BREAKPOINT, WIDE, WIDEST] {
+    for w in [
+        FLOOR_W,
+        90,
+        PANE_BREAKPOINT - 1,
+        PANE_BREAKPOINT,
+        CAP_BREAKPOINT,
+        WIDE,
+        WIDEST,
+    ] {
         for (section, row) in every_row(&state) {
             let view = looking_at(section, row.key.clone());
             let shown = inspector_lines_in_frame(&state, &view, w, TALL);
@@ -874,7 +928,10 @@ fn the_inspector_states_a_later_rows_label_beneath_the_name_at_every_width() {
         }
     }
     for label in labels {
-        assert!(labelled.get(label).copied().unwrap_or(0) > 0, "fixture: no row labelled {label:?} was inspected");
+        assert!(
+            labelled.get(label).copied().unwrap_or(0) > 0,
+            "fixture: no row labelled {label:?} was inspected"
+        );
     }
 }
 
@@ -892,19 +949,35 @@ fn list_and_inspector_in_frame(
     w: u16,
     h: u16,
 ) -> (Option<Vec<String>>, Vec<String>) {
-    let view = ViewState { inspector_wanted: true, ..view.clone() };
+    let view = ViewState {
+        inspector_wanted: true,
+        ..view.clone()
+    };
     let mut term = terminal(w, h);
     let mut layout = None;
     term.draw(|f| layout = Some(clowder_tui::render::frame(f, state, &view, None)))
         .expect("TestBackend is infallible");
     let (list, rect) = match layout.expect("frame returns its layout").body {
-        Body::Wide { list, inspector, .. } => (Some(list), inspector),
-        Body::Narrow { main, .. } => (None, Rect::new(main.x + 1, main.y, main.width.saturating_sub(1), main.height)),
+        Body::Wide {
+            list, inspector, ..
+        } => (Some(list), inspector),
+        Body::Narrow { main, .. } => (
+            None,
+            Rect::new(
+                main.x + 1,
+                main.y,
+                main.width.saturating_sub(1),
+                main.height,
+            ),
+        ),
         other => panic!("fixture: {w}x{h} lays out an inspector, not {other:?}"),
     };
     let buf = term.backend().buffer();
-    let inspector =
-        region_lines(buf, rect).into_iter().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect();
+    let inspector = region_lines(buf, rect)
+        .into_iter()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
     (list.map(|r| region_lines(buf, r)), inspector)
 }
 
@@ -928,7 +1001,8 @@ fn list_and_inspector_in_frame(
 fn the_inspector_states_the_elders_mark_beneath_the_name_on_the_elders_row_alone_at_every_width() {
     let mut base = world(true);
     base.kittens[1].name = format!("Marmalad{}", "e".repeat(72));
-    base.kittens[2].name = "Clementine of the Seven Long Whiskers and the Very Soft Paws".to_string();
+    base.kittens[2].name =
+        "Clementine of the Seven Long Whiskers and the Very Soft Paws".to_string();
     base.elder = None;
     let kittens: Vec<(usize, RowKey)> = rows(&base, Section::Clowder)
         .into_iter()
@@ -937,10 +1011,23 @@ fn the_inspector_states_the_elders_mark_beneath_the_name_on_the_elders_row_alone
             _ => None,
         })
         .collect();
-    assert_eq!(kittens.len(), base.kittens.len(), "fixture: every kitten's row is listed");
+    assert_eq!(
+        kittens.len(),
+        base.kittens.len(),
+        "fixture: every kitten's row is listed"
+    );
 
-    let (mut stated, mut stated_in_the_swap, mut stated_with_no_room, mut stated_beside_the_row) = (0u32, 0u32, 0u32, 0u32);
-    for w in [FLOOR_W, 90, PANE_BREAKPOINT - 1, PANE_BREAKPOINT, CAP_BREAKPOINT, WIDE, WIDEST] {
+    let (mut stated, mut stated_in_the_swap, mut stated_with_no_room, mut stated_beside_the_row) =
+        (0u32, 0u32, 0u32, 0u32);
+    for w in [
+        FLOOR_W,
+        90,
+        PANE_BREAKPOINT - 1,
+        PANE_BREAKPOINT,
+        CAP_BREAKPOINT,
+        WIDE,
+        WIDEST,
+    ] {
         for (k, key) in &kittens {
             let k = *k;
             let name = &base.kittens[k].name;
@@ -1004,8 +1091,14 @@ fn the_inspector_states_the_elders_mark_beneath_the_name_on_the_elders_row_alone
         }
     }
     assert!(stated > 0, "fixture: the Elder's row was inspected");
-    assert!(stated_in_the_swap > 0, "fixture: the Elder's row was inspected with the list off screen");
-    assert!(stated_beside_the_row > 0, "fixture: the Elder's row was inspected beside a row carrying the mark");
+    assert!(
+        stated_in_the_swap > 0,
+        "fixture: the Elder's row was inspected with the list off screen"
+    );
+    assert!(
+        stated_beside_the_row > 0,
+        "fixture: the Elder's row was inspected beside a row carrying the mark"
+    );
     assert!(
         stated_with_no_room > 0,
         "fixture: the Elder's row was inspected beside a row whose name left the mark no room"
@@ -1034,7 +1127,10 @@ fn the_inspector_states_the_elders_mark_beneath_the_name_on_the_elders_row_alone
             others += 1;
         }
     }
-    assert!(others > 0, "fixture: rows other than the Elder's were inspected");
+    assert!(
+        others > 0,
+        "fixture: rows other than the Elder's were inspected"
+    );
 }
 
 /// The exact next cost, component by component, with what the player has beside
@@ -1056,7 +1152,10 @@ fn the_next_cost_is_exact_and_per_component_with_have_and_need() {
     // Distinctive, exactly-representable stocks: one component generously
     // covered, one plainly short.
     let costs = state.next_cost(s);
-    assert!(costs.len() >= 2, "fixture: this structure costs several things");
+    assert!(
+        costs.len() >= 2,
+        "fixture: this structure costs several things"
+    );
     state.resources[costs[0].0.ix()] = 4_096.5;
     state.resources[costs[1].0.ix()] = 0.25;
 
@@ -1118,7 +1217,8 @@ fn the_time_to_afford_moves_with_the_cores_net_rate() {
         "fixture: the price of the focused item must be the same in both states"
     );
     assert_eq!(
-        still.structures[s.ix()], flowing.structures[s.ix()],
+        still.structures[s.ix()],
+        flowing.structures[s.ix()],
         "fixture: the owned count of the focused item must be the same in both states"
     );
     for r in ResourceId::ALL {
@@ -1173,7 +1273,11 @@ fn the_owned_count_is_on_screen() {
     // inspector is obliged to show may be spelled the same way.
     let owned = OWNED.to_string();
     for (r, need) in state.next_cost(s) {
-        assert_ne!(fmt::exact(need), owned, "fixture: the cost of {r:?} must not read as {owned}");
+        assert_ne!(
+            fmt::exact(need),
+            owned,
+            "fixture: the cost of {r:?} must not read as {owned}"
+        );
         assert_ne!(
             fmt::exact(state.stock(r)),
             owned,
@@ -1330,8 +1434,18 @@ fn the_inspector_states_each_items_own_mechanics() {
     let b = housing();
     let state = meadow(&[a, b]);
 
-    let shown_a = pane_text(&state, &looking_at(Section::Meadow, structure_row(a)), WIDE, TALL);
-    let shown_b = pane_text(&state, &looking_at(Section::Meadow, structure_row(b)), WIDE, TALL);
+    let shown_a = pane_text(
+        &state,
+        &looking_at(Section::Meadow, structure_row(a)),
+        WIDE,
+        TALL,
+    );
+    let shown_b = pane_text(
+        &state,
+        &looking_at(Section::Meadow, structure_row(b)),
+        WIDE,
+        TALL,
+    );
 
     let ignore: BTreeSet<String> = resource_words()
         .into_iter()
@@ -1540,7 +1654,12 @@ fn waits(text: &str) -> Vec<Wait> {
             k += 1;
             continue;
         };
-        let mut w = Wait { seconds: secs, granularity: gran, start, end };
+        let mut w = Wait {
+            seconds: secs,
+            granularity: gran,
+            start,
+            end,
+        };
         k += 2;
         loop {
             let skip = match toks.get(k) {
@@ -1580,13 +1699,18 @@ fn numbers_outside_waits(text: &str) -> BTreeSet<String> {
 
 /// The non-blank lines of a drawing, trimmed, in order.
 fn lines_of(text: &str) -> Vec<String> {
-    text.lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect()
+    text.lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect()
 }
 
 /// The one line of a drawing that states `figure`.
 fn line_stating(text: &str, figure: &str) -> String {
-    let found: Vec<String> =
-        lines_of(text).into_iter().filter(|l| numbers(l).contains(figure)).collect();
+    let found: Vec<String> = lines_of(text)
+        .into_iter()
+        .filter(|l| numbers(l).contains(figure))
+        .collect();
     assert_eq!(
         found.len(),
         1,
@@ -1671,7 +1795,10 @@ fn every_row(state: &GameState) -> Vec<(Section, Row)> {
     Section::ALL
         .into_iter()
         .flat_map(|section| {
-            rows(state, section).into_iter().filter(|r| r.selectable()).map(move |r| (section, r))
+            rows(state, section)
+                .into_iter()
+                .filter(|r| r.selectable())
+                .map(move |r| (section, r))
         })
         .collect()
 }
@@ -1681,7 +1808,9 @@ fn every_row(state: &GameState) -> Vec<(Section, Row)> {
 /// price names no component, the row is a craft's tinkerer count row, or the
 /// core reports the item already the player's.
 fn stated_next_cost(state: &GameState, key: &RowKey) -> Option<Vec<(ResourceId, f64)>> {
-    let RowKey::Content(id, tag) = key else { return None };
+    let RowKey::Content(id, tag) = key else {
+        return None;
+    };
     if *tag == "tinker" || state.lock_reason(*id) == Some(LockReason::AlreadyYours) {
         return None;
     }
@@ -1795,9 +1924,18 @@ fn structure_pane(s: StructureId) -> (GameState, String) {
     for (r, need) in state.next_cost(s) {
         state.resources[r.ix()] = need + 0.5;
     }
-    assert_eq!(state.lock_reason(ContentId::Structure(s)), None, "fixture: {s:?} is open and covered");
+    assert_eq!(
+        state.lock_reason(ContentId::Structure(s)),
+        None,
+        "fixture: {s:?} is open and covered"
+    );
     assert_is_a_row(&state, Section::Meadow, &structure_row(s));
-    let shown = pane_text(&state, &looking_at(Section::Meadow, structure_row(s)), WIDE, TALL);
+    let shown = pane_text(
+        &state,
+        &looking_at(Section::Meadow, structure_row(s)),
+        WIDE,
+        TALL,
+    );
     (state, shown)
 }
 
@@ -1822,8 +1960,16 @@ fn the_inspector_describes_the_row_the_list_falls_back_to_when_the_focused_row_l
         .expect("fixture: a fresh meadow lists something selectable");
 
     let fallen = pane_text(&state, &looking_at(Section::Meadow, key), WIDE, TALL);
-    let on_first = pane_text(&state, &looking_at(Section::Meadow, first.key.clone()), WIDE, TALL);
-    assert!(!on_first.trim().is_empty(), "fixture: the first row has something to say");
+    let on_first = pane_text(
+        &state,
+        &looking_at(Section::Meadow, first.key.clone()),
+        WIDE,
+        TALL,
+    );
+    assert!(
+        !on_first.trim().is_empty(),
+        "fixture: the first row has something to say"
+    );
     assert_eq!(
         fallen, on_first,
         "the focused row left the list, so the list highlights {:?}; the inspector describes the \
@@ -1855,11 +2001,17 @@ fn every_row_names_its_item_whole() {
                 "the inspector on {:?} must carry its whole name {name:?}; it read:\n{shown}",
                 row.key
             );
-            assert!(!shown.contains('\u{2026}'), "nothing in the pane may be cut; it read:\n{shown}");
+            assert!(
+                !shown.contains('\u{2026}'),
+                "nothing in the pane may be cut; it read:\n{shown}"
+            );
             checked += 1;
         }
     }
-    assert!(checked > 50, "fixture: the world lists many named rows ({checked})");
+    assert!(
+        checked > 50,
+        "fixture: the world lists many named rows ({checked})"
+    );
 }
 
 /// A structure's statement is every field its definition sets apart from its
@@ -1927,18 +2079,28 @@ fn a_structures_qualifiers_are_stated_exactly_where_its_definition_sets_them() {
     type Qualifier = (&'static str, fn(StructureId) -> bool);
     let qualifiers: [Qualifier; 3] = [
         ("seasonal", |s| tables::structure_def(s).seasonal),
-        ("scaled by the energy surplus", |s| tables::structure_def(s).surplus_scaled),
-        ("routed through the outdoor channel", |s| tables::structure_def(s).outdoor),
+        ("scaled by the energy surplus", |s| {
+            tables::structure_def(s).surplus_scaled
+        }),
+        ("routed through the outdoor channel", |s| {
+            tables::structure_def(s).outdoor
+        }),
     ];
     for (label, has) in qualifiers {
-        let with: Vec<&BTreeSet<String>> = panes.iter().filter(|(s, _)| has(*s)).map(|(_, w)| w).collect();
-        let without: BTreeSet<String> =
-            panes.iter().filter(|(s, _)| !has(*s)).flat_map(|(_, w)| w.iter().cloned()).collect();
-        assert!(!with.is_empty(), "fixture: some structure is {label}");
-        let common: BTreeSet<String> = with
+        let with: Vec<&BTreeSet<String>> = panes
             .iter()
-            .skip(1)
-            .fold(with[0].clone(), |acc, w| acc.intersection(w).cloned().collect());
+            .filter(|(s, _)| has(*s))
+            .map(|(_, w)| w)
+            .collect();
+        let without: BTreeSet<String> = panes
+            .iter()
+            .filter(|(s, _)| !has(*s))
+            .flat_map(|(_, w)| w.iter().cloned())
+            .collect();
+        assert!(!with.is_empty(), "fixture: some structure is {label}");
+        let common: BTreeSet<String> = with.iter().skip(1).fold(with[0].clone(), |acc, w| {
+            acc.intersection(w).cloned().collect()
+        });
         let distinguishing: BTreeSet<&String> = common.difference(&without).collect();
         assert!(
             !distinguishing.is_empty(),
@@ -1978,11 +2140,27 @@ fn a_jobs_row_states_its_yield_per_worker_per_second_and_the_workers_in_the_mead
 
         let key = RowKey::Content(ContentId::Job(j), "");
         assert_is_a_row(&state, Section::Clowder, &key);
-        assert_eq!(state.effective_workers(j), HOME as u32, "fixture: {HOME} of {j:?} are in the meadow");
-        assert_eq!(state.lock_reason(ContentId::Job(j)), None, "fixture: a kitten is free");
-        assert!(state.cost_of_next(ContentId::Job(j), 1).is_empty(), "fixture: a job's price names nothing");
+        assert_eq!(
+            state.effective_workers(j),
+            HOME as u32,
+            "fixture: {HOME} of {j:?} are in the meadow"
+        );
+        assert_eq!(
+            state.lock_reason(ContentId::Job(j)),
+            None,
+            "fixture: a kitten is free"
+        );
+        assert!(
+            state.cost_of_next(ContentId::Job(j), 1).is_empty(),
+            "fixture: a job's price names nothing"
+        );
 
-        let shown = pane_text(&state, &looking_at(Section::Clowder, key.clone()), WIDE, TALL);
+        let shown = pane_text(
+            &state,
+            &looking_at(Section::Clowder, key.clone()),
+            WIDE,
+            TALL,
+        );
         let on_screen = numbers_outside_waits(&shown);
 
         let mut allowed = name_numbers(&state, &key);
@@ -2003,7 +2181,10 @@ fn a_jobs_row_states_its_yield_per_worker_per_second_and_the_workers_in_the_mead
                 "{j:?}: the yield per worker per game second is {y}; it read:\n{shown}"
             );
             for w in words(&spaced(&format!("{r:?}"))) {
-                assert!(words(&shown).contains(&w), "{j:?}: the yield names {r:?}; it read:\n{shown}");
+                assert!(
+                    words(&shown).contains(&w),
+                    "{j:?}: the yield names {r:?}; it read:\n{shown}"
+                );
             }
             allowed.insert(y);
         }
@@ -2036,7 +2217,10 @@ fn a_crafts_rows_state_what_it_makes_and_the_tinker_row_counts_bound_tinkerers_i
     const BOUND_HOME: usize = 7;
     const BOUND_AWAY: usize = 4;
     for c in CraftId::ALL {
-        let other = CraftId::ALL.into_iter().find(|o| *o != c).expect("fixture: two recipes");
+        let other = CraftId::ALL
+            .into_iter()
+            .find(|o| *o != c)
+            .expect("fixture: two recipes");
         let mut state = world(true);
         let mut roster = Vec::new();
         let tinkerer = |i: usize, bound: CraftId, away: bool| {
@@ -2060,7 +2244,10 @@ fn a_crafts_rows_state_what_it_makes_and_the_tinker_row_counts_bound_tinkerers_i
         state.kittens = roster;
 
         let def = tables::craft_def(c);
-        assert_ne!(def.tier as usize, BOUND_HOME, "fixture: the count must not read as the tier");
+        assert_ne!(
+            def.tier as usize, BOUND_HOME,
+            "fixture: the count must not read as the tier"
+        );
         let output_words = words(&spaced(&format!("{:?}", tables::craft_output(c))));
         let tier = (def.tier != 0).then(|| bare(def.tier as f64));
 
@@ -2070,7 +2257,12 @@ fn a_crafts_rows_state_what_it_makes_and_the_tinker_row_counts_bound_tinkerers_i
         assert_is_a_row(&state, Section::Crafts, &bind);
 
         for key in [&make, &bind] {
-            let shown = pane_text(&state, &looking_at(Section::Crafts, key.clone()), WIDE, TALL);
+            let shown = pane_text(
+                &state,
+                &looking_at(Section::Crafts, key.clone()),
+                WIDE,
+                TALL,
+            );
             let on_screen = numbers_outside_waits(&shown);
             for w in &output_words {
                 assert!(
@@ -2080,7 +2272,10 @@ fn a_crafts_rows_state_what_it_makes_and_the_tinker_row_counts_bound_tinkerers_i
             }
             let mut allowed = name_numbers(&state, key);
             if let Some(t) = &tier {
-                assert!(on_screen.contains(t), "{key:?}: the work tier is {t}; it read:\n{shown}");
+                assert!(
+                    on_screen.contains(t),
+                    "{key:?}: the work tier is {t}; it read:\n{shown}"
+                );
                 allowed.insert(t.clone());
             }
             if key == &bind {
@@ -2114,7 +2309,9 @@ fn a_blurb_kinds_statement_is_its_blurb_and_nothing_restated_beside_it() {
     let mut seen = 0;
     for state in [world(true), world(false)] {
         for (section, row) in every_row(&state) {
-            let RowKey::Content(id, _) = &row.key else { continue };
+            let RowKey::Content(id, _) = &row.key else {
+                continue;
+            };
             let blurb = match id {
                 ContentId::Idea(i) => tables::idea_def(*i).blurb,
                 ContentId::Refinement(r) => tables::refinement_def(*r).blurb,
@@ -2132,8 +2329,10 @@ fn a_blurb_kinds_statement_is_its_blurb_and_nothing_restated_beside_it() {
             let mut allowed = numbers(blurb);
             allowed.extend(cost_and_reason_numbers(&state, &row.key));
             allowed.extend(name_numbers(&state, &row.key));
-            let stray: Vec<String> =
-                numbers_outside_waits(&shown).difference(&allowed).cloned().collect();
+            let stray: Vec<String> = numbers_outside_waits(&shown)
+                .difference(&allowed)
+                .cloned()
+                .collect();
             assert!(
                 stray.is_empty(),
                 "{id:?} states {stray:?}, which is in neither its blurb nor the core's next cost or \
@@ -2204,15 +2403,27 @@ fn rows_whose_definition_states_nothing_carry_no_statement_and_no_stand_in() {
         let key = RowKey::Content(id, "");
         assert_is_a_row(&held, section, &key);
         assert_is_a_row(&open, section, &key);
-        assert_eq!(held.lock_reason(id), Some(LockReason::AlreadyYours), "fixture: {id:?} is held");
-        assert_eq!(open.lock_reason(id), None, "fixture: {id:?} is open to take");
+        assert_eq!(
+            held.lock_reason(id),
+            Some(LockReason::AlreadyYours),
+            "fixture: {id:?} is held"
+        );
+        assert_eq!(
+            open.lock_reason(id),
+            None,
+            "fixture: {id:?} is open to take"
+        );
 
         let view = looking_at(section, key.clone());
         let a = pane_text(&held, &view, WIDE, TALL);
         let b = pane_text(&open, &view, WIDE, TALL);
         let la = lines_of(&a);
         let lb = lines_of(&b);
-        let common: Vec<&String> = la.iter().skip(1).filter(|l| lb.iter().skip(1).any(|m| m == *l)).collect();
+        let common: Vec<&String> = la
+            .iter()
+            .skip(1)
+            .filter(|l| lb.iter().skip(1).any(|m| m == *l))
+            .collect();
         assert!(
             common.is_empty(),
             "{id:?}: {common:?} is said whether the item is held or open — neither a next cost nor \
@@ -2232,7 +2443,10 @@ fn rows_whose_definition_states_nothing_carry_no_statement_and_no_stand_in() {
         );
         checked += 1;
     }
-    assert!(checked > 20, "fixture: every rite, arch, tradition, and loom ({checked})");
+    assert!(
+        checked > 20,
+        "fixture: every rite, arch, tradition, and loom ({checked})"
+    );
 }
 
 /// A row whose action has no content definition — a fixed action, a kitten's
@@ -2251,7 +2465,10 @@ fn a_row_with_no_definition_states_only_its_name() {
                 continue;
             }
             if let RowKind::Act { command, .. } = &row.kind {
-                if matches!(command, clowder_core::Command::Pounce(_) | clowder_core::Command::Trade(..)) {
+                if matches!(
+                    command,
+                    clowder_core::Command::Pounce(_) | clowder_core::Command::Trade(..)
+                ) {
                     continue;
                 }
             }
@@ -2269,7 +2486,10 @@ fn a_row_with_no_definition_states_only_its_name() {
             checked += 1;
         }
     }
-    assert!(checked > 10, "fixture: a full meadow lists many rows with no definition ({checked})");
+    assert!(
+        checked > 10,
+        "fixture: a full meadow lists many rows with no definition ({checked})"
+    );
 }
 
 /// The copies held of a rite are stated — a rite is held in copies, like a
@@ -2288,7 +2508,12 @@ fn the_copies_held_of_a_rite_are_on_screen() {
     state.rite_counts[r.ix()] = COPIES;
     let key = RowKey::Content(ContentId::Rite(r), "");
     assert_is_a_row(&state, Section::Sunbeams, &key);
-    let shown = pane_text(&state, &looking_at(Section::Sunbeams, key.clone()), WIDE, TALL);
+    let shown = pane_text(
+        &state,
+        &looking_at(Section::Sunbeams, key.clone()),
+        WIDE,
+        TALL,
+    );
     assert!(
         numbers_outside_waits(&shown).contains(&COPIES.to_string()),
         "{COPIES} copies of this rite are held and the inspector did not say so; it read:\n{shown}"
@@ -2309,9 +2534,19 @@ fn every_row_that_takes_an_item_states_the_cores_price_for_one_more_with_need_an
     let mut kinds = BTreeSet::new();
     for state in [world(true), world(false)] {
         for (section, row) in every_row(&state) {
-            let Some(cost) = stated_next_cost(&state, &row.key) else { continue };
-            let RowKey::Content(id, _) = &row.key else { unreachable!() };
-            kinds.insert(format!("{id:?}").split('(').next().unwrap_or_default().to_string());
+            let Some(cost) = stated_next_cost(&state, &row.key) else {
+                continue;
+            };
+            let RowKey::Content(id, _) = &row.key else {
+                unreachable!()
+            };
+            kinds.insert(
+                format!("{id:?}")
+                    .split('(')
+                    .next()
+                    .unwrap_or_default()
+                    .to_string(),
+            );
             let shown = pane_text(&state, &looking_at(section, row.key.clone()), WIDE, TALL);
             let on_screen = numbers(&shown);
             for (r, need) in cost {
@@ -2326,7 +2561,11 @@ fn every_row_that_takes_an_item_states_the_cores_price_for_one_more_with_need_an
             }
         }
     }
-    assert!(kinds.len() >= 7, "fixture: every priced kind is listed ({} kinds)", kinds.len());
+    assert!(
+        kinds.len() >= 7,
+        "fixture: every priced kind is listed ({} kinds)",
+        kinds.len()
+    );
 }
 
 /// No next cost where there is none to state: on an item the core reports
@@ -2340,7 +2579,9 @@ fn no_next_cost_is_stated_for_what_is_yours_on_a_tinker_row_or_where_the_price_n
     let mut yours = 0;
     let mut tinker = 0;
     for (section, row) in every_row(&state) {
-        let RowKey::Content(id, tag) = &row.key else { continue };
+        let RowKey::Content(id, tag) = &row.key else {
+            continue;
+        };
         let is_yours = state.lock_reason(*id) == Some(LockReason::AlreadyYours);
         if !(is_yours || *tag == "tinker") {
             continue;
@@ -2367,7 +2608,11 @@ fn no_next_cost_is_stated_for_what_is_yours_on_a_tinker_row_or_where_the_price_n
             // ingredient amounts.
             ContentId::Craft(c) => {
                 let tier = tables::craft_def(*c).tier;
-                if tier != 0 { [bare(tier as f64)].into_iter().collect() } else { BTreeSet::new() }
+                if tier != 0 {
+                    [bare(tier as f64)].into_iter().collect()
+                } else {
+                    BTreeSet::new()
+                }
             }
             _ => BTreeSet::new(),
         };
@@ -2383,15 +2628,25 @@ fn no_next_cost_is_stated_for_what_is_yours_on_a_tinker_row_or_where_the_price_n
             }
         }
     }
-    assert!(yours > 3 && tinker > 3, "fixture: held items ({yours}) and tinker rows ({tinker}) are listed");
+    assert!(
+        yours > 3 && tinker > 3,
+        "fixture: held items ({yours}) and tinker rows ({tinker}) are listed"
+    );
 
     let t = TraditionId::ALL[0];
     let mut open = GameState::new(11);
     open.generation = 1;
     open.elder_wisdom = 1.0e9;
     let key = RowKey::Content(ContentId::Tradition(t), "");
-    assert!(open.cost_of_next(ContentId::Tradition(t), 1).is_empty(), "fixture: the core names no component");
-    assert_eq!(open.lock_reason(ContentId::Tradition(t)), None, "fixture: open to take");
+    assert!(
+        open.cost_of_next(ContentId::Tradition(t), 1).is_empty(),
+        "fixture: the core names no component"
+    );
+    assert_eq!(
+        open.lock_reason(ContentId::Tradition(t)),
+        None,
+        "fixture: open to take"
+    );
     let shown = pane_text(&open, &looking_at(Section::Legacy, key), WIDE, TALL);
     assert_eq!(
         lines_of(&shown).len(),
@@ -2424,8 +2679,15 @@ fn a_component_the_core_accepts_a_hair_under_its_need_is_marked_covered() {
     let (r0, need0) = plain.next_cost(s)[0];
     let mut hair = plain.clone();
     hair.resources[r0.ix()] = need0 - 1.0e-10;
-    assert!(hair.stock(r0) < need0, "fixture: the stock is under the need");
-    assert_eq!(hair.lock_reason(ContentId::Structure(s)), None, "fixture: the core's gate accepts it");
+    assert!(
+        hair.stock(r0) < need0,
+        "fixture: the stock is under the need"
+    );
+    assert_eq!(
+        hair.lock_reason(ContentId::Structure(s)),
+        None,
+        "fixture: the core's gate accepts it"
+    );
 
     let a = pane_text(&plain, &view, WIDE, TALL);
     let b = pane_text(&hair, &view, WIDE, TALL);
@@ -2435,7 +2697,10 @@ fn a_component_the_core_accepts_a_hair_under_its_need_is_marked_covered() {
         "the core reports no reason, so every component is covered; the drawings must differ only \
          in their figures.\ncovered:\n{a}\na hair under:\n{b}"
     );
-    assert!(waits(&b).is_empty(), "no wait stands beside a covered component; it read:\n{b}");
+    assert!(
+        waits(&b).is_empty(),
+        "no wait stands beside a covered component; it read:\n{b}"
+    );
 }
 
 /// Under a shortfall, each component it names is marked short by the amount it
@@ -2514,7 +2779,11 @@ fn under_a_reason_other_than_a_shortfall_components_stand_unmarked() {
         );
         assert_is_a_row(st, Section::Meadow, &structure_row(g));
     }
-    assert_eq!(open_covered.lock_reason(ContentId::Structure(g)), None, "fixture: gate open, covered");
+    assert_eq!(
+        open_covered.lock_reason(ContentId::Structure(g)),
+        None,
+        "fixture: gate open, covered"
+    );
 
     let a = pane_text(&gated_covered, &view, WIDE, TALL);
     let b = pane_text(&gated_short, &view, WIDE, TALL);
@@ -2524,7 +2793,10 @@ fn under_a_reason_other_than_a_shortfall_components_stand_unmarked() {
         "another reason holds the item back, so stock marks nothing and no wait is stated.\n\
          covered:\n{a}\nshort:\n{b}"
     );
-    assert!(waits(&b).is_empty(), "no wait under another reason; it read:\n{b}");
+    assert!(
+        waits(&b).is_empty(),
+        "no wait under another reason; it read:\n{b}"
+    );
 
     let c = pane_text(&open_covered, &view, WIDE, TALL);
     let (r, _) = gated_covered.next_cost(g)[0];
@@ -2546,7 +2818,10 @@ fn waiting_fixture() -> (StructureId, ResourceId, GameState) {
         for (r, need) in &costs {
             for p in StructureId::ALL {
                 let pd = structure_def(p);
-                if p == s || pd.converter.is_some() || !pd.productions.iter().any(|(pr, a)| pr == r && *a > 0.0) {
+                if p == s
+                    || pd.converter.is_some()
+                    || !pd.productions.iter().any(|(pr, a)| pr == r && *a > 0.0)
+                {
                     continue;
                 }
                 let mut state = meadow(&[s]);
@@ -2628,7 +2903,9 @@ fn a_need_above_the_cap_or_a_stock_not_growing_gets_a_note_in_place_of_a_wait() 
         }
         for (r, _) in sd.base_costs {
             let base_cap = GameState::new(11).cap(*r);
-            if !(base_cap > 0.0 && base_cap.is_finite()) || sd.productions.iter().any(|(p, _)| p == r) {
+            if !(base_cap > 0.0 && base_cap.is_finite())
+                || sd.productions.iter().any(|(p, _)| p == r)
+            {
                 continue;
             }
             let Some(q) = StructureId::ALL.into_iter().find(|q| {
@@ -2643,14 +2920,21 @@ fn a_need_above_the_cap_or_a_stock_not_growing_gets_a_note_in_place_of_a_wait() 
             };
             let Some(p) = StructureId::ALL.into_iter().find(|p| {
                 let d = structure_def(*p);
-                *p != s && d.converter.is_none() && d.productions.iter().any(|(c, a)| c == r && *a > 0.0)
+                *p != s
+                    && d.converter.is_none()
+                    && d.productions.iter().any(|(c, a)| c == r && *a > 0.0)
             }) else {
                 continue;
             };
             for owned in 1..200u32 {
                 let mut st = meadow(&[s]);
                 st.structures[s.ix()] = owned;
-                let need = st.next_cost(s).iter().find(|(c, _)| c == r).map(|(_, n)| *n).unwrap();
+                let need = st
+                    .next_cost(s)
+                    .iter()
+                    .find(|(c, _)| c == r)
+                    .map(|(_, n)| *n)
+                    .unwrap();
                 if need > st.cap(*r) {
                     found = Some((s, *r, owned, q, p));
                     break 'search;
@@ -2670,7 +2954,12 @@ fn a_need_above_the_cap_or_a_stock_not_growing_gets_a_note_in_place_of_a_wait() 
         }
         st
     };
-    let need = setup(0, 0).next_cost(s).iter().find(|(c, _)| *c == r).unwrap().1;
+    let need = setup(0, 0)
+        .next_cost(s)
+        .iter()
+        .find(|(c, _)| *c == r)
+        .unwrap()
+        .1;
     let store = (1..10_000u32)
         .find(|m| setup(*m, 0).cap(r) >= need)
         .expect("fixture: enough stores hold the need");
@@ -2678,16 +2967,32 @@ fn a_need_above_the_cap_or_a_stock_not_growing_gets_a_note_in_place_of_a_wait() 
     let above_growing = setup(0, 6);
     let above_still = setup(0, 0);
     let within_still = setup(store, 0);
-    assert!(need > above_growing.cap(r) && above_growing.net_rate(r) > 0.0, "fixture: above the cap, growing");
-    assert!(need > above_still.cap(r) && above_still.net_rate(r) <= 0.0, "fixture: above the cap, not growing");
-    assert!(need <= within_still.cap(r) && within_still.net_rate(r) <= 0.0, "fixture: within the cap, not growing");
+    assert!(
+        need > above_growing.cap(r) && above_growing.net_rate(r) > 0.0,
+        "fixture: above the cap, growing"
+    );
+    assert!(
+        need > above_still.cap(r) && above_still.net_rate(r) <= 0.0,
+        "fixture: above the cap, not growing"
+    );
+    assert!(
+        need <= within_still.cap(r) && within_still.net_rate(r) <= 0.0,
+        "fixture: within the cap, not growing"
+    );
 
     let view = looking_at(Section::Meadow, structure_row(s));
     let a = pane_text(&above_growing, &view, WIDE, TALL);
     let b = pane_text(&above_still, &view, WIDE, TALL);
     let c = pane_text(&within_still, &view, WIDE, TALL);
-    for (label, shown) in [("above the cap, growing", &a), ("above the cap, not growing", &b), ("not growing", &c)] {
-        assert!(waits(shown).is_empty(), "{label}: no wait is stated; it read:\n{shown}");
+    for (label, shown) in [
+        ("above the cap, growing", &a),
+        ("above the cap, not growing", &b),
+        ("not growing", &c),
+    ] {
+        assert!(
+            waits(shown).is_empty(),
+            "{label}: no wait is stated; it read:\n{shown}"
+        );
     }
     let mut fast = above_growing.clone();
     fast.speed = 8.0;
@@ -2727,18 +3032,36 @@ fn a_stores_row_states_its_exact_stock_its_cap_or_none_and_its_net_rate_per_game
     for r in ResourceId::ALL {
         let key = RowKey::Resource(r);
         assert_is_a_row(&state, Section::Meadow, &key);
-        let shown = pane_text(&state, &looking_at(Section::Meadow, key.clone()), WIDE, TALL);
+        let shown = pane_text(
+            &state,
+            &looking_at(Section::Meadow, key.clone()),
+            WIDE,
+            TALL,
+        );
         let on_screen = numbers(&shown);
         let stock = bare(state.stock(r));
         let rate = bare(state.net_rate(r));
         let cap = state.cap(r);
-        assert!(on_screen.contains(&stock), "{r:?}: the exact stock {stock}; it read:\n{shown}");
-        assert!(on_screen.contains(&rate), "{r:?}: the net rate per game second {rate}; it read:\n{shown}");
+        assert!(
+            on_screen.contains(&stock),
+            "{r:?}: the exact stock {stock}; it read:\n{shown}"
+        );
+        assert!(
+            on_screen.contains(&rate),
+            "{r:?}: the net rate per game second {rate}; it read:\n{shown}"
+        );
         let mut allowed: BTreeSet<String> = [stock, rate].into_iter().collect();
-        let body: Vec<String> = lines_of(&shown).into_iter().skip(1).map(|l| masked(&l)).collect();
+        let body: Vec<String> = lines_of(&shown)
+            .into_iter()
+            .skip(1)
+            .map(|l| masked(&l))
+            .collect();
         if cap.is_finite() {
             let c = bare(cap);
-            assert!(on_screen.contains(&c), "{r:?}: the cap the core reports, {c}; it read:\n{shown}");
+            assert!(
+                on_screen.contains(&c),
+                "{r:?}: the cap the core reports, {c}; it read:\n{shown}"
+            );
             allowed.insert(c);
             finite_body.get_or_insert((r, body));
         } else {
@@ -2764,7 +3087,10 @@ fn a_stores_row_states_its_exact_stock_its_cap_or_none_and_its_net_rate_per_game
             "{r:?} has no cap and must say so where {fr:?} states its cap — the same facts, one \
              worded differently. It read:\n{shown}"
         );
-        assert_ne!(body, fbody, "{r:?}: saying there is no cap must not read as a cap; it read:\n{shown}");
+        assert_ne!(
+            body, fbody,
+            "{r:?}: saying there is no cap must not read as a cap; it read:\n{shown}"
+        );
     }
 }
 
@@ -2781,12 +3107,22 @@ fn signed_numbers(s: &str) -> Vec<String> {
     let mut i = 0;
     while i < chars.len() {
         if chars[i].is_ascii_digit() {
-            let start = if i > 0 && (chars[i - 1] == '+' || chars[i - 1] == '-') { i - 1 } else { i };
+            let start = if i > 0 && (chars[i - 1] == '+' || chars[i - 1] == '-') {
+                i - 1
+            } else {
+                i
+            };
             let mut j = i;
             while j < chars.len() && (chars[j].is_ascii_digit() || chars[j] == '.') {
                 j += 1;
             }
-            out.push(chars[start..j].iter().collect::<String>().trim_end_matches('.').to_string());
+            out.push(
+                chars[start..j]
+                    .iter()
+                    .collect::<String>()
+                    .trim_end_matches('.')
+                    .to_string(),
+            );
             i = j;
         } else {
             i += 1;
@@ -2825,8 +3161,10 @@ fn a_stores_rows_net_rate_is_its_exact_size_behind_its_sign() {
             let key = RowKey::Resource(r);
             assert_is_a_row(&state, Section::Meadow, &key);
             let shown = pane_text(&state, &looking_at(Section::Meadow, key), WIDE, TALL);
-            let signed: Vec<String> =
-                signed_numbers(&shown).into_iter().filter(|t| t.starts_with('+') || t.starts_with('-')).collect();
+            let signed: Vec<String> = signed_numbers(&shown)
+                .into_iter()
+                .filter(|t| t.starts_with('+') || t.starts_with('-'))
+                .collect();
             let rate = rates[r.ix()];
             let size = fmt::exact(rate.abs());
             if size == "0" {
@@ -2848,7 +3186,10 @@ fn a_stores_rows_net_rate_is_its_exact_size_behind_its_sign() {
             }
         }
     }
-    assert!(classes.iter().all(|n| *n > 0), "fixture: stores still, gaining, and draining: {classes:?}");
+    assert!(
+        classes.iter().all(|n| *n > 0),
+        "fixture: stores still, gaining, and draining: {classes:?}"
+    );
 }
 
 /// Every figure the inspector states is in the exact form: no magnitude
@@ -2863,12 +3204,19 @@ fn every_figure_the_inspector_states_is_in_the_exact_form() {
     let mut checked = 0;
     for (section, row) in every_row(&state) {
         let shown = pane_text(&state, &looking_at(section, row.key.clone()), WIDEST, TALL);
-        let body: String = lines_of(&shown).into_iter().skip(1).collect::<Vec<_>>().join("\n");
+        let body: String = lines_of(&shown)
+            .into_iter()
+            .skip(1)
+            .collect::<Vec<_>>()
+            .join("\n");
         let chars: Vec<char> = format!("{body} ").chars().collect();
         for w in chars.windows(3) {
             let marker = w[0].is_ascii_digit() && "KMBTQ".contains(w[1]) && !w[2].is_alphanumeric();
-            let exponent = w[0].is_ascii_digit() && w[1] == 'e' && (w[2].is_ascii_digit() || w[2] == '-' || w[2] == '+');
-            let grouping = w[0].is_ascii_digit() && (w[1] == ',' || w[1] == '_') && w[2].is_ascii_digit();
+            let exponent = w[0].is_ascii_digit()
+                && w[1] == 'e'
+                && (w[2].is_ascii_digit() || w[2] == '-' || w[2] == '+');
+            let grouping =
+                w[0].is_ascii_digit() && (w[1] == ',' || w[1] == '_') && w[2].is_ascii_digit();
             assert!(
                 !(marker || exponent || grouping),
                 "{:?}: {:?} glues a marker, exponent, or grouping to a figure; the inspector's \
@@ -2877,12 +3225,22 @@ fn every_figure_the_inspector_states_is_in_the_exact_form() {
                 w.iter().collect::<String>()
             );
         }
-        assert!(!body.contains("<0.001") && !body.contains(">999Q"), "{:?}: a compact bound in the inspector:\n{shown}", row.key);
+        assert!(
+            !body.contains("<0.001") && !body.contains(">999Q"),
+            "{:?}: a compact bound in the inspector:\n{shown}",
+            row.key
+        );
         for t in numbers(&body) {
             checked += 1;
-            let v: f64 = t.parse().unwrap_or_else(|_| panic!("{:?}: {t:?} is not a figure", row.key));
+            let v: f64 = t
+                .parse()
+                .unwrap_or_else(|_| panic!("{:?}: {t:?} is not a figure", row.key));
             if let Some((_, frac)) = t.split_once('.') {
-                assert!(!frac.ends_with('0'), "{:?}: {t:?} ends its fraction in a zero:\n{shown}", row.key);
+                assert!(
+                    !frac.ends_with('0'),
+                    "{:?}: {t:?} ends its fraction in a zero:\n{shown}",
+                    row.key
+                );
                 let places = 3.max(3 - v.log10().floor() as i32) as usize;
                 assert!(
                     frac.len() <= places,
@@ -2897,10 +3255,17 @@ fn every_figure_the_inspector_states_is_in_the_exact_form() {
 
     let mut endless = ragged_world();
     endless.resources[ResourceId::ALL[0].ix()] = f64::INFINITY;
-    let shown = pane_text(&endless, &looking_at(Section::Meadow, RowKey::Resource(ResourceId::ALL[0])), WIDE, TALL);
+    let shown = pane_text(
+        &endless,
+        &looking_at(Section::Meadow, RowKey::Resource(ResourceId::ALL[0])),
+        WIDE,
+        TALL,
+    );
     let w = words(&shown);
     assert!(
-        flat(&shown).to_lowercase().contains("beyond reach") && !w.contains("inf") && !w.contains("infinity"),
+        flat(&shown).to_lowercase().contains("beyond reach")
+            && !w.contains("inf")
+            && !w.contains("infinity"),
         "a stock that is not finite is said in words as beyond reach, never printed \
          (TUI-RENDER-018):\n{shown}"
     );
@@ -2922,8 +3287,12 @@ fn every_abbreviated_figure_has_its_exact_form_on_its_rows_inspector() {
         let on_screen = numbers(&shown);
         let mut owed: Vec<(String, f64)> = Vec::new();
         match &row.key {
-            RowKey::Content(ContentId::Structure(b), _) => owed.push(("the owned count".into(), state.structures[b.ix()] as f64)),
-            RowKey::Content(ContentId::Rite(r), _) => owed.push(("the owned count".into(), state.rite_counts[r.ix()] as f64)),
+            RowKey::Content(ContentId::Structure(b), _) => {
+                owed.push(("the owned count".into(), state.structures[b.ix()] as f64))
+            }
+            RowKey::Content(ContentId::Rite(r), _) => {
+                owed.push(("the owned count".into(), state.rite_counts[r.ix()] as f64))
+            }
             RowKey::Resource(r) => {
                 owed.push(("the stock".into(), state.stock(*r)));
                 if state.cap(*r).is_finite() {
@@ -2935,7 +3304,9 @@ fn every_abbreviated_figure_has_its_exact_form_on_its_rows_inspector() {
         }
         let cost = stated_next_cost(&state, &row.key).or_else(|| match (&row.key, &row.kind) {
             (RowKey::Content(..), _) => None,
-            (_, RowKind::Act { command, .. }) => state.unit_price(command).filter(|c| !c.is_empty()),
+            (_, RowKind::Act { command, .. }) => {
+                state.unit_price(command).filter(|c| !c.is_empty())
+            }
             _ => None,
         });
         for (r, need) in cost.unwrap_or_default() {
@@ -2994,7 +3365,13 @@ fn the_inspectors_cost_lines_wear_each_components_coat_on_its_name_short_or_cove
 
     let (w, h) = (200u16, 40u16);
     let rect = pane_rect(w, h);
-    let buf = render(&state, &looking_at(Section::Meadow, structure_row(s)), w, h, rect);
+    let buf = render(
+        &state,
+        &looking_at(Section::Meadow, structure_row(s)),
+        w,
+        h,
+        rect,
+    );
     let lines = region_lines(&buf, rect);
     let ring: Vec<Color> = Hue::RING.iter().map(|h| h.color()).collect();
 
@@ -3003,7 +3380,9 @@ fn the_inspectors_cost_lines_wear_each_components_coat_on_its_name_short_or_cove
         let y = rect.y + i as u16;
         let trimmed = line.trim_start();
         let indent = line.chars().count() - trimmed.chars().count();
-        let heads = cost.iter().find(|(r, _)| trimmed.starts_with(&format!("{}:", resource_name(*r))));
+        let heads = cost
+            .iter()
+            .find(|(r, _)| trimmed.starts_with(&format!("{}:", resource_name(*r))));
         if let Some((r, _)) = heads {
             found += 1;
             let name = resource_name(*r);
@@ -3034,8 +3413,16 @@ fn the_inspectors_cost_lines_wear_each_components_coat_on_its_name_short_or_cove
             }
         }
     }
-    assert_eq!(found, cost.len(), "fixture: every component has a cost line: {lines:?}");
-    assert_eq!(fg_at(&buf, rect.x, rect.y), Color::Reset, "a structure's name line wears no colour");
+    assert_eq!(
+        found,
+        cost.len(),
+        "fixture: every component has a cost line: {lines:?}"
+    );
+    assert_eq!(
+        fg_at(&buf, rect.x, rect.y),
+        Color::Reset,
+        "a structure's name line wears no colour"
+    );
 }
 
 /// A stores row's description opens with the store's name, in its coat.
@@ -3051,16 +3438,32 @@ fn a_stores_rows_name_line_in_the_inspector_wears_its_coat() {
     state.resources[r.ix()] = 5.0;
     let (w, h) = (160u16, 40u16);
     let rect = pane_rect(w, h);
-    let buf = render(&state, &looking_at(Section::Meadow, RowKey::Resource(r)), w, h, rect);
+    let buf = render(
+        &state,
+        &looking_at(Section::Meadow, RowKey::Resource(r)),
+        w,
+        h,
+        rect,
+    );
     let first = region_lines(&buf, rect)[0].clone();
     let name = resource_name(r);
-    assert!(first.starts_with(&name), "fixture: the description opens with the name: {first:?}");
+    assert!(
+        first.starts_with(&name),
+        "fixture: the description opens with the name: {first:?}"
+    );
     let expected = coat_colours(coat(r), name.chars().count());
     for (k, want) in expected.iter().enumerate() {
         let got = fg_at(&buf, rect.x + k as u16, rect.y);
-        assert_eq!(&got, want, "the name line for {name}, character {k}, wears {got:?}: {first:?}");
+        assert_eq!(
+            &got, want,
+            "the name line for {name}, character {k}, wears {got:?}: {first:?}"
+        );
     }
     for x in name.chars().count()..first.chars().count() {
-        assert_eq!(fg_at(&buf, rect.x + x as u16, rect.y), Color::Reset, "past the name, no colour");
+        assert_eq!(
+            fg_at(&buf, rect.x + x as u16, rect.y),
+            Color::Reset,
+            "past the name, no colour"
+        );
     }
 }

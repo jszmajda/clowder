@@ -164,7 +164,10 @@ fn every_command() -> Vec<Command> {
 /// Every command of the fixed-per-unit shape: a pounce, and a trade to every
 /// colony (the whale's exchange included).
 fn fixed_per_unit_commands() -> Vec<Command> {
-    every_command().into_iter().filter(|c| shape(c) == Shape::FixedPerUnit).collect()
+    every_command()
+        .into_iter()
+        .filter(|c| shape(c) == Shape::FixedPerUnit)
+        .collect()
 }
 
 /// A meadow in which every count-taking command is open: every idea known,
@@ -189,7 +192,10 @@ fn meadows() -> Vec<(&'static str, GameState)> {
     no_pounce.ideas.retain(|i| *i != IdeaId::PouncingPractice);
 
     let mut one_colony = open.clone();
-    let first = ColonyId::ALL.into_iter().find(|c| *c != ColonyId::StarWhales).unwrap();
+    let first = ColonyId::ALL
+        .into_iter()
+        .find(|c| *c != ColonyId::StarWhales)
+        .unwrap();
     one_colony.discovered = [first].into_iter().collect();
 
     let mut no_whale = open.clone();
@@ -248,8 +254,14 @@ fn a_fixed_per_unit_command_is_priced_exactly_where_the_command_layer_would_not_
             }
         }
     }
-    assert!(priced > 0, "fixture: no meadow opens a fixed-per-unit command");
-    assert!(withheld > 0, "fixture: no meadow locks a fixed-per-unit command");
+    assert!(
+        priced > 0,
+        "fixture: no meadow opens a fixed-per-unit command"
+    );
+    assert!(
+        withheld > 0,
+        "fixture: no meadow locks a fixed-per-unit command"
+    );
 }
 
 /// The price is of ONE unit, whatever count the command carries.
@@ -327,7 +339,10 @@ fn n_units_cost_exactly_n_times_the_price_reported() {
 #[test]
 fn a_count_taking_command_priced_otherwise_is_answered_with_nothing() {
     for (what, state) in meadows() {
-        for c in every_command().into_iter().filter(|c| shape(c) == Shape::PricedOtherwise) {
+        for c in every_command()
+            .into_iter()
+            .filter(|c| shape(c) == Shape::PricedOtherwise)
+        {
             for n in [1, 3] {
                 assert_eq!(
                     state.unit_price(&counted(c, n)),
@@ -348,7 +363,10 @@ fn a_count_taking_command_priced_otherwise_is_answered_with_nothing() {
 fn a_command_that_takes_no_count_is_answered_with_nothing() {
     let mut asked = 0;
     for (what, state) in meadows() {
-        for c in every_command().into_iter().filter(|c| shape(c) == Shape::NoCount) {
+        for c in every_command()
+            .into_iter()
+            .filter(|c| shape(c) == Shape::NoCount)
+        {
             asked += 1;
             assert_eq!(
                 state.unit_price(&c),
@@ -357,5 +375,8 @@ fn a_command_that_takes_no_count_is_answered_with_nothing() {
             );
         }
     }
-    assert!(asked > 0, "fixture: no command without a count was asked about");
+    assert!(
+        asked > 0,
+        "fixture: no command without a count was asked about"
+    );
 }

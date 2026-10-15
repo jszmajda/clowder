@@ -121,7 +121,8 @@ fn fast_reach(s: &mut GameState, site: SiteId) {
 /// table lists *headline* fuels; this checks a headline component is present
 /// without over-pinning any smaller escalating components the table omits.
 fn fuel_has(fuel: &[(ResourceId, f64)], r: ResourceId, amount: f64) -> bool {
-    fuel.iter().any(|(fr, fa)| *fr == r && (*fa - amount).abs() < TOL)
+    fuel.iter()
+        .any(|(fr, fa)| *fr == r && (*fa - amount).abs() < TOL)
 }
 
 // =====================================================================
@@ -137,7 +138,8 @@ fn launching_an_expedition_reaches_the_next_site_only() {
     give(&mut cold, ResourceId::Curiosity, 1e9);
     give(&mut cold, ResourceId::Skymaps, 1e9);
     assert_eq!(
-        cold.apply(Command::LaunchExpedition(SiteId::FenceTop)).unwrap_err(),
+        cold.apply(Command::LaunchExpedition(SiteId::FenceTop))
+            .unwrap_err(),
         CommandError::Locked,
         "the cosmic surface (Skyward Longing) gates every launch"
     );
@@ -147,13 +149,20 @@ fn launching_an_expedition_reaches_the_next_site_only() {
     // out of order and rejects Locked (predecessor unreached).
     let mut s = GameState::new(502);
     s.ideas.insert(IdeaId::SkywardLonging);
-    assert!(s.site_reachable(SiteId::FenceTop), "Fence Top is first after the idea");
-    assert!(!s.site_reachable(SiteId::OldOak), "the second rung waits on the first");
+    assert!(
+        s.site_reachable(SiteId::FenceTop),
+        "Fence Top is first after the idea"
+    );
+    assert!(
+        !s.site_reachable(SiteId::OldOak),
+        "the second rung waits on the first"
+    );
     give(&mut s, ResourceId::Curiosity, 1e9);
     give(&mut s, ResourceId::Skymaps, 1e9);
     give(&mut s, ResourceId::Moonmilk, 1e9);
     assert_eq!(
-        s.apply(Command::LaunchExpedition(SiteId::OldOak)).unwrap_err(),
+        s.apply(Command::LaunchExpedition(SiteId::OldOak))
+            .unwrap_err(),
         CommandError::Locked,
         "out-of-order launch is Locked, not merely unaffordable"
     );
@@ -162,10 +171,15 @@ fn launching_an_expedition_reaches_the_next_site_only() {
     let mut broke = GameState::new(503);
     broke.ideas.insert(IdeaId::SkywardLonging);
     assert!(matches!(
-        broke.apply(Command::LaunchExpedition(SiteId::FenceTop)).unwrap_err(),
+        broke
+            .apply(Command::LaunchExpedition(SiteId::FenceTop))
+            .unwrap_err(),
         CommandError::InsufficientResources { .. }
     ));
-    assert!(broke.sites_reached.is_empty(), "a rejected launch reaches nothing");
+    assert!(
+        broke.sites_reached.is_empty(),
+        "a rejected launch reaches nothing"
+    );
 
     // Success: the exact mission fuel is spent, the site is marked reached, and
     // a SiteReached event fires.
@@ -173,24 +187,35 @@ fn launching_an_expedition_reaches_the_next_site_only() {
     for (r, amt) in fuel {
         give(&mut s, *r, *amt);
     }
-    let events = s.apply(Command::LaunchExpedition(SiteId::FenceTop)).unwrap();
+    let events = s
+        .apply(Command::LaunchExpedition(SiteId::FenceTop))
+        .unwrap();
     assert!(s.sites_reached.contains(&SiteId::FenceTop));
     assert!(
-        events.iter().any(|e| matches!(e, Event::SiteReached { site } if *site == SiteId::FenceTop)),
+        events
+            .iter()
+            .any(|e| matches!(e, Event::SiteReached { site } if *site == SiteId::FenceTop)),
         "a reached site announces itself"
     );
     for (r, _) in fuel {
         assert!(s.stock(*r) < 1e-6, "{r:?} fuel is spent to the bottom");
     }
     // Now the second rung has opened.
-    assert!(s.site_reachable(SiteId::OldOak), "reaching Fence Top opens Old Oak");
+    assert!(
+        s.site_reachable(SiteId::OldOak),
+        "reaching Fence Top opens Old Oak"
+    );
 
     // The ladder holds mid-way too: with every prior rung reached and fuel in
     // paw (the fast_reach helper), the next-in-order rung launches on demand.
     let mut deep = GameState::new(508);
     fast_reach(&mut deep, SiteId::TheBrook);
-    assert!(deep.site_reachable(SiteId::TheBrook), "priors reached ⇒ the next rung is reachable");
-    deep.apply(Command::LaunchExpedition(SiteId::TheBrook)).unwrap();
+    assert!(
+        deep.site_reachable(SiteId::TheBrook),
+        "priors reached ⇒ the next rung is reachable"
+    );
+    deep.apply(Command::LaunchExpedition(SiteId::TheBrook))
+        .unwrap();
     assert!(deep.sites_reached.contains(&SiteId::TheBrook));
 }
 
@@ -202,7 +227,11 @@ fn launching_an_expedition_reaches_the_next_site_only() {
 #[test]
 fn the_site_ladder_is_thirteen_in_order_with_fuels_and_outposts() {
     use ResourceId::{Cometsilk, Curiosity, Echoes, JarsOfPurrs, Moonmilk, Skymaps};
-    assert_eq!(SiteId::ALL.len(), 13, "exactly the thirteen sites, append-only");
+    assert_eq!(
+        SiteId::ALL.len(),
+        13,
+        "exactly the thirteen sites, append-only"
+    );
 
     // Each site's one outpost, in ladder order (economy ids 40..=52).
     let outposts: [(SiteId, StructureId); 13] = [
@@ -222,7 +251,11 @@ fn the_site_ladder_is_thirteen_in_order_with_fuels_and_outposts() {
     ];
     for (i, (site, outpost)) in outposts.iter().enumerate() {
         assert_eq!(SiteId::ALL[i], *site, "site {i} out of ladder order");
-        assert_eq!(content::site_def(*site).outpost, *outpost, "{site:?} hosts the wrong outpost");
+        assert_eq!(
+            content::site_def(*site).outpost,
+            *outpost,
+            "{site:?} hosts the wrong outpost"
+        );
         assert_eq!(outpost.ix(), 40 + i, "{outpost:?} appended out of id order");
     }
 
@@ -259,7 +292,8 @@ fn outpost_structures_are_locked_until_their_site_is_reached() {
     }
     assert!(!s.structure_unlocked(StructureId::LookoutPost));
     assert_eq!(
-        s.apply(Command::Build(StructureId::LookoutPost)).unwrap_err(),
+        s.apply(Command::Build(StructureId::LookoutPost))
+            .unwrap_err(),
         CommandError::Locked
     );
 
@@ -272,7 +306,10 @@ fn outpost_structures_are_locked_until_their_site_is_reached() {
     // A reached site is never un-reached by ordinary play.
     give(&mut s, ResourceId::Catnip, 50.0);
     run_ticks(&mut s, 5);
-    assert!(s.sites_reached.contains(&SiteId::FenceTop), "reached sites are permanent");
+    assert!(
+        s.sites_reached.contains(&SiteId::FenceTop),
+        "reached sites are permanent"
+    );
 }
 
 // =====================================================================
@@ -310,15 +347,27 @@ fn outdoor_output_takes_the_global_layer_at_a_reduced_transfer() {
 
     let d_in = patch.stock(ResourceId::Catnip);
     let d_out = tree.stock(ResourceId::Catnip);
-    assert!(d_in > 0.0 && d_out > 0.0, "both channels must produce for the test to bite");
+    assert!(
+        d_in > 0.0 && d_out > 0.0,
+        "both channels must produce for the test to bite"
+    );
 
     let indoor_ratio = patch_boost.stock(ResourceId::Catnip) / d_in;
     let outdoor_ratio = tree_boost.stock(ResourceId::Catnip) / d_out;
 
     let t = tree.outdoor_transfer();
-    assert!(t > 0.0 && t < 1.0, "the transfer fraction dilutes but does not erase");
-    assert!((indoor_ratio - 1.02).abs() < 1e-9, "indoor takes the full +2%");
-    assert!(outdoor_ratio < indoor_ratio - 1e-9, "outdoor takes strictly less");
+    assert!(
+        t > 0.0 && t < 1.0,
+        "the transfer fraction dilutes but does not erase"
+    );
+    assert!(
+        (indoor_ratio - 1.02).abs() < 1e-9,
+        "indoor takes the full +2%"
+    );
+    assert!(
+        outdoor_ratio < indoor_ratio - 1e-9,
+        "outdoor takes strictly less"
+    );
     assert!(
         (outdoor_ratio - 1.0 - 0.02 * t).abs() < 1e-9,
         "outdoor bonus is exactly the diluted global layer"
@@ -328,7 +377,10 @@ fn outdoor_output_takes_the_global_layer_at_a_reduced_transfer() {
     let mut vane = GameState::new(507);
     assert_eq!(vane.energy_consumption(), 0.0);
     grant(&mut vane, StructureId::WeatherVane, 1);
-    assert!(vane.energy_consumption() > 0.0, "an outpost consumes energy");
+    assert!(
+        vane.energy_consumption() > 0.0,
+        "an outpost consumes energy"
+    );
 }
 
 // =====================================================================
@@ -378,18 +430,30 @@ fn outposts_produce_skymaps_and_hushfelt_and_grant_their_storage() {
     off_boundary(&mut grotto);
     grant(&mut grotto, StructureId::HushfeltGrotto, 1);
     let bare_cap = GameState::new(512).cap(ResourceId::Hushfelt);
-    assert!(grotto.cap(ResourceId::Hushfelt) > bare_cap, "the Grotto extends hushfelt storage");
+    assert!(
+        grotto.cap(ResourceId::Hushfelt) > bare_cap,
+        "the Grotto extends hushfelt storage"
+    );
     give(&mut grotto, ResourceId::Hushfelt, 0.0);
     run_ticks(&mut grotto, 1);
-    assert!(grotto.stock(ResourceId::Hushfelt) > 0.0, "the Grotto trickles hushfelt");
+    assert!(
+        grotto.stock(ResourceId::Hushfelt) > 0.0,
+        "the Grotto trickles hushfelt"
+    );
 
     let mut whisper = GameState::new(513);
     off_boundary(&mut whisper);
     grant(&mut whisper, StructureId::WhisperPost, 1);
-    assert!(whisper.cap(ResourceId::Hushfelt) > bare_cap, "the Whisper Post extends storage too");
+    assert!(
+        whisper.cap(ResourceId::Hushfelt) > bare_cap,
+        "the Whisper Post extends storage too"
+    );
     give(&mut whisper, ResourceId::Hushfelt, 0.0);
     run_ticks(&mut whisper, 1);
-    assert!(whisper.stock(ResourceId::Hushfelt) > 0.0, "the Whisper Post trickles hushfelt");
+    assert!(
+        whisper.stock(ResourceId::Hushfelt) > 0.0,
+        "the Whisper Post trickles hushfelt"
+    );
 
     let mut many = GameState::new(514);
     grant(&mut many, StructureId::HushfeltGrotto, 500);
@@ -426,12 +490,18 @@ fn the_outer_outposts_raise_the_jar_cap_past_two() {
     let mut s = GameState::new(516);
     s.arches_bought.insert(ArchId::EverdreamArch);
     grant(&mut s, StructureId::AuroraLantern, 1);
-    assert!(s.cap(ResourceId::JarsOfPurrs) > 2.0, "the Jar cap has climbed past 2");
+    assert!(
+        s.cap(ResourceId::JarsOfPurrs) > 2.0,
+        "the Jar cap has climbed past 2"
+    );
     give(&mut s, ResourceId::Rainbows, 30000.0);
     for _ in 0..3 {
         s.apply(Command::CondenseJar).unwrap();
     }
-    assert!((s.stock(ResourceId::JarsOfPurrs) - 3.0).abs() < 1e-9, "three Jars now sit in store");
+    assert!(
+        (s.stock(ResourceId::JarsOfPurrs) - 3.0).abs() < 1e-9,
+        "three Jars now sit in store"
+    );
     assert!(s.stock(ResourceId::JarsOfPurrs) <= s.cap(ResourceId::JarsOfPurrs));
 }
 
@@ -480,7 +550,11 @@ fn summoning_the_star_whale_needs_the_sky_dock_and_the_song() {
     give(&mut s, ResourceId::Curiosity, 1e9);
     give(&mut s, ResourceId::Echoes, 1e9);
     let events = s.apply(Command::SummonStarWhale).unwrap();
-    assert_eq!(s.whale_visit_years, 5 + s.whale_contentment, "5 years + 1 per contentment");
+    assert_eq!(
+        s.whale_visit_years,
+        5 + s.whale_contentment,
+        "5 years + 1 per contentment"
+    );
     assert_eq!(s.whale_contentment, 0, "a fresh whale is uncontented");
     assert_eq!(s.whale_visit_years, 5);
     assert!(s.stock(ResourceId::Curiosity) < 1e9, "curiosity is spent");
@@ -507,17 +581,23 @@ fn feeding_lengthens_the_visit_and_the_exchange_is_visit_gated() {
     );
     give(&mut s, ResourceId::Dreamcorns, 3.0);
     let events = s.apply(Command::FeedWhale).unwrap();
-    assert!((s.stock(ResourceId::Dreamcorns) - 2.0).abs() < TOL, "one dreamcorn lullaby is spent");
+    assert!(
+        (s.stock(ResourceId::Dreamcorns) - 2.0).abs() < TOL,
+        "one dreamcorn lullaby is spent"
+    );
     assert_eq!(s.whale_contentment, 1, "contentment rises");
     assert_eq!(s.whale_visit_years, 6, "and the visit lengthens with it");
-    assert!(events.iter().any(|e| matches!(e, Event::WhaleFed { contentment } if *contentment == 1)));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, Event::WhaleFed { contentment } if *contentment == 1)));
 
     // The hushfelt exchange runs only while the whale visits.
     let mut away = GameState::new(525);
     away.whale_visit_years = 0;
     give(&mut away, ResourceId::Hushfelt, 1e6);
     assert_eq!(
-        away.apply(Command::Trade(ColonyId::StarWhales, 1)).unwrap_err(),
+        away.apply(Command::Trade(ColonyId::StarWhales, 1))
+            .unwrap_err(),
         CommandError::Locked,
         "no exchange without a visit"
     );
@@ -532,7 +612,10 @@ fn feeding_lengthens_the_visit_and_the_exchange_is_visit_gated() {
         here.stock(ResourceId::Echoes),
     );
     here.apply(Command::Trade(ColonyId::StarWhales, 1)).unwrap();
-    assert!(here.stock(ResourceId::Hushfelt) < 1e6, "hushfelt is given to the whale");
+    assert!(
+        here.stock(ResourceId::Hushfelt) < 1e6,
+        "hushfelt is given to the whale"
+    );
     let gained = here.stock(ResourceId::Skymaps) > sky0
         || here.stock(ResourceId::Starshards) > star0
         || here.stock(ResourceId::Echoes) > echo0;
@@ -543,8 +626,14 @@ fn feeding_lengthens_the_visit_and_the_exchange_is_visit_gated() {
     depart.whale_visit_years = 1;
     depart.whale_contentment = 0;
     run_ticks(&mut depart, 2000); // two game-years — well past a 1-year visit
-    assert_eq!(depart.whale_visit_years, 0, "the visit ends and the whale departs");
-    assert_eq!(depart.whale_contentment, 0, "an unfed whale leaves as calm as it came");
+    assert_eq!(
+        depart.whale_visit_years, 0,
+        "the visit ends and the whale departs"
+    );
+    assert_eq!(
+        depart.whale_contentment, 0,
+        "an unfed whale leaves as calm as it came"
+    );
 }
 
 // =====================================================================
@@ -557,7 +646,10 @@ fn a_deep_nap_fast_forwards_the_meadow_through_the_real_tick() {
     // Locked before the Deep Nap Theory idea, even with starshards in paw.
     let mut cold = GameState::new(530);
     give(&mut cold, ResourceId::Starshards, 1e9);
-    assert_eq!(cold.apply(Command::DeepNap(1)).unwrap_err(), CommandError::Locked);
+    assert_eq!(
+        cold.apply(Command::DeepNap(1)).unwrap_err(),
+        CommandError::Locked
+    );
 
     // A nap longer than max_nap_length is refused (InsufficientResources),
     // however many starshards are in store.
@@ -585,7 +677,11 @@ fn a_deep_nap_fast_forwards_the_meadow_through_the_real_tick() {
     let before_star = s.stock(ResourceId::Starshards);
     let events = s.apply(Command::DeepNap(years)).unwrap();
 
-    assert_eq!(s.ticks, before_ticks + years as u64 * 1000, "years×1000 ticks elapse");
+    assert_eq!(
+        s.ticks,
+        before_ticks + years as u64 * 1000,
+        "years×1000 ticks elapse"
+    );
     assert!(
         (before_star - s.stock(ResourceId::Starshards) - cost).abs() < 1e-6,
         "the nap spends exactly starshard_cost(years)"
@@ -595,7 +691,10 @@ fn a_deep_nap_fast_forwards_the_meadow_through_the_real_tick() {
         "the meadow accrues exactly a tick() replay — nothing double-counted"
     );
     assert_eq!(
-        events.iter().filter(|e| matches!(e, Event::Napped { .. })).count(),
+        events
+            .iter()
+            .filter(|e| matches!(e, Event::Napped { .. }))
+            .count(),
         1,
         "one summarized Napped report"
     );
@@ -603,13 +702,19 @@ fn a_deep_nap_fast_forwards_the_meadow_through_the_real_tick() {
     // back by the same route an absence uses, not a bare year count. Its
     // contents are pinned in tests/bulktime.rs (SIM-DREAM-001, SIM-DREAM-008);
     // here it is enough that a report is what comes back at all.
-    let napped = events.iter().find(|e| matches!(e, Event::Napped { .. })).unwrap();
+    let napped = events
+        .iter()
+        .find(|e| matches!(e, Event::Napped { .. }))
+        .unwrap();
     let summary = serde_json::to_value(napped).unwrap();
     assert!(
         summary.to_string().contains("resource_deltas"),
         "the nap's summary carries the folded report, not just a year count: {summary}"
     );
-    assert!(events.len() < 50, "a summary, never a per-tick event stream");
+    assert!(
+        events.len() < 50,
+        "a summary, never a per-tick event stream"
+    );
 }
 
 // =====================================================================
@@ -625,7 +730,10 @@ fn napping_stirs_dreams_that_raise_the_next_nap_cost_but_touch_no_stock() {
     give(&mut plain, ResourceId::Starshards, 1e12);
     let mut pillow = plain.clone();
     pillow.dream_looms.insert(DreamLoomId::SoftPillow); // heat efficiency +10%
-    assert!(pillow.effect(Effect::HeatEfficiency) > 0.0, "Soft Pillow raises heat efficiency");
+    assert!(
+        pillow.effect(Effect::HeatEfficiency) > 0.0,
+        "Soft Pillow raises heat efficiency"
+    );
 
     plain.apply(Command::DeepNap(years)).unwrap();
     pillow.apply(Command::DeepNap(years)).unwrap();
@@ -670,12 +778,18 @@ fn stirred_dreams_dissipate_and_cool_faster_with_a_blanket() {
     off_boundary(&mut s);
     s.stirred_dreams = 100.0;
     run_ticks(&mut s, 1);
-    assert!(s.stirred_dreams < 100.0 && s.stirred_dreams >= 0.0, "one tick dissipates some heat");
+    assert!(
+        s.stirred_dreams < 100.0 && s.stirred_dreams >= 0.0,
+        "one tick dissipates some heat"
+    );
 
     let mut floored = GameState::new(536);
     floored.stirred_dreams = 0.5;
     run_ticks(&mut floored, 1000);
-    assert_eq!(floored.stirred_dreams, 0.0, "dissipation floors at zero, never negative");
+    assert_eq!(
+        floored.stirred_dreams, 0.0,
+        "dissipation floors at zero, never negative"
+    );
 
     // The Warm Blanket loom cools faster (dissipation +20%).
     let mut plain = GameState::new(537);
@@ -683,7 +797,10 @@ fn stirred_dreams_dissipate_and_cool_faster_with_a_blanket() {
     plain.stirred_dreams = 100.0;
     let mut blanket = plain.clone();
     blanket.dream_looms.insert(DreamLoomId::WarmBlanket);
-    assert!(blanket.effect(Effect::HeatDissipation) > 0.0, "Warm Blanket raises dissipation");
+    assert!(
+        blanket.effect(Effect::HeatDissipation) > 0.0,
+        "Warm Blanket raises dissipation"
+    );
     run_ticks(&mut plain, 1);
     run_ticks(&mut blanket, 1);
     assert!(
@@ -704,7 +821,10 @@ fn deja_vu_days_accrue_reverie_over_many_seasons() {
     let mut s = GameState::new(540);
     grant(&mut s, StructureId::MemoryChest, 200);
     s.dream_looms.insert(DreamLoomId::DreamCatcher);
-    assert!(s.effect(Effect::DejaVuChance) > 0.0, "chests and the loom drive the roll");
+    assert!(
+        s.effect(Effect::DejaVuChance) > 0.0,
+        "chests and the loom drive the roll"
+    );
     give(&mut s, ResourceId::Reverie, 0.0);
     // 100 seasons = 2500 days = 25000 ticks (day-aligned start).
     run_ticks(&mut s, 25_000);
@@ -728,7 +848,10 @@ fn a_deja_vu_day_pauses_production_and_consumption_so_nothing_is_short() {
     run_ticks(&mut ctrl, 10);
     dream.deja_vu_until = dream.ticks + 100; // force the whole run déjà-vu
     run_ticks(&mut dream, 10);
-    assert!(ctrl.stock(ResourceId::Catnip) < 100.0, "an ordinary day, the clowder eats");
+    assert!(
+        ctrl.stock(ResourceId::Catnip) < 100.0,
+        "an ordinary day, the clowder eats"
+    );
     assert!(
         (dream.stock(ResourceId::Catnip) - 100.0).abs() < TOL,
         "a déjà-vu day pauses consumption — the shelf is untouched"
@@ -744,8 +867,15 @@ fn a_deja_vu_day_pauses_production_and_consumption_so_nothing_is_short() {
     run_ticks(&mut pctrl, 10);
     pdream.deja_vu_until = pdream.ticks + 100;
     run_ticks(&mut pdream, 10);
-    assert!(pctrl.stock(ResourceId::Catnip) > 0.0, "an ordinary day, the patches grow");
-    assert_eq!(pdream.stock(ResourceId::Catnip), 0.0, "a déjà-vu day pauses production");
+    assert!(
+        pctrl.stock(ResourceId::Catnip) > 0.0,
+        "an ordinary day, the patches grow"
+    );
+    assert_eq!(
+        pdream.stock(ResourceId::Catnip),
+        0.0,
+        "a déjà-vu day pauses production"
+    );
 }
 
 // =====================================================================
@@ -771,8 +901,13 @@ fn reverie_is_monotone_except_for_a_loom_purchase() {
     // The only thing that lowers reverie is a player-chosen loom purchase.
     let mut buyer = GameState::new(544);
     give(&mut buyer, ResourceId::Reverie, 5.0);
-    buyer.apply(Command::BuyDreamLoom(DreamLoomId::SoftPillow)).unwrap();
-    assert!(buyer.stock(ResourceId::Reverie) < 5.0, "a loom purchase spends reverie");
+    buyer
+        .apply(Command::BuyDreamLoom(DreamLoomId::SoftPillow))
+        .unwrap();
+    assert!(
+        buyer.stock(ResourceId::Reverie) < 5.0,
+        "a loom purchase spends reverie"
+    );
 }
 
 // =====================================================================
@@ -782,10 +917,17 @@ fn reverie_is_monotone_except_for_a_loom_purchase() {
 // @spec SIM-DREAM-006
 #[test]
 fn the_dream_loom_ladder_is_nine_with_costs_and_effects() {
-    assert_eq!(DreamLoomId::ALL.len(), 9, "exactly nine loom upgrades, append-only");
+    assert_eq!(
+        DreamLoomId::ALL.len(),
+        9,
+        "exactly nine loom upgrades, append-only"
+    );
 
     // Spot-check three rungs' costs (design table).
-    assert_eq!(content::dream_loom_def(DreamLoomId::SoftPillow).cost, &[(ResourceId::Reverie, 5.0)]);
+    assert_eq!(
+        content::dream_loom_def(DreamLoomId::SoftPillow).cost,
+        &[(ResourceId::Reverie, 5.0)]
+    );
     assert_eq!(
         content::dream_loom_def(DreamLoomId::DreamCatcher).cost,
         &[(ResourceId::Reverie, 40.0)]
@@ -797,41 +939,63 @@ fn the_dream_loom_ladder_is_nine_with_costs_and_effects() {
     // The Distant Dawn rung carries a Jar cost too.
     assert_eq!(
         content::dream_loom_def(DreamLoomId::DistantDawn).cost,
-        &[(ResourceId::Reverie, 10000.0), (ResourceId::JarsOfPurrs, 100.0)]
+        &[
+            (ResourceId::Reverie, 10000.0),
+            (ResourceId::JarsOfPurrs, 100.0)
+        ]
     );
 
     // Spot-check three rungs' effects flow through the effect-key system.
     let mut pillow = GameState::new(545);
     let mut catcher = GameState::new(545);
     let base_deja = GameState::new(545).effect(Effect::DejaVuChance);
-    assert_eq!(GameState::new(545).max_nap_length(), 100, "base nap length is 100");
+    assert_eq!(
+        GameState::new(545).max_nap_length(),
+        100,
+        "base nap length is 100"
+    );
     pillow.dream_looms.insert(DreamLoomId::SoftPillow);
     catcher.dream_looms.insert(DreamLoomId::DreamCatcher);
     let mut slumber = GameState::new(545);
     slumber.dream_looms.insert(DreamLoomId::LongSlumber);
-    assert!(pillow.effect(Effect::HeatEfficiency) > 0.0, "Soft Pillow → heat efficiency");
-    assert!(catcher.effect(Effect::DejaVuChance) > base_deja, "Dream Catcher → déjà-vu chance");
+    assert!(
+        pillow.effect(Effect::HeatEfficiency) > 0.0,
+        "Soft Pillow → heat efficiency"
+    );
+    assert!(
+        catcher.effect(Effect::DejaVuChance) > base_deja,
+        "Dream Catcher → déjà-vu chance"
+    );
     assert!(slumber.max_nap_length() > 100, "Long Slumber → longer naps");
 
     // Buyable once each; a second purchase does not spend again.
     let mut s = GameState::new(546);
     give(&mut s, ResourceId::Reverie, 5.0);
-    let events = s.apply(Command::BuyDreamLoom(DreamLoomId::SoftPillow)).unwrap();
+    let events = s
+        .apply(Command::BuyDreamLoom(DreamLoomId::SoftPillow))
+        .unwrap();
     assert!(s.stock(ResourceId::Reverie) < TOL, "reverie is spent");
     assert!(s.dream_looms.contains(&DreamLoomId::SoftPillow));
-    assert!(events.iter().any(|e| matches!(e, Event::DreamLoomBought { id } if *id == DreamLoomId::SoftPillow)));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, Event::DreamLoomBought { id } if *id == DreamLoomId::SoftPillow)));
     give(&mut s, ResourceId::Reverie, 100.0);
     assert!(
-        s.apply(Command::BuyDreamLoom(DreamLoomId::SoftPillow)).is_err(),
+        s.apply(Command::BuyDreamLoom(DreamLoomId::SoftPillow))
+            .is_err(),
         "no re-buying a loom already woven"
     );
-    assert!((s.stock(ResourceId::Reverie) - 100.0).abs() < TOL, "no double-spend");
+    assert!(
+        (s.stock(ResourceId::Reverie) - 100.0).abs() < TOL,
+        "no double-spend"
+    );
 
     // Unaffordable rejects with InsufficientResources.
     let mut poor = GameState::new(547);
     give(&mut poor, ResourceId::Reverie, 4.0);
     assert!(matches!(
-        poor.apply(Command::BuyDreamLoom(DreamLoomId::SoftPillow)).unwrap_err(),
+        poor.apply(Command::BuyDreamLoom(DreamLoomId::SoftPillow))
+            .unwrap_err(),
         CommandError::InsufficientResources { .. }
     ));
 }
@@ -861,7 +1025,10 @@ fn reaching_year_forty_thousand_with_the_loom_lights_the_distant_dawn() {
     give(&mut no_loom, ResourceId::Starshards, 1e12);
     no_loom.ticks = 39_999_000;
     no_loom.apply(Command::DeepNap(1)).unwrap();
-    assert!(!no_loom.distant_dawn, "no loom, no dawn — the flag never sets");
+    assert!(
+        !no_loom.distant_dawn,
+        "no loom, no dawn — the flag never sets"
+    );
 
     // Once lit, the Passed-Down Wisdom production cap climbs from +100% to +400%.
     let mk = |seed: u64| {
@@ -886,8 +1053,14 @@ fn reaching_year_forty_thousand_with_the_loom_lights_the_distant_dawn() {
     let bonus_on = limited_dr(2.0, 4.0);
     assert!((off.stock(ResourceId::Catnip) - p * (1.0 + bonus_off)).abs() < 1e-9);
     assert!((on.stock(ResourceId::Catnip) - p * (1.0 + bonus_on)).abs() < 1e-9);
-    assert!(off.stock(ResourceId::Catnip) < p * 2.0, "without dawn, +100% holds");
-    assert!(on.stock(ResourceId::Catnip) > p * 2.0, "the dawn lifts the cap past +100%");
+    assert!(
+        off.stock(ResourceId::Catnip) < p * 2.0,
+        "without dawn, +100% holds"
+    );
+    assert!(
+        on.stock(ResourceId::Catnip) > p * 2.0,
+        "the dawn lifts the cap past +100%"
+    );
 }
 
 // =====================================================================
@@ -914,11 +1087,23 @@ fn a_move_keeps_the_cosmic_dreamtime_legacies_and_resets_the_rest() {
 
     // Preserved — the permanent frontier knowledge and dreamtime currency.
     assert!(s.sites_reached.contains(&SiteId::FenceTop));
-    assert!(s.sites_reached.contains(&SiteId::OldOak), "reached sites persist a Move");
+    assert!(
+        s.sites_reached.contains(&SiteId::OldOak),
+        "reached sites persist a Move"
+    );
     assert!(s.dream_looms.contains(&DreamLoomId::SoftPillow));
-    assert!(s.dream_looms.contains(&DreamLoomId::DistantDawn), "woven looms persist a Move");
-    assert!((s.stock(ResourceId::Reverie) - 42.0).abs() < TOL, "reverie persists a Move");
-    assert!(s.distant_dawn, "the Distant Dawn, once lit, is never un-lit");
+    assert!(
+        s.dream_looms.contains(&DreamLoomId::DistantDawn),
+        "woven looms persist a Move"
+    );
+    assert!(
+        (s.stock(ResourceId::Reverie) - 42.0).abs() < TOL,
+        "reverie persists a Move"
+    );
+    assert!(
+        s.distant_dawn,
+        "the Distant Dawn, once lit, is never un-lit"
+    );
 
     // Reset — the Star Whale visit and the stirred-dreams heat are new-meadow.
     assert_eq!(s.stirred_dreams, 0.0, "stirred dreams reset");
@@ -933,8 +1118,16 @@ fn a_move_keeps_the_cosmic_dreamtime_legacies_and_resets_the_rest() {
 // @spec SIM-ECO-028, SIM-ECO-024
 #[test]
 fn the_structure_table_is_fifty_three_with_site_gated_outposts() {
-    assert_eq!(StructureId::ALL.len(), 53, "40 meadow structures + 13 cosmic outposts");
-    assert_eq!(GameState::new(552).structures, [0u32; 53], "a new meadow across the widened array");
+    assert_eq!(
+        StructureId::ALL.len(),
+        53,
+        "40 meadow structures + 13 cosmic outposts"
+    );
+    assert_eq!(
+        GameState::new(552).structures,
+        [0u32; 53],
+        "a new meadow across the widened array"
+    );
 
     // The thirteen outposts (ids 40..=52) each carry a Site gate.
     for i in 40..53 {
@@ -945,8 +1138,14 @@ fn the_structure_table_is_fifty_three_with_site_gated_outposts() {
         );
     }
     // Non-outpost gates are unchanged (Always / Idea).
-    assert_eq!(content::structure_def(StructureId::CatnipPatch).gate, StructureGate::Always);
-    assert!(matches!(content::structure_def(StructureId::Pantry).gate, StructureGate::Idea(_)));
+    assert_eq!(
+        content::structure_def(StructureId::CatnipPatch).gate,
+        StructureGate::Always
+    );
+    assert!(matches!(
+        content::structure_def(StructureId::Pantry).gate,
+        StructureGate::Idea(_)
+    ));
 }
 
 // =====================================================================
@@ -996,7 +1195,10 @@ fn a_cosmic_state_round_trips_byte_identically() {
     let loaded = load_string(&json, 1000).unwrap();
     let r = &loaded.state;
     assert!(r.sites_reached.contains(&SiteId::FenceTop));
-    assert!(r.sites_reached.contains(&SiteId::TheBrook), "reached sites survive the save");
+    assert!(
+        r.sites_reached.contains(&SiteId::TheBrook),
+        "reached sites survive the save"
+    );
     assert!(r.dream_looms.contains(&DreamLoomId::SoftPillow));
     assert!(r.distant_dawn, "the Distant Dawn flag persists");
     assert!((r.stirred_dreams - 7.5).abs() < TOL);

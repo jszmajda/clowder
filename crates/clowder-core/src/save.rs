@@ -274,8 +274,8 @@ impl CatchUp {
     fn built_report(&self) -> OfflineReport {
         let mut resource_deltas = [0.0; crate::state::RESOURCE_COUNT];
         for r in ResourceId::ALL {
-            resource_deltas[r.ix()] =
-                self.carried.resource_deltas[r.ix()] + (self.state.resources[r.ix()] - self.before[r.ix()]);
+            resource_deltas[r.ix()] = self.carried.resource_deltas[r.ix()]
+                + (self.state.resources[r.ix()] - self.before[r.ix()]);
         }
         OfflineReport {
             elapsed_seconds: self.carried.elapsed_seconds + self.this_elapsed_seconds,
@@ -321,7 +321,11 @@ impl CatchUp {
     /// tale. @spec SAVE-020
     pub fn set_down(self) -> SetDown {
         let report_so_far = self.built_report();
-        SetDown { state: self.state, owed_ticks: self.remaining_ticks, report_so_far }
+        SetDown {
+            state: self.state,
+            owed_ticks: self.remaining_ticks,
+            report_so_far,
+        }
     }
 }
 
@@ -333,17 +337,21 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
     // Version-check on the loose parse first: a newer save may contain
     // variants this binary can't deserialize, and that must read as TooNew,
     // not Corrupt.
-    let value: serde_json::Value =
-        serde_json::from_str(s).map_err(|e| LoadError::Corrupt { detail: e.to_string() })?;
+    let value: serde_json::Value = serde_json::from_str(s).map_err(|e| LoadError::Corrupt {
+        detail: e.to_string(),
+    })?;
     let found = value
         .get("save_version")
         .and_then(|v| v.as_u64())
-        .ok_or_else(|| LoadError::Corrupt { detail: "missing save_version".into() })? as u32;
+        .ok_or_else(|| LoadError::Corrupt {
+            detail: "missing save_version".into(),
+        })? as u32;
     if found > SAVE_VERSION {
         return Err(LoadError::TooNew { found });
     }
-    let file: SaveFile = serde_json::from_value(value)
-        .map_err(|e| LoadError::Corrupt { detail: e.to_string() })?;
+    let file: SaveFile = serde_json::from_value(value).map_err(|e| LoadError::Corrupt {
+        detail: e.to_string(),
+    })?;
     let mut state = file.state;
     // The reveal worklists aren't serialized; rebuild them from `revealed`
     // before any tick (catch-up) runs, so a reloaded game reveals exactly as
@@ -355,7 +363,9 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
     if !state.speed.is_finite() {
         state.speed = 1.0;
     }
-    state.speed = state.speed.clamp(crate::state::SPEED_MIN, crate::state::SPEED_MAX);
+    state.speed = state
+        .speed
+        .clamp(crate::state::SPEED_MIN, crate::state::SPEED_MAX);
     if !state.mess.is_finite() || state.mess < 0.0 {
         state.mess = 0.0;
     }
@@ -500,7 +510,11 @@ pub fn read_save(path: &Path, now_unix: u64) -> Result<LoadedGame, LoadError> {
     let contents = match std::fs::read_to_string(path) {
         Ok(c) => c,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(LoadError::NotFound),
-        Err(e) => return Err(LoadError::Corrupt { detail: e.to_string() }),
+        Err(e) => {
+            return Err(LoadError::Corrupt {
+                detail: e.to_string(),
+            })
+        }
     };
     load_string(&contents, now_unix)
 }
@@ -508,6 +522,5 @@ pub fn read_save(path: &Path, now_unix: u64) -> Result<LoadedGame, LoadError> {
 /// Platform data dir + clowder/save.json.
 // @spec SAVE-012
 pub fn default_save_path() -> Option<PathBuf> {
-    directories::ProjectDirs::from("", "", "clowder")
-        .map(|dirs| dirs.data_dir().join("save.json"))
+    directories::ProjectDirs::from("", "", "clowder").map(|dirs| dirs.data_dir().join("save.json"))
 }

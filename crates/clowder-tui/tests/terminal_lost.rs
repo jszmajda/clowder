@@ -187,9 +187,23 @@ fn open_terminal() -> (File, File) {
         let fd = sys::posix_openpt(sys::O_RDWR | sys::O_NOCTTY);
         assert!(fd >= 0, "posix_openpt: {}", io::Error::last_os_error());
         let master = File::from_raw_fd(fd);
-        assert!(sys::fcntl(fd, sys::F_SETFD, sys::FD_CLOEXEC) >= 0, "F_SETFD: {}", io::Error::last_os_error());
-        assert_eq!(sys::grantpt(fd), 0, "grantpt: {}", io::Error::last_os_error());
-        assert_eq!(sys::unlockpt(fd), 0, "unlockpt: {}", io::Error::last_os_error());
+        assert!(
+            sys::fcntl(fd, sys::F_SETFD, sys::FD_CLOEXEC) >= 0,
+            "F_SETFD: {}",
+            io::Error::last_os_error()
+        );
+        assert_eq!(
+            sys::grantpt(fd),
+            0,
+            "grantpt: {}",
+            io::Error::last_os_error()
+        );
+        assert_eq!(
+            sys::unlockpt(fd),
+            0,
+            "unlockpt: {}",
+            io::Error::last_os_error()
+        );
         let name = sys::ptsname(fd);
         assert!(!name.is_null(), "ptsname: {}", io::Error::last_os_error());
         (master, CStr::from_ptr(name).to_string_lossy().into_owned())
@@ -201,9 +215,20 @@ fn open_terminal() -> (File, File) {
         .custom_flags(sys::O_NOCTTY)
         .open(&name)
         .unwrap_or_else(|e| panic!("opening the terminal side {name}: {e}"));
-    let size = sys::Winsize { rows: 30, cols: 100, xpixel: 0, ypixel: 0 };
+    let size = sys::Winsize {
+        rows: 30,
+        cols: 100,
+        xpixel: 0,
+        ypixel: 0,
+    };
     // SAFETY: TIOCSWINSZ reads one `winsize` from the pointer it is given.
-    let set = unsafe { sys::ioctl(terminal.as_raw_fd(), sys::TIOCSWINSZ, &size as *const sys::Winsize) };
+    let set = unsafe {
+        sys::ioctl(
+            terminal.as_raw_fd(),
+            sys::TIOCSWINSZ,
+            &size as *const sys::Winsize,
+        )
+    };
     assert_eq!(set, 0, "TIOCSWINSZ: {}", io::Error::last_os_error());
     make_nonblocking(master.as_raw_fd());
     (master, terminal)
@@ -214,7 +239,13 @@ fn open_terminal() -> (File, File) {
 /// has gone (the terminal side of a session's controlling terminal is revoked
 /// when the session's leader exits).
 fn local_modes(master: &File) -> (bool, bool) {
-    let mut t = sys::Termios { c_iflag: 0, c_oflag: 0, c_cflag: 0, c_lflag: 0, rest: [0; 256] };
+    let mut t = sys::Termios {
+        c_iflag: 0,
+        c_oflag: 0,
+        c_cflag: 0,
+        c_lflag: 0,
+        rest: [0; 256],
+    };
     // SAFETY: `Termios` is at least as large as the platform's `struct termios`.
     let got = unsafe { sys::tcgetattr(master.as_raw_fd(), &mut t) };
     assert_eq!(got, 0, "tcgetattr: {}", io::Error::last_os_error());
@@ -242,7 +273,8 @@ impl TempDir {
     fn new(tag: &str) -> TempDir {
         static COUNTER: AtomicU32 = AtomicU32::new(0);
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path = scratch_root().join(format!("clowder-lost-{}-{}-{}", std::process::id(), tag, n));
+        let path =
+            scratch_root().join(format!("clowder-lost-{}-{}-{}", std::process::id(), tag, n));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).expect("a scratch directory should be creatable");
         TempDir { path }
@@ -269,7 +301,9 @@ fn child_save_path(home: &Path) -> PathBuf {
 /// before its stamp, which owes no interval, so the total is the carried
 /// count alone.
 fn owed_by(save_contents: &str) -> u64 {
-    clowder_core::begin_load(save_contents, 0).expect("the save loads").total_ticks()
+    clowder_core::begin_load(save_contents, 0)
+        .expect("the save loads")
+        .total_ticks()
 }
 
 // ---------------------------------------------------------------------------
@@ -346,7 +380,13 @@ struct Game {
 }
 
 impl Game {
-    fn launch(tag: &str, phase: Phase, terminal: Terminal, frames: Frames, parting: Parting) -> Game {
+    fn launch(
+        tag: &str,
+        phase: Phase,
+        terminal: Terminal,
+        frames: Frames,
+        parting: Parting,
+    ) -> Game {
         Game::launch_with(tag, phase, terminal, frames, parting, &[])
     }
 
@@ -395,7 +435,9 @@ impl Game {
             .env("COLORTERM", "truecolor")
             .current_dir(&home.path)
             .args(args)
-            .stdin(Stdio::from(term.try_clone().expect("duplicating the terminal")));
+            .stdin(Stdio::from(
+                term.try_clone().expect("duplicating the terminal"),
+            ));
         match frames {
             Frames::ToTheTerminal => command.stdout(Stdio::from(term.try_clone().unwrap())),
             Frames::ToAPipe => command.stdout(Stdio::piped()),
@@ -423,7 +465,9 @@ impl Game {
                 Ok(())
             });
         }
-        let mut child = command.spawn().unwrap_or_else(|e| panic!("spawning {CLOWDER}: {e}"));
+        let mut child = command
+            .spawn()
+            .unwrap_or_else(|e| panic!("spawning {CLOWDER}: {e}"));
         // The command holds copies of the terminal side; with these gone the
         // child's are the only ones.
         drop(command);
@@ -455,7 +499,11 @@ impl Game {
     fn beside_the_save(&self) -> Vec<String> {
         let save = self.save_path();
         let mut names: Vec<String> = fs::read_dir(save.parent().unwrap())
-            .map(|rd| rd.flatten().map(|e| e.file_name().to_string_lossy().into_owned()).collect())
+            .map(|rd| {
+                rd.flatten()
+                    .map(|e| e.file_name().to_string_lossy().into_owned())
+                    .collect()
+            })
             .unwrap_or_default();
         names.retain(|n| Some(n.as_str()) != save.file_name().and_then(|s| s.to_str()));
         names.sort();
@@ -463,7 +511,10 @@ impl Game {
     }
 
     fn locks(&self) -> Vec<String> {
-        self.beside_the_save().into_iter().filter(|n| n.contains("lock")).collect()
+        self.beside_the_save()
+            .into_iter()
+            .filter(|n| n.contains("lock"))
+            .collect()
     }
 
     /// Read whatever the game has written, without waiting.
@@ -504,7 +555,8 @@ impl Game {
         let deadline = Instant::now() + START_BUDGET;
         loop {
             self.drain();
-            let framed = find(&self.drawn, ENTER).is_some_and(|at| find(&self.drawn[at..], HIDE).is_some());
+            let framed =
+                find(&self.drawn, ENTER).is_some_and(|at| find(&self.drawn[at..], HIDE).is_some());
             if framed {
                 break;
             }
@@ -514,7 +566,10 @@ impl Game {
                     self.stderr()
                 );
             }
-            assert!(Instant::now() < deadline, "the game drew no frame within {START_BUDGET:?} of starting");
+            assert!(
+                Instant::now() < deadline,
+                "the game drew no frame within {START_BUDGET:?} of starting"
+            );
             std::thread::sleep(Duration::from_millis(5));
         }
         let settle = Instant::now() + Duration::from_millis(250);
@@ -547,7 +602,11 @@ impl Game {
     }
 
     fn press(&mut self, keys: &[u8]) {
-        self.master.as_mut().expect("the terminal is still open").write_all(keys).expect("typing at the game");
+        self.master
+            .as_mut()
+            .expect("the terminal is still open")
+            .write_all(keys)
+            .expect("typing at the game");
     }
 
     fn terminate(&mut self) {
@@ -612,7 +671,11 @@ impl Game {
                 );
             }
         }
-        assert!(!self.stderr().contains("panicked at"), "{what}: the game panicked on its way out.\n{}", self.stderr());
+        assert!(
+            !self.stderr().contains("panicked at"),
+            "{what}: the game panicked on its way out.\n{}",
+            self.stderr()
+        );
     }
 
     /// The session lock is gone from beside the save.
@@ -643,7 +706,9 @@ impl Game {
                     .duration_since(std::time::UNIX_EPOCH)
                     .expect("the clock is past the epoch")
                     .as_secs();
-                let whole = clowder_core::begin_load(fixture, now).expect("the fixture loads").total_ticks();
+                let whole = clowder_core::begin_load(fixture, now)
+                    .expect("the fixture loads")
+                    .total_ticks();
                 assert!(
                     owed > 0,
                     "{what}: a wake cut short must leave its save owing the rest of the absence"
@@ -689,13 +754,18 @@ impl Drop for Game {
 fn the_terminal_library_is_built_with_its_terminal_device_input_source() {
     let crate_manifest = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
     let workspace_manifest = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.toml");
-    let asked = [&crate_manifest, &workspace_manifest].into_iter().any(|path| {
-        let text = fs::read_to_string(path).unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
-        text.lines().any(|line| {
-            let line = line.trim_start();
-            line.starts_with("crossterm") && !line.starts_with('#') && line.contains("\"use-dev-tty\"")
-        })
-    });
+    let asked = [&crate_manifest, &workspace_manifest]
+        .into_iter()
+        .any(|path| {
+            let text = fs::read_to_string(path)
+                .unwrap_or_else(|e| panic!("reading {}: {e}", path.display()));
+            text.lines().any(|line| {
+                let line = line.trim_start();
+                line.starts_with("crossterm")
+                    && !line.starts_with('#')
+                    && line.contains("\"use-dev-tty\"")
+            })
+        });
     assert!(
         asked,
         "neither {} nor {} asks crossterm for its `use-dev-tty` feature, so the game is built \
@@ -719,8 +789,17 @@ fn the_terminal_library_is_built_with_its_terminal_device_input_source() {
 fn closing_the_terminal_in_play_saves_releases_the_lock_and_exits() {
     for terminal in [Terminal::NotControlling, Terminal::Controlling] {
         let what = format!("terminal closed in play ({terminal:?})");
-        let mut game = Game::launch("close-play", Phase::Play, terminal, Frames::ToTheTerminal, Parting::ToTheTerminal);
-        assert!(!game.save_path().exists(), "fixture: a new game has no save until it shuts down");
+        let mut game = Game::launch(
+            "close-play",
+            Phase::Play,
+            terminal,
+            Frames::ToTheTerminal,
+            Parting::ToTheTerminal,
+        );
+        assert!(
+            !game.save_path().exists(),
+            "fixture: a new game has no save until it shuts down"
+        );
         game.close_the_terminal();
         game.expect_a_clean_ending(&what);
     }
@@ -735,10 +814,19 @@ fn closing_the_terminal_in_play_saves_releases_the_lock_and_exits() {
 fn a_termination_signal_after_the_terminal_has_closed_still_ends_the_session() {
     for terminal in [Terminal::NotControlling, Terminal::Controlling] {
         for signal_first in [false, true] {
-            let order = if signal_first { "signal, then terminal closed" } else { "terminal closed, then signal" };
+            let order = if signal_first {
+                "signal, then terminal closed"
+            } else {
+                "terminal closed, then signal"
+            };
             let what = format!("{order}, in play ({terminal:?})");
-            let mut game =
-                Game::launch("close-term", Phase::Play, terminal, Frames::ToTheTerminal, Parting::ToTheTerminal);
+            let mut game = Game::launch(
+                "close-term",
+                Phase::Play,
+                terminal,
+                Frames::ToTheTerminal,
+                Parting::ToTheTerminal,
+            );
             if signal_first {
                 game.terminate();
                 game.close_the_terminal();
@@ -758,7 +846,13 @@ fn a_termination_signal_after_the_terminal_has_closed_still_ends_the_session() {
 fn the_quit_key_reaches_a_game_in_play() {
     for terminal in [Terminal::NotControlling, Terminal::Controlling] {
         let what = format!("q pressed in play ({terminal:?})");
-        let mut game = Game::launch("quit-play", Phase::Play, terminal, Frames::ToTheTerminal, Parting::ToAFile);
+        let mut game = Game::launch(
+            "quit-play",
+            Phase::Play,
+            terminal,
+            Frames::ToTheTerminal,
+            Parting::ToAFile,
+        );
         game.press(b"q");
         game.expect_a_clean_ending(&what);
     }
@@ -776,8 +870,13 @@ fn the_quit_key_reaches_a_game_in_play() {
 fn closing_the_terminal_while_waking_saves_where_the_wake_had_reached_and_exits() {
     for terminal in [Terminal::NotControlling, Terminal::Controlling] {
         let what = format!("terminal closed while waking ({terminal:?})");
-        let mut game =
-            Game::launch("close-waking", Phase::Waking, terminal, Frames::ToTheTerminal, Parting::ToTheTerminal);
+        let mut game = Game::launch(
+            "close-waking",
+            Phase::Waking,
+            terminal,
+            Frames::ToTheTerminal,
+            Parting::ToTheTerminal,
+        );
         game.close_the_terminal();
         game.expect_a_clean_ending(&what);
     }
@@ -789,7 +888,11 @@ fn closing_the_terminal_while_waking_saves_where_the_wake_had_reached_and_exits(
 #[test]
 fn a_termination_signal_and_a_lost_terminal_while_waking_are_one_shutdown() {
     for signal_first in [false, true] {
-        let order = if signal_first { "signal, then terminal closed" } else { "terminal closed, then signal" };
+        let order = if signal_first {
+            "signal, then terminal closed"
+        } else {
+            "terminal closed, then signal"
+        };
         let what = format!("{order}, while waking");
         let mut game = Game::launch(
             "close-term-waking",
@@ -822,7 +925,13 @@ fn a_termination_signal_and_a_lost_terminal_while_waking_are_one_shutdown() {
 fn a_waking_game_answers_its_quit_key() {
     for terminal in [Terminal::NotControlling, Terminal::Controlling] {
         let what = format!("q pressed while waking ({terminal:?})");
-        let mut game = Game::launch("quit-waking", Phase::Waking, terminal, Frames::ToTheTerminal, Parting::ToAFile);
+        let mut game = Game::launch(
+            "quit-waking",
+            Phase::Waking,
+            terminal,
+            Frames::ToTheTerminal,
+            Parting::ToAFile,
+        );
         game.press(b"q");
         game.expect_a_clean_ending(&what);
     }
@@ -840,7 +949,13 @@ fn a_waking_game_answers_its_quit_key() {
 fn a_termination_signal_ends_a_session_promptly_in_play_and_while_waking() {
     for phase in [Phase::Play, Phase::Waking] {
         let what = format!("SIGTERM with the terminal still there ({phase:?})");
-        let mut game = Game::launch("term", phase, Terminal::Controlling, Frames::ToTheTerminal, Parting::ToAFile);
+        let mut game = Game::launch(
+            "term",
+            phase,
+            Terminal::Controlling,
+            Frames::ToTheTerminal,
+            Parting::ToAFile,
+        );
         game.terminate();
         game.expect_a_clean_ending(&what);
     }
@@ -860,9 +975,19 @@ fn a_termination_signal_ends_a_session_promptly_in_play_and_while_waking() {
 fn a_screen_that_refuses_frames_ends_the_session_though_no_signal_is_sent() {
     for phase in [Phase::Play, Phase::Waking] {
         let what = format!("frames refused, terminal still there ({phase:?})");
-        let mut game = Game::launch("refused", phase, Terminal::Controlling, Frames::ToAPipe, Parting::ToAFile);
+        let mut game = Game::launch(
+            "refused",
+            phase,
+            Terminal::Controlling,
+            Frames::ToAPipe,
+            Parting::ToAFile,
+        );
         let raw = local_modes(game.master.as_ref().unwrap());
-        assert_eq!(raw, (false, false), "fixture: a running game holds its terminal in raw mode");
+        assert_eq!(
+            raw,
+            (false, false),
+            "fixture: a running game holds its terminal in raw mode"
+        );
 
         game.refuse_frames();
         game.expect_a_clean_ending(&what);
@@ -886,14 +1011,31 @@ fn the_restoration_is_attempted_once_though_the_terminal_has_gone() {
     const LEAVE: &[u8] = b"\x1b[?1049l";
     for phase in [Phase::Play, Phase::Waking] {
         let what = format!("terminal closed, frames still accepted ({phase:?})");
-        let mut game = Game::launch("restored-once", phase, Terminal::Controlling, Frames::ToAPipe, Parting::ToAFile);
-        let left_before = game.drawn.windows(LEAVE.len()).filter(|w| *w == LEAVE).count();
-        assert_eq!(left_before, 0, "fixture: a running game has not left the alternate screen");
+        let mut game = Game::launch(
+            "restored-once",
+            phase,
+            Terminal::Controlling,
+            Frames::ToAPipe,
+            Parting::ToAFile,
+        );
+        let left_before = game
+            .drawn
+            .windows(LEAVE.len())
+            .filter(|w| *w == LEAVE)
+            .count();
+        assert_eq!(
+            left_before, 0,
+            "fixture: a running game has not left the alternate screen"
+        );
 
         game.close_the_terminal();
         game.expect_a_clean_ending(&what);
 
-        let left = game.drawn.windows(LEAVE.len()).filter(|w| *w == LEAVE).count();
+        let left = game
+            .drawn
+            .windows(LEAVE.len())
+            .filter(|w| *w == LEAVE)
+            .count();
         assert_eq!(
             left, 1,
             "{what}: the shutdown should hand the screen back once — it left the alternate screen \
@@ -924,8 +1066,13 @@ fn a_shutdown_save_that_cannot_be_written_is_tried_once_and_the_session_still_en
     for phase in [Phase::Play, Phase::Waking] {
         for ending in [Ending::QuitKey, Ending::Signal, Ending::LostTerminal] {
             let what = format!("unwritable save, {ending:?}, {phase:?}");
-            let mut game =
-                Game::launch("unwritable", phase, Terminal::NotControlling, Frames::ToTheTerminal, Parting::ToAFile);
+            let mut game = Game::launch(
+                "unwritable",
+                phase,
+                Terminal::NotControlling,
+                Frames::ToTheTerminal,
+                Parting::ToAFile,
+            );
             game.make_the_save_unwritable();
             match ending {
                 Ending::QuitKey => game.press(b"q"),
@@ -936,7 +1083,10 @@ fn a_shutdown_save_that_cannot_be_written_is_tried_once_and_the_session_still_en
             game.expect_no_lock(&what);
 
             let stderr = game.stderr();
-            let named: Vec<&str> = stderr.lines().filter(|l| l.to_lowercase().contains("save")).collect();
+            let named: Vec<&str> = stderr
+                .lines()
+                .filter(|l| l.to_lowercase().contains("save"))
+                .collect();
             assert_eq!(
                 named.len(),
                 1,
@@ -960,8 +1110,13 @@ fn a_parting_line_with_no_terminal_left_to_print_it_on_is_not_an_error() {
     for phase in [Phase::Play, Phase::Waking] {
         for terminal in [Terminal::NotControlling, Terminal::Controlling] {
             let what = format!("unwritable save and a lost terminal ({phase:?}, {terminal:?})");
-            let mut game =
-                Game::launch("unsaid", phase, terminal, Frames::ToTheTerminal, Parting::ToTheTerminal);
+            let mut game = Game::launch(
+                "unsaid",
+                phase,
+                terminal,
+                Frames::ToTheTerminal,
+                Parting::ToTheTerminal,
+            );
             game.make_the_save_unwritable();
             game.close_the_terminal();
             game.expect_a_quits_exit(&what);
@@ -992,7 +1147,10 @@ struct ModeChange {
 /// The mouse modes and the alternate screen as the output sets and resets
 /// them, for a failure message: the cursor's showing and hiding left out.
 fn screen_and_mouse_modes(out: &[u8]) -> Vec<ModeChange> {
-    mode_changes(out).into_iter().filter(|c| c.mode != 25).collect()
+    mode_changes(out)
+        .into_iter()
+        .filter(|c| c.mode != 25)
+        .collect()
 }
 
 /// Every DEC private mode the output sets or resets, in the order written.
@@ -1009,7 +1167,11 @@ fn mode_changes(out: &[u8]) -> Vec<ModeChange> {
                 let params = std::str::from_utf8(&out[i + 3..j]).expect("digits and semicolons");
                 for p in params.split(';') {
                     if let Ok(mode) = p.parse() {
-                        changes.push(ModeChange { at: i, mode, on: out[j] == b'h' });
+                        changes.push(ModeChange {
+                            at: i,
+                            mode,
+                            on: out[j] == b'h',
+                        });
                     }
                 }
                 i = j + 1;
@@ -1042,7 +1204,10 @@ fn first_frame_finished(out: &[u8]) -> usize {
         .expect("the game entered the alternate screen")
         .at;
     entered
-        + out[entered..].windows(HIDE.len()).position(|w| w == HIDE).expect("the game finished a frame")
+        + out[entered..]
+            .windows(HIDE.len())
+            .position(|w| w == HIDE)
+            .expect("the game finished a frame")
 }
 
 /// At startup the game asked for normal tracking and the SGR encoding, each
@@ -1089,11 +1254,23 @@ fn expect_reporting_turned_on(out: &[u8], what: &str) {
 fn expect_reporting_turned_off(out: &[u8], from: usize, what: &str) {
     let changes = mode_changes(out);
     for mode in [NORMAL_TRACKING, SGR_ENCODING] {
-        let early: Vec<&ModeChange> = changes.iter().filter(|c| c.mode == mode && !c.on && c.at < from).collect();
-        assert!(early.is_empty(), "{what}: mode {mode} was turned off while the game was still running: {early:?}");
+        let early: Vec<&ModeChange> = changes
+            .iter()
+            .filter(|c| c.mode == mode && !c.on && c.at < from)
+            .collect();
+        assert!(
+            early.is_empty(),
+            "{what}: mode {mode} was turned off while the game was still running: {early:?}"
+        );
     }
     let after: Vec<&ModeChange> = changes.iter().filter(|c| c.at >= from).collect();
-    let off = |mode: u32| -> Vec<usize> { after.iter().filter(|c| c.mode == mode && !c.on).map(|c| c.at).collect() };
+    let off = |mode: u32| -> Vec<usize> {
+        after
+            .iter()
+            .filter(|c| c.mode == mode && !c.on)
+            .map(|c| c.at)
+            .collect()
+    };
     let sgr_off = off(SGR_ENCODING);
     let normal_off = off(NORMAL_TRACKING);
     assert_eq!(
@@ -1119,16 +1296,27 @@ fn expect_reporting_turned_off(out: &[u8], from: usize, what: &str) {
         normal_off[0] < left,
         "{what}: mouse reporting is turned off before the alternate screen is left, not after"
     );
-    let back_on: Vec<&&ModeChange> =
-        after.iter().filter(|c| c.on && (c.mode == NORMAL_TRACKING || c.mode == SGR_ENCODING)).collect();
-    assert!(back_on.is_empty(), "{what}: reporting was turned back on during the shutdown: {back_on:?}");
+    let back_on: Vec<&&ModeChange> = after
+        .iter()
+        .filter(|c| c.on && (c.mode == NORMAL_TRACKING || c.mode == SGR_ENCODING))
+        .collect();
+    assert!(
+        back_on.is_empty(),
+        "{what}: reporting was turned back on during the shutdown: {back_on:?}"
+    );
 }
 
 /// A report in the SGR encoding: `button` as the terminal numbers it (0 the
 /// left button, 64 a wheel step up, 65 a wheel step down), at the zero-based
 /// cell `(x, y)`, a press (`M`) or a release (`m`).
 fn sgr(button: u8, x: u16, y: u16, press: bool) -> Vec<u8> {
-    format!("\x1b[<{button};{};{}{}", x + 1, y + 1, if press { 'M' } else { 'm' }).into_bytes()
+    format!(
+        "\x1b[<{button};{};{}{}",
+        x + 1,
+        y + 1,
+        if press { 'M' } else { 'm' }
+    )
+    .into_bytes()
 }
 
 fn left_click(x: u16, y: u16) -> Vec<u8> {
@@ -1159,7 +1347,12 @@ struct Glass {
 
 impl Glass {
     fn of(out: &[u8], (w, h): (u16, u16)) -> Glass {
-        let mut g = Glass { w, h, cells: vec![' '; w as usize * h as usize], glyphs: Vec::new() };
+        let mut g = Glass {
+            w,
+            h,
+            cells: vec![' '; w as usize * h as usize],
+            glyphs: Vec::new(),
+        };
         let (mut x, mut y) = (0u16, 0u16);
         let mut i = 0;
         while i < out.len() {
@@ -1178,18 +1371,25 @@ impl Glass {
                         let Some(&fin) = out.get(j) else { break };
                         match fin {
                             b'H' | b'f' => {
-                                let mut ps = params.split(';').map(|p| p.parse::<u16>().unwrap_or(1).max(1));
+                                let mut ps = params
+                                    .split(';')
+                                    .map(|p| p.parse::<u16>().unwrap_or(1).max(1));
                                 y = ps.next().unwrap_or(1) - 1;
                                 x = ps.next().unwrap_or(1) - 1;
                             }
-                            b'J' if params == "2" || params == "3" => g.cells.iter_mut().for_each(|c| *c = ' '),
+                            b'J' if params == "2" || params == "3" => {
+                                g.cells.iter_mut().for_each(|c| *c = ' ')
+                            }
                             _ => {}
                         }
                         i = j + 1;
                     }
                     Some(b']') => {
                         let mut j = i + 2;
-                        while j < out.len() && out[j] != 0x07 && !(out[j] == 0x1b && out.get(j + 1) == Some(&b'\\')) {
+                        while j < out.len()
+                            && out[j] != 0x07
+                            && !(out[j] == 0x1b && out.get(j + 1) == Some(&b'\\'))
+                        {
                             j += 1;
                         }
                         i = j + if out.get(j) == Some(&0x07) { 1 } else { 2 };
@@ -1215,8 +1415,13 @@ impl Glass {
                 0xe0..=0xef => 3,
                 _ => 4,
             };
-            let Some(bytes) = out.get(i..i + len) else { break };
-            let ch = std::str::from_utf8(bytes).ok().and_then(|s| s.chars().next()).unwrap_or('?');
+            let Some(bytes) = out.get(i..i + len) else {
+                break;
+            };
+            let ch = std::str::from_utf8(bytes)
+                .ok()
+                .and_then(|s| s.chars().next())
+                .unwrap_or('?');
             if x < w && y < h {
                 g.cells[y as usize * w as usize + x as usize] = ch;
                 if ch == CURSOR_GLYPH {
@@ -1230,14 +1435,18 @@ impl Glass {
     }
 
     fn line(&self, y: u16) -> String {
-        self.cells[y as usize * self.w as usize..(y as usize + 1) * self.w as usize].iter().collect()
+        self.cells[y as usize * self.w as usize..(y as usize + 1) * self.w as usize]
+            .iter()
+            .collect()
     }
 
     /// Every cell now showing the cursor glyph.
     fn cursor_cells(&self) -> Vec<(u16, u16)> {
         (0..self.h)
             .flat_map(|y| (0..self.w).map(move |x| (x, y)))
-            .filter(|(x, y)| self.cells[*y as usize * self.w as usize + *x as usize] == CURSOR_GLYPH)
+            .filter(|(x, y)| {
+                self.cells[*y as usize * self.w as usize + *x as usize] == CURSOR_GLYPH
+            })
             .collect()
     }
 }
@@ -1255,8 +1464,14 @@ impl Game {
             let master = self.master.as_mut().expect("the terminal is still open");
             match master.write(&bytes[sent..]) {
                 Ok(n) => sent += n,
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::Interrupted => {
-                    assert!(Instant::now() < deadline, "the game stopped reading its terminal");
+                Err(e)
+                    if e.kind() == io::ErrorKind::WouldBlock
+                        || e.kind() == io::ErrorKind::Interrupted =>
+                {
+                    assert!(
+                        Instant::now() < deadline,
+                        "the game stopped reading its terminal"
+                    );
                     self.drain();
                     std::thread::sleep(Duration::from_millis(1));
                 }
@@ -1303,12 +1518,14 @@ impl Game {
             cells.len(),
             1,
             "{what}: fixture — the screen should show the cursor glyph in exactly one cell\n{}",
-            (0..glass.h).map(|y| glass.line(y)).collect::<Vec<_>>().join("\n")
+            (0..glass.h)
+                .map(|y| glass.line(y))
+                .collect::<Vec<_>>()
+                .join("\n")
         );
         cells[0]
     }
 }
-
 
 /// A launch of the game outside the `Game` harness, for launches that never
 /// draw a frame: its terminal's master side, where it has one, read while it
@@ -1322,7 +1539,13 @@ struct Bare {
 impl Bare {
     /// Launch with `home` as its home, in a session of its own with no
     /// controlling terminal, its standard streams as given.
-    fn spawn(home: &Path, stdin: Stdio, stdout: Stdio, stderr: Stdio, master: Option<File>) -> Bare {
+    fn spawn(
+        home: &Path,
+        stdin: Stdio,
+        stdout: Stdio,
+        stderr: Stdio,
+        master: Option<File>,
+    ) -> Bare {
         let mut command = Command::new(CLOWDER);
         command
             .env_clear()
@@ -1345,9 +1568,15 @@ impl Bare {
                 Ok(())
             });
         }
-        let child = command.spawn().unwrap_or_else(|e| panic!("spawning {CLOWDER}: {e}"));
+        let child = command
+            .spawn()
+            .unwrap_or_else(|e| panic!("spawning {CLOWDER}: {e}"));
         drop(command);
-        Bare { child, master, out: Vec::new() }
+        Bare {
+            child,
+            master,
+            out: Vec::new(),
+        }
     }
 
     /// Wait, reading the terminal all the while, for the launch to end.
@@ -1368,7 +1597,10 @@ impl Bare {
             if let Some(status) = self.child.try_wait().expect("polling the child") {
                 return status;
             }
-            assert!(Instant::now() < deadline, "{what}: the launch was still running {START_BUDGET:?} later");
+            assert!(
+                Instant::now() < deadline,
+                "{what}: the launch was still running {START_BUDGET:?} later"
+            );
             std::thread::sleep(Duration::from_millis(5));
         }
     }
@@ -1419,11 +1651,18 @@ fn first_text(out: &[u8]) -> Option<usize> {
 /// still reaches the game, in play and while waking.
 /// @spec TUI-RUN-060
 #[test]
-fn mouse_reporting_is_turned_on_at_startup_as_normal_tracking_in_the_sgr_encoding_and_nothing_else() {
+fn mouse_reporting_is_turned_on_at_startup_as_normal_tracking_in_the_sgr_encoding_and_nothing_else()
+{
     for phase in [Phase::Play, Phase::Waking] {
         for terminal in [Terminal::Controlling, Terminal::NotControlling] {
             let what = format!("startup ({phase:?}, {terminal:?})");
-            let mut game = Game::launch("mouse-on", phase, terminal, Frames::ToTheTerminal, Parting::ToAFile);
+            let mut game = Game::launch(
+                "mouse-on",
+                phase,
+                terminal,
+                Frames::ToTheTerminal,
+                Parting::ToAFile,
+            );
             expect_reporting_turned_on(&game.drawn, &what);
             game.press(b"q");
             game.expect_a_clean_ending(&what);
@@ -1436,7 +1675,13 @@ fn mouse_reporting_is_turned_on_at_startup_as_normal_tracking_in_the_sgr_encodin
 /// @spec TUI-RUN-060
 #[test]
 fn a_launch_that_refuses_to_start_never_turns_mouse_reporting_on() {
-    let mut holder = Game::launch("mouse-refused", Phase::Play, Terminal::Controlling, Frames::ToTheTerminal, Parting::ToAFile);
+    let mut holder = Game::launch(
+        "mouse-refused",
+        Phase::Play,
+        Terminal::Controlling,
+        Frames::ToTheTerminal,
+        Parting::ToAFile,
+    );
     let mut refused = {
         let _spawning = SPAWNING.lock().unwrap_or_else(|e| e.into_inner());
         let (master, term) = open_terminal();
@@ -1459,7 +1704,10 @@ fn a_launch_that_refuses_to_start_never_turns_mouse_reporting_on() {
         .into_iter()
         .filter(|c| c.on && (c.mode == NORMAL_TRACKING || c.mode == SGR_ENCODING))
         .collect();
-    assert!(asked.is_empty(), "a launch that refused to start turned mouse reporting on: {asked:?}");
+    assert!(
+        asked.is_empty(),
+        "a launch that refused to start turned mouse reporting on: {asked:?}"
+    );
     holder.press(b"q");
     holder.expect_a_clean_ending("the session holding the save");
 }
@@ -1480,7 +1728,13 @@ fn mouse_reporting_is_turned_off_before_the_screen_is_handed_back_on_every_way_o
     for phase in [Phase::Play, Phase::Waking] {
         for ending in [Ending::QuitKey, Ending::Signal] {
             let what = format!("{ending:?} ({phase:?})");
-            let mut game = Game::launch("mouse-off", phase, Terminal::Controlling, Frames::ToTheTerminal, Parting::ToAFile);
+            let mut game = Game::launch(
+                "mouse-off",
+                phase,
+                Terminal::Controlling,
+                Frames::ToTheTerminal,
+                Parting::ToAFile,
+            );
             let from = game.drawn.len();
             match ending {
                 Ending::QuitKey => game.press(b"q"),
@@ -1503,7 +1757,13 @@ fn mouse_reporting_is_turned_off_before_the_screen_is_handed_back_on_every_way_o
             // terminal: a closed one the game does not control, with frames
             // elsewhere, is not detected (Deferred 5 of the runtime LLD).
             let what = format!("the terminal closed ({phase:?}, {terminal:?})");
-            let mut game = Game::launch("mouse-off-lost", phase, terminal, Frames::ToAPipe, Parting::ToAFile);
+            let mut game = Game::launch(
+                "mouse-off-lost",
+                phase,
+                terminal,
+                Frames::ToAPipe,
+                Parting::ToAFile,
+            );
             let from = game.drawn.len();
             game.close_the_terminal();
             game.expect_a_clean_ending(&what);
@@ -1543,26 +1803,44 @@ fn where_raw_mode_cannot_be_entered_reporting_and_the_screen_are_turned_off_befo
     };
     let what = "raw mode cannot be entered";
     let status = bare.finish(what);
-    assert!(!status.success() && status.signal().is_none(), "{what}: the launch should refuse to start ({status})");
+    assert!(
+        !status.success() && status.signal().is_none(),
+        "{what}: the launch should refuse to start ({status})"
+    );
     let out = fs::read(&out_path).expect("reading the output");
     let said = first_text(&out).unwrap_or_else(|| panic!("{what}: the failure was never said"));
     let changes = mode_changes(&out);
-    let off_at = |mode: u32| changes.iter().find(|c| c.mode == mode && !c.on).map(|c| c.at);
-    let (sgr_off, normal_off, left) = (off_at(SGR_ENCODING), off_at(NORMAL_TRACKING), off_at(ALTERNATE_SCREEN));
+    let off_at = |mode: u32| {
+        changes
+            .iter()
+            .find(|c| c.mode == mode && !c.on)
+            .map(|c| c.at)
+    };
+    let (sgr_off, normal_off, left) = (
+        off_at(SGR_ENCODING),
+        off_at(NORMAL_TRACKING),
+        off_at(ALTERNATE_SCREEN),
+    );
     assert!(
         sgr_off.is_some() && normal_off.is_some() && left.is_some(),
         "{what}: entering failed partway, so reporting and the alternate screen are turned off \
-         before the launch refuses, however far entering got (mode changes: {:?})", screen_and_mouse_modes(&out)
+         before the launch refuses, however far entering got (mode changes: {:?})",
+        screen_and_mouse_modes(&out)
     );
     assert!(
         sgr_off < normal_off && normal_off < left && left < Some(said),
         "{what}: the SGR encoding, normal tracking, then the alternate screen are turned off, all \
-         before the failure is said (mode changes: {:?}, failure said at {said})", screen_and_mouse_modes(&out)
+         before the failure is said (mode changes: {:?}, failure said at {said})",
+        screen_and_mouse_modes(&out)
     );
-    let asked: Vec<&ModeChange> =
-        changes.iter().filter(|c| c.on && (c.mode == NORMAL_TRACKING || c.mode == SGR_ENCODING)).collect();
-    assert!(asked.is_empty(), "{what}: reporting was turned on though raw mode never was: {asked:?}");
-
+    let asked: Vec<&ModeChange> = changes
+        .iter()
+        .filter(|c| c.on && (c.mode == NORMAL_TRACKING || c.mode == SGR_ENCODING))
+        .collect();
+    assert!(
+        asked.is_empty(),
+        "{what}: reporting was turned on though raw mode never was: {asked:?}"
+    );
 }
 
 /// The alternate screen cannot be written — the launch's output refuses
@@ -1589,12 +1867,22 @@ fn where_the_alternate_screen_cannot_be_written_raw_mode_is_undone_before_the_re
     };
     let what = "the alternate screen cannot be written";
     let status = bare.finish(what);
-    assert!(!status.success() && status.signal().is_none(), "{what}: the launch should refuse to start ({status})");
     assert!(
-        !fs::read_to_string(home.path.join("stderr.txt")).unwrap_or_default().trim().is_empty(),
+        !status.success() && status.signal().is_none(),
+        "{what}: the launch should refuse to start ({status})"
+    );
+    assert!(
+        !fs::read_to_string(home.path.join("stderr.txt"))
+            .unwrap_or_default()
+            .trim()
+            .is_empty(),
         "{what}: the failure was never said"
     );
-    assert_eq!(local_modes(&master), (true, true), "{what}: the terminal was left in raw mode");
+    assert_eq!(
+        local_modes(&master),
+        (true, true),
+        "{what}: the terminal was left in raw mode"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1606,13 +1894,20 @@ fn where_the_alternate_screen_cannot_be_written_raw_mode_is_undone_before_the_re
 /// Esc, Tab and Shift-Tab, the arrows and the editing keys, and the function
 /// keys.
 fn every_key_but_quitting() -> Vec<Vec<u8>> {
-    let mut keys: Vec<Vec<u8>> = (0x20u8..0x7f).filter(|b| *b != b'q').map(|b| vec![b]).collect();
-    keys.extend((0x01u8..0x20).filter(|b| *b != 0x03 && *b != 0x1b).map(|b| vec![b]));
+    let mut keys: Vec<Vec<u8>> = (0x20u8..0x7f)
+        .filter(|b| *b != b'q')
+        .map(|b| vec![b])
+        .collect();
+    keys.extend(
+        (0x01u8..0x20)
+            .filter(|b| *b != 0x03 && *b != 0x1b)
+            .map(|b| vec![b]),
+    );
     keys.push(vec![0x7f]);
     for seq in [
-        "\x1b[A", "\x1b[B", "\x1b[C", "\x1b[D", "\x1b[Z", "\x1b[H", "\x1b[F", "\x1b[2~", "\x1b[3~", "\x1b[5~", "\x1b[6~",
-        "\x1bOP", "\x1bOQ", "\x1bOR", "\x1bOS", "\x1b[15~", "\x1b[17~", "\x1b[18~", "\x1b[19~", "\x1b[20~", "\x1b[21~",
-        "\x1b[23~", "\x1b[24~",
+        "\x1b[A", "\x1b[B", "\x1b[C", "\x1b[D", "\x1b[Z", "\x1b[H", "\x1b[F", "\x1b[2~", "\x1b[3~",
+        "\x1b[5~", "\x1b[6~", "\x1bOP", "\x1bOQ", "\x1bOR", "\x1bOS", "\x1b[15~", "\x1b[17~",
+        "\x1b[18~", "\x1b[19~", "\x1b[20~", "\x1b[21~", "\x1b[23~", "\x1b[24~",
     ] {
         keys.push(seq.as_bytes().to_vec());
     }
@@ -1628,7 +1923,13 @@ fn every_key_but_quitting() -> Vec<Vec<u8>> {
 fn no_key_turns_mouse_reporting_off_while_the_game_runs() {
     for phase in [Phase::Play, Phase::Waking] {
         let what = format!("every key pressed ({phase:?})");
-        let mut game = Game::launch("mouse-keys", phase, Terminal::Controlling, Frames::ToTheTerminal, Parting::ToAFile);
+        let mut game = Game::launch(
+            "mouse-keys",
+            phase,
+            Terminal::Controlling,
+            Frames::ToTheTerminal,
+            Parting::ToAFile,
+        );
         for key in every_key_but_quitting() {
             game.send(&key);
             std::thread::sleep(Duration::from_millis(15));
@@ -1686,17 +1987,30 @@ fn no_launch_option_turns_mouse_reporting_off_and_no_setting_is_stored() {
     ];
     for args in options {
         let what = format!("launched with {args:?}");
-        let mut game =
-            Game::launch_with("mouse-option", Phase::Play, Terminal::Controlling, Frames::ToTheTerminal, Parting::ToAFile, args);
+        let mut game = Game::launch_with(
+            "mouse-option",
+            Phase::Play,
+            Terminal::Controlling,
+            Frames::ToTheTerminal,
+            Parting::ToAFile,
+            args,
+        );
         expect_reporting_turned_on(&game.drawn, &what);
         game.press(b"q");
         game.expect_a_clean_ending(&what);
-        let save = game.save_path().strip_prefix(&game.home.path).unwrap().to_path_buf();
+        let save = game
+            .save_path()
+            .strip_prefix(&game.home.path)
+            .unwrap()
+            .to_path_buf();
         let stored: Vec<PathBuf> = files_beneath(&game.home.path)
             .into_iter()
             .filter(|p| *p != save && *p != Path::new("stderr.txt"))
             .collect();
-        assert!(stored.is_empty(), "{what}: the session left files beside its save: {stored:?}");
+        assert!(
+            stored.is_empty(),
+            "{what}: the session left files beside its save: {stored:?}"
+        );
     }
 }
 
@@ -1711,12 +2025,24 @@ fn no_launch_option_turns_mouse_reporting_off_and_no_setting_is_stored() {
 /// @spec TUI-RUN-065, TUI-RUN-060
 #[test]
 fn a_click_sent_as_an_sgr_report_moves_the_cursor_to_the_row_under_it() {
-    let mut game = Game::launch("mouse-click", Phase::Lively, Terminal::Controlling, Frames::ToTheTerminal, Parting::ToAFile);
+    let mut game = Game::launch(
+        "mouse-click",
+        Phase::Lively,
+        Terminal::Controlling,
+        Frames::ToTheTerminal,
+        Parting::ToAFile,
+    );
     let (x0, y0) = game.cursor_cell("the opening");
 
     game.send(&wheel_down_at(x0 + 4, y0));
-    let moved = game.wait_for(EXIT_BUDGET, |g| matches!(g.cursor_cells()[..], [(x, y)] if x == x0 && y > y0));
-    assert!(moved, "a wheel step down over the list did not move the cursor down a row");
+    let moved = game.wait_for(
+        EXIT_BUDGET,
+        |g| matches!(g.cursor_cells()[..], [(x, y)] if x == x0 && y > y0),
+    );
+    assert!(
+        moved,
+        "a wheel step down over the list did not move the cursor down a row"
+    );
     let (_, y1) = game.cursor_cell("after a wheel step down");
 
     game.send(&wheel_up_at(x0 + 4, y1));
@@ -1755,11 +2081,20 @@ fn a_click_sent_as_an_sgr_report_moves_the_cursor_to_the_row_under_it() {
 /// @spec TUI-RUN-064
 #[test]
 fn a_burst_of_wheel_reports_does_not_hold_back_the_key_behind_it() {
-    let mut game = Game::launch("mouse-burst", Phase::Lively, Terminal::Controlling, Frames::ToTheTerminal, Parting::ToAFile);
+    let mut game = Game::launch(
+        "mouse-burst",
+        Phase::Lively,
+        Terminal::Controlling,
+        Frames::ToTheTerminal,
+        Parting::ToAFile,
+    );
     let (x0, y0) = game.cursor_cell("the opening");
     game.send(&wheel_down_at(x0 + 4, y0));
     assert!(
-        game.wait_for(EXIT_BUDGET, |g| matches!(g.cursor_cells()[..], [(x, y)] if x == x0 && y > y0)),
+        game.wait_for(
+            EXIT_BUDGET,
+            |g| matches!(g.cursor_cells()[..], [(x, y)] if x == x0 && y > y0)
+        ),
         "fixture: a wheel step down over the list moves the cursor"
     );
     let (_, y1) = game.cursor_cell("after a wheel step down");
@@ -1783,8 +2118,12 @@ fn a_burst_of_wheel_reports_does_not_hold_back_the_key_behind_it() {
     game.send(&burst);
     game.expect_a_clean_ending("a burst of wheel reports, then the quit key");
 
-    let drawn_elsewhere: Vec<(usize, u16, u16)> =
-        game.glass().glyphs.into_iter().filter(|(at, x, y)| *at >= from && (*x, *y) != (x0, y0)).collect();
+    let drawn_elsewhere: Vec<(usize, u16, u16)> = game
+        .glass()
+        .glyphs
+        .into_iter()
+        .filter(|(at, x, y)| *at >= from && (*x, *y) != (x0, y0))
+        .collect();
     assert!(
         drawn_elsewhere.is_empty(),
         "the burst was split across frames: a frame was drawn with the cursor part-way down the \

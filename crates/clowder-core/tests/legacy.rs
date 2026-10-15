@@ -125,7 +125,9 @@ fn a_move_needs_seventy_one_kittens_and_archives_the_whole_roster() {
     let names: Vec<String> = s.kittens.iter().map(|k| k.name.clone()).collect();
     let album0 = s.family_album.len();
     let events = s.apply(Command::GreatMeadowMove).unwrap();
-    assert!(events.iter().any(|e| matches!(e, Event::MeadowMoved { .. })));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, Event::MeadowMoved { .. })));
     assert_eq!(
         s.family_album.len(),
         album0 + 71,
@@ -152,14 +154,20 @@ fn archived_kittens_are_slim_and_keep_name_trait_rank() {
     s.kittens[0].trait_id = KittenTrait::Bold;
     s.kittens[0].rank = 4;
     let events = s.apply(Command::GreatMeadowMove).unwrap();
-    assert!(events.iter().any(|e| matches!(e, Event::MeadowMoved { .. })));
+    assert!(events
+        .iter()
+        .any(|e| matches!(e, Event::MeadowMoved { .. })));
     let bold = s
         .family_album
         .iter()
         .find(|a| a.name == "Kit000")
         .expect("the senior kitten is archived");
     // ArchivedKitten is slim: name, trait, rank, generation — no skills/job.
-    assert_eq!(bold.trait_id, KittenTrait::Bold, "trait preserved in the Album");
+    assert_eq!(
+        bold.trait_id,
+        KittenTrait::Bold,
+        "trait preserved in the Album"
+    );
     assert_eq!(bold.rank, 4, "rank preserved in the Album");
 }
 
@@ -174,7 +182,10 @@ fn traveling_baskets_carry_the_most_senior_kittens_normalized() {
     let mut empty = meadow_with(404, 71);
     assert_eq!(empty.basket_capacity(), 0);
     empty.apply(Command::GreatMeadowMove).unwrap();
-    assert!(empty.kittens.is_empty(), "no baskets → the new meadow starts empty");
+    assert!(
+        empty.kittens.is_empty(),
+        "no baskets → the new meadow starts empty"
+    );
 
     // Traveling Baskets I + II + III raise capacity to 1 + 2 + 4 = 7.
     let mut s = meadow_with(405, 71);
@@ -201,7 +212,10 @@ fn traveling_baskets_carry_the_most_senior_kittens_normalized() {
     // Every carried kitten is normalized to the fresh meadow (no Second Wind).
     for k in &s.kittens {
         assert_eq!(k.location, Location::Home, "carried kittens arrive Home");
-        assert_eq!(k.arrived_day, 0, "arrived_day normalized to the fresh meadow");
+        assert_eq!(
+            k.arrived_day, 0,
+            "arrived_day normalized to the fresh meadow"
+        );
         assert_eq!(k.job, None, "job cleared without Second Wind");
         assert_eq!(k.job_seq, None, "job_seq cleared");
         assert_eq!(k.away_seq, None, "away_seq cleared");
@@ -210,7 +224,8 @@ fn traveling_baskets_carry_the_most_senior_kittens_normalized() {
     let veteran = s.kittens.iter().find(|k| k.name == "Kit000").unwrap();
     assert_eq!(veteran.rank, 3, "rank rides along in the basket");
     assert_eq!(
-        veteran.skills[JobId::Gardener as usize], 500.0,
+        veteran.skills[JobId::Gardener as usize],
+        500.0,
         "skills ride along in the basket"
     );
 }
@@ -228,7 +243,10 @@ fn second_wind_lets_exactly_one_carried_kitten_keep_its_job() {
     s.apply(Command::GreatMeadowMove).unwrap();
     assert_eq!(s.kittens.len(), 2);
     let with_job = s.kittens.iter().filter(|k| k.job.is_some()).count();
-    assert_eq!(with_job, 1, "Second Wind keeps exactly one carried kitten's job");
+    assert_eq!(
+        with_job, 1,
+        "Second Wind keeps exactly one carried kitten's job"
+    );
 }
 
 // =====================================================================
@@ -265,7 +283,12 @@ fn the_memory_chest_carries_a_fraction_of_each_stock() {
 
 /// A slim Album entry for pre-seeding the Family Album.
 fn archived(name: &str, generation: u32) -> ArchivedKitten {
-    ArchivedKitten { name: name.to_string(), trait_id: KittenTrait::None, rank: 0, generation }
+    ArchivedKitten {
+        name: name.to_string(),
+        trait_id: KittenTrait::None,
+        rank: 0,
+        generation,
+    }
 }
 
 // =====================================================================
@@ -318,20 +341,37 @@ fn a_move_preserves_the_legacy_set_and_resets_everything_else() {
     s.apply(Command::GreatMeadowMove).unwrap();
 
     // ---- Preserved ----
-    assert!(s.elder_wisdom >= 12.0, "Elder Wisdom persists (and grows) — never reset");
+    assert!(
+        s.elder_wisdom >= 12.0,
+        "Elder Wisdom persists (and grows) — never reset"
+    );
     assert!(s.warm_memories >= 34.0, "Warm Memories persists");
-    assert!((s.passed_down_wisdom - 5.0).abs() < TOL, "Passed-Down Wisdom persists");
+    assert!(
+        (s.passed_down_wisdom - 5.0).abs() < TOL,
+        "Passed-Down Wisdom persists"
+    );
     assert!((s.serenity - 7.0).abs() < TOL, "serenity persists");
     assert_eq!(s.enlightenment_tier, 3, "enlightenment tier persists");
     assert!(s.traditions.contains(&TraditionId::CarefulPacking));
-    assert!(s.traditions.contains(&TraditionId::WellRested), "traditions persist");
+    assert!(
+        s.traditions.contains(&TraditionId::WellRested),
+        "traditions persist"
+    );
     assert!(
         s.family_album.iter().any(|a| a.name == "Ancestor"),
         "the Family Album keeps its prior entries"
     );
-    assert_eq!(s.active_adventure, Some(AdventureId::LongWinter), "active adventure persists");
+    assert_eq!(
+        s.active_adventure,
+        Some(AdventureId::LongWinter),
+        "active adventure persists"
+    );
     assert_eq!(s.speed, 2.0, "the game-speed setting persists");
-    assert_eq!(s.generation, gen0 + 1, "generation increments by exactly one");
+    assert_eq!(
+        s.generation,
+        gen0 + 1,
+        "generation increments by exactly one"
+    );
 
     // ---- Reset to new-game defaults ----
     assert!(s.structures.iter().all(|&c| c == 0), "structures reset");
@@ -368,7 +408,8 @@ fn a_move_preserves_the_legacy_set_and_resets_everything_else() {
 fn a_move_never_reseeds_the_rng_and_rebuilds_the_reveal_worklists() {
     // The RNG continues across a Move — the Move itself draws no randomness.
     let mut s = meadow_with(410, 71);
-    s.revealed.insert(ContentId::Structure(StructureId::CatnipPatch));
+    s.revealed
+        .insert(ContentId::Structure(StructureId::CatnipPatch));
     let rng_before = s.rng.clone();
     s.apply(Command::GreatMeadowMove).unwrap();
     assert_eq!(s.rng, rng_before, "the RNG is carried over, never reseeded");
@@ -380,11 +421,18 @@ fn a_move_never_reseeds_the_rng_and_rebuilds_the_reveal_worklists() {
     let mut b = b;
     a.apply(Command::GreatMeadowMove).unwrap();
     b.apply(Command::GreatMeadowMove).unwrap();
-    assert_eq!(save_string(&a, 0), save_string(&b, 0), "the Move is deterministic");
+    assert_eq!(
+        save_string(&a, 0),
+        save_string(&b, 0),
+        "the Move is deterministic"
+    );
 
     // The reveal worklists are rebuilt from the emptied `revealed` set: a fresh
     // meadow still reveals content on a tick.
-    assert!(s.revealed.is_empty(), "the reveal set is emptied by the Move");
+    assert!(
+        s.revealed.is_empty(),
+        "the reveal set is emptied by the Move"
+    );
     give(&mut s, ResourceId::Catnip, 100.0);
     run_ticks(&mut s, 1);
     assert!(
@@ -411,8 +459,14 @@ fn a_move_never_decreases_a_legacy_and_the_album_only_grows() {
     let album0 = s.family_album.len();
     s.apply(Command::GreatMeadowMove).unwrap();
     assert!(s.elder_wisdom >= ew0, "Elder Wisdom never falls on a Move");
-    assert!(s.warm_memories >= wm0, "Warm Memories never falls on a Move");
-    assert!((s.passed_down_wisdom - pd0).abs() < TOL, "Passed-Down Wisdom untouched by a Move");
+    assert!(
+        s.warm_memories >= wm0,
+        "Warm Memories never falls on a Move"
+    );
+    assert!(
+        (s.passed_down_wisdom - pd0).abs() < TOL,
+        "Passed-Down Wisdom untouched by a Move"
+    );
     assert_eq!(s.family_album.len(), album0 + 71, "the Album grew");
 
     // Re-populate and Move again: still monotone, the Album still only grows.
@@ -423,9 +477,16 @@ fn a_move_never_decreases_a_legacy_and_the_album_only_grows() {
         s.kittens.push(kitten(&format!("New{i:03}"), i as u64));
     }
     s.apply(Command::GreatMeadowMove).unwrap();
-    assert!(s.elder_wisdom >= ew1, "legacies stay monotone across many Moves");
+    assert!(
+        s.elder_wisdom >= ew1,
+        "legacies stay monotone across many Moves"
+    );
     assert!(s.warm_memories >= wm1);
-    assert_eq!(s.family_album.len(), album1 + 71, "the Album is append-only");
+    assert_eq!(
+        s.family_album.len(),
+        album1 + 71,
+        "the Album is append-only"
+    );
 }
 
 // =====================================================================
@@ -440,13 +501,19 @@ fn a_move_adds_kittens_minus_seventy_plus_millennia_to_elder_wisdom() {
     let mut s = meadow_with(413, 71);
     let ew0 = s.elder_wisdom;
     s.apply(Command::GreatMeadowMove).unwrap();
-    assert!((s.elder_wisdom - (ew0 + 1.0)).abs() < TOL, "71 kittens → +1 Elder Wisdom");
+    assert!(
+        (s.elder_wisdom - (ew0 + 1.0)).abs() < TOL,
+        "71 kittens → +1 Elder Wisdom"
+    );
 
     // A bigger clowder: += max(0, k − 70).
     let mut big = meadow_with(414, 85);
     let ew0 = big.elder_wisdom;
     big.apply(Command::GreatMeadowMove).unwrap();
-    assert!((big.elder_wisdom - (ew0 + 15.0)).abs() < TOL, "85 kittens → +15 Elder Wisdom");
+    assert!(
+        (big.elder_wisdom - (ew0 + 15.0)).abs() < TOL,
+        "85 kittens → +15 Elder Wisdom"
+    );
 
     // The slow trickle: +1 per game-millennium (1000 game-years) since the last
     // Move. ticks = 2_000_000 → day 200_000 → year 2000 → 2 millennia. (ASSUMES
@@ -571,7 +638,10 @@ fn pass_it_down_converts_all_elder_wisdom_one_way() {
     s.passed_down_wisdom = 5.0;
     let events = s.apply(Command::PassItDown).unwrap();
     assert_eq!(s.elder_wisdom, 0.0, "all Elder Wisdom is converted");
-    assert!((s.passed_down_wisdom - 35.0).abs() < TOL, "…into Passed-Down Wisdom");
+    assert!(
+        (s.passed_down_wisdom - 35.0).abs() < TOL,
+        "…into Passed-Down Wisdom"
+    );
     assert!(events.iter().any(
         |e| matches!(e, Event::Passed { passed_down_wisdom } if (*passed_down_wisdom - 35.0).abs() < TOL)
     ));
@@ -616,7 +686,11 @@ fn passed_down_wisdom_is_a_second_capped_production_and_storage_pool() {
 // @spec SIM-MOVE-010
 #[test]
 fn the_traditions_table_is_thirty_in_shop_order_with_wisdom_costs() {
-    assert_eq!(TraditionId::ALL.len(), 30, "exactly 30 traditions, append-only");
+    assert_eq!(
+        TraditionId::ALL.len(),
+        30,
+        "exactly 30 traditions, append-only"
+    );
     // Shop-table ordering (indices are load-bearing: the Nine Lives ladder and
     // the derived nine_lives_ratio both count owned traditions).
     assert_eq!(TraditionId::CarefulPacking as usize, 0);
@@ -641,8 +715,13 @@ fn the_traditions_table_is_thirty_in_shop_order_with_wisdom_costs() {
 fn buy_tradition_spends_wisdom_once_each_and_survives_a_move() {
     let mut s = GameState::new(424);
     s.elder_wisdom = 10.0;
-    let events = s.apply(Command::BuyTradition(TraditionId::CarefulPacking)).unwrap();
-    assert!((s.elder_wisdom - 5.0).abs() < TOL, "Elder Wisdom is spent (cost 5)");
+    let events = s
+        .apply(Command::BuyTradition(TraditionId::CarefulPacking))
+        .unwrap();
+    assert!(
+        (s.elder_wisdom - 5.0).abs() < TOL,
+        "Elder Wisdom is spent (cost 5)"
+    );
     assert!(s.traditions.contains(&TraditionId::CarefulPacking));
     assert!(events
         .iter()
@@ -650,7 +729,8 @@ fn buy_tradition_spends_wisdom_once_each_and_survives_a_move() {
 
     // Once each: a second buy is refused and spends nothing more.
     assert_eq!(
-        s.apply(Command::BuyTradition(TraditionId::CarefulPacking)).unwrap_err(),
+        s.apply(Command::BuyTradition(TraditionId::CarefulPacking))
+            .unwrap_err(),
         CommandError::AlreadyResearched
     );
     assert!((s.elder_wisdom - 5.0).abs() < TOL, "no double-spend");
@@ -660,7 +740,8 @@ fn buy_tradition_spends_wisdom_once_each_and_survives_a_move() {
     poor.elder_wisdom = 2.0;
     let before = poor.clone();
     assert!(matches!(
-        poor.apply(Command::BuyTradition(TraditionId::CarefulPacking)).unwrap_err(),
+        poor.apply(Command::BuyTradition(TraditionId::CarefulPacking))
+            .unwrap_err(),
         CommandError::InsufficientResources { .. }
     ));
     assert_eq!(poor, before, "a rejected buy mutates nothing");
@@ -773,22 +854,32 @@ fn declare_adventure_arms_only_once_the_surface_is_unlocked() {
     // Before the surface is unlocked: Locked.
     let mut s = GameState::new(435);
     assert_eq!(
-        s.apply(Command::DeclareAdventure(Some(AdventureId::LongWinter))).unwrap_err(),
+        s.apply(Command::DeclareAdventure(Some(AdventureId::LongWinter)))
+            .unwrap_err(),
         CommandError::Locked
     );
 
     // The Adventurous Spirit tradition opens the surface.
     let mut s = GameState::new(436);
     s.traditions.insert(TraditionId::AdventurousSpirit);
-    let events = s.apply(Command::DeclareAdventure(Some(AdventureId::LongWinter))).unwrap();
+    let events = s
+        .apply(Command::DeclareAdventure(Some(AdventureId::LongWinter)))
+        .unwrap();
     assert_eq!(s.armed_adventure, Some(AdventureId::LongWinter));
     assert!(events.iter().any(|e| matches!(
         e,
-        Event::AdventureDeclared { id: Some(AdventureId::LongWinter) }
+        Event::AdventureDeclared {
+            id: Some(AdventureId::LongWinter)
+        }
     )));
     // Re-declaring replaces the armed adventure.
-    s.apply(Command::DeclareAdventure(Some(AdventureId::NapTime))).unwrap();
-    assert_eq!(s.armed_adventure, Some(AdventureId::NapTime), "re-declare replaces");
+    s.apply(Command::DeclareAdventure(Some(AdventureId::NapTime)))
+        .unwrap();
+    assert_eq!(
+        s.armed_adventure,
+        Some(AdventureId::NapTime),
+        "re-declare replaces"
+    );
     // None disarms.
     s.apply(Command::DeclareAdventure(None)).unwrap();
     assert_eq!(s.armed_adventure, None, "None disarms");
@@ -796,7 +887,8 @@ fn declare_adventure_arms_only_once_the_surface_is_unlocked() {
     // The same-named curiosity idea also opens the surface.
     let mut s = GameState::new(437);
     s.ideas.insert(IdeaId::AdventurousSpirit);
-    s.apply(Command::DeclareAdventure(Some(AdventureId::QuietRetreat))).unwrap();
+    s.apply(Command::DeclareAdventure(Some(AdventureId::QuietRetreat)))
+        .unwrap();
     assert_eq!(s.armed_adventure, Some(AdventureId::QuietRetreat));
 }
 
@@ -809,14 +901,27 @@ fn declare_adventure_arms_only_once_the_surface_is_unlocked() {
 fn a_move_activates_the_armed_adventure_and_long_winter_forces_winter() {
     let mut s = meadow_with(438, 71);
     s.traditions.insert(TraditionId::AdventurousSpirit);
-    s.apply(Command::DeclareAdventure(Some(AdventureId::LongWinter))).unwrap();
+    s.apply(Command::DeclareAdventure(Some(AdventureId::LongWinter)))
+        .unwrap();
     s.apply(Command::GreatMeadowMove).unwrap();
-    assert_eq!(s.active_adventure, Some(AdventureId::LongWinter), "armed → active");
+    assert_eq!(
+        s.active_adventure,
+        Some(AdventureId::LongWinter),
+        "armed → active"
+    );
     assert_eq!(s.armed_adventure, None, "the armed slot is cleared");
     // Long Winter forces season() to Winter regardless of the tick counter.
-    assert_eq!(s.season(), Season::Winter, "a fresh (Spring) meadow reads Winter");
+    assert_eq!(
+        s.season(),
+        Season::Winter,
+        "a fresh (Spring) meadow reads Winter"
+    );
     s.ticks = 300; // day 30 → would be Summer
-    assert_eq!(s.season(), Season::Winter, "…still Winter, whatever the ticks say");
+    assert_eq!(
+        s.season(),
+        Season::Winter,
+        "…still Winter, whatever the ticks say"
+    );
 }
 
 // @spec SIM-ADV-002
@@ -853,11 +958,16 @@ fn silent_sun_and_quiet_retreat_remove_options() {
     let mut s = GameState::new(440);
     s.active_adventure = Some(AdventureId::SilentSun);
     give(&mut s, ResourceId::Warmth, 100.0);
-    assert_eq!(s.apply(Command::Bask).unwrap_err(), CommandError::Locked, "Bask is Locked");
+    assert_eq!(
+        s.apply(Command::Bask).unwrap_err(),
+        CommandError::Locked,
+        "Bask is Locked"
+    );
     s.peak_devotion = 500.0; // gate met, so only the twist can block the rite
     give(&mut s, ResourceId::Shinies, 500.0);
     assert_eq!(
-        s.apply(Command::BuyRite(RiteId::MorningStretch)).unwrap_err(),
+        s.apply(Command::BuyRite(RiteId::MorningStretch))
+            .unwrap_err(),
         CommandError::Locked,
         "BuyRite is Locked under Silent Sun"
     );
@@ -869,7 +979,10 @@ fn silent_sun_and_quiet_retreat_remove_options() {
     give(&mut s, ResourceId::Charm, 1500.0);
     give(&mut s, ResourceId::Quills, 40.0);
     s.active_adventure = Some(AdventureId::QuietRetreat);
-    assert_eq!(s.apply(Command::HostJamboree).unwrap_err(), CommandError::Locked);
+    assert_eq!(
+        s.apply(Command::HostJamboree).unwrap_err(),
+        CommandError::Locked
+    );
 }
 
 // @spec SIM-ADV-002
@@ -883,16 +996,23 @@ fn gentle_paws_zeroes_pounce_yields() {
     let ret = events
         .iter()
         .find_map(|e| match e {
-            Event::PounceReturned { feathers, bells, shinies, unicorns, .. } => {
-                Some((*feathers, *bells, *shinies, *unicorns))
-            }
+            Event::PounceReturned {
+                feathers,
+                bells,
+                shinies,
+                unicorns,
+                ..
+            } => Some((*feathers, *bells, *shinies, *unicorns)),
             _ => None,
         })
         .expect("a pounce returns");
     assert!(ret.0.abs() < TOL, "no feathers");
     assert!(ret.1.abs() < TOL, "no bells");
     assert!(ret.2.abs() < TOL, "no shinies");
-    assert_eq!(ret.3, 0, "no unicorns — pounces yield nothing under Gentle Paws");
+    assert_eq!(
+        ret.3, 0,
+        "no unicorns — pounces yield nothing under Gentle Paws"
+    );
 }
 
 // =====================================================================
@@ -913,7 +1033,9 @@ fn seven_adventures_are_defined_and_no_twist_deletes_the_roster() {
     plain.traditions.insert(TraditionId::TravelingBasketsIII); // capacity 4
     plain.traditions.insert(TraditionId::AdventurousSpirit);
     let mut twisted = plain.clone();
-    twisted.apply(Command::DeclareAdventure(Some(AdventureId::LongWinter))).unwrap();
+    twisted
+        .apply(Command::DeclareAdventure(Some(AdventureId::LongWinter)))
+        .unwrap();
     plain.apply(Command::GreatMeadowMove).unwrap();
     twisted.apply(Command::GreatMeadowMove).unwrap();
     let plain_roster: Vec<String> = plain.kittens.iter().map(|k| k.name.clone()).collect();
@@ -936,16 +1058,22 @@ fn an_active_adventure_completes_when_its_goal_is_met() {
     let mut s = GameState::new(444);
     s.active_adventure = Some(AdventureId::NapTime);
     assert_eq!(s.adventure_completions[AdventureId::NapTime as usize], 0);
-    assert!((s.effect(Effect::MasterSkillMultiplier) - 0.0).abs() < TOL, "no reward yet");
+    assert!(
+        (s.effect(Effect::MasterSkillMultiplier) - 0.0).abs() < TOL,
+        "no reward yet"
+    );
     grant(&mut s, StructureId::YarnComputer, 1); // the goal is met
     let events = run_ticks(&mut s, 15); // cross a day boundary
     assert_eq!(
-        s.adventure_completions[AdventureId::NapTime as usize], 1,
+        s.adventure_completions[AdventureId::NapTime as usize],
+        1,
         "the goal is completed exactly once"
     );
     assert!(events.iter().any(|e| matches!(
         e,
-        Event::AdventureCompleted { id: AdventureId::NapTime }
+        Event::AdventureCompleted {
+            id: AdventureId::NapTime
+        }
     )));
     // The reward pool grows and flows through the effect system (+0.2 per run).
     assert!(
@@ -967,11 +1095,16 @@ fn a_never_completed_adventure_carries_no_penalty() {
     let roster0 = s.kittens.len();
     run_ticks(&mut s, 30);
     assert_eq!(
-        s.adventure_completions[AdventureId::QuietRetreat as usize], 0,
+        s.adventure_completions[AdventureId::QuietRetreat as usize],
+        0,
         "an unmet goal never completes"
     );
     assert_eq!(s.kittens.len(), roster0, "no penalty: the roster is intact");
-    assert_eq!(s.active_adventure, Some(AdventureId::QuietRetreat), "it just stays active");
+    assert_eq!(
+        s.active_adventure,
+        Some(AdventureId::QuietRetreat),
+        "it just stays active"
+    );
 }
 
 // @spec SIM-ADV-004
@@ -993,7 +1126,8 @@ fn tidy_meadow_completes_after_a_full_year_of_zero_mess() {
     messy.mess = 100_000.0;
     run_ticks(&mut messy, 1010);
     assert_eq!(
-        messy.adventure_completions[AdventureId::TidyMeadow as usize], 0,
+        messy.adventure_completions[AdventureId::TidyMeadow as usize],
+        0,
         "a year that never reached zero mess does not complete"
     );
 }
@@ -1020,9 +1154,14 @@ fn adventure_rewards_are_applied_through_effects_and_survive_a_move() {
     }
     s.apply(Command::GreatMeadowMove).unwrap();
     assert_eq!(s.active_adventure, None, "nothing armed → no active twist");
-    assert_eq!(s.structures[StructureId::YarnComputer.ix()], 0, "structures reset");
     assert_eq!(
-        s.adventure_completions[AdventureId::NapTime as usize], 1,
+        s.structures[StructureId::YarnComputer.ix()],
+        0,
+        "structures reset"
+    );
+    assert_eq!(
+        s.adventure_completions[AdventureId::NapTime as usize],
+        1,
         "completion counts persist across a Move"
     );
     assert!(
@@ -1054,14 +1193,20 @@ fn quiet_retreat_reward_measurably_raises_spring_catnip() {
     let b = base.stock(ResourceId::Catnip);
     let r = rewarded.stock(ResourceId::Catnip);
     assert!(b > 0.0, "the patch produced catnip");
-    assert!((r - b * 1.05).abs() < TOL, "Quiet Retreat adds +5% spring catnip, got {r} vs {b}");
+    assert!(
+        (r - b * 1.05).abs() < TOL,
+        "Quiet Retreat adds +5% spring catnip, got {r} vs {b}"
+    );
 
     // A second completion stacks (still under the LDR cap): strictly more.
     let mut twice = rewarded.clone();
     twice.adventure_rewards[AdventureId::QuietRetreat as usize] = 0.10;
     twice.resources[ResourceId::Catnip.ix()] = 0.0;
     run_ticks(&mut twice, 1);
-    assert!(twice.stock(ResourceId::Catnip) > r, "rewards stack across completions");
+    assert!(
+        twice.stock(ResourceId::Catnip) > r,
+        "rewards stack across completions"
+    );
 
     // Out of season the spring reward does nothing: winter catnip is unchanged.
     let mut winter_base = GameState::new(461);
@@ -1114,7 +1259,10 @@ fn frugal_meadow_reward_lowers_energy_and_its_twist_raises_it() {
     // The reward (−2% per completion, a NEGATIVE ratio, LDR-capped) lowers the
     // draw. One completion adds reward_per (−0.02) to the pool.
     let reward_per = content::adventure_def(AdventureId::FrugalMeadow).reward_per;
-    assert!(reward_per < 0.0, "the Frugal Meadow reward is a negative ratio");
+    assert!(
+        reward_per < 0.0,
+        "the Frugal Meadow reward is a negative ratio"
+    );
     let mut rewarded = base.clone();
     rewarded.adventure_rewards[AdventureId::FrugalMeadow as usize] = reward_per;
     let reward_delta = -limited_dr(reward_per.abs(), 0.02); // signed, LDR-capped
@@ -1137,8 +1285,7 @@ fn frugal_meadow_reward_lowers_energy_and_its_twist_raises_it() {
     both.active_adventure = Some(AdventureId::FrugalMeadow);
     both.adventure_rewards[AdventureId::FrugalMeadow as usize] = reward_per;
     assert!(
-        (both.energy_consumption()
-            - draw * (1.0 + content::FRUGAL_MEADOW_TWIST + reward_delta))
+        (both.energy_consumption() - draw * (1.0 + content::FRUGAL_MEADOW_TWIST + reward_delta))
             .abs()
             < TOL,
         "twist and reward flow through one summed EnergyConsumptionRatio key"
@@ -1167,7 +1314,10 @@ fn nap_time_reward_lifts_only_the_master_tier_yield() {
     assert!(b > 0.0);
     // The master tier's +18.75% becomes 0.1875 × (1 + 0.2); lower tiers untouched.
     let expected = (1.0 + 0.1875 * 1.2) / (1.0 + 0.1875);
-    assert!((r / b - expected).abs() < 1e-9, "Nap Time lifts the master-tier yield");
+    assert!(
+        (r / b - expected).abs() < 1e-9,
+        "Nap Time lifts the master-tier yield"
+    );
 
     // A non-master worker (5000 XP → +12.5% tier) is unchanged by the reward.
     let mut jr_base = GameState::new(465);
@@ -1193,7 +1343,10 @@ fn silent_sun_reward_now_flows_through_the_long_sun_cap_key() {
     // The Silent Sun reward was mapped to an unread key; it now raises the Long
     // Sun cap through the real LongSunCapBonus effect.
     let mut s = GameState::new(466);
-    assert!((s.effect(Effect::LongSunCapBonus) - 0.0).abs() < TOL, "no reward yet");
+    assert!(
+        (s.effect(Effect::LongSunCapBonus) - 0.0).abs() < TOL,
+        "no reward yet"
+    );
     s.adventure_completions[AdventureId::SilentSun as usize] = 1;
     s.adventure_rewards[AdventureId::SilentSun as usize] = 0.10;
     assert!(
@@ -1308,10 +1461,24 @@ fn a_played_and_moved_state_round_trips_losslessly() {
     // now == saved_at → zero catch-up ticks, so the state persists verbatim.
     let json = save_string(&s, 900_000);
     let st = load_string(&json, 900_000).unwrap().state;
-    assert_eq!(save_string(&st, 900_000), json, "save → load → save is byte-stable");
-    assert_eq!(st.family_album.len(), s.family_album.len(), "the Album survives the save");
-    assert!(st.family_album.iter().any(|a| a.name == "Forebear"), "ancestors persist");
-    assert!((st.elder_wisdom - s.elder_wisdom).abs() < TOL, "Elder Wisdom persists");
+    assert_eq!(
+        save_string(&st, 900_000),
+        json,
+        "save → load → save is byte-stable"
+    );
+    assert_eq!(
+        st.family_album.len(),
+        s.family_album.len(),
+        "the Album survives the save"
+    );
+    assert!(
+        st.family_album.iter().any(|a| a.name == "Forebear"),
+        "ancestors persist"
+    );
+    assert!(
+        (st.elder_wisdom - s.elder_wisdom).abs() < TOL,
+        "Elder Wisdom persists"
+    );
     assert_eq!(st.generation, s.generation, "generation persists");
     assert!(st.traditions.contains(&TraditionId::TravelingBasketsI));
 }

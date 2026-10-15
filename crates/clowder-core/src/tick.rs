@@ -1,7 +1,8 @@
 use crate::content;
 use crate::events::Event;
 use crate::state::{
-    season_of_day, AdventureId, GameState, IdeaId, JobId, Location, ResourceId, StructureId, EPSILON,
+    season_of_day, AdventureId, GameState, IdeaId, JobId, Location, ResourceId, StructureId,
+    EPSILON,
 };
 
 impl GameState {
@@ -94,8 +95,7 @@ impl GameState {
         // @spec SIM-KIT-013
         self.grumpy = shortfall;
         // @spec SIM-ECO-037
-        self.mess =
-            (self.mess + mess_accrual - content::MESS_DISSIPATION * self.mess).max(0.0);
+        self.mess = (self.mess + mess_accrual - content::MESS_DISSIPATION * self.mess).max(0.0);
         // Stirred dreams cool passively each tick (a nap-cadence brake, never a
         // loss), flooring at zero; free when the dream-space is already cool.
         // @spec SIM-DREAM-003
@@ -231,7 +231,9 @@ impl GameState {
                 let kitten = &mut self.kittens[ix];
                 kitten.location = Location::Home;
                 kitten.away_seq = None;
-                events.push(Event::KittenReturned { name: kitten.name.clone() });
+                events.push(Event::KittenReturned {
+                    name: kitten.name.clone(),
+                });
             }
         }
 
@@ -252,14 +254,16 @@ impl GameState {
                 let kitten = &mut self.kittens[ix];
                 kitten.location = Location::NeighborsYard;
                 kitten.away_seq = Some(seq);
-                events.push(Event::KittenWanderedOff { name: kitten.name.clone() });
+                events.push(Event::KittenWanderedOff {
+                    name: kitten.name.clone(),
+                });
             }
         }
 
         // (d) Arrival check.
         // @spec SIM-KIT-003, SIM-KIT-005, SIM-KIT-007
-        let eligible =
-            self.free_slots() >= 1 && self.stock(ResourceId::Catnip) + EPSILON >= content::ARRIVAL_MIN_CATNIP;
+        let eligible = self.free_slots() >= 1
+            && self.stock(ResourceId::Catnip) + EPSILON >= content::ARRIVAL_MIN_CATNIP;
         if eligible {
             // Pity forces success without an RNG draw. @spec SIM-ENG-018
             let success = self.pity >= content::PITY_THRESHOLD || {
@@ -270,8 +274,8 @@ impl GameState {
                 let name = self.draw_name();
                 // The trait draw follows the name draw in the fixed schedule.
                 // @spec SIM-KIT-023, SIM-ENG-018
-                let trait_id =
-                    crate::state::KittenTrait::ALL[self.rng.index(crate::state::KittenTrait::ALL.len())];
+                let trait_id = crate::state::KittenTrait::ALL
+                    [self.rng.index(crate::state::KittenTrait::ALL.len())];
                 self.kittens.push(crate::state::Kitten {
                     name: name.clone(),
                     job: None,
@@ -306,7 +310,9 @@ impl GameState {
             // loom woven; once lit it never clears. @spec SIM-DREAM-007
             if !self.distant_dawn
                 && self.year() >= content::DISTANT_DAWN_YEAR
-                && self.dream_looms.contains(&crate::state::DreamLoomId::DistantDawn)
+                && self
+                    .dream_looms
+                    .contains(&crate::state::DreamLoomId::DistantDawn)
             {
                 self.distant_dawn = true;
                 events.push(Event::DistantDawn);
@@ -364,8 +370,8 @@ impl GameState {
         if cogworks == 0 {
             return;
         }
-        let share = (content::COGWORKS_CONVERT_PER * cogworks as f64)
-            .min(content::COGWORKS_CONVERT_MAX);
+        let share =
+            (content::COGWORKS_CONVERT_PER * cogworks as f64).min(content::COGWORKS_CONVERT_MAX);
         for (raw, craft) in content::COGWORKS_AUTOCRAFT {
             if !self.craft_unlocked(craft) {
                 continue;
@@ -416,8 +422,11 @@ impl GameState {
         // Each layer is 1.0 (skipped) on the common hot path.
         // @spec SIM-ENG-021, SIM-MOVE-007, SIM-SUN-004
         let global_layer = 1.0 + self.effect(crate::effects::Effect::GlobalProductionRatio);
-        let long_sun_layer =
-            if self.rites.is_empty() { 1.0 } else { 1.0 + self.long_sun_bonus() };
+        let long_sun_layer = if self.rites.is_empty() {
+            1.0
+        } else {
+            1.0 + self.long_sun_bonus()
+        };
         let wisdom_layer = if self.elder_wisdom > 0.0 || self.passed_down_wisdom > 0.0 {
             // The Distant Dawn era lifts the Passed-Down cap +100% → +400%.
             // @spec SIM-MOVE-009, SIM-DREAM-007
@@ -435,14 +444,16 @@ impl GameState {
         // reduced transfer, times its own per-source ratio. Computed lazily on
         // the first outdoor structure with raw output — free (no scan, no effect
         // sum) until then, the outpost-free hot path. @spec SIM-SKY-004, SIM-ENG-021
-        let outdoor_raw_mult =
-            1.0 + (combined_layers - 1.0) * deficit * self.outdoor_transfer();
+        let outdoor_raw_mult = 1.0 + (combined_layers - 1.0) * deficit * self.outdoor_transfer();
         let mut outdoor_ratio: Option<f64> = None;
         // Adventure twists on production: Nap Time halves job (kitten) output;
         // Tidy Meadow raises mess accrual. Both 1.0 with no active adventure.
         // @spec SIM-ADV-002
-        let job_twist =
-            if self.active_adventure == Some(AdventureId::NapTime) { 0.5 } else { 1.0 };
+        let job_twist = if self.active_adventure == Some(AdventureId::NapTime) {
+            0.5
+        } else {
+            1.0
+        };
         let tidy_mult = if self.active_adventure == Some(AdventureId::TidyMeadow) {
             content::TIDY_MESS_MULT
         } else {
@@ -517,8 +528,8 @@ impl GameState {
                 // Per-season, per-resource Adventure reward (Quiet Retreat +spring
                 // catnip, Long Winter +winter catnip). @spec SIM-ADV-005
                 if season_reward {
-                    flow *= 1.0
-                        + self.effect(crate::effects::Effect::SeasonResourceRatio(season, *r));
+                    flow *=
+                        1.0 + self.effect(crate::effects::Effect::SeasonResourceRatio(season, *r));
                 }
                 self.resources[r.ix()] += flow;
             }
@@ -608,9 +619,11 @@ impl GameState {
         // Grumpiness slows paws, never learning; loafing and Away kittens
         // neither accrue nor decay.
         // @spec SIM-KIT-019
-        let xp_gain = content::SKILL_XP_PER_TICK
-            * (1.0 + self.effect(crate::effects::Effect::SkillXpRatio));
-        let decay_removed = self.refinements.contains(&crate::state::RefinementId::GroupLessons);
+        let xp_gain =
+            content::SKILL_XP_PER_TICK * (1.0 + self.effect(crate::effects::Effect::SkillXpRatio));
+        let decay_removed = self
+            .refinements
+            .contains(&crate::state::RefinementId::GroupLessons);
         for k in &mut self.kittens {
             if k.location != Location::Home {
                 continue;
@@ -654,8 +667,11 @@ impl GameState {
                     * (def.tier as f64 - (k.rank as f64 + 1.0)).max(0.0))
             .max(content::TINKER_EFFECTIVENESS_FLOOR);
             let rate = content::TINKER_BATCHES_PER_TICK * speed * effectiveness;
-            let demands: Vec<(ResourceId, f64)> =
-                def.inputs.iter().map(|(r, amount)| (*r, amount * rate)).collect();
+            let demands: Vec<(ResourceId, f64)> = def
+                .inputs
+                .iter()
+                .map(|(r, amount)| (*r, amount * rate))
+                .collect();
             let fraction = self.throttle_fraction(&demands);
             if fraction <= 0.0 {
                 continue; // a starved Tinkerer idles quietly, still bound
@@ -742,7 +758,11 @@ impl GameState {
         if self.deja_vu_until > self.ticks {
             return false;
         }
-        let home = self.kittens.iter().filter(|k| k.location == Location::Home).count();
+        let home = self
+            .kittens
+            .iter()
+            .filter(|k| k.location == Location::Home)
+            .count();
         if home == 0 {
             return false;
         }
@@ -761,16 +781,17 @@ impl GameState {
         // by an active jamboree (celebrations consume), floored at zero.
         // An empty shelf drains nothing — skip the effect sum entirely.
         // @spec SIM-ECO-026, SIM-KIT-025
-        if content::LUXURY_DRAINS.iter().any(|(r, _)| self.resources[r.ix()] > 0.0) {
+        if content::LUXURY_DRAINS
+            .iter()
+            .any(|(r, _)| self.resources[r.ix()] > 0.0)
+        {
             let jamboree = if self.jamboree_active() {
                 content::JAMBOREE_LUXURY_DEMAND
             } else {
                 0.0
             };
-            let scale = (1.0
-                + self.effect(crate::effects::Effect::LuxuryDemandRatio)
-                + jamboree)
-                .max(0.0);
+            let scale =
+                (1.0 + self.effect(crate::effects::Effect::LuxuryDemandRatio) + jamboree).max(0.0);
             for (r, per_kitten) in content::LUXURY_DRAINS {
                 let ix = r.ix();
                 let drain = per_kitten * home as f64 * scale;
@@ -814,7 +835,9 @@ impl GameState {
             // extends one past the arithmetic end for exactly `duration`
             // boosted production ticks. @spec SIM-ENG-012
             self.zoomies_until = self.ticks + duration + 1;
-            events.push(Event::ZoomiesStarted { until_tick: self.zoomies_until });
+            events.push(Event::ZoomiesStarted {
+                until_tick: self.zoomies_until,
+            });
         }
 
         // @spec SIM-ENG-014
@@ -868,8 +891,7 @@ impl GameState {
         // consumption and gathers reverie (a deterministic RNG draw).
         // @spec SIM-DREAM-004, SIM-ENG-018
         if self.day().is_multiple_of(content::DAYS_PER_SEASON)
-            && (self.structures[StructureId::MemoryChest.ix()] > 0
-                || !self.dream_looms.is_empty())
+            && (self.structures[StructureId::MemoryChest.ix()] > 0 || !self.dream_looms.is_empty())
         {
             let chance = self.effect(crate::effects::Effect::DejaVuChance);
             if chance > 0.0 && self.rng.chance(chance) {
@@ -996,8 +1018,19 @@ impl GameState {
 
 fn roman(n: u32) -> String {
     const VALUES: [(u32, &str); 13] = [
-        (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"),
-        (50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"),
+        (1000, "M"),
+        (900, "CM"),
+        (500, "D"),
+        (400, "CD"),
+        (100, "C"),
+        (90, "XC"),
+        (50, "L"),
+        (40, "XL"),
+        (10, "X"),
+        (9, "IX"),
+        (5, "V"),
+        (4, "IV"),
+        (1, "I"),
     ];
     let mut n = n;
     let mut out = String::new();

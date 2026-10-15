@@ -61,7 +61,11 @@ const NARROW: [(u16, u16); 3] = [(80, 24), (99, 24), (99, 40)];
 
 /// Wide enough for the pane layout, and tall enough that no list here scrolls.
 fn tall(state: &GameState) -> (u16, u16) {
-    let longest = Section::ALL.iter().map(|s| rows(state, *s).len()).max().unwrap_or(0);
+    let longest = Section::ALL
+        .iter()
+        .map(|s| rows(state, *s).len())
+        .max()
+        .unwrap_or(0);
     (150, (longest + 40).min(u16::MAX as usize) as u16)
 }
 
@@ -129,10 +133,20 @@ fn meadow() -> GameState {
     s.stirred_dreams = 0.0;
 
     assert_eq!(s.year(), YEAR, "fixture: the calendar year");
-    assert_eq!(s.kittens.len(), HOME + AWAY, "fixture: the clowder, away kittens included");
+    assert_eq!(
+        s.kittens.len(),
+        HOME + AWAY,
+        "fixture: the clowder, away kittens included"
+    );
     assert_eq!(s.basket_capacity(), 7, "fixture: the basket's room");
-    assert!((s.memory_chest_ratio() - 0.06).abs() < 1e-9, "fixture: the chest's share");
-    assert!(s.clone().apply(Command::GreatMeadowMove).is_ok(), "fixture: a Move is accepted");
+    assert!(
+        (s.memory_chest_ratio() - 0.06).abs() < 1e-9,
+        "fixture: the chest's share"
+    );
+    assert!(
+        s.clone().apply(Command::GreatMeadowMove).is_ok(),
+        "fixture: a Move is accepted"
+    );
     s
 }
 
@@ -145,11 +159,18 @@ fn find(state: &GameState, section: Section, pred: impl Fn(&Command) -> bool) ->
         .into_iter()
         .find(|r| matches!(&r.kind, RowKind::Act { command, .. } if pred(command)))
         .map(|r| r.key)
-        .unwrap_or_else(|| panic!("fixture: no row in {} offers the wanted command", section.title()))
+        .unwrap_or_else(|| {
+            panic!(
+                "fixture: no row in {} offers the wanted command",
+                section.title()
+            )
+        })
 }
 
 fn move_key(state: &GameState) -> RowKey {
-    find(state, Section::Legacy, |c| matches!(c, Command::GreatMeadowMove))
+    find(state, Section::Legacy, |c| {
+        matches!(c, Command::GreatMeadowMove)
+    })
 }
 
 fn pass_key(state: &GameState) -> RowKey {
@@ -165,7 +186,10 @@ fn rule_key(state: &GameState, rule: RuleId) -> RowKey {
 }
 
 fn focused(section: Section, key: &RowKey) -> ViewState {
-    let mut v = ViewState { section: Some(section), ..Default::default() };
+    let mut v = ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     v.focus[section.index()] = Some(key.clone());
     v
 }
@@ -174,7 +198,11 @@ fn focused(section: Section, key: &RowKey) -> ViewState {
 fn armed_by_enter(state: &GameState, section: Section, key: &RowKey) -> ViewState {
     let mut v = focused(section, key);
     assert_eq!(update(Action::Activate, &mut v, state), Outcome::Handled);
-    assert_eq!(v.armed.as_ref().map(|a| &a.key), Some(key), "fixture: Enter armed the row");
+    assert_eq!(
+        v.armed.as_ref().map(|a| &a.key),
+        Some(key),
+        "fixture: Enter armed the row"
+    );
     v
 }
 
@@ -197,7 +225,10 @@ fn nap_armed(state: &GameState, years: u32) -> ViewState {
 
 /// The same view with nothing armed — the baseline a summary is read against.
 fn unarmed(view: &ViewState) -> ViewState {
-    ViewState { armed: None, ..view.clone() }
+    ViewState {
+        armed: None,
+        ..view.clone()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +245,10 @@ fn draw(state: &GameState, view: &ViewState, (w, h): (u16, u16)) -> Drawn {
     let mut layout = None;
     term.draw(|f| layout = Some(render::frame(f, state, view, None)))
         .expect("TestBackend is infallible");
-    Drawn { buffer: term.backend().buffer().clone(), layout: layout.expect("a layout") }
+    Drawn {
+        buffer: term.backend().buffer().clone(),
+        layout: layout.expect("a layout"),
+    }
 }
 
 fn region_lines(buf: &Buffer, rect: Rect) -> Vec<String> {
@@ -250,7 +284,10 @@ fn expansion(state: &GameState, view: &ViewState, size: (u16, u16)) -> Vec<Strin
     let a = region_lines(&armed.buffer, list_rect(&armed.layout));
     let u = region_lines(&plain.buffer, list_rect(&plain.layout));
 
-    let r = u.iter().position(|l| l.contains('▸')).expect("fixture: the unarmed list shows the cursor");
+    let r = u
+        .iter()
+        .position(|l| l.contains('▸'))
+        .expect("fixture: the unarmed list shows the cursor");
     assert_eq!(
         a[..r],
         u[..r],
@@ -262,8 +299,16 @@ fn expansion(state: &GameState, view: &ViewState, size: (u16, u16)) -> Vec<Strin
         a[r]
     );
     let end = match u.get(r + 1).filter(|l| !l.trim().is_empty()) {
-        Some(next) => a[r + 1..].iter().position(|l| l == next).map(|p| r + 1 + p).unwrap_or(a.len()),
-        None => a[r + 1..].iter().position(|l| l.trim().is_empty()).map(|p| r + 1 + p).unwrap_or(a.len()),
+        Some(next) => a[r + 1..]
+            .iter()
+            .position(|l| l == next)
+            .map(|p| r + 1 + p)
+            .unwrap_or(a.len()),
+        None => a[r + 1..]
+            .iter()
+            .position(|l| l.trim().is_empty())
+            .map(|p| r + 1 + p)
+            .unwrap_or(a.len()),
     };
     a[r + 1..end].to_vec()
 }
@@ -295,7 +340,8 @@ fn has_form(text: &str, form: &str) -> bool {
     while let Some(at) = text[from..].find(form) {
         let start = from + at;
         let end = start + form.len();
-        let before_ok = start == 0 || !(bytes[start - 1].is_ascii_digit() || bytes[start - 1] == b'.');
+        let before_ok =
+            start == 0 || !(bytes[start - 1].is_ascii_digit() || bytes[start - 1] == b'.');
         let after_ok = end >= bytes.len()
             || !(bytes[end].is_ascii_digit()
                 || (bytes[end] == b'.' && bytes.get(end + 1).is_some_and(|b| b.is_ascii_digit())));
@@ -340,7 +386,9 @@ fn shape(text: &str) -> String {
     let mut i = 0;
     while i < chars.len() {
         if chars[i].is_ascii_digit() {
-            while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.' || chars[i] == ',') {
+            while i < chars.len()
+                && (chars[i].is_ascii_digit() || chars[i] == '.' || chars[i] == ',')
+            {
                 i += 1;
             }
             // A single magnitude letter glued to the number is part of it.
@@ -430,7 +478,10 @@ fn summary_clause_1_states_every_figure_it_lists() {
         "the Move's summary counts only the kittens at home: {text:?}"
     );
     let basket = state.basket_capacity() as f64;
-    assert!(states(&text, basket), "the Move's summary does not state the basket's room: {text:?}");
+    assert!(
+        states(&text, basket),
+        "the Move's summary does not state the basket's room: {text:?}"
+    );
     let share = state.memory_chest_ratio();
     let pct = (share * 100.0 * 1e6).round() / 1e6;
     assert!(
@@ -452,8 +503,14 @@ fn summary_clause_1_states_nothing_it_leaves_unstated() {
     let text = summary_text(&state, &view, tall(&state));
 
     let mut after = state.clone();
-    after.apply(Command::GreatMeadowMove).expect("fixture: the Move is accepted");
-    let stated = [state.kittens.len() as f64, state.basket_capacity() as f64, 6.0];
+    after
+        .apply(Command::GreatMeadowMove)
+        .expect("fixture: the Move is accepted");
+    let stated = [
+        state.kittens.len() as f64,
+        state.basket_capacity() as f64,
+        6.0,
+    ];
     for (what, gain) in [
         ("elder wisdom", after.elder_wisdom - state.elder_wisdom),
         ("warm memories", after.warm_memories - state.warm_memories),
@@ -468,12 +525,16 @@ fn summary_clause_1_states_nothing_it_leaves_unstated() {
         );
     }
     let w = words(&text);
-    assert!(!w.contains(" wisdom "), "the Move's summary speaks of what it earns: {text:?}");
+    assert!(
+        !w.contains(" wisdom "),
+        "the Move's summary speaks of what it earns: {text:?}"
+    );
     for r in ResourceId::ALL {
         let debug = format!("{r:?}");
         let spaced = humanize(&debug).to_lowercase();
         assert!(
-            !w.contains(&format!(" {spaced} ")) && !w.contains(&format!(" {} ", debug.to_lowercase())),
+            !w.contains(&format!(" {spaced} "))
+                && !w.contains(&format!(" {} ", debug.to_lowercase())),
             "the Move's summary names a stock ({debug}); which stocks a Move keeps whole is the \
              core's rule and goes unstated: {text:?}"
         );
@@ -527,8 +588,14 @@ fn summary_clause_4_states_the_armed_count_its_cost_and_its_end_point() {
     let state = meadow();
     let size = tall(&state);
 
-    let mut cases = vec![(1u32, armed_by_enter(&state, Section::Dreams, &nap_key(&state)))];
-    assert_eq!(cases[0].1.armed.as_ref().map(|a| a.command), Some(Command::DeepNap(1)));
+    let mut cases = vec![(
+        1u32,
+        armed_by_enter(&state, Section::Dreams, &nap_key(&state)),
+    )];
+    assert_eq!(
+        cases[0].1.armed.as_ref().map(|a| a.command),
+        Some(Command::DeepNap(1))
+    );
     for years in [4u32, 12] {
         cases.push((years, nap_armed(&state, years)));
     }
@@ -537,7 +604,10 @@ fn summary_clause_4_states_the_armed_count_its_cost_and_its_end_point() {
         let text = summary_text(&state, &view, size);
         let cost = state.starshard_cost(years);
         let wake = (state.year() + years as u64) as f64;
-        assert!(states(&text, years as f64), "the {years}-year nap's summary lacks its count: {text:?}");
+        assert!(
+            states(&text, years as f64),
+            "the {years}-year nap's summary lacks its count: {text:?}"
+        );
         assert!(
             states(&text, cost),
             "the {years}-year nap's summary lacks the core's cost ({cost}): {text:?}"
@@ -566,9 +636,18 @@ fn the_summary_is_re_derived_from_current_state_on_every_frame() {
     after.traditions.remove(&TraditionId::TravelingBasketsIII);
     after.structures[StructureId::MemoryChest.ix()] = 3;
     let text = summary_text(&after, &view, size);
-    assert!(states(&text, after.kittens.len() as f64), "stale kitten count: {text:?}");
-    assert!(!states(&text, before.kittens.len() as f64), "stale kitten count: {text:?}");
-    assert!(states(&text, after.basket_capacity() as f64), "stale basket room: {text:?}");
+    assert!(
+        states(&text, after.kittens.len() as f64),
+        "stale kitten count: {text:?}"
+    );
+    assert!(
+        !states(&text, before.kittens.len() as f64),
+        "stale kitten count: {text:?}"
+    );
+    assert!(
+        states(&text, after.basket_capacity() as f64),
+        "stale basket room: {text:?}"
+    );
     let pct = (after.memory_chest_ratio() * 100.0 * 1e6).round() / 1e6;
     assert!(
         states(&text, pct) || states(&text, after.memory_chest_ratio()),
@@ -580,19 +659,38 @@ fn the_summary_is_re_derived_from_current_state_on_every_frame() {
     let mut after = before.clone();
     after.elder_wisdom = 8765.0;
     let text = summary_text(&after, &view, size);
-    assert!(states(&text, after.elder_wisdom), "stale elder wisdom: {text:?}");
-    assert!(!states(&text, before.elder_wisdom), "stale elder wisdom: {text:?}");
+    assert!(
+        states(&text, after.elder_wisdom),
+        "stale elder wisdom: {text:?}"
+    );
+    assert!(
+        !states(&text, before.elder_wisdom),
+        "stale elder wisdom: {text:?}"
+    );
 
     // The nap.
     let view = nap_armed(&before, 4);
     let mut after = before.clone();
     after.stirred_dreams = 300.0;
     after.ticks += 11 * content::DAYS_PER_YEAR * content::TICKS_PER_DAY;
-    assert_ne!(after.starshard_cost(4), before.starshard_cost(4), "fixture: the cost moved");
+    assert_ne!(
+        after.starshard_cost(4),
+        before.starshard_cost(4),
+        "fixture: the cost moved"
+    );
     let text = summary_text(&after, &view, size);
-    assert!(states(&text, after.starshard_cost(4)), "stale nap cost: {text:?}");
-    assert!(states(&text, (after.year() + 4) as f64), "stale wake-year: {text:?}");
-    assert!(!states(&text, (before.year() + 4) as f64), "stale wake-year: {text:?}");
+    assert!(
+        states(&text, after.starshard_cost(4)),
+        "stale nap cost: {text:?}"
+    );
+    assert!(
+        states(&text, (after.year() + 4) as f64),
+        "stale wake-year: {text:?}"
+    );
+    assert!(
+        !states(&text, (before.year() + 4) as f64),
+        "stale wake-year: {text:?}"
+    );
 }
 
 /// The summary makes no judgement of whether the commit will be accepted: a
@@ -609,7 +707,10 @@ fn the_summary_makes_no_judgement_of_whether_the_commit_will_be_accepted() {
     let view = armed_by_enter(&ok, Section::Legacy, &move_key(&ok));
     let mut short = ok.clone();
     short.kittens.truncate(20);
-    assert!(short.clone().apply(Command::GreatMeadowMove).is_err(), "fixture: refused");
+    assert!(
+        short.clone().apply(Command::GreatMeadowMove).is_err(),
+        "fixture: refused"
+    );
     assert_eq!(
         shape(&summary_text(&short, &view, size)),
         shape(&summary_text(&ok, &view, size)),
@@ -624,9 +725,14 @@ fn the_summary_makes_no_judgement_of_whether_the_commit_will_be_accepted() {
     broke.resources[ResourceId::Charm.ix()] = 0.0;
     {
         let (why, world) = ("nothing to pay", &broke);
-        assert!(world.clone().apply(Command::AdoptRule(rule)).is_err(), "fixture: refused");
         assert!(
-            rows(world, Section::Ideas).iter().any(|r| Some(&r.key) == view.armed.as_ref().map(|a| &a.key)),
+            world.clone().apply(Command::AdoptRule(rule)).is_err(),
+            "fixture: refused"
+        );
+        assert!(
+            rows(world, Section::Ideas)
+                .iter()
+                .any(|r| Some(&r.key) == view.armed.as_ref().map(|a| &a.key)),
             "fixture: the rule's row is still listed with {why}"
         );
         assert_eq!(
@@ -640,7 +746,10 @@ fn the_summary_makes_no_judgement_of_whether_the_commit_will_be_accepted() {
     let four = nap_armed(&ok, 4);
     let mut poor = ok.clone();
     poor.resources[ResourceId::Starshards.ix()] = 0.0;
-    assert!(poor.clone().apply(Command::DeepNap(4)).is_err(), "fixture: refused");
+    assert!(
+        poor.clone().apply(Command::DeepNap(4)).is_err(),
+        "fixture: refused"
+    );
     assert_eq!(
         shape(&summary_text(&poor, &four, size)),
         shape(&summary_text(&ok, &four, size)),
@@ -648,8 +757,14 @@ fn the_summary_makes_no_judgement_of_whether_the_commit_will_be_accepted() {
     );
     let too_long_years = ok.max_nap_length() + 1;
     let too_long = nap_armed(&ok, too_long_years);
-    assert!(ok.clone().apply(Command::DeepNap(too_long_years)).is_err(), "fixture: refused");
-    assert!(ok.starshard_cost(too_long_years).is_finite(), "fixture: a finite cost");
+    assert!(
+        ok.clone().apply(Command::DeepNap(too_long_years)).is_err(),
+        "fixture: refused"
+    );
+    assert!(
+        ok.starshard_cost(too_long_years).is_finite(),
+        "fixture: a finite cost"
+    );
     assert_eq!(
         shape(&summary_text(&ok, &too_long, size)),
         shape(&summary_text(&ok, &four, size)),
@@ -683,7 +798,10 @@ fn a_figure_that_is_not_finite_is_stated_as_beyond_reach_and_never_printed() {
         }
         let view = armed_by_enter(&state, Section::Legacy, &pass_key(&state));
         let text = summary_text(&state, &view, size);
-        assert!(!printed(&text), "a {wisdom} elder wisdom stock was printed: {text:?}");
+        assert!(
+            !printed(&text),
+            "a {wisdom} elder wisdom stock was printed: {text:?}"
+        );
         assert!(
             text.to_lowercase().contains("beyond reach"),
             "a {wisdom} elder wisdom stock was not stated as beyond reach: {text:?}"
@@ -692,12 +810,24 @@ fn a_figure_that_is_not_finite_is_stated_as_beyond_reach_and_never_printed() {
 
     // A count far past any real nap: its cost overflows.
     let huge = clowder_tui::nav::update::MAX_AFFORDABLE_CAP;
-    assert!(!base.starshard_cost(huge).is_finite(), "fixture: the cost is not finite");
+    assert!(
+        !base.starshard_cost(huge).is_finite(),
+        "fixture: the cost is not finite"
+    );
     let view = nap_armed(&base, huge);
     let text = summary_text(&base, &view, size);
-    assert!(!printed(&text), "an unbounded nap cost was printed: {text:?}");
-    assert!(text.to_lowercase().contains("beyond reach"), "not stated as beyond reach: {text:?}");
-    assert!(states(&text, huge as f64), "the armed count went unstated: {text:?}");
+    assert!(
+        !printed(&text),
+        "an unbounded nap cost was printed: {text:?}"
+    );
+    assert!(
+        text.to_lowercase().contains("beyond reach"),
+        "not stated as beyond reach: {text:?}"
+    );
+    assert!(
+        states(&text, huge as f64),
+        "the armed count went unstated: {text:?}"
+    );
     assert!(
         states(&text, (base.year() + huge as u64) as f64),
         "the wake-year went unstated beside an unbounded cost: {text:?}"
@@ -706,11 +836,20 @@ fn a_figure_that_is_not_finite_is_stated_as_beyond_reach_and_never_printed() {
     // A cost the core reports as not a number at all.
     let mut hazy = base.clone();
     hazy.stirred_dreams = f64::NAN;
-    assert!(hazy.starshard_cost(4).is_nan(), "fixture: the cost is not a number");
+    assert!(
+        hazy.starshard_cost(4).is_nan(),
+        "fixture: the cost is not a number"
+    );
     let view = nap_armed(&hazy, 4);
     let text = summary_text(&hazy, &view, size);
-    assert!(!printed(&text), "a not-a-number nap cost was printed: {text:?}");
-    assert!(text.to_lowercase().contains("beyond reach"), "not stated as beyond reach: {text:?}");
+    assert!(
+        !printed(&text),
+        "a not-a-number nap cost was printed: {text:?}"
+    );
+    assert!(
+        text.to_lowercase().contains("beyond reach"),
+        "not stated as beyond reach: {text:?}"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -721,11 +860,12 @@ fn a_figure_that_is_not_finite_is_stated_as_beyond_reach_and_never_printed() {
 /// compact form's `K`, `M`, `B`, `T`, or `Q` — or the compact form's bounds.
 fn carries_a_compact_figure(text: &str) -> bool {
     let chars: Vec<char> = text.chars().collect();
-    let marked = chars.windows(3).any(|w| {
-        w[0].is_ascii_digit() && "KMBTQ".contains(w[1]) && !w[2].is_alphanumeric()
-    }) || chars.last().is_some_and(|c| "KMBTQ".contains(*c))
-        && chars.len() >= 2
-        && chars[chars.len() - 2].is_ascii_digit();
+    let marked = chars
+        .windows(3)
+        .any(|w| w[0].is_ascii_digit() && "KMBTQ".contains(w[1]) && !w[2].is_alphanumeric())
+        || chars.last().is_some_and(|c| "KMBTQ".contains(*c))
+            && chars.len() >= 2
+            && chars[chars.len() - 2].is_ascii_digit();
     marked || text.contains("<0.001") || text.contains(">999Q")
 }
 
@@ -773,17 +913,28 @@ fn every_figure_of_a_consequence_summary_is_drawn_in_the_exact_form() {
     );
 
     for (name, view, figures) in cases {
-        let mut texts = vec![(format!("the list at {:?}", tall(&state)), summary_text(&state, &view, tall(&state)))];
+        let mut texts = vec![(
+            format!("the list at {:?}", tall(&state)),
+            summary_text(&state, &view, tall(&state)),
+        )];
         for size in NARROW {
-            let swapped = ViewState { inspector_wanted: true, ..view.clone() };
+            let swapped = ViewState {
+                inspector_wanted: true,
+                ..view.clone()
+            };
             let armed = draw(&state, &swapped, size);
             let plain = draw(&state, &unarmed(&swapped), size);
-            let before: BTreeSet<String> = region_lines(&plain.buffer, list_rect(&plain.layout)).into_iter().collect();
+            let before: BTreeSet<String> = region_lines(&plain.buffer, list_rect(&plain.layout))
+                .into_iter()
+                .collect();
             let added: Vec<String> = region_lines(&armed.buffer, list_rect(&armed.layout))
                 .into_iter()
                 .filter(|l| !before.contains(l))
                 .collect();
-            texts.push((format!("the swapped inspector at {size:?}"), added.join("\n")));
+            texts.push((
+                format!("the swapped inspector at {size:?}"),
+                added.join("\n"),
+            ));
         }
         for (where_, text) in texts {
             for v in &figures {
@@ -813,8 +964,14 @@ fn every_figure_of_a_consequence_summary_is_drawn_in_the_exact_form() {
 fn the_swapped_inspector_carries_the_same_summary() {
     let state = meadow();
     let cases: Vec<(&str, ViewState)> = vec![
-        ("GreatMeadowMove", armed_by_enter(&state, Section::Legacy, &move_key(&state))),
-        ("PassItDown", armed_by_enter(&state, Section::Legacy, &pass_key(&state))),
+        (
+            "GreatMeadowMove",
+            armed_by_enter(&state, Section::Legacy, &move_key(&state)),
+        ),
+        (
+            "PassItDown",
+            armed_by_enter(&state, Section::Legacy, &pass_key(&state)),
+        ),
         ("DeepNap", nap_armed(&state, 4)),
         (
             "AdoptRule",
@@ -827,7 +984,10 @@ fn the_swapped_inspector_carries_the_same_summary() {
         let tokens: Vec<&str> = listed.split_whitespace().collect();
 
         for size in NARROW {
-            let swapped = ViewState { inspector_wanted: true, ..view.clone() };
+            let swapped = ViewState {
+                inspector_wanted: true,
+                ..view.clone()
+            };
             let armed = draw(&state, &swapped, size);
             let plain = draw(&state, &unarmed(&swapped), size);
             assert!(
@@ -861,11 +1021,19 @@ fn the_swapped_inspector_carries_the_same_summary() {
 #[test]
 fn the_moment_an_arming_ends_nothing_on_screen_shows_it_armed() {
     let state = meadow();
-    let past = Instant::now().checked_sub(Duration::from_secs(1)).expect("clock has a past");
+    let past = Instant::now()
+        .checked_sub(Duration::from_secs(1))
+        .expect("clock has a past");
 
     let cases: Vec<(&str, ViewState)> = vec![
-        ("GreatMeadowMove", armed_by_enter(&state, Section::Legacy, &move_key(&state))),
-        ("PassItDown", armed_by_enter(&state, Section::Legacy, &pass_key(&state))),
+        (
+            "GreatMeadowMove",
+            armed_by_enter(&state, Section::Legacy, &move_key(&state)),
+        ),
+        (
+            "PassItDown",
+            armed_by_enter(&state, Section::Legacy, &pass_key(&state)),
+        ),
         ("DeepNap", nap_armed(&state, 4)),
         (
             "AdoptRule",
@@ -877,10 +1045,14 @@ fn the_moment_an_arming_ends_nothing_on_screen_shows_it_armed() {
         let mut expired = view.clone();
         expired.armed.as_mut().expect("armed").expires_at = past;
         for swap in [false, true] {
-            let expired = ViewState { inspector_wanted: swap, ..expired.clone() };
+            let expired = ViewState {
+                inspector_wanted: swap,
+                ..expired.clone()
+            };
             for size in SIZES {
                 assert!(
-                    draw(&state, &expired, size).buffer == draw(&state, &unarmed(&expired), size).buffer,
+                    draw(&state, &expired, size).buffer
+                        == draw(&state, &unarmed(&expired), size).buffer,
                     "at {size:?} (inspector asked for: {swap}), an expired {name} arming still \
                      shows on screen"
                 );
@@ -894,10 +1066,15 @@ fn the_moment_an_arming_ends_nothing_on_screen_shows_it_armed() {
     gone.ideas.remove(&IdeaId::DeepNapTheory);
     let nap = nap_key(&state);
     assert!(
-        Section::ALL.iter().all(|s| rows(&gone, *s).iter().all(|r| r.key != nap)),
+        Section::ALL
+            .iter()
+            .all(|s| rows(&gone, *s).iter().all(|r| r.key != nap)),
         "fixture: the nap row is listed nowhere"
     );
-    for (section, key) in [(Section::Dreams, nap.clone()), (Section::Legacy, move_key(&gone))] {
+    for (section, key) in [
+        (Section::Dreams, nap.clone()),
+        (Section::Legacy, move_key(&gone)),
+    ] {
         let mut v = focused(section, &key);
         v.armed = armed.armed.clone();
         let _: &ArmedRow = v.armed.as_ref().expect("armed");
@@ -927,24 +1104,37 @@ fn the_moment_an_arming_ends_nothing_on_screen_shows_it_armed() {
 const MARKERS: [&str; 4] = ["●", "◐", "○", "✓"];
 
 fn attention() -> ratatui::style::Color {
-    clowder_tui::theme::Role::Attention.color().expect("Attention carries a colour")
+    clowder_tui::theme::Role::Attention
+        .color()
+        .expect("Attention carries a colour")
 }
 
 /// The list's cursor line and the run of lines the arming expands beneath
 /// it, as row offsets into the list rectangle of the armed frame — read the
 /// same way `expansion` reads them.
-fn armed_rows(
-    armed: &Drawn,
-    plain: &Drawn,
-    size: (u16, u16),
-) -> (usize, std::ops::Range<usize>) {
+fn armed_rows(armed: &Drawn, plain: &Drawn, size: (u16, u16)) -> (usize, std::ops::Range<usize>) {
     let a = region_lines(&armed.buffer, list_rect(&armed.layout));
     let u = region_lines(&plain.buffer, list_rect(&plain.layout));
-    let r = u.iter().position(|l| l.contains('▸')).expect("fixture: the unarmed list shows the cursor");
-    assert!(a[r].contains('▸'), "at {size:?}, the armed row is no longer where it was: {:?}", a[r]);
+    let r = u
+        .iter()
+        .position(|l| l.contains('▸'))
+        .expect("fixture: the unarmed list shows the cursor");
+    assert!(
+        a[r].contains('▸'),
+        "at {size:?}, the armed row is no longer where it was: {:?}",
+        a[r]
+    );
     let end = match u.get(r + 1).filter(|l| !l.trim().is_empty()) {
-        Some(next) => a[r + 1..].iter().position(|l| l == next).map(|p| r + 1 + p).unwrap_or(a.len()),
-        None => a[r + 1..].iter().position(|l| l.trim().is_empty()).map(|p| r + 1 + p).unwrap_or(a.len()),
+        Some(next) => a[r + 1..]
+            .iter()
+            .position(|l| l == next)
+            .map(|p| r + 1 + p)
+            .unwrap_or(a.len()),
+        None => a[r + 1..]
+            .iter()
+            .position(|l| l.trim().is_empty())
+            .map(|p| r + 1 + p)
+            .unwrap_or(a.len()),
     };
     (r, r + 1..end)
 }
@@ -955,7 +1145,11 @@ fn armed_rows(
 fn inserted_rows(armed: &Buffer, plain: &Buffer, rect: Rect) -> std::ops::Range<usize> {
     let a = region_lines(armed, rect);
     let u = region_lines(plain, rect);
-    let i = a.iter().zip(&u).position(|(x, y)| x != y).unwrap_or(a.len());
+    let i = a
+        .iter()
+        .zip(&u)
+        .position(|(x, y)| x != y)
+        .unwrap_or(a.len());
     let j = (i + 1..a.len())
         .find(|&j| a[j..].iter().zip(&u[i..]).all(|(x, y)| x == y))
         .unwrap_or(a.len());
@@ -963,7 +1157,11 @@ fn inserted_rows(armed: &Buffer, plain: &Buffer, rect: Rect) -> std::ops::Range<
 }
 
 /// Every drawn (non-blank) cell of the given rows of `rect`, with its column.
-fn drawn_cells(buf: &Buffer, rect: Rect, rows: std::ops::Range<usize>) -> Vec<(u16, u16, ratatui::buffer::Cell)> {
+fn drawn_cells(
+    buf: &Buffer,
+    rect: Rect,
+    rows: std::ops::Range<usize>,
+) -> Vec<(u16, u16, ratatui::buffer::Cell)> {
     let mut out = Vec::new();
     for dy in rows {
         let y = rect.y + dy as u16;
@@ -1045,7 +1243,12 @@ fn an_armed_row_wears_attention_on_its_expansion_and_nowhere_on_its_own_line() {
             armed_by_enter(&rich, Section::Legacy, &pass_key(&rich)),
             SIZES.to_vec(),
         ),
-        ("DeepNap".into(), rich.clone(), nap_armed(&rich, 4), SIZES.to_vec()),
+        (
+            "DeepNap".into(),
+            rich.clone(),
+            nap_armed(&rich, 4),
+            SIZES.to_vec(),
+        ),
     ];
     for rule in RuleId::ALL {
         let view = armed_by_enter(&rich, Section::Ideas, &rule_key(&rich, rule));
@@ -1055,7 +1258,12 @@ fn an_armed_row_wears_attention_on_its_expansion_and_nowhere_on_its_own_line() {
             ("not paid for", rule_short(rule, 0.0)),
         ] {
             let size = tall(&state);
-            cases.push((format!("AdoptRule({rule:?}), {how}"), state, view.clone(), vec![size]));
+            cases.push((
+                format!("AdoptRule({rule:?}), {how}"),
+                state,
+                view.clone(),
+                vec![size],
+            ));
         }
     }
 
@@ -1101,10 +1309,16 @@ fn an_armed_row_wears_attention_on_its_expansion_and_nowhere_on_its_own_line() {
 
         // The narrow-mode swap carries the summary in the inspector instead.
         for size in NARROW {
-            let swapped = ViewState { inspector_wanted: true, ..view.clone() };
+            let swapped = ViewState {
+                inspector_wanted: true,
+                ..view.clone()
+            };
             let armed = draw(state, &swapped, size);
             let plain = draw(state, &unarmed(&swapped), size);
-            assert!(matches!(armed.layout.body, Body::Narrow { .. }), "fixture: {size:?} is a swap size");
+            assert!(
+                matches!(armed.layout.body, Body::Narrow { .. }),
+                "fixture: {size:?} is a swap size"
+            );
             let rect = list_rect(&armed.layout);
             let rows = inserted_rows(&armed.buffer, &plain.buffer, rect);
             assert_expansion_wears_attention(
@@ -1141,8 +1355,14 @@ fn an_armed_row_wears_attention_on_its_expansion_and_nowhere_on_its_own_line() {
 /// Every heavy row, armed as the player arms it, over the rich meadow.
 fn every_arming(state: &GameState) -> Vec<(String, ViewState)> {
     let mut out = vec![
-        ("GreatMeadowMove".to_string(), armed_by_enter(state, Section::Legacy, &move_key(state))),
-        ("PassItDown".to_string(), armed_by_enter(state, Section::Legacy, &pass_key(state))),
+        (
+            "GreatMeadowMove".to_string(),
+            armed_by_enter(state, Section::Legacy, &move_key(state)),
+        ),
+        (
+            "PassItDown".to_string(),
+            armed_by_enter(state, Section::Legacy, &pass_key(state)),
+        ),
         ("DeepNap".to_string(), nap_armed(state, 4)),
     ];
     for rule in RuleId::ALL {
@@ -1198,7 +1418,11 @@ fn an_armed_rows_expansion_keeps_attention_on_what_is_drawn_and_nothing_else_tak
         .map(|rule| {
             (
                 format!("AdoptRule({rule:?}), nothing on the Ideas screen done"),
-                armed_by_enter(&nothing_done, Section::Ideas, &rule_key(&nothing_done, rule)),
+                armed_by_enter(
+                    &nothing_done,
+                    Section::Ideas,
+                    &rule_key(&nothing_done, rule),
+                ),
             )
         })
         .collect();
@@ -1227,8 +1451,12 @@ fn an_armed_rows_expansion_keeps_attention_on_what_is_drawn_and_nothing_else_tak
         for (size, swap) in frames {
             // The sweep outlasts an arming's own expiry, so each frame is
             // drawn over an arming made fresh for it.
-            let mut view = ViewState { inspector_wanted: swap, ..view.clone() };
-            view.armed.as_mut().expect("armed").expires_at = Instant::now() + Duration::from_secs(3600);
+            let mut view = ViewState {
+                inspector_wanted: swap,
+                ..view.clone()
+            };
+            view.armed.as_mut().expect("armed").expires_at =
+                Instant::now() + Duration::from_secs(3600);
             let armed = draw(st, &view, size);
             let plain = draw(st, &unarmed(&view), size);
             let what = format!("the armed {name} row at {size:?} (swap {swap})");
@@ -1247,14 +1475,19 @@ fn an_armed_rows_expansion_keeps_attention_on_what_is_drawn_and_nothing_else_tak
                     n if n == full_len => whole += 1,
                     0 => none += 1,
                     n if n < full_len => part += 1,
-                    n => panic!("{what}: {n} expansion lines drawn, more than the {full_len} it has"),
+                    n => {
+                        panic!("{what}: {n} expansion lines drawn, more than the {full_len} it has")
+                    }
                 }
                 if !rows.is_empty() {
                     assert_expansion_wears_attention(&what, &armed.buffer, main, rows.clone());
                 }
                 allowed.push((main, rows));
                 if let Body::Wide { inspector, .. } = armed.layout.body {
-                    allowed.push((inspector, inserted_rows(&armed.buffer, &plain.buffer, inspector)));
+                    allowed.push((
+                        inspector,
+                        inserted_rows(&armed.buffer, &plain.buffer, inspector),
+                    ));
                 }
             }
 

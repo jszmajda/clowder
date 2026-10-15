@@ -35,7 +35,10 @@ pub fn set_aside(path: &std::path::Path) -> std::io::Result<PathBuf> {
     let mut name = path
         .file_name()
         .ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidInput, "save path has no file name")
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "save path has no file name",
+            )
         })?
         .to_os_string();
     name.push(".broken");

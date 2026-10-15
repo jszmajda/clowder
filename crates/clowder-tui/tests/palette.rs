@@ -49,11 +49,11 @@ use ratatui::Terminal;
 
 use clowder_tui::nav::palette::{results, PaletteResult};
 use clowder_tui::nav::rows::{drawn_rows, revealed_sections, rows};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use clowder_tui::nav::{update, Action, Outcome, Overlay, RowKey, Section, ViewState};
 use clowder_tui::render;
 use clowder_tui::render::layout::{compute, Body};
 use clowder_tui::render::widgets::overlays;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -126,11 +126,16 @@ fn rich() -> GameState {
     s.peak_devotion = 1.0e12;
     s.devotion = 1.0e6;
     s.serenity = 1.0e12;
-    s.rites = [RiteId::TheReverie, RiteId::Enlightenment].into_iter().collect::<BTreeSet<_>>();
+    s.rites = [RiteId::TheReverie, RiteId::Enlightenment]
+        .into_iter()
+        .collect::<BTreeSet<_>>();
     s.arches_bought = [ArchId::EverdreamArch].into_iter().collect::<BTreeSet<_>>();
 
-    s.discovered =
-        ColonyId::ALL.iter().copied().filter(|c| *c != UNDISCOVERED).collect::<BTreeSet<_>>();
+    s.discovered = ColonyId::ALL
+        .iter()
+        .copied()
+        .filter(|c| *c != UNDISCOVERED)
+        .collect::<BTreeSet<_>>();
     s.sites_reached = BTreeSet::new();
     s.whale_visit_years = 5;
     s.whale_contentment = 1;
@@ -139,7 +144,10 @@ fn rich() -> GameState {
     s.elder_wisdom = 1.0e9;
     s.warm_memories = 1.0e3;
 
-    assert!(revealed_sections(&s).len() >= 8, "fixture: most sections are revealed");
+    assert!(
+        revealed_sections(&s).len() >= 8,
+        "fixture: most sections are revealed"
+    );
     s
 }
 
@@ -170,7 +178,11 @@ fn fresh() -> GameState {
 }
 
 fn every_state() -> Vec<(&'static str, GameState)> {
-    vec![("a maximal meadow", rich()), ("a young meadow", young()), ("a new meadow", fresh())]
+    vec![
+        ("a maximal meadow", rich()),
+        ("a young meadow", young()),
+        ("a new meadow", fresh()),
+    ]
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +266,9 @@ fn expected_order(all: &[PaletteResult], query: &str) -> Vec<(Section, RowKey)> 
         })
         .collect();
     hits.sort();
-    hits.into_iter().map(|(_, i)| (all[i].section, all[i].key.clone())).collect()
+    hits.into_iter()
+        .map(|(_, i)| (all[i].section, all[i].key.clone()))
+        .collect()
 }
 
 /// Queries drawn from the names themselves, so every tier of the ranking is
@@ -264,7 +278,11 @@ fn query_corpus(all: &[PaletteResult]) -> Vec<String> {
     let mut qs: BTreeSet<String> = BTreeSet::new();
     for r in all {
         let chars: Vec<char> = r.name.chars().collect();
-        let span = |a: usize, b: usize| -> String { chars[a.min(chars.len())..b.min(chars.len())].iter().collect() };
+        let span = |a: usize, b: usize| -> String {
+            chars[a.min(chars.len())..b.min(chars.len())]
+                .iter()
+                .collect()
+        };
         qs.insert(r.name.clone());
         qs.insert(r.name.to_uppercase());
         qs.insert(r.name.to_lowercase());
@@ -300,7 +318,10 @@ fn lines_of(buf: &Buffer, rect: Rect) -> Vec<String> {
 
 fn palette_view(query: &str) -> ViewState {
     ViewState {
-        overlay: Some(Overlay::Palette { query: query.to_string(), selected: 0 }),
+        overlay: Some(Overlay::Palette {
+            query: query.to_string(),
+            selected: 0,
+        }),
         ..ViewState::default()
     }
 }
@@ -310,7 +331,8 @@ fn draw_palette(state: &GameState, query: &str, area: Rect) -> Vec<String> {
     let mut term = Terminal::new(TestBackend::new(area.right(), area.bottom()))
         .expect("TestBackend is infallible");
     let view = palette_view(query);
-    term.draw(|f| overlays::palette(f, area, state, &view)).expect("TestBackend is infallible");
+    term.draw(|f| overlays::palette(f, area, state, &view))
+        .expect("TestBackend is infallible");
     lines_of(term.backend().buffer(), area)
 }
 
@@ -329,7 +351,9 @@ fn floor_rect() -> Rect {
     let layout = compute(Rect::new(0, 0, 80, 24), None, false);
     match layout.body {
         Body::Narrow { sidebar, main } => sidebar.union(main),
-        Body::Wide { sidebar, inspector, .. } => sidebar.union(inspector),
+        Body::Wide {
+            sidebar, inspector, ..
+        } => sidebar.union(inspector),
         Body::TooSmall(r) => panic!("the floor is a supported size, not {r:?}"),
     }
 }
@@ -374,12 +398,21 @@ fn has_lone_digit(line: &str, digit: char, skip: (usize, usize)) -> bool {
 fn displayed_after_cursor(state: &GameState, section: Section, key: &RowKey) -> String {
     let (w, h) = (150u16, 200u16);
     let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
-    let mut view = ViewState { section: Some(section), ..Default::default() };
+    let mut view = ViewState {
+        section: Some(section),
+        ..Default::default()
+    };
     view.focus[section.index()] = Some(key.clone());
     // A finished Ideas row is drawn only with the done group open
     // (TUI-NAV-113): open it by its key, keeping the focus on the row.
-    if !drawn_rows(state, section, &view).iter().any(|r| &r.key == key) {
-        let d = clowder_tui::nav::keys::resolve(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE), &view);
+    if !drawn_rows(state, section, &view)
+        .iter()
+        .any(|r| &r.key == key)
+    {
+        let d = clowder_tui::nav::keys::resolve(
+            KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE),
+            &view,
+        );
         update(d, &mut view, state);
         view.focus[section.index()] = Some(key.clone());
     }
@@ -393,7 +426,12 @@ fn displayed_after_cursor(state: &GameState, section: Section, key: &RowKey) -> 
     let line = lines_of(term.backend().buffer(), list)
         .into_iter()
         .find(|l| l.contains('▸'))
-        .unwrap_or_else(|| panic!("fixture: no cursor line drawn for {key:?} in {}", section.title()));
+        .unwrap_or_else(|| {
+            panic!(
+                "fixture: no cursor line drawn for {key:?} in {}",
+                section.title()
+            )
+        });
     // Cursor glyph, space, marker, space — then the name.
     line.chars().skip_while(|c| *c != '▸').skip(4).collect()
 }
@@ -452,13 +490,18 @@ fn a_teased_item_is_found_and_an_item_with_no_row_never_is() {
     let keys = placed(&results(&state, ""));
     for b in StructureId::ALL.iter().take(YOUNG_REVEALED) {
         assert!(
-            keys.contains(&(Section::Meadow, RowKey::Content(ContentId::Structure(*b), ""))),
+            keys.contains(&(
+                Section::Meadow,
+                RowKey::Content(ContentId::Structure(*b), "")
+            )),
             "a Teased structure is listed in its section and was not a palette result"
         );
     }
     for b in StructureId::ALL.iter().skip(YOUNG_REVEALED) {
         assert!(
-            !keys.iter().any(|(_, k)| *k == RowKey::Content(ContentId::Structure(*b), "")),
+            !keys
+                .iter()
+                .any(|(_, k)| *k == RowKey::Content(ContentId::Structure(*b), "")),
             "a Hidden structure was a palette result; the palette never reads ahead"
         );
     }
@@ -483,7 +526,9 @@ fn each_result_carries_the_name_its_rows_display() {
             let shown = displayed_after_cursor(&state, r.section, &r.key);
             let matches = if let Some(rest) = shown.strip_prefix(r.name.as_str()) {
                 // The name is followed by padding, never by more of a longer name.
-                rest.is_empty() || rest.starts_with("  ") || rest.starts_with(' ') && !rest[1..].starts_with(char::is_alphabetic)
+                rest.is_empty()
+                    || rest.starts_with("  ")
+                    || rest.starts_with(' ') && !rest[1..].starts_with(char::is_alphabetic)
             } else if let Some(cut) = shown.find('…') {
                 cut > 0 && r.name.starts_with(&shown[..cut])
             } else {
@@ -519,14 +564,25 @@ fn two_items_sharing_a_name_are_two_results() {
          its own result",
         twins.len()
     );
-    assert_ne!(twins[0].key, twins[1].key, "the two same-named results point at one item");
+    assert_ne!(
+        twins[0].key, twins[1].key,
+        "the two same-named results point at one item"
+    );
     assert!(
-        results(&state, TWIN).iter().filter(|r| r.name == TWIN).count() == 2,
+        results(&state, TWIN)
+            .iter()
+            .filter(|r| r.name == TWIN)
+            .count()
+            == 2,
         "searching the shared name found fewer than both items"
     );
 
     let shared = structure_def(StructureId::ALL[0]).name;
-    let across: Vec<Section> = all.iter().filter(|r| r.name == shared).map(|r| r.section).collect();
+    let across: Vec<Section> = all
+        .iter()
+        .filter(|r| r.name == shared)
+        .map(|r| r.section)
+        .collect();
     assert!(
         across.contains(&Section::Meadow) && across.contains(&Section::Clowder),
         "a kitten and a structure share a name in two sections, and the palette listed them in \
@@ -577,8 +633,10 @@ fn the_drawn_palette_shows_each_result_beside_its_sections_digit() {
 #[test]
 fn the_results_follow_the_state_beneath_an_open_palette() {
     let mut state = young();
-    let revealed_names: Vec<String> =
-        results(&state, "").into_iter().map(|r| r.name.to_lowercase()).collect();
+    let revealed_names: Vec<String> = results(&state, "")
+        .into_iter()
+        .map(|r| r.name.to_lowercase())
+        .collect();
 
     // A structure not yet revealed whose name no other name contains, so the
     // query aims at it alone once it appears.
@@ -603,7 +661,10 @@ fn the_results_follow_the_state_beneath_an_open_palette() {
     for c in name.chars() {
         update(Action::Type(c), &mut view, &state);
     }
-    assert!(results(&state, name).is_empty(), "fixture: nothing matches while it is hidden");
+    assert!(
+        results(&state, name).is_empty(),
+        "fixture: nothing matches while it is hidden"
+    );
     update(Action::Activate, &mut view, &state);
     assert!(
         view.overlay.is_some(),
@@ -620,7 +681,10 @@ fn the_results_follow_the_state_beneath_an_open_palette() {
 
     let out = update(Action::Activate, &mut view, &state);
     assert_eq!(out, Outcome::Handled);
-    assert!(view.overlay.is_none(), "Enter did not jump to content revealed while the palette was open");
+    assert!(
+        view.overlay.is_none(),
+        "Enter did not jump to content revealed while the palette was open"
+    );
     assert_eq!(view.section, Some(Section::Meadow));
     assert_eq!(
         view.focus[Section::Meadow.index()],
@@ -676,7 +740,10 @@ fn the_query_matches_ignoring_case_spaces_included_and_ranks_by_closeness() {
                 .iter()
                 .find(|a| a.section == r.section && a.key == r.key)
                 .expect("a filtered result is one of the unfiltered ones");
-            assert_eq!(r.name, unfiltered.name, "a result's name changed with the query");
+            assert_eq!(
+                r.name, unfiltered.name,
+                "a result's name changed with the query"
+            );
         }
     }
 }
@@ -694,7 +761,12 @@ fn the_top_result_is_the_first_one_drawn_and_always_on_screen() {
 
     let mut queries: Vec<String> = vec!["e".to_string(), "a".to_string()];
     queries.push(all.last().expect("fixture: results exist").name.clone());
-    queries.push(all.last().expect("fixture: results exist").name.to_uppercase());
+    queries.push(
+        all.last()
+            .expect("fixture: results exist")
+            .name
+            .to_uppercase(),
+    );
     queries.push(TWIN.to_string());
     queries.push(structure_def(StructureId::ALL[0]).name.to_string());
     assert!(
@@ -705,10 +777,11 @@ fn the_top_result_is_the_first_one_drawn_and_always_on_screen() {
     let head = |name: &str| -> String { name.chars().take(16).collect() };
     for query in queries {
         let ranked = results(&state, &query);
-        let top = ranked.first().unwrap_or_else(|| panic!("fixture: {query:?} matches something"));
+        let top = ranked
+            .first()
+            .unwrap_or_else(|| panic!("fixture: {query:?} matches something"));
         let lines = draw_palette(&state, &query, area);
-        let first_line_of =
-            |name: &str| lines.iter().position(|l| l.contains(&head(name)));
+        let first_line_of = |name: &str| lines.iter().position(|l| l.contains(&head(name)));
 
         let top_at = first_line_of(&top.name).unwrap_or_else(|| {
             panic!(
@@ -830,7 +903,10 @@ fn enter_lands_on_the_top_results_first_row_and_does_nothing_else() {
             "Enter on {query:?} asked the core for {out:?}; the palette's jump performs no row \
              action"
         );
-        assert!(view.overlay.is_none(), "Enter on {query:?} left the palette open");
+        assert!(
+            view.overlay.is_none(),
+            "Enter on {query:?} left the palette open"
+        );
         assert_eq!(
             view.section,
             Some(top.section),
@@ -841,7 +917,10 @@ fn enter_lands_on_the_top_results_first_row_and_does_nothing_else() {
             Some(top.key.clone()),
             "Enter on {query:?} did not focus the top result's first row"
         );
-        assert!(view.prompt.is_none() && view.armed.is_none(), "Enter on {query:?} opened or armed something");
+        assert!(
+            view.prompt.is_none() && view.armed.is_none(),
+            "Enter on {query:?} opened or armed something"
+        );
         sections_landed.insert(top.section);
     }
     assert_eq!(
@@ -858,7 +937,9 @@ fn enter_lands_on_the_top_results_first_row_and_does_nothing_else() {
 /// Whether the core names `key`'s item already the player's.
 fn is_finished(state: &GameState, key: &RowKey) -> bool {
     match key {
-        RowKey::Content(id, _) => state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours),
+        RowKey::Content(id, _) => {
+            state.lock_reason(*id) == Some(clowder_core::LockReason::AlreadyYours)
+        }
         _ => false,
     }
 }
@@ -931,21 +1012,43 @@ fn ideas_all_done() -> GameState {
 /// @spec TUI-NAV-114
 #[test]
 fn a_folded_row_is_a_palette_result_exactly_as_a_drawn_one_is() {
-    for (label, state) in [("part done", ideas_part_done()), ("all done", ideas_all_done())] {
-        let listed: Vec<RowKey> =
-            rows(&state, Section::Ideas).into_iter().filter(|r| r.selectable()).map(|r| r.key).collect();
-        let folded: Vec<RowKey> = listed.iter().filter(|k| is_finished(&state, k)).cloned().collect();
-        assert!(!folded.is_empty(), "fixture: {label}, the Ideas screen has finished rows");
-        let view = ViewState { section: Some(Section::Ideas), ..Default::default() };
-        let drawn: Vec<RowKey> = drawn_rows(&state, Section::Ideas, &view).into_iter().map(|r| r.key).collect();
+    for (label, state) in [
+        ("part done", ideas_part_done()),
+        ("all done", ideas_all_done()),
+    ] {
+        let listed: Vec<RowKey> = rows(&state, Section::Ideas)
+            .into_iter()
+            .filter(|r| r.selectable())
+            .map(|r| r.key)
+            .collect();
+        let folded: Vec<RowKey> = listed
+            .iter()
+            .filter(|k| is_finished(&state, k))
+            .cloned()
+            .collect();
+        assert!(
+            !folded.is_empty(),
+            "fixture: {label}, the Ideas screen has finished rows"
+        );
+        let view = ViewState {
+            section: Some(Section::Ideas),
+            ..Default::default()
+        };
+        let drawn: Vec<RowKey> = drawn_rows(&state, Section::Ideas, &view)
+            .into_iter()
+            .map(|r| r.key)
+            .collect();
         assert!(
             folded.iter().all(|k| !drawn.contains(k)),
             "{label}: a finished row is drawn with the done group folded (TUI-NAV-113)"
         );
 
         let all = results(&state, "");
-        let found: Vec<RowKey> =
-            all.iter().filter(|r| r.section == Section::Ideas).map(|r| r.key.clone()).collect();
+        let found: Vec<RowKey> = all
+            .iter()
+            .filter(|r| r.section == Section::Ideas)
+            .map(|r| r.key.clone())
+            .collect();
         assert_eq!(
             found, listed,
             "{label}: the palette's Ideas results are not every item the section lists, folded ones \

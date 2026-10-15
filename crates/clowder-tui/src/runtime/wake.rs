@@ -57,7 +57,9 @@ pub struct Refused {
 
 impl std::fmt::Debug for Refused {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Refused").field("error", &self.error).finish_non_exhaustive()
+        f.debug_struct("Refused")
+            .field("error", &self.error)
+            .finish_non_exhaustive()
     }
 }
 
@@ -132,7 +134,10 @@ impl Waking {
                 // Only the final size matters, as for the awake loop.
                 Event::Resize(w, h) => {
                     if let Err(error) = terminal.resize(Rect::new(0, 0, *w, *h)) {
-                        return Err(Box::new(Refused { error, waking: self }));
+                        return Err(Box::new(Refused {
+                            error,
+                            waking: self,
+                        }));
                     }
                 }
                 // Every other key is discarded, not held: it would otherwise
@@ -174,7 +179,10 @@ impl Waking {
     /// play begins (TUI-RUN-038). Otherwise draw the waking screen having
     /// replayed no more than this bound, and come back pending.
     /// @spec TUI-RUN-033, TUI-RUN-034, TUI-RUN-037, TUI-RUN-038
-    fn advance_and_draw<B: Backend>(mut self, terminal: &mut Terminal<B>) -> Result<Wake, Box<Refused>> {
+    fn advance_and_draw<B: Backend>(
+        mut self,
+        terminal: &mut Terminal<B>,
+    ) -> Result<Wake, Box<Refused>> {
         let bound = self.bound;
         match self.catch_up.advance(bound) {
             Advance::Finished(loaded) => {
@@ -200,11 +208,18 @@ impl Waking {
                 // @spec TUI-NAV-102
                 // @spec TUI-RUN-047, TUI-RUN-048
                 let drawn = terminal.draw(|f| {
-                    render::waking(f, self.catch_up.total_ticks(), self.catch_up.remaining_ticks())
+                    render::waking(
+                        f,
+                        self.catch_up.total_ticks(),
+                        self.catch_up.remaining_ticks(),
+                    )
                 });
                 match drawn {
                     Ok(_) => Ok(Wake::Waking(self)),
-                    Err(error) => Err(Box::new(Refused { error, waking: self })),
+                    Err(error) => Err(Box::new(Refused {
+                        error,
+                        waking: self,
+                    })),
                 }
             }
         }

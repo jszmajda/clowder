@@ -6,9 +6,9 @@
 //! hoped-for. @spec TUI-RENDER-001
 
 pub mod fmt;
-pub mod widgets;
 pub mod layout;
 pub mod pointer;
+pub mod widgets;
 
 use clowder_core::{content, Command, ContentId, GameState, Location, LockReason, ResourceId};
 use ratatui::layout::Rect;
@@ -48,13 +48,19 @@ pub(crate) struct Piece {
 
 impl Piece {
     pub(crate) fn plain(text: impl Into<String>) -> Self {
-        Piece { text: text.into(), coat: None }
+        Piece {
+            text: text.into(),
+            coat: None,
+        }
     }
 
     /// A resource's name as drawn — whole, or cut with its ellipsis — and the
     /// character count of the whole name.
     pub(crate) fn name(r: ResourceId, drawn: impl Into<String>, full_chars: usize) -> Self {
-        Piece { text: drawn.into(), coat: Some((r, full_chars)) }
+        Piece {
+            text: drawn.into(),
+            coat: Some((r, full_chars)),
+        }
     }
 }
 
@@ -71,7 +77,12 @@ pub(crate) fn pieces_text(pieces: &[Piece]) -> String {
 /// position. A line whose colour says one thing whole — dim, attention, a
 /// reversal — passes `coats` off, and every character keeps `base`.
 /// @spec TUI-THEME-019, TUI-THEME-020, TUI-THEME-021
-pub(crate) fn line_from_pieces(pieces: &[Piece], base: Style, coats: bool, width: usize) -> Line<'static> {
+pub(crate) fn line_from_pieces(
+    pieces: &[Piece],
+    base: Style,
+    coats: bool,
+    width: usize,
+) -> Line<'static> {
     let mut cells: Vec<(char, Style)> = Vec::new();
     for piece in pieces {
         match piece.coat {
@@ -204,7 +215,11 @@ fn widest_resource_name() -> usize {
     use std::sync::OnceLock;
     static WIDEST: OnceLock<usize> = OnceLock::new();
     *WIDEST.get_or_init(|| {
-        ResourceId::ALL.iter().map(|r| resource_label(*r).chars().count()).max().unwrap_or(0)
+        ResourceId::ALL
+            .iter()
+            .map(|r| resource_label(*r).chars().count())
+            .max()
+            .unwrap_or(0)
     })
 }
 
@@ -220,7 +235,10 @@ fn cost_field_width() -> usize {
 /// tinkerers on a craft's tinkerer row — judged by the section alone, so the
 /// column is the same whatever is listed. @spec TUI-RENDER-020
 fn section_gives_count(section: Section) -> bool {
-    matches!(section, Section::Meadow | Section::Clowder | Section::Crafts | Section::Sunbeams)
+    matches!(
+        section,
+        Section::Meadow | Section::Clowder | Section::Crafts | Section::Sunbeams
+    )
 }
 
 /// Whether a section's list gives a next-cost field (TUI-NAV-078,
@@ -286,7 +304,9 @@ fn count_field_text(count: Option<u64>) -> String {
 /// that fits the field, with `, …` after it where any is left out; blank to
 /// the field's width. @spec TUI-RENDER-020, TUI-THEME-019
 fn cost_field_pieces(cost: Option<&[(ResourceId, f64)]>, width: usize) -> Vec<Piece> {
-    let Some(cost) = cost else { return vec![Piece::plain(" ".repeat(width))] };
+    let Some(cost) = cost else {
+        return vec![Piece::plain(" ".repeat(width))];
+    };
     let components: Vec<[Piece; 2]> = cost
         .iter()
         .enumerate()
@@ -302,7 +322,10 @@ fn cost_field_pieces(cost: Option<&[(ResourceId, f64)]>, width: usize) -> Vec<Pi
         })
         .collect();
     let run_len = |k: usize| -> usize {
-        components[..k].iter().map(|c| c[0].text.chars().count() + c[1].text.chars().count()).sum::<usize>()
+        components[..k]
+            .iter()
+            .map(|c| c[0].text.chars().count() + c[1].text.chars().count())
+            .sum::<usize>()
             + 2 * k.saturating_sub(1)
     };
     let mut out: Vec<Piece> = Vec::new();
@@ -329,7 +352,6 @@ fn cost_field_pieces(cost: Option<&[(ResourceId, f64)]>, width: usize) -> Vec<Pi
     out
 }
 
-
 /// The components an open count prompt's preview (TUI-NAV-067) prices for
 /// `digits`: the core's per-component total for taking the count (a
 /// repeat-N row), or N times the core's one-unit price (a Pounce or Trade
@@ -344,13 +366,23 @@ fn prompt_preview_components(state: &GameState, row: &Row, digits: &str) -> Vec<
         return Vec::new();
     }
     match &row.kind {
-        RowKind::Act { semantics: CountSemantics::RepeatN, .. } => match row.key {
+        RowKind::Act {
+            semantics: CountSemantics::RepeatN,
+            ..
+        } => match row.key {
             RowKey::Content(id, _) => state.cost_of_next(id, n),
             _ => Vec::new(),
         },
-        RowKind::Act { command, semantics: CountSemantics::CountTaking } if !row.heavy => state
+        RowKind::Act {
+            command,
+            semantics: CountSemantics::CountTaking,
+        } if !row.heavy => state
             .unit_price(command)
-            .map(|unit| unit.into_iter().map(|(r, each)| (r, each * n as f64)).collect())
+            .map(|unit| {
+                unit.into_iter()
+                    .map(|(r, each)| (r, each * n as f64))
+                    .collect()
+            })
             .unwrap_or_default(),
         _ => Vec::new(),
     }
@@ -413,10 +445,13 @@ fn prompt_pieces_cut(parts: &[(String, ResourceId)], digits: &str, place: usize)
     prompt_pieces(parts, digits, Some(0))
 }
 
-
 /// The preview as pieces, each component's name a piece of its own so it can
 /// wear its coat wherever the preview is drawn. @spec TUI-NAV-067, TUI-THEME-019
-pub(crate) fn count_prompt_preview_pieces(state: &GameState, row: &Row, digits: &str) -> Vec<Piece> {
+pub(crate) fn count_prompt_preview_pieces(
+    state: &GameState,
+    row: &Row,
+    digits: &str,
+) -> Vec<Piece> {
     let comps = prompt_preview_components(state, row, digits);
     prompt_pieces(&prompt_preview_parts(&comps), digits, None)
 }
@@ -437,7 +472,11 @@ fn row_label(state: &GameState, row: &Row) -> String {
         RowKey::Adventure(Some(a)) => humanize(&format!("{a:?}")),
         RowKey::Adventure(None) => "No Adventure".to_string(),
         RowKey::Kitten(ix, _) => {
-            let name = state.kittens.get(*ix).map(|k| k.name.as_str()).unwrap_or("");
+            let name = state
+                .kittens
+                .get(*ix)
+                .map(|k| k.name.as_str())
+                .unwrap_or("");
             if name.is_empty() {
                 format!("Kitten {}", ix + 1)
             } else {
@@ -524,7 +563,10 @@ pub(crate) fn consequence_summary(state: &GameState, armed: &ArmedRow) -> Vec<St
             ]
         }
         Command::PassItDown => {
-            vec![format!("Pass down {} elder wisdom", figure(state.elder_wisdom))]
+            vec![format!(
+                "Pass down {} elder wisdom",
+                figure(state.elder_wisdom)
+            )]
         }
         Command::AdoptRule(rule) => {
             let sibling = content::rule_def(content::rule_def(rule).blocks).name;
@@ -533,7 +575,11 @@ pub(crate) fn consequence_summary(state: &GameState, armed: &ArmedRow) -> Vec<St
         Command::DeepNap(years) => {
             let cost = figure(state.starshard_cost(years));
             let wake = figure((state.year() + years as u64) as f64);
-            vec![format!("Nap {years} years"), format!("costs {cost} starshards"), format!("wakes in year {wake}")]
+            vec![
+                format!("Nap {years} years"),
+                format!("costs {cost} starshards"),
+                format!("wakes in year {wake}"),
+            ]
         }
         _ => Vec::new(),
     }
@@ -551,10 +597,18 @@ struct Window {
 /// has rows to spare. @spec TUI-RENDER-009
 fn window_for(total: usize, cursor: usize, capacity: usize) -> Window {
     if capacity == 0 || total == 0 {
-        return Window { start: 0, len: 0, hidden: total };
+        return Window {
+            start: 0,
+            len: 0,
+            hidden: total,
+        };
     }
     if total <= capacity {
-        return Window { start: 0, len: total, hidden: 0 };
+        return Window {
+            start: 0,
+            len: total,
+            hidden: 0,
+        };
     }
 
     // One row of the pane is reserved for the overflow note, so the rows
@@ -565,7 +619,11 @@ fn window_for(total: usize, cursor: usize, capacity: usize) -> Window {
     let max_start = total - usable;
     let start = cursor.saturating_sub(MARGIN).min(max_start);
     let hidden = total - (start + usable);
-    Window { start, len: usable, hidden }
+    Window {
+        start,
+        len: usable,
+        hidden,
+    }
 }
 
 /// Render one section's rows into a pane, deriving the scroll window from the
@@ -616,7 +674,11 @@ fn draw_list(
         if crate::nav::rows::is_done_header(row) {
             // @spec TUI-NAV-111
             lines.push(Line::from(Span::styled(
-                fmt::done_header_line(crate::nav::rows::done_count(state), view.done_open, area.width as usize),
+                fmt::done_header_line(
+                    crate::nav::rows::done_count(state),
+                    view.done_open,
+                    area.width as usize,
+                ),
                 style_for(Role::Dim),
             )));
             continue;
@@ -625,7 +687,14 @@ fn draw_list(
         if row.selectable() && y < area.bottom() as usize {
             drawn_at.push((Rect::new(area.x, y as u16, area.width, 1), row.key.clone()));
         }
-        lines.push(row_line(state, row, focused, area.width as usize, section, on_this_row));
+        lines.push(row_line(
+            state,
+            row,
+            focused,
+            area.width as usize,
+            section,
+            on_this_row,
+        ));
         // The row an arming holds expands in place, on the lines directly
         // beneath it — never anywhere else, and only while the arming still
         // holds. The expansion carries attention's colour so the row's own
@@ -679,7 +748,10 @@ fn row_line(
     let label = row_label(state, row);
     if matches!(row.kind, RowKind::Group) {
         // @spec TUI-RENDER-023
-        return Line::from(Span::styled(fmt::group_header_line(&label, width), style_for(Role::Dim)));
+        return Line::from(Span::styled(
+            fmt::group_header_line(&label, width),
+            style_for(Role::Dim),
+        ));
     }
 
     let (marker, role) = marker_for(state, row).unwrap_or((" ", Role::Inherited));
@@ -721,10 +793,16 @@ fn row_line(
     if let RowKey::Kitten(ix, _) = row.key {
         let total = fixed - (cursor.chars().count() + 2);
         let place = total.saturating_sub(1);
-        suffix.push(Piece::plain(format!(" {:<place$}", kitten_state_word(state, ix))));
+        suffix.push(Piece::plain(format!(
+            " {:<place$}",
+            kitten_state_word(state, ix)
+        )));
     } else {
         if counted {
-            suffix.push(Piece::plain(format!(" {}", count_field_text(stated_count(state, row)))));
+            suffix.push(Piece::plain(format!(
+                " {}",
+                count_field_text(stated_count(state, row))
+            )));
         }
         if costed {
             suffix.push(Piece::plain(" "));
@@ -737,8 +815,8 @@ fn row_line(
     // draws that hint in the dim role — a colour the row's own focus reverse
     // never overrides — and never in part. @spec TUI-NAV-095
     let name_len = label.chars().count();
-    let hint = kitten_elder_hint(state, row)
-        .filter(|hint| name_len + 1 + hint.chars().count() <= name_w);
+    let hint =
+        kitten_elder_hint(state, row).filter(|hint| name_len + 1 + hint.chars().count() <= name_w);
 
     // The Elder's own row draws the mark in the row's own style instead,
     // stepping down to the glyph alone, then to nothing, by what the name's
@@ -792,11 +870,15 @@ fn row_line(
 /// row earns the hint at all.
 /// @spec TUI-NAV-095
 fn kitten_elder_hint(state: &GameState, row: &Row) -> Option<&'static str> {
-    let RowKey::Kitten(ix, _) = row.key else { return None };
+    let RowKey::Kitten(ix, _) = row.key else {
+        return None;
+    };
     if state.elder == Some(ix) {
         return None;
     }
-    state.command_gate_open(&Command::AppointElder(ix)).then_some(ELDER_HINT)
+    state
+        .command_gate_open(&Command::AppointElder(ix))
+        .then_some(ELDER_HINT)
 }
 
 /// The forms of the Elder's mark the row of the kitten the core holds as the
@@ -888,7 +970,10 @@ fn prompt_row_pieces(
 
     let name = fmt::fit(label, name_w);
     let pad = name_w.saturating_sub(name.chars().count());
-    let mut out = vec![Piece::plain(format!("{cursor}{marker} ")), name_piece(row, &name, label)];
+    let mut out = vec![
+        Piece::plain(format!("{cursor}{marker} ")),
+        name_piece(row, &name, label),
+    ];
     out.push(Piece::plain(format!("{} ", " ".repeat(pad))));
     if counted {
         out.push(Piece::plain(count_field_text(stated_count(state, row))));
@@ -902,20 +987,36 @@ fn prompt_row_pieces(
 /// from its edge facing the sidebar — is set aside, so whatever draws there
 /// fits its lines to that width rather than being drawn full width and cut.
 fn left_of_divider(main: Rect) -> Rect {
-    Rect::new(main.x + 1, main.y, main.width.saturating_sub(1), main.height)
+    Rect::new(
+        main.x + 1,
+        main.y,
+        main.width.saturating_sub(1),
+        main.height,
+    )
 }
 
 /// The list's space once both its dividers — taken from its edges facing the
 /// sidebar and the inspector — are set aside.
 fn left_between_dividers(list: Rect) -> Rect {
-    Rect::new(list.x + 1, list.y, list.width.saturating_sub(2), list.height)
+    Rect::new(
+        list.x + 1,
+        list.y,
+        list.width.saturating_sub(2),
+        list.height,
+    )
 }
 
 /// Draw a pane divider — a `│` in the season's accent, and nothing else in
 /// its cells — down each named column, the panes' rows only. Taken from the
 /// list's space rather than given a column of its own, so the layout algebra
 /// is untouched.
-fn draw_dividers(f: &mut Frame, columns: &[u16], top: u16, height: u16, season: clowder_core::Season) {
+fn draw_dividers(
+    f: &mut Frame,
+    columns: &[u16],
+    top: u16,
+    height: u16,
+    season: clowder_core::Season,
+) {
     let accent = theme::seasonal_accent(season);
     let buf = f.buffer_mut();
     for &x in columns {
@@ -954,13 +1055,16 @@ pub fn waking_recorded(f: &mut Frame, total_ticks: u64, remaining_ticks: u64) ->
     let total = total_ticks.max(1);
     let filled = (40 * replayed / total) as usize;
     let percent = 100 * replayed / total;
-    let bar: String =
-        "\u{2588}".repeat(filled) + &"\u{2591}".repeat(40 - filled);
+    let bar: String = "\u{2588}".repeat(filled) + &"\u{2591}".repeat(40 - filled);
 
     let calm = "the clowder is stretching awake\u{2026}";
     let bar_line = format!("{bar}   {percent}%");
     let hint = "q save & quit \u{b7} the meadow finishes waking next time";
-    let lines = [(calm, Role::Dim), (bar_line.as_str(), Role::Inherited), (hint, Role::Dim)];
+    let lines = [
+        (calm, Role::Dim),
+        (bar_line.as_str(), Role::Inherited),
+        (hint, Role::Dim),
+    ];
 
     // Centred in the pane, one blank row between each. @spec TUI-NAV-102
     let block_h = 5u16;
@@ -973,7 +1077,10 @@ pub fn waking_recorded(f: &mut Frame, total_ticks: u64, remaining_ticks: u64) ->
         let w = (text.chars().count() as u16).min(area.width);
         let x = area.x + (area.width.saturating_sub(w)) / 2;
         let rect = Rect::new(x, y, w, 1);
-        f.render_widget(Paragraph::new(Line::styled(text.to_string(), style_for(*role))), rect);
+        f.render_widget(
+            Paragraph::new(Line::styled(text.to_string(), style_for(*role))),
+            rect,
+        );
     }
     record
 }
@@ -984,12 +1091,7 @@ pub fn waking_recorded(f: &mut Frame, total_ticks: u64, remaining_ticks: u64) ->
 /// *previous* frame's layout, so a frame that computed one and dropped it
 /// would leave the next frame unable to tell which side of a boundary it was
 /// already on. @spec TUI-RENDER-001, TUI-RENDER-002, TUI-RENDER-008
-pub fn frame(
-    f: &mut Frame,
-    state: &GameState,
-    view: &ViewState,
-    prev: Option<&Layout>,
-) -> Layout {
+pub fn frame(f: &mut Frame, state: &GameState, view: &ViewState, prev: Option<&Layout>) -> Layout {
     frame_recorded(f, state, view, prev).0
 }
 
@@ -1026,7 +1128,9 @@ pub fn frame_recorded(
     // header gave it. @spec TUI-RENDER-016, TUI-THEME-008
     f.buffer_mut().set_style(
         layout.header,
-        Style::default().add_modifier(Modifier::UNDERLINED).underline_color(theme::seasonal_accent(state.season())),
+        Style::default()
+            .add_modifier(Modifier::UNDERLINED)
+            .underline_color(theme::seasonal_accent(state.season())),
     );
     record.record_tabs(widgets::chrome::tabs_recorded(f, layout.tabs, state, view));
 
@@ -1041,7 +1145,9 @@ pub fn frame_recorded(
     let body_rect = match layout.body {
         Body::TooSmall(r) => r,
         Body::Narrow { sidebar, main } => sidebar.union(main),
-        Body::Wide { sidebar, inspector, .. } => sidebar.union(inspector),
+        Body::Wide {
+            sidebar, inspector, ..
+        } => sidebar.union(inspector),
     };
     match &view.overlay {
         Some(Overlay::Journal { .. }) => {
@@ -1069,7 +1175,11 @@ pub fn frame_recorded(
                 }
                 draw_dividers(f, &[main.x], main.y, main.height, state.season());
             }
-            Body::Wide { sidebar, list, inspector } => {
+            Body::Wide {
+                sidebar,
+                list,
+                inspector,
+            } => {
                 widgets::chrome::sidebar(f, sidebar, state);
                 let space = left_between_dividers(list);
                 let drawn = draw_list(f, space, state, section, view);
@@ -1078,9 +1188,18 @@ pub fn frame_recorded(
                 // narrow-mode swap alone — "while the inspector holds the
                 // list's space" — so the persistent pane never loses its next
                 // cost or lock reason to an open prompt on the same row.
-                let pane_view = ViewState { prompt: None, ..view.clone() };
+                let pane_view = ViewState {
+                    prompt: None,
+                    ..view.clone()
+                };
                 widgets::inspector::draw(f, inspector, state, &pane_view);
-                draw_dividers(f, &[list.x, list.right() - 1], list.y, list.height, state.season());
+                draw_dividers(
+                    f,
+                    &[list.x, list.right() - 1],
+                    list.y,
+                    list.height,
+                    state.season(),
+                );
             }
         },
     }
@@ -1091,9 +1210,16 @@ pub fn frame_recorded(
     // looking. It does not want the player — it is ordinary prose, not one of
     // attention's three wearers — so it is drawn in the inherited foreground,
     // never attention. @spec TUI-NAV-014, TUI-THEME-015
-    match view.footer.as_ref().filter(|(_, until)| *until > std::time::Instant::now()) {
+    match view
+        .footer
+        .as_ref()
+        .filter(|(_, until)| *until > std::time::Instant::now())
+    {
         Some((note, _)) => f.render_widget(
-            Paragraph::new(Line::from(Span::raw(fmt::fit(note, layout.hints.width as usize)))),
+            Paragraph::new(Line::from(Span::raw(fmt::fit(
+                note,
+                layout.hints.width as usize,
+            )))),
             layout.hints,
         ),
         None => widgets::chrome::hints(f, layout.hints, state, view),

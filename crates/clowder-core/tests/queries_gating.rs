@@ -89,7 +89,11 @@ fn revealed_meadow(seed: u64) -> GameState {
 
 /// The amount of one resource inside a cost list (0 when unnamed).
 fn amount_of(costs: &[(ResourceId, f64)], r: ResourceId) -> f64 {
-    costs.iter().filter(|(cr, _)| *cr == r).map(|(_, a)| *a).sum()
+    costs
+        .iter()
+        .filter(|(cr, _)| *cr == r)
+        .map(|(_, a)| *a)
+        .sum()
 }
 
 /// The escalating price of `n` copies, observed one build at a time rather
@@ -126,11 +130,22 @@ fn builds_until_rejected(s: &GameState, id: StructureId) -> u32 {
 fn assert_costs_eq(actual: &[(ResourceId, f64)], expected: &[(ResourceId, f64)], what: &str) {
     let mut seen: Vec<ResourceId> = Vec::new();
     for (r, _) in actual {
-        assert!(!seen.contains(r), "{what}: {r:?} named twice — a total, not a per-step log");
+        assert!(
+            !seen.contains(r),
+            "{what}: {r:?} named twice — a total, not a per-step log"
+        );
         seen.push(*r);
     }
-    let mut a: Vec<(ResourceId, f64)> = actual.iter().copied().filter(|(_, v)| v.abs() > TOL).collect();
-    let mut e: Vec<(ResourceId, f64)> = expected.iter().copied().filter(|(_, v)| v.abs() > TOL).collect();
+    let mut a: Vec<(ResourceId, f64)> = actual
+        .iter()
+        .copied()
+        .filter(|(_, v)| v.abs() > TOL)
+        .collect();
+    let mut e: Vec<(ResourceId, f64)> = expected
+        .iter()
+        .copied()
+        .filter(|(_, v)| v.abs() > TOL)
+        .collect();
     a.sort_by_key(|(r, _)| r.ix());
     e.sort_by_key(|(r, _)| r.ix());
     assert_eq!(a.len(), e.len(), "{what}: expected {e:?}, got {a:?}");
@@ -147,11 +162,16 @@ fn assert_costs_eq(actual: &[(ResourceId, f64)], expected: &[(ResourceId, f64)],
 fn names_the_same_cause(reason: &LockReason, err: &CommandError) -> bool {
     matches!(
         (reason, err),
-        (LockReason::NotYetReached | LockReason::Prerequisite, CommandError::Locked)
-            | (LockReason::AlreadyYours, CommandError::AlreadyResearched)
+        (
+            LockReason::NotYetReached | LockReason::Prerequisite,
+            CommandError::Locked
+        ) | (LockReason::AlreadyYours, CommandError::AlreadyResearched)
             | (LockReason::NoOneFree, CommandError::NoIdleKittens)
             | (LockReason::NoRoom, CommandError::NoSeats)
-            | (LockReason::ShortBy { .. }, CommandError::InsufficientResources { .. })
+            | (
+                LockReason::ShortBy { .. },
+                CommandError::InsufficientResources { .. }
+            )
     )
 }
 
@@ -204,18 +224,31 @@ fn a_short_lock_reason_carries_the_shortfall_the_command_reports() {
     give(&mut s, ResourceId::Catnip, 4.0);
     let id = ContentId::Structure(StructureId::CatnipPatch);
 
-    let reason = s.lock_reason(id).expect("4 catnip does not buy a 10-catnip patch");
+    let reason = s
+        .lock_reason(id)
+        .expect("4 catnip does not buy a 10-catnip patch");
     let LockReason::ShortBy { missing } = reason else {
         panic!("a revealed, merely-unaffordable item is short by an amount, got {reason:?}")
     };
     // Data, not prose, and not a re-derivation: the same shortfall the command
     // layer hands back, because it comes from the same gate.
     let outcome = s.clone().apply(Command::Build(StructureId::CatnipPatch));
-    let Err(CommandError::InsufficientResources { missing: from_command }) = outcome else {
+    let Err(CommandError::InsufficientResources {
+        missing: from_command,
+    }) = outcome
+    else {
         panic!("fixture: the command should report a shortfall, got {outcome:?}")
     };
-    assert_costs_eq(&missing, &from_command, "the query's shortfall vs the command's");
-    assert_costs_eq(&missing, &[(ResourceId::Catnip, 6.0)], "the shortfall itself");
+    assert_costs_eq(
+        &missing,
+        &from_command,
+        "the query's shortfall vs the command's",
+    );
+    assert_costs_eq(
+        &missing,
+        &[(ResourceId::Catnip, 6.0)],
+        "the shortfall itself",
+    );
 }
 
 // ---- SIM-ENG-036: the command layer's precedence, item by item ----
@@ -264,7 +297,10 @@ fn what_is_already_yours_outranks_what_it_would_cost() {
     )
     .expect("a sibling-blocked rule is not actionable");
     assert!(
-        matches!(blocked, LockReason::NotYetReached | LockReason::Prerequisite),
+        matches!(
+            blocked,
+            LockReason::NotYetReached | LockReason::Prerequisite
+        ),
         "the block outranks the empty purse, got {blocked:?}"
     );
 
@@ -274,7 +310,11 @@ fn what_is_already_yours_outranks_what_it_would_cost() {
         Command::AdoptRule(RuleId::EarlyBirds),
     )
     .expect("an adopted rule cannot be adopted again");
-    assert_eq!(owned, LockReason::AlreadyYours, "already yours outranks the price");
+    assert_eq!(
+        owned,
+        LockReason::AlreadyYours,
+        "already yours outranks the price"
+    );
 
     // Wealth changes neither answer: the earlier blocker still wins.
     give(&mut s, ResourceId::Charm, 10_000.0);
@@ -284,7 +324,10 @@ fn what_is_already_yours_outranks_what_it_would_cost() {
         Command::AdoptRule(RuleId::NightOwls),
     )
     .expect("a sibling-blocked rule stays blocked however rich the meadow");
-    assert!(matches!(blocked, LockReason::NotYetReached | LockReason::Prerequisite));
+    assert!(matches!(
+        blocked,
+        LockReason::NotYetReached | LockReason::Prerequisite
+    ));
     assert_eq!(
         reason_and_error(
             &s,
@@ -355,11 +398,17 @@ fn revealing_an_item_is_what_permits_naming_its_price() {
     // Same stock, same shortfall — only the reveal changed, and now the reason
     // may name what is missing.
     assert_eq!(s.availability(patch), Availability::Teased, "fixture");
-    let reason = s.lock_reason(patch).expect("3 catnip does not buy a 10-catnip patch");
+    let reason = s
+        .lock_reason(patch)
+        .expect("3 catnip does not buy a 10-catnip patch");
     let LockReason::ShortBy { missing } = reason else {
         panic!("a revealed item may name its price, got {reason:?}")
     };
-    assert_costs_eq(&missing, &[(ResourceId::Catnip, 7.0)], "the revealed shortfall");
+    assert_costs_eq(
+        &missing,
+        &[(ResourceId::Catnip, 7.0)],
+        "the revealed shortfall",
+    );
 }
 
 // ---- SIM-ENG-038: the total cost of n steps, escalation included ----
@@ -376,7 +425,11 @@ fn cost_of_next_totals_the_escalating_price_over_n_steps() {
 
     // n steps are the n successive prices — not n copies of the first.
     for n in [2u32, 3, 5] {
-        assert_costs_eq(&s.cost_of_next(id, n), &walked_total(&s, patch, n), &format!("{n} steps"));
+        assert_costs_eq(
+            &s.cost_of_next(id, n),
+            &walked_total(&s, patch, n),
+            &format!("{n} steps"),
+        );
     }
     let one = amount_of(&s.next_cost(patch), ResourceId::Catnip);
     let three = amount_of(&s.cost_of_next(id, 3), ResourceId::Catnip);
@@ -389,7 +442,11 @@ fn cost_of_next_totals_the_escalating_price_over_n_steps() {
     let cushion = StructureId::CozyCushion;
     let total = s.cost_of_next(ContentId::Structure(cushion), 3);
     assert_costs_eq(&total, &walked_total(&s, cushion, 3), "three cushions");
-    assert_eq!(total.iter().filter(|(_, a)| a.abs() > TOL).count(), 2, "both components named");
+    assert_eq!(
+        total.iter().filter(|(_, a)| a.abs() > TOL).count(),
+        2,
+        "both components named"
+    );
 
     // Taking the action no times costs nothing.
     assert!(
@@ -404,7 +461,10 @@ fn cost_of_next_is_exactly_what_n_actions_consume() {
     let s = revealed_meadow(42);
     let patch = StructureId::CatnipPatch;
     let total = s.cost_of_next(ContentId::Structure(patch), 4);
-    assert!(!total.is_empty(), "a four-patch preview names what it would spend");
+    assert!(
+        !total.is_empty(),
+        "a four-patch preview names what it would spend"
+    );
 
     // Stock exactly the preview, then spend it: four builds land, the purse
     // empties, and a fifth was never in the preview.
@@ -413,8 +473,9 @@ fn cost_of_next_is_exactly_what_n_actions_consume() {
         give(&mut play, *r, *amount);
     }
     for i in 1..=4 {
-        play.apply(Command::Build(patch))
-            .unwrap_or_else(|e| panic!("build {i} of 4 should be covered by the preview, got {e:?}"));
+        play.apply(Command::Build(patch)).unwrap_or_else(|e| {
+            panic!("build {i} of 4 should be covered by the preview, got {e:?}")
+        });
     }
     for (r, _) in &total {
         assert!(
@@ -423,7 +484,10 @@ fn cost_of_next_is_exactly_what_n_actions_consume() {
             play.stock(*r)
         );
     }
-    assert!(play.apply(Command::Build(patch)).is_err(), "a fifth build was never previewed");
+    assert!(
+        play.apply(Command::Build(patch)).is_err(),
+        "a fifth build was never previewed"
+    );
 }
 
 // @spec SIM-ENG-038
@@ -436,7 +500,11 @@ fn cost_of_next_prices_from_current_state_not_from_an_empty_meadow() {
     let from_scratch = amount_of(&s.cost_of_next(id, 2), ResourceId::Catnip);
     s.structures[patch.ix()] += 2;
     let later = s.cost_of_next(id, 2);
-    assert_costs_eq(&later, &walked_total(&s, patch, 2), "two more once two are owned");
+    assert_costs_eq(
+        &later,
+        &walked_total(&s, patch, 2),
+        "two more once two are owned",
+    );
     assert!(
         amount_of(&later, ResourceId::Catnip) > from_scratch + TOL,
         "the next two cost more than the first two did"
@@ -457,7 +525,11 @@ fn affordability_runs_from_empty_to_covered() {
     for (r, _) in &cost {
         give(&mut s, *r, 0.0);
     }
-    assert!(s.affordability(id).abs() < TOL, "empty stores cover nothing, got {}", s.affordability(id));
+    assert!(
+        s.affordability(id).abs() < TOL,
+        "empty stores cover nothing, got {}",
+        s.affordability(id)
+    );
 
     // Half of every component: half covered.
     for (r, amount) in &cost {
@@ -473,14 +545,25 @@ fn affordability_runs_from_empty_to_covered() {
     for (r, amount) in &cost {
         give(&mut s, *r, *amount);
     }
-    assert!((s.affordability(id) - 1.0).abs() < TOL, "got {}", s.affordability(id));
-    assert!(s.clone().apply(Command::Build(cushion)).is_ok(), "fixture: 1.0 means affordable now");
+    assert!(
+        (s.affordability(id) - 1.0).abs() < TOL,
+        "got {}",
+        s.affordability(id)
+    );
+    assert!(
+        s.clone().apply(Command::Build(cushion)).is_ok(),
+        "fixture: 1.0 means affordable now"
+    );
 
     // A pile beyond the price does not push the fraction past 1.
     for (r, amount) in &cost {
         give(&mut s, *r, amount * 10.0);
     }
-    assert!((s.affordability(id) - 1.0).abs() < TOL, "got {}", s.affordability(id));
+    assert!(
+        (s.affordability(id) - 1.0).abs() < TOL,
+        "got {}",
+        s.affordability(id)
+    );
 }
 
 // @spec SIM-ENG-039
@@ -498,7 +581,10 @@ fn affordability_reaches_one_only_when_every_component_is_covered() {
     give(&mut s, cost[0].0, cost[0].1 * 8.0);
     give(&mut s, cost[1].0, cost[1].1 * 0.5);
     let f = s.affordability(id);
-    assert!(f > 0.0 && f < 1.0 - TOL, "partly affordable is neither 0 nor 1, got {f}");
+    assert!(
+        f > 0.0 && f < 1.0 - TOL,
+        "partly affordable is neither 0 nor 1, got {f}"
+    );
     assert!(
         matches!(s.lock_reason(id), Some(LockReason::ShortBy { .. })),
         "the same state the fraction calls short, the gate calls short"
@@ -506,7 +592,11 @@ fn affordability_reaches_one_only_when_every_component_is_covered() {
 
     // Cover the short component and both answers close together.
     give(&mut s, cost[1].0, cost[1].1);
-    assert!((s.affordability(id) - 1.0).abs() < TOL, "got {}", s.affordability(id));
+    assert!(
+        (s.affordability(id) - 1.0).abs() < TOL,
+        "got {}",
+        s.affordability(id)
+    );
     assert_eq!(s.lock_reason(id), None);
 }
 
@@ -538,10 +628,15 @@ fn max_affordable_sits_exactly_on_the_boundary_cost_of_next_draws() {
     let id = ContentId::Structure(patch);
     give(&mut s, ResourceId::Catnip, 137.0);
 
-    let n = s.max_affordable(id).expect("an escalating structure price has a closed form");
+    let n = s
+        .max_affordable(id)
+        .expect("an escalating structure price has a closed form");
     assert!(n > 0, "137 catnip buys at least one 10-catnip patch");
     for (r, amount) in s.cost_of_next(id, n) {
-        assert!(s.stock(r) + TOL >= amount, "{n} copies should be covered: {r:?} short of {amount}");
+        assert!(
+            s.stock(r) + TOL >= amount,
+            "{n} copies should be covered: {r:?} short of {amount}"
+        );
     }
     let over = s.cost_of_next(id, n + 1);
     assert!(
@@ -567,19 +662,68 @@ fn max_affordable_sits_exactly_on_the_boundary_cost_of_next_draws() {
 fn a_meadow_at_tick_zero_states_nothing_it_has_not_reached() {
     let s = GameState::new(5);
     let shown = |all: Vec<ContentId>| -> usize {
-        all.into_iter().filter(|c| s.availability(*c) != Availability::Hidden).count()
+        all.into_iter()
+            .filter(|c| s.availability(*c) != Availability::Hidden)
+            .count()
     };
 
     for (kind, count) in [
-        ("structures", shown(StructureId::ALL.iter().map(|i| ContentId::Structure(*i)).collect())),
-        ("ideas", shown(IdeaId::ALL.iter().map(|i| ContentId::Idea(*i)).collect())),
-        ("crafts", shown(CraftId::ALL.iter().map(|i| ContentId::Craft(*i)).collect())),
-        ("rites", shown(RiteId::ALL.iter().map(|i| ContentId::Rite(*i)).collect())),
-        ("arch upgrades", shown(ArchId::ALL.iter().map(|i| ContentId::Arch(*i)).collect())),
-        ("refinements", shown(RefinementId::ALL.iter().map(|i| ContentId::Refinement(*i)).collect())),
-        ("house rules", shown(RuleId::ALL.iter().map(|i| ContentId::Rule(*i)).collect())),
-        ("traditions", shown(TraditionId::ALL.iter().map(|i| ContentId::Tradition(*i)).collect())),
-        ("dream-loom threads", shown(DreamLoomId::ALL.iter().map(|i| ContentId::DreamLoom(*i)).collect())),
+        (
+            "structures",
+            shown(
+                StructureId::ALL
+                    .iter()
+                    .map(|i| ContentId::Structure(*i))
+                    .collect(),
+            ),
+        ),
+        (
+            "ideas",
+            shown(IdeaId::ALL.iter().map(|i| ContentId::Idea(*i)).collect()),
+        ),
+        (
+            "crafts",
+            shown(CraftId::ALL.iter().map(|i| ContentId::Craft(*i)).collect()),
+        ),
+        (
+            "rites",
+            shown(RiteId::ALL.iter().map(|i| ContentId::Rite(*i)).collect()),
+        ),
+        (
+            "arch upgrades",
+            shown(ArchId::ALL.iter().map(|i| ContentId::Arch(*i)).collect()),
+        ),
+        (
+            "refinements",
+            shown(
+                RefinementId::ALL
+                    .iter()
+                    .map(|i| ContentId::Refinement(*i))
+                    .collect(),
+            ),
+        ),
+        (
+            "house rules",
+            shown(RuleId::ALL.iter().map(|i| ContentId::Rule(*i)).collect()),
+        ),
+        (
+            "traditions",
+            shown(
+                TraditionId::ALL
+                    .iter()
+                    .map(|i| ContentId::Tradition(*i))
+                    .collect(),
+            ),
+        ),
+        (
+            "dream-loom threads",
+            shown(
+                DreamLoomId::ALL
+                    .iter()
+                    .map(|i| ContentId::DreamLoom(*i))
+                    .collect(),
+            ),
+        ),
     ] {
         assert_eq!(
             count, 0,
@@ -627,7 +771,8 @@ fn the_gate_query_and_the_command_layer_agree_on_every_gated_action() {
         let open = s.command_gate_open(&cmd);
         let locked = matches!(s.clone().apply(cmd), Err(CommandError::Locked));
         assert_eq!(
-            open, !locked,
+            open,
+            !locked,
             "on a meadow at tick zero the gate query says {what} is {} while the command \
              layer says {}: one of them is deciding a rule the other owns",
             if open { "open" } else { "closed" },
@@ -714,7 +859,11 @@ fn the_roster_reach_never_falls() {
     let mut s = GameState::new(3);
     s.kittens = (0..5).map(|i| kitten(&format!("kitten-{i}"))).collect();
     run_ticks(&mut s, 1);
-    assert_eq!(s.roster_reach(), 5, "a roster of five was never recorded as having been met");
+    assert_eq!(
+        s.roster_reach(),
+        5,
+        "a roster of five was never recorded as having been met"
+    );
 
     s.kittens.truncate(2);
     run_ticks(&mut s, 1);

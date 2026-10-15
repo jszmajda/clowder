@@ -93,7 +93,11 @@ fn meadow(seed: u64) -> GameState {
     s.kittens[0].job = Some(JobId::Gardener);
     s.kittens[1].job = Some(JobId::TwigCollector);
     for k in &s.kittens {
-        assert_eq!(k.location, Location::Home, "fixture wants both kittens home");
+        assert_eq!(
+            k.location,
+            Location::Home,
+            "fixture wants both kittens home"
+        );
     }
     give(&mut s, ResourceId::Catnip, 100.0);
     give(&mut s, ResourceId::Twigs, 20.0);
@@ -112,8 +116,14 @@ fn net_rate_is_what_the_tick_actually_moves() {
     let s = meadow(1);
     let rates = agrees_with_tick(&s, &[ResourceId::Catnip, ResourceId::Twigs]);
     // The fixture is alive: growth and gathering both register.
-    assert!(rates[ResourceId::Catnip.ix()] > 0.0, "patches and a gardener grow catnip");
-    assert!(rates[ResourceId::Twigs.ix()] > 0.0, "a twig collector gathers twigs");
+    assert!(
+        rates[ResourceId::Catnip.ix()] > 0.0,
+        "patches and a gardener grow catnip"
+    );
+    assert!(
+        rates[ResourceId::Twigs.ix()] > 0.0,
+        "a twig collector gathers twigs"
+    );
 }
 
 /// Every multiplier the pipeline applies has to reach the rate. Each variant
@@ -130,34 +140,49 @@ fn net_rate_tracks_every_layer_the_pipeline_applies() {
     let mut grumpy = base.clone();
     grumpy.grumpy = true;
     let r = agrees_with_tick(&grumpy, &[ResourceId::Catnip])[ResourceId::Catnip.ix()];
-    assert!(r < baseline - 1e-6, "mood must reach the rate (grumpy {r} vs {baseline})");
+    assert!(
+        r < baseline - 1e-6,
+        "mood must reach the rate (grumpy {r} vs {baseline})"
+    );
 
     // Zoomies: a live multiplier on job output.
     let mut zoomy = base.clone();
     zoomy.zoomies_until = zoomy.ticks + 500;
     assert!(zoomy.zoomies_active());
     let r = agrees_with_tick(&zoomy, &[ResourceId::Catnip])[ResourceId::Catnip.ix()];
-    assert!(r > baseline + 1e-6, "zoomies must reach the rate ({r} vs {baseline})");
+    assert!(
+        r > baseline + 1e-6,
+        "zoomies must reach the rate ({r} vs {baseline})"
+    );
 
     // Season: the patch's seasonal modifier.
     let mut winter = base.clone();
     winter.ticks = 802; // mid-day 80
     assert_eq!(winter.season(), Season::Winter);
     let r = agrees_with_tick(&winter, &[ResourceId::Catnip])[ResourceId::Catnip.ix()];
-    assert!(r < baseline - 1e-6, "season must reach the rate ({r} vs {baseline})");
+    assert!(
+        r < baseline - 1e-6,
+        "season must reach the rate ({r} vs {baseline})"
+    );
 
     // A per-job ratio bought as a refinement.
     let mut refined = base.clone();
     refined.refinements.insert(RefinementId::PebbleCombs);
     let r = agrees_with_tick(&refined, &[ResourceId::Catnip])[ResourceId::Catnip.ix()];
-    assert!(r > baseline + 1e-6, "a job-ratio effect must reach the rate ({r} vs {baseline})");
+    assert!(
+        r > baseline + 1e-6,
+        "a job-ratio effect must reach the rate ({r} vs {baseline})"
+    );
 
     // A global production layer, itself fuel-scaled.
     let mut global = base.clone();
     grant(&mut global, StructureId::DynamoWheel, 2);
     give(&mut global, ResourceId::Dew, 5.0);
     let r = agrees_with_tick(&global, &[ResourceId::Catnip])[ResourceId::Catnip.ix()];
-    assert!(r > baseline + 1e-6, "the global layer must reach the rate ({r} vs {baseline})");
+    assert!(
+        r > baseline + 1e-6,
+        "the global layer must reach the rate ({r} vs {baseline})"
+    );
 }
 
 /// "Production less consumption" — the consumption half is not optional, and
@@ -238,7 +263,10 @@ fn asking_for_a_rate_changes_nothing_and_repeats() {
     }
     let second = s.net_rates();
     assert_eq!(first, second, "the same state must yield the same rates");
-    assert_eq!(s, snapshot, "reading a rate must leave the game state untouched");
+    assert_eq!(
+        s, snapshot,
+        "reading a rate must leave the game state untouched"
+    );
 }
 
 /// The rate describes production and consumption *at current state* — not
@@ -257,7 +285,11 @@ fn net_rate_reads_current_state_not_the_next_ticks_daily_processing() {
     mid_day.ticks = 1002; // next tick stays inside day 100
     let mut day_end = base.clone();
     day_end.ticks = 1009; // next tick crosses into day 101
-    assert_eq!(mid_day.day(), day_end.day(), "same day, same season, same production");
+    assert_eq!(
+        mid_day.day(),
+        day_end.day(),
+        "same day, same season, same production"
+    );
 
     // The fixture is discriminating: the two next ticks really do differ.
     let mut a = mid_day.clone();
@@ -265,10 +297,17 @@ fn net_rate_reads_current_state_not_the_next_ticks_daily_processing() {
     let mut b = day_end.clone();
     b.tick();
     assert_eq!(a.kittens.len(), mid_day.kittens.len());
-    assert_eq!(b.kittens.len(), day_end.kittens.len() + 1, "the day close adopts");
+    assert_eq!(
+        b.kittens.len(),
+        day_end.kittens.len() + 1,
+        "the day close adopts"
+    );
     let moved_a = a.stock(ResourceId::Catnip) - mid_day.stock(ResourceId::Catnip);
     let moved_b = b.stock(ResourceId::Catnip) - day_end.stock(ResourceId::Catnip);
-    assert!((moved_a - moved_b).abs() > 1e-9, "the ticks differ; the rates must not");
+    assert!(
+        (moved_a - moved_b).abs() > 1e-9,
+        "the ticks differ; the rates must not"
+    );
 
     assert_eq!(
         mid_day.net_rates(),
@@ -293,7 +332,8 @@ fn net_rate_is_free_of_the_speed_multiplier() {
 
     for speed in [0.25, 0.5, 2.0, 8.0] {
         let mut s = base.clone();
-        s.apply(Command::SetSpeed(speed)).expect("SetSpeed is always legal");
+        s.apply(Command::SetSpeed(speed))
+            .expect("SetSpeed is always legal");
         assert_eq!(s.speed, speed);
         assert_eq!(
             s.net_rates(),
@@ -309,7 +349,8 @@ fn net_rate_is_free_of_the_speed_multiplier() {
 #[test]
 fn a_sped_up_meadow_still_reports_the_ticks_own_arithmetic() {
     let mut s = meadow(9);
-    s.apply(Command::SetSpeed(8.0)).expect("SetSpeed is always legal");
+    s.apply(Command::SetSpeed(8.0))
+        .expect("SetSpeed is always legal");
     agrees_with_tick(&s, &[ResourceId::Catnip, ResourceId::Twigs]);
 }
 
@@ -364,7 +405,12 @@ fn net_rate_reflects_converter_throttling() {
     let flowing = stocked(50.0); // both inputs abundant: fraction 1
     let full = agrees_with_tick(
         &flowing,
-        &[ResourceId::Twigs, ResourceId::Pebbles, ResourceId::Buttons, ResourceId::Embers],
+        &[
+            ResourceId::Twigs,
+            ResourceId::Pebbles,
+            ResourceId::Buttons,
+            ResourceId::Embers,
+        ],
     );
     assert!(full[ResourceId::Buttons.ix()] > 0.0);
     assert!(full[ResourceId::Twigs.ix()] < 0.0, "inputs are drawn down");
@@ -374,9 +420,19 @@ fn net_rate_reflects_converter_throttling() {
     let starved = stocked(demand / 2.0);
     let half = agrees_with_tick(
         &starved,
-        &[ResourceId::Twigs, ResourceId::Pebbles, ResourceId::Buttons, ResourceId::Embers],
+        &[
+            ResourceId::Twigs,
+            ResourceId::Pebbles,
+            ResourceId::Buttons,
+            ResourceId::Embers,
+        ],
     );
-    for r in [ResourceId::Twigs, ResourceId::Pebbles, ResourceId::Buttons, ResourceId::Embers] {
+    for r in [
+        ResourceId::Twigs,
+        ResourceId::Pebbles,
+        ResourceId::Buttons,
+        ResourceId::Embers,
+    ] {
         assert!(
             agree(half[r.ix()], full[r.ix()] * 0.5, full[r.ix()]),
             "{r:?}: throttling scales every flow by the same fraction — expected {} , got {}",
@@ -473,7 +529,10 @@ fn availability_answers_for_every_id_of_every_kind() {
         for id in ids {
             let a = s.availability(id);
             assert!(
-                matches!(a, Availability::Hidden | Availability::Teased | Availability::Available),
+                matches!(
+                    a,
+                    Availability::Hidden | Availability::Teased | Availability::Available
+                ),
                 "{id:?} must answer with an availability"
             );
         }
@@ -498,7 +557,10 @@ fn kinds_without_a_reveal_ladder_are_never_teased() {
     open_but_broke.ideas.insert(IdeaId::ParadeRoutes);
     open_but_broke.ideas.insert(IdeaId::GroomedToPurrfection);
     open_but_broke.peak_devotion = 1000.0;
-    assert_eq!(open_but_broke.resources, [0.0; RESOURCES], "nothing in the pantry");
+    assert_eq!(
+        open_but_broke.resources, [0.0; RESOURCES],
+        "nothing in the pantry"
+    );
 
     for s in [&fresh, &open_but_broke] {
         for id in one_of_each() {
