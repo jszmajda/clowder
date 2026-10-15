@@ -1,9 +1,16 @@
 [package]
 name = "clowder-tui"
-version = "1.1.0"
+description = "A cozy terminal incremental game about raising a clowder of kittens"
+version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
-description = "The ratatui shell for clowder"
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+readme = "../../README.md"
+keywords = ["game", "incremental", "idle", "tui", "ratatui"]
+categories = ["games", "command-line-utilities"]
 
 [lib]
 name = "clowder_tui"
