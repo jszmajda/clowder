@@ -2,6 +2,10 @@
 
 A cozy terminal incremental game about raising a thriving clowder of kittens. Clowder is written in Rust with [ratatui](https://ratatui.rs). You can play it entirely from the keyboard, and it is built to live in a tmux pane for weeks. Nothing in Clowder ever dies, and nothing is ever sacrificed.
 
+![Clowder in a tmux pane: the stores down the left, a section's list of things to do and build in the middle, and the inspector on the right](docs/screenshots/clowder-1.png)
+
+![Clowder's inspector beside a list, stating exactly what the row under the cursor does and costs](docs/screenshots/clowder-2.png)
+
 Clowder is also a demonstration of [Linked-Intent Development](https://github.com/jszmajda/lid) (LID). Claude Code agents wrote the design, the requirements, the tests and the code. Jess Szmajda, who owns the project, steered it in about 1,340 words over 15 weeks, and she plays the game without reading its design. [How Clowder was built](docs/how-it-was-built.md) measures how much direction that took and where it went.
 
 ## Playing
