@@ -6532,3 +6532,61 @@ fn a_store_cut_short_keeps_its_colours_by_position_and_the_ellipsis_wears_its_ow
         "fixture: some name is longer than {name_col} characters"
     );
 }
+
+/// A refused command's footer note names the store it is short of in the
+/// stores' own words, in lower case — a name of several words spelled as
+/// words — and in that store's coat; every other character of the note stays
+/// in the inherited foreground.
+///
+/// @spec TUI-NAV-014, TUI-THEME-019, TUI-THEME-023, TUI-THEME-024
+#[test]
+fn a_refusal_short_of_a_store_names_it_in_words_and_in_its_coat() {
+    use clowder_tui::theme::{coat, coat_colours};
+    let state = every_section_revealed();
+    for r in [ResourceId::Catnip, ResourceId::JarsOfPurrs] {
+        let note =
+            clowder_tui::nav::plain_error(&clowder_core::CommandError::InsufficientResources {
+                missing: vec![(r, 5.0)],
+            });
+        let mut view = calm_view(&state);
+        view.section = Some(Section::Meadow);
+        view.footer = Some((note, Instant::now() + Duration::from_secs(600)));
+        let (w, h) = (WIDE_W, WIDE_H);
+        let mut term = terminal(w, h);
+        let mut layout = None;
+        term.draw(|f| layout = Some(clowder_tui::render::frame(f, &state, &view, None)))
+            .expect("TestBackend is infallible");
+        let hints = layout.expect("frame returns its layout").hints;
+        let cells = row_cells(term.backend().buffer(), hints, hints.y);
+        let line = symbols_of(&cells).concat();
+
+        let spaced: String = format!("{r:?}")
+            .chars()
+            .enumerate()
+            .flat_map(|(i, c)| {
+                let space = (i > 0 && c.is_uppercase()).then_some(' ');
+                space.into_iter().chain(std::iter::once(c))
+            })
+            .collect();
+        let words = spaced.to_lowercase();
+        let at = line
+            .find(&words)
+            .unwrap_or_else(|| panic!("the note names {r:?} as {words:?}: {line:?}"));
+        let at = line[..at].chars().count();
+        let colours = coat_colours(coat(r), words.chars().count());
+        for (x, cell) in cells.iter().enumerate() {
+            let want = if x >= at && x < at + colours.len() {
+                colours[x - at]
+            } else {
+                ratatui::style::Color::Reset
+            };
+            assert_eq!(
+                cell.fg,
+                want,
+                "{r:?}: the note's {:?} at column {x} wears {:?}, not {want:?}: {line:?}",
+                cell.symbol(),
+                cell.fg
+            );
+        }
+    }
+}

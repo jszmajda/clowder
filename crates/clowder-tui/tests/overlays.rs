@@ -650,6 +650,8 @@ fn the_ticker_is_drawn_quietly() {
 
     // The line's opening mark may carry its tier's own colour; everything
     // after it is the event's text, and the text is the part that must recede.
+    // (A resource a line names wears its coat instead, TUI-THEME-023; this
+    // occurrence names none.)
     let cells = cells_of(&buffer, rect);
     let after_mark = cells
         .iter()
@@ -2281,55 +2283,218 @@ fn no_departure_reads_as_a_loss_a_decrease_or_a_net_total() {
 }
 
 // ---------------------------------------------------------------------------
-// Coats stay out of sentences — TUI-THEME-019
+// Coats in sentences — TUI-THEME-019, TUI-THEME-020, TUI-THEME-023,
+// TUI-THEME-024
 // ---------------------------------------------------------------------------
 
-/// A resource named in a sentence — the report banner, the Journal, the ticker
-/// — wears the sentence's colour: every cell of those surfaces is the inherited
-/// foreground, a state colour, or the chrome's accent, and never a coat.
-///
-/// @spec TUI-THEME-019
-#[test]
-fn a_resource_named_in_a_sentence_wears_the_sentences_colour_and_no_coat() {
-    use clowder_tui::theme::{seasonal_accent, Role};
-    use ratatui::style::Color;
-
-    let state = away(&[(10_000, full_report())]);
-    let view = unread(&state);
-    let mut allowed: Vec<Color> = vec![Color::Reset];
-    for role in [
-        Role::Dim,
-        Role::Ready,
-        Role::Partial,
-        Role::Attention,
-        Role::Milestone,
-    ] {
-        allowed.push(role.color().expect("a state colour"));
+/// A resource's name as the stores spell it: the identifier spaced at each
+/// capital.
+fn label(r: ResourceId) -> String {
+    let tag = format!("{r:?}");
+    let mut out = String::new();
+    for (i, c) in tag.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            out.push(' ');
+        }
+        out.push(c);
     }
-    for season in Season::ALL {
-        allowed.push(seasonal_accent(season));
-    }
+    out
+}
 
-    let surfaces: [(&str, Buffer, Rect); 3] = [
-        ("the report banner", banner(&state, &view), banner_rect()),
-        ("the Journal", journal(&state, 0), overlay_rect()),
-        ("the ticker", ticker(&state), ticker_rect()),
-    ];
-    let named = ["Twigs", "Feathers", "Catnip"];
-    let mut mentioned = false;
-    for (what, buf, rect) in &surfaces {
-        let text = text_of(buf, *rect);
-        mentioned |= named.iter().any(|n| mentions(&text, n));
-        for y in rect.y..rect.bottom() {
-            for x in rect.x..rect.right() {
-                let fg = buf.cell((x, y)).map(|c| c.fg).unwrap_or_default();
+/// Every cell of a rect, row by row, with the character it shows.
+fn chars_and_cells(buf: &Buffer, rect: Rect) -> Vec<Vec<(char, &Cell)>> {
+    (rect.y..rect.bottom())
+        .map(|y| {
+            (rect.x..rect.right())
+                .map(|x| {
+                    let cell = buf.cell((x, y)).expect("every cell of a drawn rect exists");
+                    (cell.symbol().chars().next().unwrap_or(' '), cell)
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Where each resource's stores-spelled name stands as whole words on a row:
+/// (column, resource, name length).
+fn named_on(row: &[char]) -> Vec<(usize, ResourceId, usize)> {
+    let mut out = Vec::new();
+    for r in ResourceId::ALL {
+        let name: Vec<char> = label(r).chars().collect();
+        if name.len() > row.len() {
+            continue;
+        }
+        for at in 0..=row.len() - name.len() {
+            let end = at + name.len();
+            let left = at == 0 || !row[at - 1].is_alphanumeric();
+            let right = end == row.len() || !row[end].is_alphanumeric();
+            if left && right && row[at..end] == name[..] {
+                out.push((at, r, name.len()));
+            }
+        }
+    }
+    out
+}
+
+/// Check one surface: every resource its rows name wears its coat across the
+/// name, at full strength — no dim attribute — and every other cell passes
+/// `rest`. Returns how many names were checked.
+fn coats_on_names(what: &str, buf: &Buffer, rect: Rect, rest: impl Fn(&Cell) -> bool) -> usize {
+    use clowder_tui::theme::{coat, coat_colours};
+    let mut checked = 0;
+    for (y, row) in chars_and_cells(buf, rect).iter().enumerate() {
+        let text: Vec<char> = row.iter().map(|(c, _)| *c).collect();
+        let line: String = text.iter().collect();
+        let mut in_name = vec![false; row.len()];
+        for (at, r, len) in named_on(&text) {
+            checked += 1;
+            let colours = coat_colours(coat(r), len);
+            for (k, want) in colours.iter().enumerate() {
+                let cell = row[at + k].1;
+                assert_eq!(
+                    &cell.fg, want,
+                    "{what}, row {y}: {r:?}'s name, character {k}, wears {:?}, not its coat's \
+                     {want:?}: {line:?}",
+                    cell.fg
+                );
                 assert!(
-                    allowed.contains(&fg),
-                    "{what} wears {fg:?} at ({x}, {y}), a colour outside the state palette — a \
-                     coat in a sentence:\n{text}"
+                    !cell.modifier.contains(Modifier::DIM),
+                    "{what}, row {y}: {r:?}'s name is drawn faint; a coat is worn at full \
+                     strength: {line:?}"
+                );
+                in_name[at + k] = true;
+            }
+        }
+        for (x, (c, cell)) in row.iter().enumerate() {
+            if !in_name[x] && !c.is_whitespace() {
+                assert!(
+                    rest(cell),
+                    "{what}, row {y}: {c:?} at {x} is no resource's name, yet wears {:?} \
+                     {:?}: {line:?}",
+                    cell.fg,
+                    cell.modifier
                 );
             }
         }
     }
-    assert!(mentioned, "fixture: some surface names a resource");
+    checked
+}
+
+/// The ticker's line for a time away names its gains, each in its coat at full
+/// strength; the rest of the line keeps the ticker's quiet.
+///
+/// @spec TUI-THEME-019, TUI-THEME-020, TUI-THEME-023, TUI-THEME-024
+#[test]
+fn the_tickers_away_line_names_each_gain_in_its_coat() {
+    let state = away(&[(10_000, full_report())]);
+    let buf = ticker(&state);
+    let checked = coats_on_names("the ticker", &buf, ticker_rect(), |cell| {
+        is_quiet(cell) || cell.symbol() == "\u{2605}"
+    });
+    assert!(
+        checked >= 3,
+        "fixture: the ticker names the report's gains ({checked})"
+    );
+}
+
+/// The Journal's away report names each changed store in its coat, and every
+/// other character of the Journal stays in the inherited foreground.
+///
+/// @spec TUI-THEME-019, TUI-THEME-020, TUI-THEME-023, TUI-THEME-024
+#[test]
+fn the_journals_away_report_names_each_changed_store_in_its_coat() {
+    let state = away(&[(10_000, full_report())]);
+    let buf = journal(&state, 0);
+    let checked = coats_on_names("the Journal", &buf, overlay_rect(), |cell| {
+        cell.fg == ratatui::style::Color::Reset
+    });
+    assert!(
+        checked >= 3,
+        "fixture: the Journal names the changed stores ({checked})"
+    );
+}
+
+/// The report banner is a reversed line: it keeps its line whole, every
+/// resource it names drawn in the terminal's own pair inverted and never in a
+/// coat, which a reversal would turn into a block of ground.
+///
+/// @spec TUI-THEME-020
+#[test]
+fn the_reversed_report_banner_keeps_its_names_in_its_own_colour() {
+    let state = away(&[(10_000, full_report())]);
+    let view = unread(&state);
+    let buf = banner(&state, &view);
+    let text = text_of(&buf, banner_rect());
+    assert!(
+        ["Twigs", "Feathers", "Catnip"]
+            .iter()
+            .any(|n| mentions(&text, n)),
+        "fixture: the banner names a gain: {text:?}"
+    );
+    for cell in cells_of(&buf, banner_rect()) {
+        assert_eq!(
+            cell.fg,
+            ratatui::style::Color::Reset,
+            "the banner wears {:?} on {:?}: {text:?}",
+            cell.fg,
+            cell.symbol()
+        );
+    }
+}
+
+/// A store's result in the find palette names it in its coat; every other
+/// result, and the query line, stays in the inherited foreground — another
+/// item's name that holds a resource's word names that item, not the store.
+///
+/// @spec TUI-THEME-019
+#[test]
+fn a_stores_result_in_the_palette_wears_its_coat() {
+    use clowder_tui::theme::{coat, coat_colours};
+    let stores = [
+        ResourceId::Catnip,
+        ResourceId::Twigs,
+        ResourceId::JarsOfPurrs,
+    ];
+    let mut state = GameState::new(11);
+    for r in stores {
+        state.resources[r.ix()] = 1.0;
+    }
+    let mut checked = 0;
+    for r in stores {
+        let buf = palette(&state, &label(r).to_lowercase());
+        for (y, row) in chars_and_cells(&buf, overlay_rect()).iter().enumerate() {
+            let line: String = row.iter().map(|(c, _)| *c).collect();
+            let name_at = line.find("] ").map(|i| line[..i + 2].chars().count());
+            let store = name_at.and_then(|at| {
+                let rest: String = line.chars().skip(at).collect();
+                ResourceId::ALL
+                    .into_iter()
+                    .find(|s| rest.trim_end() == label(*s))
+                    .map(|s| (at, s))
+            });
+            for (x, (c, cell)) in row.iter().enumerate() {
+                let want = match store {
+                    Some((at, s)) if x >= at && x < at + label(s).chars().count() => {
+                        coat_colours(coat(s), label(s).chars().count())[x - at]
+                    }
+                    _ => ratatui::style::Color::Reset,
+                };
+                if c.is_whitespace() && want == ratatui::style::Color::Reset {
+                    continue;
+                }
+                assert_eq!(
+                    cell.fg, want,
+                    "palette for {r:?}, row {y}: {c:?} at {x} wears {:?}, not {want:?}: {line:?}",
+                    cell.fg
+                );
+            }
+            if store.is_some() {
+                checked += 1;
+            }
+        }
+    }
+    assert!(
+        checked >= stores.len(),
+        "fixture: each store has a result ({checked})"
+    );
 }

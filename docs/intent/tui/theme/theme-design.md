@@ -19,7 +19,7 @@ The load-bearing decision. There are 46 resources, 40 structures, and 59 ideas. 
 
 **Marks wear state.** Whether a row is affordable, whether a store is full, whether something wants notice — these are what the five state colours say, and they are the same handful of states on every screen. A player learns five meanings once and reads them everywhere. The state colours are worn by glyphs, tags, chips, and whole lines; they are never worn by a name as a name.
 
-**Names wear coats.** A coat is a resource's own colours, fixed for the life of the game, chosen for the name rather than for anything the store is doing. A coat says nothing the name does not say; it is texture, learned by familiarity, never asked to be read. Because a coat is always present, like the chrome's accent, the eye files it with the furniture, and a state colour appearing is still the thing that stands out.
+**Names wear coats.** A coat is a resource's own colours, fixed for the life of the game, chosen for the name rather than for anything the store is doing, and worn wherever the name is drawn. A coat says nothing the name does not say; it is texture, learned by familiarity, never asked to be read. Because a coat is on every resource name the player sees, the eye files it with the names, and a state colour appearing is still the thing that stands out — the ring is measured clear of every state colour (The ring), so no coat is ever read as one.
 
 This is also what keeps the state palette small enough to be disciplined about contrast and colour-vision safety.
 
@@ -90,28 +90,41 @@ There is no yellow. Within the band a yellow is the amber of `partial`, and a na
 
 ### Where a coat is worn
 
-A coat is worn where a resource's name **stands as a field** — a thing the eye scans and matches — and nowhere a name is set inside a sentence, which the eye reads. The fields:
+A resource is one thing, and it looks like one thing wherever it is named: **every resource name the game draws wears its coat** — where the name stands as a field the eye scans and matches, and where a sentence names it — on every line whose colour leaves it room (Which lines a coat may sit on). A name plain in one place and coated in another would read as two things, and the player would have to learn which surfaces colour and which do not.
+
+The fields:
 
 - the store's name in the sidebar (render leaf: The sidebar);
 - the store's name on its row in the stores group;
 - the name of each component in a list row's cost field (TUI-RENDER-020), and in an open count prompt's preview, on the row and in the narrow swap's inspector alike (TUI-RENDER-021);
-- in the inspector: the name line of a stores row, and the name at the head of each need-and-have cost line, unit-price line, and preview component (TUI-NAV-018, TUI-NAV-078, TUI-NAV-067).
+- in the inspector: the name line of a stores row, and the name at the head of each need-and-have cost line, unit-price line, and preview component (TUI-NAV-018, TUI-NAV-078, TUI-NAV-067);
+- a store's result line in the find palette (TUI-NAV-063).
 
-Those are the fields, and nowhere else wears a coat. The inspector's cost lines are drawn in the inherited foreground whatever a component's shortfall — the shortfall is said in words beside the figures (TUI-NAV-078) — so a coat is worn there whether or not the store is short, which is exactly where the matching matters.
+The inspector's cost lines are drawn in the inherited foreground whatever a component's shortfall — the shortfall is said in words beside the figures (TUI-NAV-078) — so a coat is worn there whether or not the store is short, which is exactly where the matching matters.
 
-A name set in a sentence wears the sentence's colour, whatever the sentence says: the header's facts, the ticker, the report banner, the Journal, the away report, a footer note, the hint bar, an armed row's consequence summary, the inspector's plain statement of what a thing does, and the find palette's result lines. A coat there would be a highlight the sentence did not ask for, and a sentence read with one word in colour is read as being *about* that word.
+The sentences:
 
-Only the name wears the coat. The figures beside it, the `/` between a stock and its cap, a cost's separators, the `:` after a cost line's name, and every blank column wear the line's own colour, so a column of figures reads as one column.
+- the inspector's description of a row — each resource named in the mechanical statement (TUI-NAV-018), whether the statement is stated from the definition's fields or is a blurb, whose marks say which of its words name a resource (curiosity leaf: Blurbs), and each resource named in the plain reason an item is held back (TUI-NAV-079);
+- the ticker, where its line names a resource — the gains of a time away;
+- the Journal, where its lines name one — each changed store in a pinned or kept away report;
+- a footer note, where it names one — the store a refused command is short of (TUI-NAV-014);
+- and any line added later that names a resource: the rule is the name, not the surface.
+
+A surface whose text names no resource — the header's facts, the hint bar, the help overlay — has nothing to colour. An armed row's consequence summary and the report banner do name resources, and keep their line's colour whole (Which lines a coat may sit on).
+
+A sentence spells a resource as a sentence does: a blurb may name one in the singular or in lower case, as the craft that makes it, or at the start of a sentence, and a footer note names it in lower case. The coat is laid across the characters as the sentence spells them, by its dressing, as across a name of that many characters, so a blended coat still runs end to end and a patched coat still divides the word it is on. A coat is worn at its full strength wherever it is worn: a line drawn quiet, as the ticker is, keeps its quiet on its own words, and the names in it wear their coats as they do everywhere else, with no faint attribute — the same coat in every place is the point.
+
+Only the name wears the coat. The figures beside it, the `/` between a stock and its cap, a cost's separators, the `:` after a cost line's name, the words and punctuation of a sentence around it, and every blank column wear the line's own colour, so a column of figures reads as one column.
 
 ### Which lines a coat may sit on
 
-A coat is worn where the line is drawn in the inherited foreground, in `ready`, or in `partial`. On a ready or partial row the marker and the row's own name say the row's state and keep the row's colour, and the names in its cost field wear their coats: a state that says *you can act* loses nothing to a coat beside it, and the marker, which is the state's exact mark, never wears one.
+A coat is worn on a line drawn in the inherited foreground, in `ready`, or in `partial`, and in the ticker, whose `dim` is its quiet rather than a state. On a ready or partial row the marker and the row's own name say the row's state and keep the row's colour, and the names in its cost field wear their coats: a state that says *you can act* loses nothing to a coat beside it, and the marker, which is the state's exact mark, never wears one.
 
 A coat is not worn on three kinds of line, each of which is already saying one thing with its whole colour:
 
-- **A line in `dim`.** A teased row, an owned or completed one-shot, an unaffordable row: a finished or out-of-reach row recedes whole (TUI-THEME-014, TUI-NAV-009), and a coat on its cost would make it the liveliest row on the list.
+- **A row in `dim`.** A teased row, an owned or completed one-shot, an unaffordable row: a finished or out-of-reach row recedes whole (TUI-THEME-014, TUI-NAV-009), and a coat on its cost would make it the liveliest row on the list.
 - **A line in `attention` or `milestone`.** An armed row's expansion is one signal, and a coat inside it would be a second colour inside the one that means "this wants you"; a line drawn whole in `milestone` is the same case.
-- **A reversed line.** Focus is the terminal's own pair inverted (Three Things the Palette Does Not Cover), on the whole line; a coat under a reversal is a block of colour the design never chose.
+- **A reversed line.** Focus is the terminal's own pair inverted (Three Things the Palette Does Not Cover), on the whole line, and the report banner is reversed the same way; a coat under a reversal is a block of colour the design never chose, since a reversal turns a text colour into a ground.
 
 ### A shortened name
 
@@ -136,7 +149,7 @@ The accent is the season of the snapshot the frame draws, so it turns on the sam
 
 On the header rule the accent colours the underline alone. The facts and chips above it keep their own colours — a chip's glyph and word stay `attention` — so the accent sits beneath state without touching it. A terminal that does not colour underlines draws the rule in each cell's own colour, or draws none, and nothing is substituted: the season's name in the header already says everything the accent says.
 
-Autumn's accent sits near `attention` in hue, and it is safe for the same reason the confinement is. The accent is only ever a line — an underline or a column of `│` — always present, always in the same places. `attention` is only ever worn by glyphs and words, and it appears only when something wants the player. The glance reads orange *appearing*; a line that never comes or goes gives it nothing to rule out. The coats are on the same side of that line as the accent: always present, never appearing.
+Autumn's accent sits near `attention` in hue, and it is safe for the same reason the confinement is. The accent is only ever a line — an underline or a column of `│` — always present, always in the same places. `attention` is only ever worn by glyphs and words, and it appears only when something wants the player. The glance reads orange *appearing*; a line that never comes or goes gives it nothing to rule out. The coats keep clear of it another way: they sit only on names, never on a glyph or a tag, and every colour a coat can put on a character is measured clear of `attention` (The ring), so a name in its coat — even one that has just arrived in the ticker — is never read as something wanting the player.
 
 ## Colour Is Always the Second Channel
 
@@ -191,8 +204,10 @@ Both rules hold whatever values the palette settles on (Deferred 1). Retuning th
 | Stops within a coat | A solid has one; patched and blended have two to four; a hue may recur but never consecutively | Any count; distinct hues only | Two consecutive equal stops are a solid coat in disguise, so two resources could look alike while counting as distinct; a recurring hue apart from itself is what a checked coat is |
 | Patched remainder | The first runs, as many as the remainder, take one extra character each | The first run takes the whole remainder | Near-equal runs is the look; a first run two longer than the rest is a lopsided coat |
 | A blend's path | Piecewise linear in OKLab, equal share per segment, evenly spaced positions, a space counting as a position | A smooth curve; arc-length spacing; spaces skipped | A straight segment is the shortest path between two stops, so its intermediates stay nearest the stops; equal shares and counted spaces keep the rule the same under every dressing |
-| Which lines carry a coat | Inherited, `ready`, and `partial` lines; never `dim`, `attention`, `milestone`, or a reversal | Every line; inherited lines only | A dim row recedes whole, an expansion or a milestone line is one signal, and a reversal is the terminal's own emphasis. Inherited lines only would leave every priced row's cost uncoloured, since a priced row always wears its marker's colour |
-| Where a coat is worn | Where a name stands as a field; never in a sentence | Everywhere a resource is named; the sidebar alone | A field is scanned and matched, a sentence is read, and a sentence with one coloured word reads as being about that word. The sidebar alone leaves the prices, where the matching happens, uncoloured |
+| Which lines carry a coat | Inherited, `ready`, and `partial` lines and the ticker; never a `dim` row, an `attention` or `milestone` line, or a reversal | Every line; inherited lines only | A dim row recedes whole, an expansion or a milestone line is one signal, and a reversal turns a text colour into a ground. The ticker's dim is its quiet, not a state, so its names wear their coats as everywhere. Inherited lines only would leave every priced row's cost uncoloured, since a priced row always wears its marker's colour |
+| Where a coat is worn | On every resource name drawn, in fields and in sentences alike, except on a line whose whole colour says one thing | Fields only; fields and the inspector's description only; the sidebar alone | A resource is one thing and should look like one thing wherever it is named; a name coated on one surface and plain on another reads as two things, and leaves the player to learn which surfaces colour. A coloured word in a report draws the eye to it, which is accepted: the resource is usually what the line is about. The sidebar alone leaves the prices, where the matching happens, uncoloured |
+| A coat on a quiet line | Full strength, the line's quiet kept on its own words | The coat dimmed or faint with the line | The same coat in every place is the point of a coat; a faint coat in the ticker is a second look for the same store |
+| A name a sentence spells otherwise | The coat laid across the characters as the sentence spells them | Coat only a spelling that matches the stores' exactly; compute the coat over the stores' spelling and cut it to the word | Sentences say "a twig" and "catnip"; coating only exact spellings leaves most of a blurb's resources plain. Laying the dressing across the word as written keeps each dressing's look on every spelling, where a cut coat would stop a blend partway |
 | What beside the name wears the coat | Nothing: figures, separators, and blanks wear the line's colour | The whole component, figure and name | A column of figures in mixed colours reads as several columns |
 | A shortened name's colours | Each kept character keeps its colour; the ellipsis wears the replaced character's | Recomputed over the drawn text; the ellipsis in `dim` | A store should look like itself at every width, and a dim ellipsis would be a second meaning on the one glyph that already says "cut" |
 | Background | Inherit the terminal's | Paint a designed ground; detect and switch | Inheriting is legible in light and dark with no detection, and looks native beside other panes; detection is unreliable under tmux and a wrong guess is worse than none |
@@ -215,11 +230,10 @@ Both rules hold whatever values the palette settles on (Deferred 1). Retuning th
 1. The exact hex values want checking against real terminals — several popular themes use low-contrast backgrounds that a mid-luminance palette could sit too close to. The *roles* and their separation, and the ring and its clearance, are the design; the five state values, the seven ring values, and the four seasonal accents are a starting point to verify on a real pane, alongside the render leaf's other measurements.
 2. Whether `●` and `◐` stay distinct enough. They are the affordable/partial pair, whose colours are the ones a red-green deficiency compresses hardest, so the whole distinction falls to the glyph — and the two differ only by fill. That is a real difference rather than a colour one, but half-filled glyphs render unevenly across fonts, and this wants checking on a real pane before it is trusted. The glyphs belong to the navigation leaf; changing them is a cascade there, not a decision here.
 3. Whether `dim` needs to be a true colour at all, or whether the terminal's own dim attribute serves better. The attribute inherits the user's theme and is arguably more native; it is also inconsistently implemented across terminals, which is what makes this worth testing rather than deciding now.
-4. Whether the find palette's result lines should wear coats. A result line names a row, and a stores row's result is a name standing nearly as a field; the palette is left uncoloured until the list of results has been looked at on a real pane with coats everywhere else.
 
 ## References
 
 - Parent: `../tui-design.md` (truecolor-only, the thin-shell split)
 - Sibling: `navigation/` owns the glyphs and words this palette sits behind — TUI-NAV-009 (markers), TUI-NAV-019 (mood as a word), TUI-NAV-020 (chips), TUI-NAV-021 (single-width glyphs), TUI-NAV-022 (the non-colour channel requirement)
 - Sibling: `render/` draws the fields a coat is worn in — the sidebar, a list row's cost field, the count prompt's preview, and the inspector's cost lines (Numbers and Names) — and shortens names with the ellipsis a coat follows (TUI-RENDER-014)
-- Consumes: `clowder_core::Season` for the chrome accent; `clowder_core::ResourceId` for the coat table
+- Consumes: `clowder_core::Season` for the chrome accent; `clowder_core::ResourceId` for the coat table; the core's reading of a blurb as text and resource references (curiosity leaf, SIM-CUR-014) for the resources a description names

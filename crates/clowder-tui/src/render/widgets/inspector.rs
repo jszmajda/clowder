@@ -124,195 +124,227 @@ fn percent(ratio: f64) -> String {
 // The plain mechanical statement — TUI-NAV-018
 // ---------------------------------------------------------------------------
 
+/// A resource named in a sentence of the description: its name as the stores
+/// spell it, in its coat (TUI-THEME-022).
+fn resource(r: ResourceId) -> Piece {
+    let name = resource_label(r);
+    let chars = name.chars().count();
+    Piece::name(r, name, chars)
+}
+
+/// Sentences run together, a blank between each.
+fn sentences(parts: Vec<Pieces>) -> Pieces {
+    let mut out: Pieces = Vec::new();
+    for part in parts {
+        if !out.is_empty() {
+            out.push(Piece::plain(" "));
+        }
+        out.extend(part);
+    }
+    out
+}
+
 /// A structure's statement: every field its definition carries apart from its
 /// name, its price and that price's escalation, its reveal threshold, and its
 /// gate, wherever the field departs from its baseline. Per-tick fields are
 /// stated per game second; ratios as the percentage they add.
-fn structure_statement(s: clowder_core::StructureId) -> String {
+fn structure_statement(s: clowder_core::StructureId) -> Pieces {
     let d = content::structure_def(s);
-    let mut parts: Vec<String> = Vec::new();
+    let mut parts: Vec<Pieces> = Vec::new();
 
-    for (r, amt) in d.productions {
-        let mut clause = format!(
-            "Produces {} {} per second",
-            per_second(*amt),
-            resource_label(*r)
-        );
-        let mut qualifiers: Vec<&str> = Vec::new();
-        if d.seasonal {
-            qualifiers.push("seasonal");
-        }
-        if d.surplus_scaled {
-            qualifiers.push("scaled by the energy surplus");
-        }
-        if d.outdoor {
-            qualifiers.push("routed through the outdoor channel");
-        }
-        if !qualifiers.is_empty() {
-            clause.push_str(&format!(", {}", qualifiers.join(", ")));
-        }
-        clause.push('.');
-        parts.push(clause);
+    let mut qualifiers: Vec<&str> = Vec::new();
+    if d.seasonal {
+        qualifiers.push("seasonal");
     }
-    if d.productions.is_empty() && (d.seasonal || d.surplus_scaled || d.outdoor) {
-        let mut qualifiers: Vec<&str> = Vec::new();
-        if d.seasonal {
-            qualifiers.push("seasonal");
+    if d.surplus_scaled {
+        qualifiers.push("scaled by the energy surplus");
+    }
+    if d.outdoor {
+        qualifiers.push("routed through the outdoor channel");
+    }
+    for (r, amt) in d.productions {
+        let mut tail = " per second".to_string();
+        if !qualifiers.is_empty() {
+            tail.push_str(&format!(", {}", qualifiers.join(", ")));
         }
-        if d.surplus_scaled {
-            qualifiers.push("scaled by the energy surplus");
-        }
-        if d.outdoor {
-            qualifiers.push("routed through the outdoor channel");
-        }
-        parts.push(format!("Is {}.", qualifiers.join(", ")));
+        tail.push('.');
+        parts.push(vec![
+            Piece::plain(format!("Produces {} ", per_second(*amt))),
+            resource(*r),
+            Piece::plain(tail),
+        ]);
+    }
+    if d.productions.is_empty() && !qualifiers.is_empty() {
+        parts.push(plain(format!("Is {}.", qualifiers.join(", "))));
     }
 
     if d.housing != 0 {
-        parts.push(format!("Houses {} kittens.", d.housing));
+        parts.push(plain(format!("Houses {} kittens.", d.housing)));
     }
     for (r, amt) in d.cap_bonuses {
-        parts.push(format!(
-            "Adds {} storage for {}.",
-            fmt::exact(*amt),
-            resource_label(*r)
-        ));
+        parts.push(vec![
+            Piece::plain(format!("Adds {} storage for ", fmt::exact(*amt))),
+            resource(*r),
+            Piece::plain("."),
+        ]);
     }
     if d.happiness_points != 0.0 {
-        parts.push(format!(
+        parts.push(plain(format!(
             "Lifts mood by {} points.",
             fmt::exact(d.happiness_points)
-        ));
+        )));
     }
     if d.crowding_relief != 0.0 {
-        parts.push(format!(
+        parts.push(plain(format!(
             "Eases crowding by {}%.",
             percent(d.crowding_relief)
-        ));
+        )));
     }
     for (r, amt) in d.resource_ratios {
-        parts.push(format!(
-            "Raises production of {} by {}%.",
-            resource_label(*r),
-            percent(*amt)
-        ));
+        parts.push(vec![
+            Piece::plain("Raises production of "),
+            resource(*r),
+            Piece::plain(format!(" by {}%.", percent(*amt))),
+        ]);
     }
     if d.craft_ratio != 0.0 {
-        parts.push(format!(
+        parts.push(plain(format!(
             "Raises craft output by {}%.",
             percent(d.craft_ratio)
-        ));
+        )));
     }
     if d.luxury_demand != 0.0 {
-        parts.push(format!(
+        parts.push(plain(format!(
             "Shifts luxury demand by {}%.",
             percent(d.luxury_demand)
-        ));
+        )));
     }
     if d.jamboree_ratio != 0.0 {
-        parts.push(format!(
+        parts.push(plain(format!(
             "Raises jamboree mood by {}%.",
             percent(d.jamboree_ratio)
-        ));
+        )));
     }
     if d.jamboree_arrival != 0.0 {
-        parts.push(format!(
+        parts.push(plain(format!(
             "Raises jamboree arrivals by {}%.",
             percent(d.jamboree_arrival)
-        ));
+        )));
     }
     if d.global_ratio != 0.0 {
-        parts.push(format!(
+        parts.push(plain(format!(
             "Raises the global ratio by {}%.",
             percent(d.global_ratio)
-        ));
+        )));
     }
     if let Some(conv) = &d.converter {
         for (r, amt) in conv.inputs {
-            parts.push(format!(
-                "Converts {} {} per second.",
-                per_second(*amt),
-                resource_label(*r)
-            ));
+            parts.push(vec![
+                Piece::plain(format!("Converts {} ", per_second(*amt))),
+                resource(*r),
+                Piece::plain(" per second."),
+            ]);
         }
         for (r, amt) in conv.outputs {
-            parts.push(format!(
-                "Yields {} {} per second.",
-                per_second(*amt),
-                resource_label(*r)
-            ));
+            parts.push(vec![
+                Piece::plain(format!("Yields {} ", per_second(*amt))),
+                resource(*r),
+                Piece::plain(" per second."),
+            ]);
         }
     }
     if d.mess != 0.0 {
-        parts.push(format!("Makes {} mess per second.", per_second(d.mess)));
+        parts.push(plain(format!(
+            "Makes {} mess per second.",
+            per_second(d.mess)
+        )));
     }
     if d.energy_prod != 0.0 {
-        parts.push(format!("Makes {} energy.", fmt::exact(d.energy_prod)));
+        parts.push(plain(format!(
+            "Makes {} energy.",
+            fmt::exact(d.energy_prod)
+        )));
     }
     if d.energy_cons != 0.0 {
-        parts.push(format!("Uses {} energy.", fmt::exact(d.energy_cons)));
+        parts.push(plain(format!("Uses {} energy.", fmt::exact(d.energy_cons))));
     }
     if d.outdoor_ratio != 0.0 {
-        parts.push(format!(
+        parts.push(plain(format!(
             "Raises outdoor production by {}%.",
             percent(d.outdoor_ratio)
-        ));
+        )));
     }
     if d.long_sun_cap != 0.0 {
-        parts.push(format!(
+        parts.push(plain(format!(
             "Extends the long sun by {}.",
             fmt::exact(d.long_sun_cap)
-        ));
+        )));
     }
 
-    parts.join(" ")
+    sentences(parts)
 }
 
 /// A job's statement: the yield per worker per game second, in the resource
 /// its definition names. A job with no yield (the Tinkerer) has none.
-fn job_statement(j: clowder_core::JobId) -> String {
+fn job_statement(j: clowder_core::JobId) -> Pieces {
     match content::job_def(j).yield_per_tick {
-        Some((r, per_tick)) => {
-            format!(
-                "Yields {} {} per worker per second.",
-                per_second(per_tick),
-                resource_label(r)
-            )
-        }
-        None => String::new(),
+        Some((r, per_tick)) => vec![
+            Piece::plain(format!("Yields {} ", per_second(per_tick))),
+            resource(r),
+            Piece::plain(" per worker per second."),
+        ],
+        None => Vec::new(),
     }
 }
 
 /// A craft's statement: the resource its recipe makes, and the tinkerer work
 /// tier the recipe meets. Shared by the make row and the tinkerer count row —
 /// both describe the same recipe.
-fn craft_statement(c: clowder_core::CraftId) -> String {
+fn craft_statement(c: clowder_core::CraftId) -> Pieces {
     let def = content::craft_def(c);
-    let output = resource_label(content::craft_output(c));
-    if def.tier != 0 {
-        format!("Makes {output}, at tinkerer tier {}.", def.tier)
+    let tail = if def.tier != 0 {
+        format!(", at tinkerer tier {}.", def.tier)
     } else {
-        format!("Makes {output}.")
-    }
+        ".".to_string()
+    };
+    vec![
+        Piece::plain("Makes "),
+        resource(content::craft_output(c)),
+        Piece::plain(tail),
+    ]
+}
+
+/// A blurb as the description states it: its words, each mark read as its
+/// text, and each resource a mark names in that resource's coat across the
+/// words as the blurb spells them. @spec TUI-NAV-018, TUI-THEME-022
+fn blurb_statement(blurb: &str) -> Pieces {
+    content::blurb_parts(blurb)
+        .into_iter()
+        .map(|part| match part {
+            content::BlurbPart::Text(t) => Piece::plain(t),
+            content::BlurbPart::Resource(r, t) => Piece::name(r, t, t.chars().count()),
+        })
+        .collect()
 }
 
 /// The plain mechanical statement behind a piece of content — what the row's
 /// flavour name is borrowing against. For a kind whose definition carries a
 /// blurb, the blurb *is* the statement and its effect fields are not restated.
 /// A rite, an arch, a tradition, and a dream loom carry nothing past name,
-/// price, and gate, so they have none. @spec TUI-NAV-018
-fn statement(id: ContentId) -> String {
+/// price, and gate, so they have none. Every resource the statement names
+/// wears its coat. @spec TUI-NAV-018, TUI-THEME-022
+fn statement(id: ContentId) -> Pieces {
     match id {
         ContentId::Structure(s) => structure_statement(s),
         ContentId::Job(j) => job_statement(j),
         ContentId::Craft(c) => craft_statement(c),
-        ContentId::Idea(i) => content::idea_def(i).blurb.to_string(),
-        ContentId::Refinement(r) => content::refinement_def(r).blurb.to_string(),
-        ContentId::Rule(r) => content::rule_def(r).blurb.to_string(),
+        ContentId::Idea(i) => blurb_statement(content::idea_def(i).blurb),
+        ContentId::Refinement(r) => blurb_statement(content::refinement_def(r).blurb),
+        ContentId::Rule(r) => blurb_statement(content::rule_def(r).blurb),
         ContentId::Rite(_)
         | ContentId::Arch(_)
         | ContentId::Tradition(_)
-        | ContentId::DreamLoom(_) => String::new(),
+        | ContentId::DreamLoom(_) => Vec::new(),
     }
 }
 
@@ -326,22 +358,32 @@ fn statement(id: ContentId) -> String {
 /// says only that the price is unmet, and names no amount.
 /// @spec TUI-NAV-079
 pub fn lock_reason_text(reason: &LockReason) -> String {
+    pieces_text(&lock_reason_pieces(reason))
+}
+
+/// The lock reason as the description draws it: each resource a shortfall
+/// names in its coat. @spec TUI-NAV-079, TUI-THEME-022
+fn lock_reason_pieces(reason: &LockReason) -> Pieces {
     match reason {
-        LockReason::NotYetReached => "Not reached yet.".to_string(),
-        LockReason::Prerequisite => "A prerequisite is still unmet.".to_string(),
-        LockReason::AlreadyYours => "Already yours.".to_string(),
-        LockReason::NoOneFree => "Nobody in the meadow is free to take this on.".to_string(),
-        LockReason::NoRoom => "There is no room for this yet.".to_string(),
+        LockReason::NotYetReached => plain("Not reached yet.".to_string()),
+        LockReason::Prerequisite => plain("A prerequisite is still unmet.".to_string()),
+        LockReason::AlreadyYours => plain("Already yours.".to_string()),
+        LockReason::NoOneFree => plain("Nobody in the meadow is free to take this on.".to_string()),
+        LockReason::NoRoom => plain("There is no room for this yet.".to_string()),
         LockReason::ShortBy { missing } => {
             if missing.is_empty() {
-                "The price is not yet met.".to_string()
-            } else {
-                let items: Vec<String> = missing
-                    .iter()
-                    .map(|(r, amt)| format!("{} {}", fmt::exact(*amt), resource_label(*r)))
-                    .collect();
-                format!("Short by {}.", items.join(", "))
+                return plain("The price is not yet met.".to_string());
             }
+            let mut out = vec![Piece::plain("Short by ")];
+            for (k, (r, amt)) in missing.iter().enumerate() {
+                if k > 0 {
+                    out.push(Piece::plain(", "));
+                }
+                out.push(Piece::plain(format!("{} ", fmt::exact(*amt))));
+                out.push(resource(*r));
+            }
+            out.push(Piece::plain("."));
+            out
         }
     }
 }
@@ -470,8 +512,8 @@ fn content_lines(
     let mut out: Vec<Pieces> = Vec::new();
 
     let stmt = statement(id);
-    if !stmt.trim().is_empty() {
-        out.push(plain(stmt));
+    if !pieces_text(&stmt).trim().is_empty() {
+        out.push(stmt);
     }
 
     match id {
@@ -518,7 +560,7 @@ fn content_lines(
         out.extend(cost_lines(state, id, &reason));
     }
     if let Some(r) = &reason {
-        out.push(plain(lock_reason_text(r)));
+        out.push(lock_reason_pieces(r));
     }
 
     out

@@ -4,7 +4,7 @@ Curiosity is the game's research system: kittens investigate the world and their
 
 ## Status
 
-**OK** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 12 of 12 active specs implemented.
+**OK** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 15 of 15 active specs implemented.
 
 ## References
 
@@ -16,7 +16,7 @@ Curiosity is the game's research system: kittens investigate the world and their
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/curiosity/curiosity-specs.md` — 12 specs, prefix `SIM-CUR`
+- `docs/intent/sim/curiosity/curiosity-specs.md` — 15 specs, prefix `SIM-CUR`
 
 ### Tests
 - `crates/clowder-core/tests/curiosity.rs`
@@ -36,9 +36,9 @@ Curiosity is the game's research system: kittens investigate the world and their
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-CUR-001 – SIM-CUR-012 | 12 | 0 | 0 |
+| All | SIM-CUR-001 – SIM-CUR-015 | 15 | 0 | 0 |
 
-**Summary:** 12 of 12 active specs implemented.
+**Summary:** 15 of 15 active specs implemented.
 
 ## Key Findings
 

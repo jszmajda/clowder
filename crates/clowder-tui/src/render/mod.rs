@@ -64,6 +64,19 @@ impl Piece {
     }
 }
 
+/// Text whose resource names are marked as a blurb marks them
+/// (`content::blurb_parts`), as pieces: each marked name in its coat across
+/// its words as written, the rest plain. @spec TUI-THEME-023
+pub(crate) fn marked_pieces(text: &str) -> Vec<Piece> {
+    content::blurb_parts(text)
+        .into_iter()
+        .map(|part| match part {
+            content::BlurbPart::Text(t) => Piece::plain(t),
+            content::BlurbPart::Resource(r, t) => Piece::name(r, t, t.chars().count()),
+        })
+        .collect()
+}
+
 /// The pieces' text, run together.
 pub(crate) fn pieces_text(pieces: &[Piece]) -> String {
     pieces.iter().map(|p| p.text.as_str()).collect()
@@ -72,11 +85,12 @@ pub(crate) fn pieces_text(pieces: &[Piece]) -> String {
 /// One line from its pieces, fitted to `width` exactly as `fmt::fit` fits a
 /// string, every character in `base` — and, where `coats` is on, each
 /// character of a resource's name in its coat's colour by its position in the
-/// whole name, the figures, separators, and blanks beside it keeping `base`.
-/// An ellipsis that cuts a name wears the colour of the character at its
-/// position. A line whose colour says one thing whole — dim, attention, a
-/// reversal — passes `coats` off, and every character keeps `base`.
-/// @spec TUI-THEME-019, TUI-THEME-020, TUI-THEME-021
+/// whole name, at full strength whatever faintness `base` carries, the
+/// figures, separators, and blanks beside it keeping `base`. An ellipsis that
+/// cuts a name wears the colour of the character at its position. A line whose
+/// colour says one thing whole — a dim row, attention, a reversal — passes
+/// `coats` off, and every character keeps `base`.
+/// @spec TUI-THEME-019, TUI-THEME-020, TUI-THEME-021, TUI-THEME-023
 pub(crate) fn line_from_pieces(
     pieces: &[Piece],
     base: Style,
@@ -89,7 +103,9 @@ pub(crate) fn line_from_pieces(
             Some((r, full)) if coats => {
                 let colours = crate::theme::coat_colours(crate::theme::coat(r), full);
                 for (i, c) in piece.text.chars().enumerate() {
-                    let style = colours.get(i).map_or(base, |colour| base.fg(*colour));
+                    let style = colours.get(i).map_or(base, |colour| {
+                        base.fg(*colour).remove_modifier(Modifier::DIM)
+                    });
                     cells.push((c, style));
                 }
             }
@@ -1209,17 +1225,21 @@ pub fn frame_recorded(
     // to what the player just did, and it belongs where they are already
     // looking. It does not want the player — it is ordinary prose, not one of
     // attention's three wearers — so it is drawn in the inherited foreground,
-    // never attention. @spec TUI-NAV-014, TUI-THEME-015
+    // never attention, and a store it names wears its coat, read from the mark
+    // the note carries (`nav::plain_error`). @spec TUI-NAV-014, TUI-THEME-015,
+    // TUI-THEME-024
     match view
         .footer
         .as_ref()
         .filter(|(_, until)| *until > std::time::Instant::now())
     {
         Some((note, _)) => f.render_widget(
-            Paragraph::new(Line::from(Span::raw(fmt::fit(
-                note,
+            Paragraph::new(line_from_pieces(
+                &marked_pieces(note),
+                Style::default(),
+                true,
                 layout.hints.width as usize,
-            )))),
+            )),
             layout.hints,
         ),
         None => widgets::chrome::hints(f, layout.hints, state, view),

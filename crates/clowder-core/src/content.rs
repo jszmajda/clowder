@@ -1095,10 +1095,66 @@ pub fn season_patch_modifier(season: Season, winter_eased: bool) -> f64 {
     }
 }
 
+// ---- Blurbs ----
+
+/// A run of a blurb: plain words, or words naming a resource.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlurbPart<'a> {
+    Text(&'a str),
+    /// The resource the words name, and the words as the blurb spells them.
+    Resource(ResourceId, &'a str),
+}
+
+fn resource_by_identifier(id: &str) -> Option<ResourceId> {
+    ResourceId::ALL.into_iter().find(|r| format!("{r:?}") == id)
+}
+
+/// A blurb read as plain words and resource references. A mark runs from a
+/// `{` to the next `}`: `{text|Id}` names the resource whose identifier is
+/// exactly `Id`, read as `text`, and `{Id}` reads as the identifier itself. A
+/// mark naming no resource reads as its text, and a brace that opens or closes
+/// no mark reads as itself, so a slip in the tables never hides words.
+/// @spec SIM-CUR-014
+pub fn blurb_parts(blurb: &str) -> Vec<BlurbPart<'_>> {
+    let mut out = Vec::new();
+    let mut rest = blurb;
+    while let Some(open) = rest.find('{') {
+        let Some(close) = rest[open + 1..].find('}') else {
+            break;
+        };
+        let inside = &rest[open + 1..open + 1 + close];
+        let (text, id) = inside.split_once('|').unwrap_or((inside, inside));
+        if open > 0 {
+            out.push(BlurbPart::Text(&rest[..open]));
+        }
+        out.push(match resource_by_identifier(id) {
+            Some(r) => BlurbPart::Resource(r, text),
+            None => BlurbPart::Text(text),
+        });
+        rest = &rest[open + 1 + close + 1..];
+    }
+    if !rest.is_empty() {
+        out.push(BlurbPart::Text(rest));
+    }
+    out
+}
+
+/// A blurb's plain words: every mark read as its text. @spec SIM-CUR-014
+pub fn blurb_text(blurb: &str) -> String {
+    blurb_parts(blurb)
+        .into_iter()
+        .map(|part| match part {
+            BlurbPart::Text(t) | BlurbPart::Resource(_, t) => t,
+        })
+        .collect()
+}
+
 // ---- Ideas ----
 
 pub struct IdeaDef {
     pub name: &'static str,
+    /// The joke and the plain effect, each resource it names marked
+    /// (`blurb_parts`). @spec SIM-CUR-013, SIM-CUR-015
     pub blurb: &'static str,
     /// Curiosity price.
     pub cost: f64,
@@ -1129,7 +1185,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     // ---- Band 0: curiosity only (the founding nine) ----
     IdeaDef {
         name: "Pantry Organization",
-        blurb: "Stack the catnip. Label nothing. Unlocks the Pantry.",
+        blurb: "Stack the {catnip|Catnip}. Label nothing. Unlocks the Pantry.",
         cost: 15.0,
         ..IDEA
     },
@@ -1148,7 +1204,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Twig Architecture",
-        blurb: "Load-bearing twigs. Unlocks the Cat Tree and Twig Pile.",
+        blurb: "Load-bearing {twigs|Twigs}. Unlocks the Cat Tree and Twig Pile.",
         cost: 60.0,
         prereqs: &[IdeaId::ScratchingArts],
         ..IDEA
@@ -1226,28 +1282,28 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Tinkering",
-        blurb: "Small paws, small parts. Unlocks the Craft Corner and the wand, tile, lattice, and cairn crafts.",
+        blurb: "Small paws, small parts. Unlocks the Craft Corner and the {wand|Wands}, {tile|Tiles}, {lattice|Lattices}, and {cairn|Cairns} crafts.",
         cost: 500.0,
         prereqs: &[IdeaId::Notetaking],
         ..IDEA
     },
     IdeaDef {
         name: "Pack Rattery",
-        blurb: "Keep everything, beautifully. Unlocks the Shed and the badge craft.",
+        blurb: "Keep everything, beautifully. Unlocks the Shed and the {badge|Badges} craft.",
         cost: 650.0,
         prereqs: &[IdeaId::Tinkering],
         ..IDEA
     },
     IdeaDef {
         name: "Unicorn Lore",
-        blurb: "The old stories were load-bearing. Unlocks the Unicorn Meadow.",
+        blurb: "The old {stories|Stories} were load-bearing. Unlocks the Unicorn Meadow.",
         cost: 750.0,
         prereqs: &[IdeaId::Notetaking],
         ..IDEA
     },
     IdeaDef {
         name: "Oral Tradition",
-        blurb: "Tales told tail-to-tail. Unlocks the Story Circle, the quill craft, and charm.",
+        blurb: "Tales told tail-to-tail. Unlocks the Story Circle, the {quill|Quills} craft, and {charm|Charm}.",
         cost: 900.0,
         prereqs: &[IdeaId::Tinkering],
         ..IDEA
@@ -1262,14 +1318,14 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Storycraft",
-        blurb: "Editing, for cats. Unlocks the story craft itself.",
+        blurb: "Editing, for cats. Unlocks the {story|Stories} craft itself.",
         cost: 1200.0,
         prereqs: &[IdeaId::OralTradition],
         ..IDEA
     },
     IdeaDef {
         name: "Sun Salutations",
-        blurb: "Greet the beam; the beam greets back. Unlocks the Sun Room and warmth.",
+        blurb: "Greet the beam; the beam greets back. Unlocks the Sun Room and {warmth|Warmth}.",
         cost: 1500.0,
         gate: &[(ResourceId::Stories, 5.0)],
         prereqs: &[IdeaId::Storycraft],
@@ -1277,7 +1333,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Excavation",
-        blurb: "Dig with intent. Unlocks the Gravel Pit and the brass craft.",
+        blurb: "Dig with intent. Unlocks the Gravel Pit and the {brass|Brass} craft.",
         cost: 1800.0,
         gate: &[(ResourceId::Stories, 8.0)],
         prereqs: &[IdeaId::Storycraft],
@@ -1285,7 +1341,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Cogwheels",
-        blurb: "Round things that turn other round things. Unlocks the Cogworks and the cog craft.",
+        blurb: "Round things that turn other round things. Unlocks the Cogworks and the {cog|Cogs} craft.",
         cost: 2600.0,
         gate: &[(ResourceId::Stories, 12.0)],
         prereqs: &[IdeaId::Excavation],
@@ -1293,7 +1349,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Treat Alchemy",
-        blurb: "Transmute shinies into snacks. Unlocks the Treat Bakery.",
+        blurb: "Transmute {shinies|Shinies} into snacks. Unlocks the Treat Bakery.",
         cost: 3200.0,
         gate: &[(ResourceId::Stories, 15.0)],
         prereqs: &[IdeaId::Excavation],
@@ -1317,7 +1373,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Sky Charts",
-        blurb: "The dots connect. Unlocks the Stargazing Ledge, sky events, and skymaps.",
+        blurb: "The dots connect. Unlocks the Stargazing Ledge, sky events, and {skymaps|Skymaps}.",
         cost: 5200.0,
         gate: &[(ResourceId::Stories, 30.0)],
         prereqs: &[IdeaId::Cogwheels],
@@ -1325,7 +1381,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Porch Logistics",
-        blurb: "Everything in its stack. Unlocks the Porch and the kite craft.",
+        blurb: "Everything in its stack. Unlocks the Porch and the {kite|Kites} craft.",
         cost: 6000.0,
         gate: &[(ResourceId::Stories, 35.0)],
         prereqs: &[IdeaId::SkyCharts],
@@ -1334,7 +1390,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     // ---- Band 2: curiosity + anthologies ----
     IdeaDef {
         name: "Anthology Binding",
-        blurb: "Stories, stitched into a spine. Unlocks the anthology craft.",
+        blurb: "{Stories}, stitched into a spine. Unlocks the {anthology|Anthologies} craft.",
         cost: 7000.0,
         gate: &[(ResourceId::Stories, 40.0)],
         prereqs: &[IdeaId::SkyCharts],
@@ -1390,7 +1446,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Grand Schemes",
-        blurb: "Plans with appendices. Unlocks the scheme craft.",
+        blurb: "Plans with appendices. Unlocks the {scheme|Schemes} craft.",
         cost: 20000.0,
         gate: &[(ResourceId::Anthologies, 40.0)],
         prereqs: &[IdeaId::DeepCuriosity],
@@ -1399,7 +1455,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     // ---- Band 3: curiosity + schemes ----
     IdeaDef {
         name: "Dynamos",
-        blurb: "Spin dew into hum. Unlocks the Dynamo Wheel.",
+        blurb: "Spin {dew|Dew} into hum. Unlocks the Dynamo Wheel.",
         cost: 25000.0,
         gate: &[(ResourceId::Schemes, 8.0)],
         prereqs: &[IdeaId::GrandSchemes],
@@ -1423,7 +1479,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Moonmetallurgy",
-        blurb: "Alloys by lamplight. Unlocks the moonsteel and paver crafts.",
+        blurb: "Alloys by lamplight. Unlocks the {moonsteel|Moonsteel} and {paver|Pavers} crafts.",
         cost: 36000.0,
         gate: &[(ResourceId::Schemes, 15.0)],
         prereqs: &[IdeaId::Dynamos],
@@ -1431,7 +1487,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Starcatching",
-        blurb: "Hold a bowl very still. Unlocks the Star Basin and the cometsilk craft.",
+        blurb: "Hold a bowl very still. Unlocks the Star Basin and the {cometsilk|Cometsilk} craft.",
         cost: 42000.0,
         gate: &[(ResourceId::Schemes, 20.0)],
         prereqs: &[IdeaId::Moonmetallurgy],
@@ -1447,7 +1503,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Balloon Craft",
-        blurb: "Logistics, but up. Unlocks the balloon craft.",
+        blurb: "Logistics, but up. Unlocks the {balloon|Balloons} craft.",
         cost: 55000.0,
         gate: &[(ResourceId::Schemes, 30.0)],
         prereqs: &[IdeaId::Moonmetallurgy],
@@ -1504,7 +1560,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Hushfelt Seeking",
-        blurb: "Listen for the softest quiet. Unlocks hushfelt sources.",
+        blurb: "Listen for the softest quiet. Unlocks {hushfelt|Hushfelt} sources.",
         cost: 80000.0,
         gate: &[(ResourceId::Echoes, 1.0)],
         prereqs: &[IdeaId::YarnComputing],
@@ -1520,7 +1576,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Skyward Longing",
-        blurb: "The meadow has an upstairs. Unlocks the cosmic surface and the moonmilk craft.",
+        blurb: "The meadow has an upstairs. Unlocks the cosmic surface and the {moonmilk|Moonmilk} craft.",
         cost: 90000.0,
         gate: &[(ResourceId::Echoes, 2.0)],
         prereqs: &[IdeaId::YarnComputing, IdeaId::PorchLogistics],
@@ -1528,7 +1584,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Dreamweaving",
-        blurb: "Fabric with a thread count of one nap. Unlocks the dreamweave craft.",
+        blurb: "Fabric with a thread count of one nap. Unlocks the {dreamweave|Dreamweave} craft.",
         cost: 120000.0,
         gate: &[(ResourceId::Echoes, 5.0)],
         prereqs: &[IdeaId::MemoryWeaving],
@@ -1760,6 +1816,7 @@ static CRAFTS: [CraftDef; 18] = [
 /// each contributing effect-key values permanently. @spec SIM-CUR-010
 pub struct RefinementDef {
     pub name: &'static str,
+    /// Marked as an idea's blurb is. @spec SIM-CUR-013, SIM-CUR-015
     pub blurb: &'static str,
     /// Curiosity price, spent together with the materials, all-or-nothing.
     pub cost: f64,
@@ -1853,7 +1910,7 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
     },
     RefinementDef {
         name: "Moonsteel Pruners",
-        blurb: "The twig barely notices. Twig Collectors +50%.",
+        blurb: "The {twig|Twigs} barely notices. Twig Collectors +50%.",
         cost: 38000.0,
         materials: &[(ResourceId::Moonsteel, 10.0)],
         gate: IdeaId::Moonmetallurgy,
@@ -1871,7 +1928,7 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
     },
     RefinementDef {
         name: "Sorting Claws",
-        blurb: "Fluff from treasure, instantly. Rummagers +50%.",
+        blurb: "{Fluff} from treasure, instantly. Rummagers +50%.",
         cost: 15000.0,
         materials: &[(ResourceId::Brass, 25.0)],
         gate: IdeaId::Excavation,
@@ -1916,7 +1973,7 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
     },
     RefinementDef {
         name: "Deep Shelves",
-        blurb: "Higher than a cat can reach, almost. +100 twig cap, +150 pebble cap.",
+        blurb: "Higher than a cat can reach, almost. +100 {twig|Twigs} cap, +150 {pebble|Pebbles} cap.",
         cost: 500.0,
         materials: &[
             (ResourceId::Twigs, 1000.0),
@@ -1932,7 +1989,7 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
     },
     RefinementDef {
         name: "Stacked Crates",
-        blurb: "A skyline of storage. +100 twig, +150 pebble, +25 button cap.",
+        blurb: "A skyline of storage. +100 {twig|Twigs}, +150 {pebble|Pebbles}, +25 {button|Buttons} cap.",
         cost: 800.0,
         materials: &[(ResourceId::Wands, 25.0), (ResourceId::Tiles, 10.0)],
         gate: IdeaId::PackRattery,
@@ -1946,7 +2003,7 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
     RefinementDef {
         name: "Labeled Jars",
         blurb:
-            "Labels nobody reads, order everybody feels. +50 button, +30 ember, +10 moonstone cap.",
+            "Labels nobody reads, order everybody feels. +50 {button|Buttons}, +30 {ember|Embers}, +10 {moonstone|Moonstone} cap.",
         cost: 60000.0,
         materials: &[(ResourceId::Moonstone, 25.0), (ResourceId::Brass, 200.0)],
         gate: IdeaId::Moonmetallurgy,
@@ -1959,7 +2016,7 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
     },
     RefinementDef {
         name: "Catnip Cellars",
-        blurb: "Cool, dark, fragrant. Pantries also hold +125 catnip each.",
+        blurb: "Cool, dark, fragrant. Pantries also hold +125 {catnip|Catnip} each.",
         cost: 50000.0,
         materials: &[(ResourceId::Brass, 125.0), (ResourceId::Schemes, 5.0)],
         gate: IdeaId::Dynamos,
@@ -1969,7 +2026,7 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
     },
     RefinementDef {
         name: "Bigger Baskets",
-        blurb: "Weave wider. +200 pebble cap, +50 button cap.",
+        blurb: "Weave wider. +200 {pebble|Pebbles} cap, +50 {button|Buttons} cap.",
         cost: 15000.0,
         materials: &[(ResourceId::Badges, 50.0), (ResourceId::Brass, 25.0)],
         gate: IdeaId::Cogwheels,
@@ -1981,7 +2038,7 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
     },
     RefinementDef {
         name: "Bellows",
-        blurb: "More air, more glow. Hearth embers +0.002/t each.",
+        blurb: "More air, more glow. Hearth {embers|Embers} +0.002/t each.",
         cost: 5000.0,
         materials: &[(ResourceId::Wands, 35.0), (ResourceId::Pebbles, 2000.0)],
         gate: IdeaId::Emberkeeping,
@@ -1993,7 +2050,7 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
     },
     RefinementDef {
         name: "Ember Beds",
-        blurb: "Ceramic cradles keep the coals company. Hearth embers +0.003/t each.",
+        blurb: "Ceramic cradles keep the coals company. Hearth {embers|Embers} +0.003/t each.",
         cost: 35000.0,
         materials: &[(ResourceId::Anthologies, 5.0)],
         gate: IdeaId::CeramicArts,
@@ -2005,7 +2062,7 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
     },
     RefinementDef {
         name: "Story Press",
-        blurb: "The gears tell tales. Cogworks +0.005 stories/t each.",
+        blurb: "The gears tell tales. Cogworks +0.005 {stories|Stories}/t each.",
         cost: 7500.0,
         materials: &[(ResourceId::Cogs, 45.0)],
         gate: IdeaId::Cogwheels,
@@ -2017,7 +2074,7 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
     },
     RefinementDef {
         name: "Better Bindings",
-        blurb: "Spines that survive enthusiasm. Stories, anthologies, and schemes craft +25%.",
+        blurb: "Spines that survive enthusiasm. {Stories}, {anthologies|Anthologies}, and {schemes|Schemes} craft +25%.",
         cost: 25000.0,
         materials: &[(ResourceId::Anthologies, 5.0)],
         gate: IdeaId::AnthologyBinding,
@@ -2120,7 +2177,7 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
     },
     RefinementDef {
         name: "Thicker Blankets",
-        blurb: "Warmth you can knead. +1 happiness point per Hearth.",
+        blurb: "{Warmth} you can knead. +1 happiness point per Hearth.",
         cost: 8000.0,
         materials: &[(ResourceId::Quills, 50.0)],
         gate: IdeaId::TeaCeremonies,
@@ -2145,6 +2202,7 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
 /// its sibling for the current meadow. @spec SIM-CUR-011
 pub struct RuleDef {
     pub name: &'static str,
+    /// Marked as an idea's blurb is. @spec SIM-CUR-013, SIM-CUR-015
     pub blurb: &'static str,
     pub cost_charm: f64,
     /// The sibling this rule permanently blocks (and is blocked by).
@@ -2159,14 +2217,14 @@ pub fn rule_def(r: RuleId) -> &'static RuleDef {
 static RULES: [RuleDef; 8] = [
     RuleDef {
         name: "Early Birds",
-        blurb: "Dawn patrol tends the patch. Catnip production +10%.",
+        blurb: "Dawn patrol tends the patch. {Catnip} production +10%.",
         cost_charm: 150.0,
         blocks: RuleId::NightOwls,
         effects: &[(Effect::ResourceRatio(ResourceId::Catnip), 0.10)],
     },
     RuleDef {
         name: "Night Owls",
-        blurb: "The best questions come after dark. Curiosity production +10%.",
+        blurb: "The best questions come after dark. {Curiosity} production +10%.",
         cost_charm: 150.0,
         blocks: RuleId::EarlyBirds,
         effects: &[(Effect::ResourceRatio(ResourceId::Curiosity), 0.10)],
@@ -2187,7 +2245,7 @@ static RULES: [RuleDef; 8] = [
     },
     RuleDef {
         name: "Sharing Circle",
-        blurb: "One feather, many admirers. Luxury drain −25%.",
+        blurb: "One {feather|Feathers}, many admirers. Luxury drain −25%.",
         cost_charm: 4000.0,
         blocks: RuleId::PersonalStashes,
         effects: &[(Effect::LuxuryDemandRatio, -0.25)],
@@ -2201,14 +2259,14 @@ static RULES: [RuleDef; 8] = [
     },
     RuleDef {
         name: "Loud Purring",
-        blurb: "Audible contentment carries. Charm production +20%.",
+        blurb: "Audible contentment carries. {Charm} production +20%.",
         cost_charm: 15000.0,
         blocks: RuleId::QuietContemplation,
         effects: &[(Effect::ResourceRatio(ResourceId::Charm), 0.20)],
     },
     RuleDef {
         name: "Quiet Contemplation",
-        blurb: "Stillness gathers its own heat. Warmth production +20%.",
+        blurb: "Stillness gathers its own heat. {Warmth} production +20%.",
         cost_charm: 15000.0,
         blocks: RuleId::LoudPurring,
         effects: &[(Effect::ResourceRatio(ResourceId::Warmth), 0.20)],

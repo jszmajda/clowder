@@ -4,7 +4,7 @@ This leaf owns every colour decision in clowder: the palette, what each colour i
 
 ## Status
 
-**IMPLEMENTED** per the spec file's own markers — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 21 of 21 active specs marked implemented; the coats (TUI-THEME-016 – 021) landed 2026-10-14 with tests across the theme, chrome, frame, rows, inspector, overlays, and armed-summary test files.
+**IMPLEMENTED** per the spec file's own markers — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 24 of 24 active specs marked implemented; the coats (TUI-THEME-016 – 021) landed 2026-10-14 with tests across the theme, chrome, frame, rows, inspector, overlays, and armed-summary test files, coats in the inspector's description (TUI-THEME-022) landed 2026-10-16, and coats on every resource name in every sentence (TUI-THEME-023, 024) the same day.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns every colour decision in clowder: the palette, what each colour i
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/theme/theme-specs.md` — 21 specs, prefix `TUI-THEME`
+- `docs/intent/tui/theme/theme-specs.md` — 24 specs, prefix `TUI-THEME`
 
 ### Tests
 - `crates/clowder-tui/tests/theme.rs`
@@ -38,9 +38,9 @@ This leaf owns every colour decision in clowder: the palette, what each colour i
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-THEME-001 – TUI-THEME-021 | 21 | 0 | 0 |
+| All | TUI-THEME-001 – TUI-THEME-024 | 24 | 0 | 0 |
 
-**Summary:** 21 of 21 active specs marked implemented.
+**Summary:** 24 of 24 active specs marked implemented.
 
 ## Key Findings
 

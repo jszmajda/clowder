@@ -2300,8 +2300,8 @@ fn a_crafts_rows_state_what_it_makes_and_the_tinker_row_counts_bound_tinkerers_i
 }
 
 /// For a kind whose definition carries a blurb — an idea, a refinement, a rule
-/// — the blurb is the statement, and none of the effect fields beside it is
-/// restated. An item held once states no count of copies. Quantified over every
+/// — the blurb's words are the statement, its marks never drawn, and none of
+/// the effect fields beside it is restated. An item held once states no count of copies. Quantified over every
 /// such row, researched and not.
 /// @spec TUI-NAV-018
 #[test]
@@ -2318,6 +2318,8 @@ fn a_blurb_kinds_statement_is_its_blurb_and_nothing_restated_beside_it() {
                 ContentId::Rule(r) => tables::rule_def(*r).blurb,
                 _ => continue,
             };
+            // The blurb's words, each mark read as its text (SIM-CUR-014).
+            let blurb = &tables::blurb_text(blurb);
             seen += 1;
             let shown = pane_text(&state, &looking_at(section, row.key.clone()), WIDE, TALL);
             if !blurb.is_empty() {
@@ -3346,9 +3348,9 @@ fn resource_name(r: ResourceId) -> String {
 }
 
 /// Every cost line heads with its component's name in that resource's coat,
-/// short or covered alike, and nothing else on the line wears a colour; no
-/// other line of the inspector — the item's name, its statement, its reason —
-/// wears a hue of the ring.
+/// short or covered alike, and nothing else on the line wears a colour; the
+/// item's name line wears none. What the description's sentences wear is
+/// TUI-THEME-022's.
 ///
 /// @spec TUI-THEME-019
 #[test]
@@ -3403,12 +3405,12 @@ fn the_inspectors_cost_lines_wear_each_components_coat_on_its_name_short_or_cove
                     "the cost line for {name}: cell {x} past the name wears {got:?}: {line:?}"
                 );
             }
-        } else {
+        } else if i == 0 {
             for x in 0..line.chars().count() {
                 let got = fg_at(&buf, rect.x + x as u16, y);
                 assert!(
                     !ring.contains(&got),
-                    "line {i} ({line:?}) is no cost line, yet cell {x} wears the ring colour {got:?}"
+                    "the name line ({line:?}) wears the ring colour {got:?} at cell {x}"
                 );
             }
         }
@@ -3466,4 +3468,200 @@ fn a_stores_rows_name_line_in_the_inspector_wears_its_coat() {
             "past the name, no colour"
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// Coats in the description — TUI-THEME-022
+// ---------------------------------------------------------------------------
+
+/// The inspector's text after its name line, read as one run: each line's
+/// trailing blanks dropped, the lines joined by one space, and every run of
+/// blanks one blank — each character with the colour it is drawn in. A
+/// sentence the pane wraps reads whole again.
+fn description_cells(buf: &Buffer, rect: Rect) -> Vec<(char, ratatui::style::Color)> {
+    let mut out: Vec<(char, ratatui::style::Color)> = Vec::new();
+    for y in rect.y + 1..rect.bottom() {
+        let mut line: Vec<(char, ratatui::style::Color)> = (rect.x..rect.right())
+            .map(|x| {
+                let cell = buf.cell((x, y)).expect("in the buffer");
+                (cell.symbol().chars().next().unwrap_or(' '), cell.fg)
+            })
+            .collect();
+        while line.last().is_some_and(|(c, _)| *c == ' ') {
+            line.pop();
+        }
+        let first = line.iter().position(|(c, _)| *c != ' ');
+        let Some(first) = first else { continue };
+        if !out.is_empty() {
+            out.push((' ', ratatui::style::Color::Reset));
+        }
+        for (c, fg) in &line[first..] {
+            if *c == ' ' && out.last().is_some_and(|(p, _)| *p == ' ') {
+                continue;
+            }
+            out.push((*c, *fg));
+        }
+    }
+    out
+}
+
+/// Where `needle` stands as whole words in `hay`, case and all.
+fn word_hits(hay: &[char], needle: &str) -> Vec<usize> {
+    let needle: Vec<char> = needle.chars().collect();
+    let mut out = Vec::new();
+    if needle.len() > hay.len() {
+        return out;
+    }
+    for at in 0..=hay.len() - needle.len() {
+        let end = at + needle.len();
+        let left = at == 0 || !hay[at - 1].is_alphanumeric();
+        let right = end == hay.len() || !hay[end].is_alphanumeric();
+        if left && right && hay[at..end] == needle[..] {
+            out.push(at);
+        }
+    }
+    out
+}
+
+/// A structure's, a job's, or a craft's statement is stated from its
+/// definition's fields, and a held-back item's reason names what it is short
+/// of: every resource those sentences name wears its coat across the name, and
+/// every other character of the description — words, figures, punctuation —
+/// wears the line's own colour. Quantified over every such row, with plenty
+/// held and in a meadow short of a price.
+///
+/// @spec TUI-THEME-022
+#[test]
+fn every_resource_a_fielded_statement_or_a_reason_names_wears_its_coat() {
+    use clowder_tui::theme::{coat, coat_colours};
+    use ratatui::style::Color;
+
+    let rect = pane_rect(WIDE, TALL);
+    let (mut in_statements, mut in_reasons) = (0, 0);
+    let short = waiting_fixture().2;
+    for state in [world(true), world(false), short] {
+        for (section, row) in every_row(&state) {
+            let RowKey::Content(id, _) = &row.key else {
+                continue;
+            };
+            if !matches!(
+                id,
+                ContentId::Structure(_) | ContentId::Job(_) | ContentId::Craft(_)
+            ) {
+                continue;
+            }
+            let buf = render(
+                &state,
+                &looking_at(section, row.key.clone()),
+                WIDE,
+                TALL,
+                rect,
+            );
+            let cells = description_cells(&buf, rect);
+            let text: Vec<char> = cells.iter().map(|(c, _)| *c).collect();
+            let shown: String = text.iter().collect();
+            let mut want: Vec<Color> = vec![Color::Reset; text.len()];
+            for r in ResourceId::ALL {
+                let name = spaced(&format!("{r:?}"));
+                let colours = coat_colours(coat(r), name.chars().count());
+                for at in word_hits(&text, &name) {
+                    let before: String = text[..at].iter().collect();
+                    let in_reason = before
+                        .rfind("Short by ")
+                        .is_some_and(|i| !before[i..].contains(". "));
+                    if text.get(at + name.chars().count()) == Some(&':') {
+                        // A cost line's head: TUI-THEME-019's, checked alike.
+                    } else if in_reason {
+                        in_reasons += 1;
+                    } else {
+                        in_statements += 1;
+                    }
+                    for (k, c) in colours.iter().enumerate() {
+                        want[at + k] = *c;
+                    }
+                }
+            }
+            for (i, ((c, got), want)) in cells.iter().zip(&want).enumerate() {
+                assert_eq!(
+                    got, want,
+                    "{id:?}: {c:?} at {i} wears {got:?}, not {want:?}, in: {shown:?}"
+                );
+            }
+        }
+    }
+    assert!(
+        in_statements > 10,
+        "fixture: many statements name a resource ({in_statements})"
+    );
+    assert!(
+        in_reasons > 0,
+        "fixture: some reason names what it is short of"
+    );
+}
+
+/// A blurb's statement is its words, each mark read as its text: each
+/// resource reference wears its resource's coat laid across the words as the
+/// blurb spells them, and every other character wears the line's own colour.
+/// Quantified over every blurb row, researched and not.
+///
+/// @spec TUI-THEME-022, TUI-NAV-018
+#[test]
+fn every_resource_a_blurb_marks_wears_its_coat_across_the_words_as_written() {
+    use clowder_core::content::{blurb_parts, BlurbPart};
+    use clowder_tui::theme::{coat, coat_colours};
+    use ratatui::style::Color;
+
+    let rect = pane_rect(WIDE, TALL);
+    let mut references = 0;
+    for state in [world(true), world(false)] {
+        for (section, row) in every_row(&state) {
+            let RowKey::Content(id, _) = &row.key else {
+                continue;
+            };
+            let blurb = match id {
+                ContentId::Idea(i) => tables::idea_def(*i).blurb,
+                ContentId::Refinement(r) => tables::refinement_def(*r).blurb,
+                ContentId::Rule(r) => tables::rule_def(*r).blurb,
+                _ => continue,
+            };
+            if blurb.is_empty() {
+                continue;
+            }
+            let buf = render(
+                &state,
+                &looking_at(section, row.key.clone()),
+                WIDE,
+                TALL,
+                rect,
+            );
+            let cells = description_cells(&buf, rect);
+            let text: String = cells.iter().map(|(c, _)| *c).collect();
+            let words = tables::blurb_text(blurb);
+            let start = text
+                .find(&words)
+                .unwrap_or_else(|| panic!("{id:?}: the statement {words:?} is not in {text:?}"));
+            let mut at = text[..start].chars().count();
+            for part in blurb_parts(blurb) {
+                let (written, colours) = match part {
+                    BlurbPart::Text(t) => (t, vec![Color::Reset; t.chars().count()]),
+                    BlurbPart::Resource(r, t) => {
+                        references += 1;
+                        (t, coat_colours(coat(r), t.chars().count()))
+                    }
+                };
+                for (k, want) in colours.iter().enumerate() {
+                    let (c, got) = cells[at + k];
+                    assert_eq!(
+                        &got, want,
+                        "{id:?}: {c:?} of {written:?} wears {got:?}, not {want:?}: {text:?}"
+                    );
+                }
+                at += written.chars().count();
+            }
+        }
+    }
+    assert!(
+        references > 20,
+        "fixture: many blurb references drawn ({references})"
+    );
 }

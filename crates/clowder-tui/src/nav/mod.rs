@@ -25,6 +25,18 @@ pub use update::{
 };
 pub use view::{ArmedRow, CountPrompt, Overlay, PendingReport, SeenMark, ViewState};
 
+/// An identifier as lower-case words: "JarsOfPurrs" -> "jars of purrs".
+fn spaced_lower(tag: &str) -> String {
+    let mut out = String::new();
+    for (i, c) in tag.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            out.push(' ');
+        }
+        out.extend(c.to_lowercase());
+    }
+    out
+}
+
 /// A command rejection in words a player can act on.
 ///
 /// The core reports rejections as typed data precisely so the shell can say
@@ -41,10 +53,13 @@ pub fn plain_error(e: &clowder_core::CommandError) -> String {
         E::NoSeats => "no room at the bench".into(),
         E::NoWorkersAssigned => "nobody's doing that yet".into(),
         E::StorageFull => "nowhere to put it — that store is full".into(),
+        // The store is named in the stores' own words, in lower case, and
+        // marked as a blurb marks a resource, so the hint bar's row can draw
+        // it in its coat. @spec TUI-NAV-014, TUI-THEME-024
         E::InsufficientResources { missing } => match missing.first() {
             Some((r, short)) => format!(
-                "not enough {} — need {} more",
-                format!("{r:?}").to_lowercase(),
+                "not enough {{{}|{r:?}}} — need {} more",
+                spaced_lower(&format!("{r:?}")),
                 crate::render::fmt::compact(*short)
             ),
             None => "not enough to hand".into(),

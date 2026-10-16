@@ -12,8 +12,9 @@ use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
 use ratatui::{layout::Rect, Frame};
 
+use crate::nav::rows::RowKey;
 use crate::nav::{Overlay, ViewState};
-use crate::render::fmt;
+use crate::render::{fmt, line_from_pieces, Piece};
 use crate::theme::Role;
 
 /// The mark a line opens with, and the class it belongs to. Prominence is the
@@ -110,6 +111,19 @@ fn resource_label(r: ResourceId) -> String {
     out
 }
 
+/// A resource named in a sentence: its stores-row name, in its coat.
+fn resource_piece(r: ResourceId) -> Piece {
+    let name = resource_label(r);
+    let chars = name.chars().count();
+    Piece::name(r, name, chars)
+}
+
+/// Pieces drawn as one line in `base`, each resource's name in its coat and
+/// at full strength (TUI-THEME-023), never fitted: the region clips it.
+fn line_of(pieces: &[Piece], base: Style) -> Line<'static> {
+    line_from_pieces(pieces, base, true, usize::MAX)
+}
+
 /// A wall-clock span, humanized coarsely enough that two spans differing by
 /// weeks never read the same.
 fn format_span(elapsed_seconds: u64) -> String {
@@ -163,14 +177,19 @@ fn largest_gains(report: &OfflineReport) -> Vec<(ResourceId, f64)> {
     gains
 }
 
-/// The curated gains, rendered as text. Never a negative number and never the
-/// small change — TUI-NAV-055 says the *largest* gains, so it has to choose.
-fn gains_text(report: &OfflineReport) -> String {
-    largest_gains(report)
-        .into_iter()
-        .map(|(r, d)| format!("+{} {}", fmt::compact(d), resource_label(r)))
-        .collect::<Vec<_>>()
-        .join(", ")
+/// The curated gains, each resource in its coat. Never a negative number and
+/// never the small change — TUI-NAV-055 says the *largest* gains, so it has
+/// to choose. @spec TUI-THEME-024
+fn gains_pieces(report: &OfflineReport) -> Vec<Piece> {
+    let mut out = Vec::new();
+    for (i, (r, d)) in largest_gains(report).into_iter().enumerate() {
+        if i > 0 {
+            out.push(Piece::plain(", "));
+        }
+        out.push(Piece::plain(format!("+{} ", fmt::compact(d))));
+        out.push(resource_piece(r));
+    }
+    out
 }
 
 /// Every resource whose stock changed at all during the report's span,
@@ -215,24 +234,27 @@ pub fn too_small(f: &mut Frame, area: Rect) {
 
 /// The dim one-line ticker. Flavour is quieter than mechanical; milestones are
 /// marked. Prominence comes from the core's classification, never from this
-/// module deciding which events matter. @spec TUI-NAV-026, TUI-NAV-057
+/// module deciding which events matter. The quiet is the line's own: a
+/// resource it names wears its coat at full strength, as everywhere.
+/// @spec TUI-NAV-026, TUI-NAV-057, TUI-THEME-024
 pub fn ticker(f: &mut Frame, area: Rect, state: &GameState) {
     let entries = state.journal.iter_chronological();
-    let text = match entries.last().map(|e| &e.item) {
-        Some(JournalItem::Happened(event)) => event_line(event),
+    let pieces: Vec<Piece> = match entries.last().map(|e| &e.item) {
+        Some(JournalItem::Happened(event)) => vec![Piece::plain(event_line(event))],
         Some(JournalItem::Away(report)) => {
-            format!(
-                "\u{2605} while you were away ({}): {}",
-                format_span(report.elapsed_seconds),
-                gains_text(report)
-            )
+            let mut out = vec![Piece::plain(format!(
+                "\u{2605} while you were away ({}): ",
+                format_span(report.elapsed_seconds)
+            ))];
+            out.extend(gains_pieces(report));
+            out
         }
-        None => String::new(),
+        None => Vec::new(),
     };
     let style = Style::default()
         .fg(Role::Dim.color().expect("Dim carries a colour"))
         .add_modifier(Modifier::DIM);
-    f.render_widget(Paragraph::new(Line::styled(text, style)), area);
+    f.render_widget(Paragraph::new(line_of(&pieces, style)), area);
 }
 
 /// Full scrollback over the retained journal, grouped by day — with every
@@ -318,8 +340,9 @@ fn journal_lines(state: &GameState, view: &ViewState) -> Vec<Line<'static>> {
 /// resource whose stock changed, signed, gains before decreases, each group
 /// largest first; each kitten who arrived, wandered, or came home, by name;
 /// and the seasons passed. Unlike the banner, this tells everything the
-/// report holds — dismissing the banner must lose nothing.
-/// @spec TUI-NAV-027, TUI-NAV-056
+/// report holds — dismissing the banner must lose nothing. Each changed
+/// store is named in its coat.
+/// @spec TUI-NAV-027, TUI-NAV-056, TUI-THEME-024
 fn away_report_lines(report: &OfflineReport) -> Vec<Line<'static>> {
     let mut header = format!("\u{2605} away for {}", span_clause(report));
     if let Some(note) = truncated_note(report) {
@@ -333,12 +356,12 @@ fn away_report_lines(report: &OfflineReport) -> Vec<Line<'static>> {
     // any pane's width; the Journal scrolls, so a line each costs nothing.
     // @spec TUI-NAV-027
     for (r, d) in changed_resources(report) {
-        lines.push(Line::raw(format!(
-            "  {}{} {}",
+        let figure = Piece::plain(format!(
+            "  {}{} ",
             if d > 0.0 { "+" } else { "-" },
-            fmt::compact(d.abs()),
-            resource_label(r)
-        )));
+            fmt::compact(d.abs())
+        ));
+        lines.push(line_of(&[figure, resource_piece(r)], Style::default()));
     }
 
     // Occurrences, never whereabouts (TUI-NAV-056): each list counts what
@@ -498,8 +521,8 @@ fn pack(entries: &[String], width: usize) -> Vec<String> {
 
 /// Find-anything over the sections' own lists, narrowing by substring as
 /// characters arrive, drawn from the top so the result Enter takes is always
-/// the first line and always on screen. @spec TUI-NAV-038, TUI-NAV-062,
-/// TUI-NAV-063
+/// the first line and always on screen. A store's result names it in its
+/// coat. @spec TUI-NAV-038, TUI-NAV-062, TUI-NAV-063, TUI-THEME-019
 pub fn palette(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     let query = match &view.overlay {
         Some(Overlay::Palette { query, .. }) => query.as_str(),
@@ -510,7 +533,17 @@ pub fn palette(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     lines.extend(
         crate::nav::palette::results(state, query)
             .into_iter()
-            .map(|r| Line::raw(format!("[{}] {}", r.section.digit(), r.name))),
+            .map(|r| {
+                let digit = Piece::plain(format!("[{}] ", r.section.digit()));
+                let name = match r.key {
+                    RowKey::Resource(res) => {
+                        let chars = r.name.chars().count();
+                        Piece::name(res, r.name, chars)
+                    }
+                    _ => Piece::plain(r.name),
+                };
+                line_of(&[digit, name], Style::default())
+            }),
     );
     let height = area.height as usize;
     lines.truncate(height);
