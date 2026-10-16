@@ -28,14 +28,23 @@ fn names_are_unique_pool_first_then_numbered() {
     let names: Vec<&str> = s.kittens.iter().map(|k| k.name.as_str()).collect();
     let unique: std::collections::BTreeSet<&&str> = names.iter().collect();
     assert_eq!(unique.len(), 45, "all names unique");
-    for k in &s.kittens[..40] {
+    for k in &s.kittens {
         assert!(
             content::NAME_POOL.contains(&k.name.as_str()),
             "first cycle from pool: {}",
             k.name
         );
     }
-    for k in &s.kittens[40..] {
+
+    // Every pool name already rostered: the next arrivals are numbered.
+    let mut s = GameState::new(2);
+    s.kittens = content::NAME_POOL.iter().map(|n| away_kitten(n)).collect();
+    adopt(&mut s, 5);
+    let newcomers = &s.kittens[content::NAME_POOL.len()..];
+    let unique: std::collections::BTreeSet<&str> =
+        newcomers.iter().map(|k| k.name.as_str()).collect();
+    assert_eq!(unique.len(), 5, "all names unique");
+    for k in newcomers {
         assert!(
             k.name.ends_with(" II"),
             "second cycle is numbered: {}",
@@ -44,6 +53,204 @@ fn names_are_unique_pool_first_then_numbered() {
         let base = k.name.trim_end_matches(" II");
         assert!(content::NAME_POOL.contains(&base));
     }
+}
+
+/// A rostered kitten away at the neighbour's: it holds a name and a cushion
+/// and eats nothing, so a test can fill a roster without a famine.
+fn away_kitten(name: &str) -> Kitten {
+    Kitten {
+        name: name.to_string(),
+        job: None,
+        location: Location::NeighborsYard,
+        arrived_day: 0,
+        job_seq: None,
+        away_seq: Some(0),
+        skills: [0.0; 8],
+        exp: 0.0,
+        rank: 0,
+        trait_id: KittenTrait::None,
+        tinkering: None,
+    }
+}
+
+/// How many single-character changes, insertions, or removals turn `a` into
+/// `b`.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.iter().enumerate() {
+        let mut diag = row[0];
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let next = (row[j + 1] + 1)
+                .min(row[j] + 1)
+                .min(diag + usize::from(ca != cb));
+            diag = row[j + 1];
+            row[j + 1] = next;
+        }
+    }
+    row[b.len()]
+}
+
+// @spec SIM-KIT-028
+#[test]
+fn the_name_pool_is_large_short_capitalised_and_free_of_look_alikes() {
+    let pool = &content::NAME_POOL;
+    assert!(pool.len() >= 300, "the pool holds {} names", pool.len());
+    for name in pool.iter() {
+        assert!(name.chars().count() <= 16, "{name:?} is longer than 16");
+        for word in name.split(' ') {
+            assert!(
+                !word.is_empty() && word.chars().all(|c| c.is_ascii_alphabetic()),
+                "{name:?}: ASCII letters with single spaces between words"
+            );
+            assert!(
+                word.starts_with(|c: char| c.is_ascii_uppercase()),
+                "{name:?}: every word begins with a capital"
+            );
+        }
+    }
+    for (i, a) in pool.iter().enumerate() {
+        for b in &pool[i + 1..] {
+            let d = edit_distance(&a.to_lowercase(), &b.to_lowercase());
+            assert!(
+                d > 1,
+                "{a:?} and {b:?} are one character apart (or the same)"
+            );
+        }
+    }
+}
+
+/// An identifier spelled as words: a space before each capital after the
+/// first.
+fn spaced(tag: &str) -> String {
+    let mut out = String::new();
+    for (i, c) in tag.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            out.push(' ');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// A spelling with its last word made singular: a final "ies" read as "y",
+/// otherwise a final "s" dropped.
+fn singular(name: &str) -> String {
+    if let Some(stem) = name.strip_suffix("ies") {
+        format!("{stem}y")
+    } else if let Some(stem) = name.strip_suffix('s') {
+        stem.to_string()
+    } else {
+        name.to_string()
+    }
+}
+
+// @spec SIM-KIT-029
+#[test]
+fn no_kitten_name_is_the_name_of_any_other_thing() {
+    let mut others: Vec<String> = Vec::new();
+    for r in ResourceId::ALL {
+        let name = spaced(&format!("{r:?}"));
+        others.push(singular(&name));
+        others.push(name);
+    }
+    let debug = |v: &dyn std::fmt::Debug| spaced(&format!("{v:?}"));
+    for s in StructureId::ALL {
+        others.push(content::structure_def(s).name.to_string());
+    }
+    for j in JobId::ALL {
+        others.push(content::job_def(j).name.to_string());
+    }
+    for i in IdeaId::ALL {
+        others.push(content::idea_def(i).name.to_string());
+    }
+    for c in CraftId::ALL {
+        others.push(content::craft_def(c).name.to_string());
+    }
+    for r in RefinementId::ALL {
+        others.push(content::refinement_def(r).name.to_string());
+    }
+    for r in RuleId::ALL {
+        others.push(content::rule_def(r).name.to_string());
+    }
+    for r in RiteId::ALL {
+        others.push(content::rite_def(r).name.to_string());
+    }
+    for a in ArchId::ALL {
+        others.push(content::arch_def(a).name.to_string());
+    }
+    for t in TraditionId::ALL {
+        others.push(debug(&t));
+    }
+    for l in DreamLoomId::ALL {
+        others.push(content::dream_loom_def(l).name.to_string());
+    }
+    for c in ColonyId::ALL {
+        others.push(content::colony_def(c).name.to_string());
+        others.push(debug(&c));
+    }
+    for s in SiteId::ALL {
+        others.push(content::site_def(s).name.to_string());
+        others.push(debug(&s));
+    }
+    for a in AdventureId::ALL {
+        others.push(debug(&a));
+    }
+    for s in Season::ALL {
+        others.push(debug(&s));
+    }
+    for t in KittenTrait::ALL {
+        others.push(debug(&t));
+    }
+    let others: std::collections::BTreeSet<String> =
+        others.iter().map(|o| o.to_lowercase()).collect();
+    for name in content::NAME_POOL.iter() {
+        assert!(
+            !others.contains(&name.to_lowercase()),
+            "{name:?} is also the name of another thing in the game"
+        );
+    }
+}
+
+// @spec SIM-KIT-030
+#[test]
+fn saved_names_are_kept_and_taken_whatever_the_pool_holds() {
+    let pool = &content::NAME_POOL;
+    // Every pool name rostered, two of them saved in another case, beside a
+    // name no pool holds.
+    let mut saved: Vec<String> = pool.iter().map(|n| n.to_string()).collect();
+    saved[0] = saved[0].to_lowercase();
+    saved[1] = saved[1].to_uppercase();
+    saved.push("Zanzibar Quux".to_string());
+
+    let mut s = GameState::new(9);
+    s.kittens = saved.iter().map(|n| away_kitten(n)).collect();
+    adopt(&mut s, 3);
+
+    let names: Vec<&str> = s.kittens.iter().map(|k| k.name.as_str()).collect();
+    for (k, want) in s.kittens.iter().zip(&saved) {
+        assert_eq!(&k.name, want, "a rostered kitten keeps its saved name");
+    }
+    let folded: std::collections::BTreeSet<String> =
+        names.iter().map(|n| n.to_lowercase()).collect();
+    assert_eq!(
+        folded.len(),
+        names.len(),
+        "no draw repeats a rostered name, whatever its case: {:?}",
+        &names[saved.len()..]
+    );
+
+    let text = save_string(&s, 1_000);
+    let loaded = load_string(&text, 1_000).expect("a fresh save loads");
+    let reloaded: Vec<&str> = loaded
+        .state
+        .kittens
+        .iter()
+        .map(|k| k.name.as_str())
+        .collect();
+    assert_eq!(reloaded, names, "loading renames no kitten");
 }
 
 // @spec SIM-KIT-003

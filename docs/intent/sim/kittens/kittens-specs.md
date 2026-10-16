@@ -4,6 +4,9 @@
 
 - [x] **SIM-KIT-001**: The system shall never remove a kitten from the roster; a kitten's absence is represented by the location NeighborsYard, never by deletion.
 - [x] **SIM-KIT-002**: When a kitten arrives, the system shall draw its name without replacement from the name pool via the state RNG, appending Roman-numeral suffixes (II, III, …) once the pool is exhausted, so every name in a save is unique.
+- [x] **SIM-KIT-028**: The system shall hold a name pool of at least 300 names, each at most 16 characters, made only of ASCII letters with single spaces between words, every word beginning with a capital letter, and no two of which are the same or differ by a single character changed, added, or removed, ignoring case.
+- [x] **SIM-KIT-029**: The system shall hold no name in the name pool that equals as a whole, ignoring case, the name of any resource (as the stores spell it, or that spelling with its last word made singular — a final "s" dropped, or a final "ies" read as "y"), structure, job, idea, craft, refinement, house rule, rite, arch, tradition, dream loom, colony, site, adventure, season, or kitten trait, each as the game spells it.
+- [x] **SIM-KIT-030**: When a kitten arrives, the system shall count as taken every name already in the roster, Home or Away, compared ignoring case and whether or not the current name pool holds it, and shall leave every rostered kitten's name as it was saved, so a name pool that changes between versions renames no kitten and no draw repeats a rostered name.
 
 ## Arrival
 

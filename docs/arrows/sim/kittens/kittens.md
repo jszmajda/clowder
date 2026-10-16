@@ -4,7 +4,7 @@ Kittens are the heart of the game and the reason the cozy invariants exist. This
 
 ## Status
 
-**OK** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 27 of 27 active specs implemented.
+**OK** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 30 of 30 active specs implemented.
 
 ## References
 
@@ -16,7 +16,7 @@ Kittens are the heart of the game and the reason the cozy invariants exist. This
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/kittens/kittens-specs.md` — 27 specs, prefix `SIM-KIT`
+- `docs/intent/sim/kittens/kittens-specs.md` — 30 specs, prefix `SIM-KIT`
 
 ### Tests
 - `crates/clowder-core/tests/kittens.rs`
@@ -36,9 +36,9 @@ Kittens are the heart of the game and the reason the cozy invariants exist. This
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-KIT-001 – SIM-KIT-027 | 27 | 0 | 0 |
+| All | SIM-KIT-001 – SIM-KIT-030 | 30 | 0 | 0 |
 
-**Summary:** 27 of 27 active specs implemented.
+**Summary:** 30 of 30 active specs implemented.
 
 ## Key Findings
 

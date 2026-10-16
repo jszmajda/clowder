@@ -990,11 +990,13 @@ impl GameState {
 
     /// Draw a name from the pool without replacement, cycling with Roman
     /// numeral suffixes once exhausted. The remaining pool is derived from the
-    /// roster — no separate stored state.
-    // @spec SIM-KIT-002
+    /// roster — no separate stored state — and every rostered name is taken,
+    /// ignoring case, whether or not the pool still holds it, so a pool that
+    /// changes between versions renames nobody and repeats nobody.
+    // @spec SIM-KIT-002, SIM-KIT-030
     fn draw_name(&mut self) -> String {
-        let taken: std::collections::BTreeSet<&str> =
-            self.kittens.iter().map(|k| k.name.as_str()).collect();
+        let taken: std::collections::BTreeSet<String> =
+            self.kittens.iter().map(|k| k.name.to_lowercase()).collect();
         for cycle in 1u32.. {
             let candidates: Vec<String> = content::NAME_POOL
                 .iter()
@@ -1005,7 +1007,7 @@ impl GameState {
                         format!("{} {}", base, roman(cycle))
                     }
                 })
-                .filter(|name| !taken.contains(name.as_str()))
+                .filter(|name| !taken.contains(&name.to_lowercase()))
                 .collect();
             if !candidates.is_empty() {
                 let ix = self.rng.index(candidates.len());

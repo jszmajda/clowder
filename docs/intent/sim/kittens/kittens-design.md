@@ -30,7 +30,19 @@ pub struct Kitten {
 
 The two `_seq` stamps come from the engine's `next_seq` counter and exist to make ordering rules implementable from stored state alone: "most recently assigned" = highest `job_seq`; "first out, first back" = lowest `away_seq`. Arrival order alone cannot reconstruct either across multiple famine episodes.
 
-**Name pool** (content table, ~40 entries): Biscuit, Mochi, Pixel, Waffles, Miso, Clementine, Tofu, Pepper, Marmalade, Noodle, Pretzel, Juniper, Bean, Dumpling, Ziggy, Olive, Paprika, Maple, Sprocket, Turnip, Gnocchi, Butterscotch, Fig, Pancake, Nimbus, Tangerine, Pickles, Comet, Bramble, Cricket, Fennel, Sesame, Plum, Wasabi, Doodle, Crumpet, Nutmeg, Socks, Clover, Captain Whiskers. Names are drawn without replacement via RNG; when the pool exhausts, reuse begins with Roman-numeral suffixes (Biscuit II) — the clowder can outgrow the pool. The remaining pool is *derived from the roster*, never stored: the current cycle is the smallest suffix count at which some base name is unused, and the draw is a uniform RNG index over the remaining names in content-table order, each cycle drawn without replacement in turn.
+### Names
+
+**The name pool** is a content table of at least three hundred names, chosen by hand in one cozy register — foods and sweets, spices and herbs, garden plants, weather and sky, small household things, and a few storybook names (Biscuit, Mochi, Pixel, Waffles, Clementine, Captain Whiskers, …). It is sized to a grown clowder, not to the opening hours. A meadow needs 71 kittens before it can move (prestige leaf), and a meadow that keeps building houses runs well past that, so a pool of a few dozen would put most of a mature clowder's newcomers under a numeral. With three hundred, a generation's roster normally draws a fresh name for every kitten, and because each generation draws its own sample, one generation's roster — and so its page of the Family Album — reads differently from the last.
+
+Every name in the pool:
+
+- is different from every other name in the pool by more than one letter — one letter changed, added, or removed, ignoring case — so no two names in a roster read alike at a glance;
+- is at most 16 characters, ASCII letters with single spaces between words and a capital at the start of each word, so it is single-width and short enough to stand whole in the roster's name column at the 80-column floor (render leaf);
+- is not the name of any other thing in the game, ignoring case: not a resource (as the stores spell it, or that spelling without its final "s"), and not a structure, job, idea, craft, refinement, house rule, rite, arch, tradition, dream loom, colony, site, adventure, season, or kitten trait. Events name kittens in sentences (`{name} became a Gardener`), and a kitten that shared a store's or a building's name would make such a line read as being about that thing.
+
+Names are drawn without replacement via RNG; when the pool exhausts, reuse begins with Roman-numeral suffixes (Biscuit II) — the clowder can always outgrow the pool. The remaining pool is *derived from the roster*, never stored: the current cycle is the smallest suffix count at which some base name is unused, and the draw is a uniform RNG index over the remaining names in content-table order, each cycle drawn without replacement in turn.
+
+A name is stored on its kitten, and the pool is only where new names come from. So the pool can grow or change between versions without renaming anyone: a saved kitten keeps its name whether or not the current pool holds it, and every name already in the roster, at home or away, counts as taken for every later draw, compared ignoring case, so no draw can repeat it.
 
 ## Arrival
 
@@ -95,6 +107,9 @@ The wander threshold (3 days ≈ 7.5 real seconds per day of famine at live spee
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
 | Roster is append-only | Location enum, never deletion | Removing starved/departed kittens | The mechanical form of Tenet 1; also keeps names stable for the player's attachment |
+| Name pool | At least three hundred names chosen by hand, Roman numerals past them | A few dozen names; names built from parts (two halves compounded, or a given name and a surname); a syllable generator | A mature generation runs well past the 71 kittens a Move needs, so a few dozen names put most newcomers under a numeral. Names built from parts multiply cheaply but share their parts, so a large roster becomes rows of look-alikes that differ by a syllable, which is the opposite of what a name is for; a chosen name is distinct at a glance. Numerals stay as the tail, so the pool never caps the clowder |
+| Pool names and other names | No pool name is the name of any other thing, ignoring case | Allow overlaps | An event line naming a kitten that shares a store's, a building's, or a trait's name reads as being about that thing (Tenet 3) |
+| A pool that changes between versions | Saved names never change; every rostered name counts as taken | Rename saved kittens from the current pool; reset the draw | A kitten's name is what the player is attached to, and the roster is append-only for that reason; renaming one would be a quiet loss (Tenet 1) |
 | Assignment semantics | Count-based commands resolved to named individuals (LIFO) | Per-kitten assignment UI, anonymous worker pools | Anonymous pools discard identity (the game's heart); per-kitten micro-management fights the idle tenet; LIFO is deterministic and narratable |
 | Arrival pity counter | Guaranteed success after 4 eligible misses | Pure probability, deterministic schedule | Pure RNG produces cruel droughts; fixed schedules feel mechanical; pity keeps surprise with bounded frustration |
 | Crowding penalty | −3%/kitten past the 5th, floor 25% | Hard population cap, no penalty | Soft pressure toward housing/happiness investment without ever forbidding growth |
