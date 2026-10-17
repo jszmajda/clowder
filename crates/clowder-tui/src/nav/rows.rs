@@ -234,20 +234,8 @@ fn clowder_rows(state: &GameState) -> Vec<Row> {
     }
     let mut out = headed_group(state, "jobs", jobs);
 
-    // Each kitten is exactly one row, drawn with its name and no label; its
-    // Enter promotes it. AppointElder is never a row of its own — it is taken
-    // only by this row's own row-bound `n` key (TUI-NAV-094).
-    // @spec TUI-NAV-093
-    let mut kittens = Vec::new();
-    for (ix, _k) in state.kittens.iter().enumerate() {
-        kittens.push(Row {
-            key: RowKey::Kitten(ix, ""),
-            kind: act(Command::Promote(ix), CountSemantics::Single),
-            heavy: false,
-        });
-    }
-    out.extend(headed_group(state, "kittens", kittens));
-
+    // The roster grows with the clowder, so it stands last: nothing beneath
+    // it is a walk past every kitten away. @spec TUI-NAV-098
     out.extend(headed_group(
         state,
         "things to do",
@@ -264,6 +252,20 @@ fn clowder_rows(state: &GameState) -> Vec<Row> {
             },
         ],
     ));
+
+    // Each kitten is exactly one row, drawn with its name and no label; its
+    // Enter promotes it. AppointElder is never a row of its own — it is taken
+    // only by this row's own row-bound `n` key (TUI-NAV-094).
+    // @spec TUI-NAV-093
+    let mut kittens = Vec::new();
+    for (ix, _k) in state.kittens.iter().enumerate() {
+        kittens.push(Row {
+            key: RowKey::Kitten(ix, ""),
+            kind: act(Command::Promote(ix), CountSemantics::Single),
+            heavy: false,
+        });
+    }
+    out.extend(headed_group(state, "kittens", kittens));
     out
 }
 

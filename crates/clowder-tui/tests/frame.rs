@@ -898,7 +898,7 @@ fn header_words_for(row: &Row) -> &'static str {
 fn designed_headers() -> BTreeSet<(usize, &'static str)> {
     let table: [(Section, &[&str]); 9] = [
         (Section::Meadow, &["things to do", "structures", "stores"]),
-        (Section::Clowder, &["jobs", "kittens", "things to do"]),
+        (Section::Clowder, &["jobs", "things to do", "kittens"]),
         (Section::Ideas, &["ideas", "refinements", "rules"]),
         (Section::Sunbeams, &["things to do", "rites"]),
         (Section::Wonders, &["things to do", "arches"]),

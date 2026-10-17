@@ -2680,7 +2680,7 @@ fn design_groups(section: Section) -> Vec<GroupKind> {
     use GroupKind::*;
     match section {
         Section::Meadow => vec![ThingsToDo, Structures, Stores],
-        Section::Clowder => vec![Jobs, Kittens, ThingsToDo],
+        Section::Clowder => vec![Jobs, ThingsToDo, Kittens],
         Section::Ideas => vec![Ideas, Refinements, Rules, Done],
         Section::Crafts => vec![Crafts],
         Section::Sunbeams => vec![ThingsToDo, Rites],
