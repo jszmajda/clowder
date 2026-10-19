@@ -113,6 +113,8 @@ fn vocabulary() -> Vec<Event> {
         Event::TradeReturned {
             colony: ColonyId::Otters,
             caravans: 1,
+            napped: 0,
+            goods: vec![(ResourceId::Twigs, 1.0)],
         },
         Event::PenPalSent {
             colony: ColonyId::Otters,

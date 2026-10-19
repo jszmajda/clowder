@@ -6,6 +6,7 @@
 - [x] **SIM-TRADE-002**: For each caravan, the system shall roll success against standing (nap chance proportional to −standing while shy; bonus-trade chance proportional to standing while warm), yielding on success the colony's sell basket × (1 + trade-ratio effects) × (1 + in-season bonus), or on a nap only the caravan's cost with a possible courtesy gift; a bonus outcome yields ×1.25.
 - [x] **SIM-TRADE-003**: The system shall define exactly the seven tradeable colonies of the colonies design's table — start standings, buy resources, and sell baskets with amounts, chances, and best-season bonuses; the Star Whale (colony 7) reserves a visitor slot only, its exchange being a visit rather than a caravan route and specified with the rest of the sky in SIM-SKY-006 and SIM-SKY-007.
 - [x] **SIM-TRADE-004**: The system shall scale Foxes' moonstone by Kites: chance 0.15 + 0.0035 × Kites, amount (1.5 + 0.03 × Kites) × (1 + fox standing bonus).
+- [x] **SIM-TRADE-009**: When a Trade is applied and accepted, whether to a colony (SIM-TRADE-001) or as the whale's exchange (SIM-SKY-007), the system shall emit one TradeReturned event carrying the colony, the caravans sent, the number of them that napped, and each resource whose stock the trade raised with the amount that stock rose by, in the core's resource order, a resource the trade did not raise being left out.
 
 ## Standing & Pen Pals
 

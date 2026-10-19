@@ -19,6 +19,8 @@ sold = base × (1 + trade_ratio effects) × (1 + season_bonus if in season) ± w
 
 A caravan **succeeds** with probability based on standing (below); on a *nap* (failure) the pep/shinies/buy-resource are still spent (the caravan travelled) and a small courtesy gift may return. A bonus outcome (positive standing) yields ×1.25.
 
+**What comes home.** A trade — caravans to a colony, or the whale's exchange while it visits — reports what it brought back in its one `TradeReturned` event: the colony, the caravans sent, how many of them napped, and each store the trade raised with the amount that stock rose by, in the core's resource order. The amounts are the stock moves the trade made, as a pounce reports its haul (expeditions leaf), so a display can say what the caravans brought home. Each caravan's yield is drawn at random, so nothing outside the trade could work it out afterwards.
+
 ## The Eight Colonies
 
 Buy → sell [amount @ base-chance, in-season]. Standings warm from their start value via Pen Pals.
@@ -59,6 +61,7 @@ The gentle-giant visitor arc (the inspiration's leviathans, de-fanged): Star Wha
 | No hostile colonies | Shy (warms to neutral) instead of hostile (capped at neutral, failure chance) | Keep hostile races | Tenet 1 — the *mechanic* (negative standing = failure chance, warmable) is preserved; only "enemy" becomes "shy" |
 | Kite-scaled moonstone | Foxes' moonstone scales with Kites built | Flat moonstone trade | The inspiration's ship-scaled-titanium loop; makes Kites doubly useful (storage + metal) and gives band 3 its trade-paced supply |
 | Failed trade still costs the caravan | Pep/goods spent on a nap, courtesy gift possible | Full refund on failure | A costless retry removes all standing tension; the courtesy gift keeps it warm |
+| What a trade's event carries | The caravans, how many napped, and each store raised with the amount it rose by | The colony and the caravan count alone | Each caravan's goods are drawn at random, so only the trade knows what came home; an event without them leaves the player no way to tell what a trade earned, and no display a way to find out |
 | Star Whales fed dreamcorns | Lullaby offering raises contentment | Necrocorn-style feeding | Reuses the mystic dreamcorn as a gentle gift rather than the inspiration's grim necrocorn upkeep |
 
 ## Open Questions & Future Decisions

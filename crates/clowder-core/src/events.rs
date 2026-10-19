@@ -1,6 +1,6 @@
 use crate::state::{
     AdventureId, ArchId, ColonyId, ContentId, DreamLoomId, IdeaId, JobId, MoodTier, RefinementId,
-    RiteId, RuleId, Season, SiteId, StructureId, TraditionId,
+    ResourceId, RiteId, RuleId, Season, SiteId, StructureId, TraditionId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -144,9 +144,17 @@ pub enum Event {
     },
     PrismDescended,
     // ---- Wave 4: colonies (SIM-TRADE) ----
+    /// A trade came home — data, not prose: the caravans sent, how many of
+    /// them napped, and each store the trade raised by the amount its stock
+    /// rose, in resource order. An entry written before a trade reported its
+    /// goods loads with none. @spec SIM-TRADE-009, SAVE-025
     TradeReturned {
         colony: ColonyId,
         caravans: u32,
+        #[serde(default)]
+        napped: u32,
+        #[serde(default)]
+        goods: Vec<(ResourceId, f64)>,
     },
     PenPalSent {
         colony: ColonyId,

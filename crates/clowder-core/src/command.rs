@@ -859,6 +859,8 @@ impl GameState {
             (def.buy.0, def.buy.1 * n),
         ])?;
 
+        let paid = self.resources;
+        let mut napped = 0;
         let st = self.standing(colony);
         let season = self.season();
         let trade_ratio = 1.0 + self.effect(crate::effects::Effect::TradeRatio);
@@ -868,6 +870,7 @@ impl GameState {
             // Shy colonies nap with probability −standing; warm/neutral trade.
             let traded = st >= 0.0 || self.rng.chance(1.0 + st);
             if !traded {
+                napped += 1;
                 continue; // a nap: the caravan travelled, cost already paid
             }
             let bonus = st > 0.0 && self.rng.chance(st.min(1.0));
@@ -907,7 +910,19 @@ impl GameState {
         Ok(vec![Event::TradeReturned {
             colony,
             caravans: count,
+            napped,
+            goods: self.raised_since(&paid),
         }])
+    }
+
+    /// Each store whose stock now stands above `before`, by how far it rose,
+    /// in resource order: what an act brought home. @spec SIM-TRADE-009
+    fn raised_since(&self, before: &[f64; RESOURCE_COUNT]) -> Vec<(ResourceId, f64)> {
+        ResourceId::ALL
+            .into_iter()
+            .map(|r| (r, self.resources[r.ix()] - before[r.ix()]))
+            .filter(|(_, rose)| *rose > 0.0)
+            .collect()
     }
 
     /// Deepen a Pen Pal correspondence: charm base × 1.15^level. Star Whales
@@ -1250,6 +1265,7 @@ impl GameState {
             ResourceId::Hushfelt,
             content::WHALE_HUSHFELT_PER_CARAVAN * n,
         )])?;
+        let paid = self.resources;
         let scale = n * (1.0 + self.whale_contentment as f64);
         let skymaps = ResourceId::Skymaps.ix();
         self.resources[skymaps] = (self.resources[skymaps]
@@ -1261,6 +1277,8 @@ impl GameState {
         Ok(vec![Event::TradeReturned {
             colony: ColonyId::StarWhales,
             caravans: count,
+            napped: 0,
+            goods: self.raised_since(&paid),
         }])
     }
 
