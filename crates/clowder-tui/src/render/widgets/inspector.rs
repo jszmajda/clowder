@@ -14,7 +14,9 @@
 //!       TUI-NAV-080, TUI-NAV-108, TUI-NAV-135
 
 use clowder_core::content::{self, TICKS_PER_SECOND};
-use clowder_core::{ContentId, FlowSource, GameState, LockReason, ResourceId};
+use clowder_core::{
+    Command, ContentId, Event, FlowSource, GameState, JournalItem, LockReason, ResourceId,
+};
 use ratatui::{
     layout::Rect,
     text::Line,
@@ -652,6 +654,64 @@ fn store_lines(state: &GameState, r: ResourceId) -> Vec<Pieces> {
     lines
 }
 
+/// What the row's act brought home the newest time the core's journal holds
+/// it: on the Pounce row the newest pounce, on a Trade row the newest trade
+/// with the row's colony. Read from the journal every frame, so nothing is
+/// kept here, and nothing is stated where the journal holds no such act.
+/// @spec TUI-NAV-148, TUI-NAV-149, TUI-THEME-019
+fn last_time_lines(state: &GameState, command: &Command) -> Vec<Pieces> {
+    let newest = state
+        .journal
+        .iter_chronological()
+        .into_iter()
+        .rev()
+        .find_map(|entry| match (&entry.item, command) {
+            (
+                JournalItem::Happened(Event::PounceReturned {
+                    squads,
+                    feathers,
+                    bells,
+                    shinies,
+                    unicorns,
+                }),
+                Command::Pounce(_),
+            ) => Some((
+                "squad",
+                *squads,
+                super::overlays::pounce_haul(*feathers, *bells, *shinies, *unicorns),
+                0,
+            )),
+            (
+                JournalItem::Happened(Event::TradeReturned {
+                    colony,
+                    caravans,
+                    napped,
+                    goods,
+                }),
+                Command::Trade(row_colony, _),
+            ) if colony == row_colony => Some(("caravan", *caravans, goods.clone(), *napped)),
+            _ => None,
+        });
+    let Some((noun, sent, goods, napped)) = newest else {
+        return Vec::new();
+    };
+    let plural = if sent == 1 { "" } else { "s" };
+    let close = if goods.is_empty() { "." } else { " with:" };
+    let mut out = vec![plain(format!(
+        "Last time, {sent} {noun}{plural} came home{close}"
+    ))];
+    for (r, amount) in goods {
+        out.push(vec![
+            resource(r),
+            Piece::plain(format!(" +{}", fmt::exact(amount))),
+        ]);
+    }
+    if napped > 0 {
+        out.push(plain(format!("{napped} of them napped.")));
+    }
+    out
+}
+
 /// The whole of the inspector's content for one row. While an open count
 /// prompt is held to this row, its count and preview (TUI-NAV-067) are shown
 /// alongside — the same row the prompt was opened on, by identity, so a
@@ -721,6 +781,13 @@ fn draw_body(
                 if let Some(unit) = state.unit_price(command) {
                     lines.push(Vec::new());
                     lines.extend(unit_cost_lines(state, &unit));
+                }
+            }
+            if let RowKind::Act { command, .. } = &row.kind {
+                let last = last_time_lines(state, command);
+                if !last.is_empty() {
+                    lines.push(Vec::new());
+                    lines.extend(last);
                 }
             }
         }

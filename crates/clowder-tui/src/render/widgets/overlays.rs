@@ -31,9 +31,84 @@ fn tier_mark(class: EventClass) -> &'static str {
 
 /// One occurrence's line: its tier mark and its text. Events carry data, never
 /// prose (`clowder_core::Event`) — the words here are the shell's own choice
-/// and are not part of the contract.
-fn event_line(event: &Event) -> String {
-    format!("{} {}", tier_mark(event.class()), event_words(event))
+/// and are not part of the contract. Where the event carries what an act
+/// brought home, the line names each store, in its coat, with its amount.
+/// @spec TUI-NAV-147, TUI-THEME-024
+pub(crate) fn event_line(event: &Event) -> Vec<Piece> {
+    let mut out = vec![Piece::plain(format!("{} ", tier_mark(event.class())))];
+    match event {
+        Event::PounceReturned {
+            feathers,
+            bells,
+            shinies,
+            unicorns,
+            ..
+        } => {
+            let haul = pounce_haul(*feathers, *bells, *shinies, *unicorns);
+            if haul.is_empty() {
+                out.push(Piece::plain("the pounce came home empty-pawed"));
+            } else {
+                out.push(Piece::plain("the pounce came home with "));
+                out.extend(goods_pieces(&haul));
+            }
+        }
+        Event::TradeReturned {
+            colony,
+            napped,
+            goods,
+            ..
+        } => {
+            let from = clowder_core::content::colony_def(*colony).name;
+            if goods.is_empty() {
+                out.push(Piece::plain(format!("caravans came home from the {from}")));
+            } else {
+                out.push(Piece::plain(format!(
+                    "caravans came home from the {from} with "
+                )));
+                out.extend(goods_pieces(goods));
+            }
+            if *napped > 0 {
+                out.push(Piece::plain(format!("; {napped} napped on the way")));
+            }
+        }
+        other => out.push(Piece::plain(event_words(other))),
+    }
+    out
+}
+
+/// A pounce's haul as stores and amounts, in the core's resource order, each
+/// store the haul raised and none it left at nothing. @spec TUI-NAV-147
+pub(crate) fn pounce_haul(
+    feathers: f64,
+    bells: f64,
+    shinies: f64,
+    unicorns: u32,
+) -> Vec<(ResourceId, f64)> {
+    let mut haul: Vec<(ResourceId, f64)> = [
+        (ResourceId::Feathers, feathers),
+        (ResourceId::Bells, bells),
+        (ResourceId::Shinies, shinies),
+        (ResourceId::Unicorns, f64::from(unicorns)),
+    ]
+    .into_iter()
+    .filter(|(_, a)| *a > 0.0)
+    .collect();
+    haul.sort_by_key(|(r, _)| r.ix());
+    haul
+}
+
+/// Stores and amounts as a sentence names them: `+12 Twigs, +3 Catnip`, each
+/// name in its coat, in the order given.
+fn goods_pieces(goods: &[(ResourceId, f64)]) -> Vec<Piece> {
+    let mut out = Vec::new();
+    for (i, (r, amount)) in goods.iter().enumerate() {
+        if i > 0 {
+            out.push(Piece::plain(", "));
+        }
+        out.push(Piece::plain(format!("+{} ", fmt::compact(*amount))));
+        out.push(resource_piece(*r));
+    }
+    out
 }
 
 /// An occurrence in words. The core hands over typed data precisely so the
@@ -181,15 +256,7 @@ fn largest_gains(report: &OfflineReport) -> Vec<(ResourceId, f64)> {
 /// never the small change — TUI-NAV-055 says the *largest* gains, so it has
 /// to choose. @spec TUI-THEME-024
 fn gains_pieces(report: &OfflineReport) -> Vec<Piece> {
-    let mut out = Vec::new();
-    for (i, (r, d)) in largest_gains(report).into_iter().enumerate() {
-        if i > 0 {
-            out.push(Piece::plain(", "));
-        }
-        out.push(Piece::plain(format!("+{} ", fmt::compact(d))));
-        out.push(resource_piece(r));
-    }
-    out
+    goods_pieces(&largest_gains(report))
 }
 
 /// Every resource whose stock changed at all during the report's span,
@@ -240,7 +307,7 @@ pub fn too_small(f: &mut Frame, area: Rect) {
 pub fn ticker(f: &mut Frame, area: Rect, state: &GameState) {
     let entries = state.journal.iter_chronological();
     let pieces: Vec<Piece> = match entries.last().map(|e| &e.item) {
-        Some(JournalItem::Happened(event)) => vec![Piece::plain(event_line(event))],
+        Some(JournalItem::Happened(event)) => event_line(event),
         Some(JournalItem::Away(report)) => {
             let mut out = vec![Piece::plain(format!(
                 "\u{2605} while you were away ({}): ",
@@ -328,7 +395,9 @@ fn journal_lines(state: &GameState, view: &ViewState) -> Vec<Line<'static>> {
             continue;
         }
         match &entry.item {
-            JournalItem::Happened(event) => lines.push(Line::raw(event_line(event))),
+            JournalItem::Happened(event) => {
+                lines.push(line_of(&event_line(event), Style::default()))
+            }
             JournalItem::Away(report) => lines.extend(away_report_lines(report)),
         }
     }
