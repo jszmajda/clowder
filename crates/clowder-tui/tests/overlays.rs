@@ -60,7 +60,6 @@
 use clowder_tui::nav::{Overlay, PendingReport, ViewState};
 use clowder_tui::render::layout::{compute, Body, Layout};
 use clowder_tui::render::widgets::overlays;
-use clowder_tui::theme::Role;
 
 use std::collections::BTreeSet;
 
@@ -259,12 +258,6 @@ fn cells_of(buf: &Buffer, rect: Rect) -> Vec<&Cell> {
 
 fn is_blank(cell: &Cell) -> bool {
     cell.symbol().trim().is_empty()
-}
-
-/// Quiet, in either of the two channels a dim thing may use: the theme's dim
-/// role, or the terminal's own dim attribute. @spec TUI-NAV-026
-fn is_quiet(cell: &Cell) -> bool {
-    Role::Dim.color() == Some(cell.fg) || cell.modifier.contains(Modifier::DIM)
 }
 
 /// The mark a line opens with — the run of symbols before its first letter or
@@ -625,46 +618,6 @@ fn the_journal_a_returning_player_opens_is_the_one_the_save_kept() {
             journal(&loaded, anchor),
             "at scroll position {anchor} the reopened game drew a different Journal from the one \
              it was closed with; the overlay must render the retained journal the save carries"
-        );
-    }
-}
-
-/// The ticker is dim. It is chrome the eye passes over, not something asking
-/// to be read — which is only true if it is drawn that way.
-/// @spec TUI-NAV-026
-#[test]
-fn the_ticker_is_drawn_quietly() {
-    let state = journaled(&[(
-        100,
-        Event::SeasonChanged {
-            season: Season::Winter,
-        },
-    )]);
-    let buffer = ticker(&state);
-    let rect = ticker_rect();
-    let line = text_of(&buffer, rect);
-    assert!(
-        !line.trim().is_empty(),
-        "fixture: the ticker drew something for an occurrence"
-    );
-
-    // The line's opening mark may carry its tier's own colour; everything
-    // after it is the event's text, and the text is the part that must recede.
-    // (A resource a line names wears its coat instead, TUI-THEME-023; this
-    // occurrence names none.)
-    let cells = cells_of(&buffer, rect);
-    let after_mark = cells
-        .iter()
-        .skip_while(|c| is_blank(c) || !c.symbol().chars().any(|ch| ch.is_alphanumeric()))
-        .filter(|c| !is_blank(c));
-    for cell in after_mark {
-        assert!(
-            is_quiet(cell),
-            "the ticker drew {:?} at full strength; a dim ticker uses the theme's dim role or the \
-             terminal's dim attribute, so that an event never competes with the thing the player \
-             is doing. The line read as {:?}",
-            cell.symbol(),
-            line.trim_end()
         );
     }
 }
@@ -2381,7 +2334,8 @@ fn coats_on_names(what: &str, buf: &Buffer, rect: Rect, rest: impl Fn(&Cell) -> 
 }
 
 /// The ticker's line for a time away names its gains, each in its coat at full
-/// strength; the rest of the line keeps the ticker's quiet.
+/// strength; the rest of the line is drawn plainly, in the inherited
+/// foreground (TUI-THEME-025).
 ///
 /// @spec TUI-THEME-019, TUI-THEME-020, TUI-THEME-023, TUI-THEME-024
 #[test]
@@ -2389,7 +2343,7 @@ fn the_tickers_away_line_names_each_gain_in_its_coat() {
     let state = away(&[(10_000, full_report())]);
     let buf = ticker(&state);
     let checked = coats_on_names("the ticker", &buf, ticker_rect(), |cell| {
-        is_quiet(cell) || cell.symbol() == "\u{2605}"
+        cell.fg == ratatui::style::Color::Reset && !cell.modifier.contains(Modifier::DIM)
     });
     assert!(
         checked >= 3,

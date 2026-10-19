@@ -3117,6 +3117,20 @@ fn nothing_but_a_chip_or_a_full_tag_wears_attention_in_a_frame_with_nothing_arme
                             span.for_each(|x| allowed[x] = true);
                         }
                     }
+                    // The ticker's sky light, whole: it gives the `!sky` chip
+                    // its clock and wears the chip's colour (TUI-THEME-015).
+                    if y == layout.ticker.y {
+                        let sky = ["!", "s", "k", "y"];
+                        if let Some(start) =
+                            (0..symbols.len().saturating_sub(3)).find(|&x| symbols[x..x + 4] == sky)
+                        {
+                            let end = (start..symbols.len())
+                                .find(|&x| symbols[x] == ")")
+                                .expect("the sky light ends with its key");
+                            marks += 1;
+                            (start..=end).for_each(|x| allowed[x] = true);
+                        }
+                    }
                     if let Some(side) = sidebar.filter(|s| y >= s.y && y < s.bottom()) {
                         let side_symbols = symbols_of(&row_cells(buf, side, y));
                         let whole_spans = word_spans(&side_symbols, "full");
@@ -3154,8 +3168,8 @@ fn nothing_but_a_chip_or_a_full_tag_wears_attention_in_a_frame_with_nothing_arme
                                 cell.fg,
                                 attention,
                                 "in {label}, {what}, at {w}x{h}: `{}` at ({x}, {y}) belongs to a \
-                                 chip or a `full` tag and is drawn in {:?}, not attention.\n\
-                                 line: {line:?}",
+                                 chip, a `full` tag, or the sky light and is drawn in {:?}, not \
+                                 attention.\nline: {line:?}",
                                 cell.symbol(),
                                 cell.fg
                             );
@@ -5126,7 +5140,7 @@ fn on_a_new_game_the_meadow_is_the_only_section_with_a_tab() {
 
 /// Every glyph the interface uses to carry a meaning. If the legend does not
 /// explain one, the player has a symbol on screen with nowhere to look it up.
-const LEGEND_GLYPHS: [char; 10] = ['●', '◐', '○', '✓', '▸', '★', '◦', '~', '!', '◆'];
+const LEGEND_GLYPHS: [char; 11] = ['●', '◐', '○', '✓', '▸', '★', '◦', '~', '!', '◆', '◇'];
 
 /// The keys whose spelling is not in question: a word, or a single character
 /// that is itself the key.

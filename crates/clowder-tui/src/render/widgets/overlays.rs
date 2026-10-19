@@ -6,9 +6,9 @@
 //! obligation, and this game does not issue those.
 //! @spec TUI-NAV-026, TUI-NAV-027, TUI-NAV-038, TUI-NAV-050, TUI-NAV-055, TUI-NAV-056, TUI-NAV-057
 
-use clowder_core::{Event, EventClass, GameState, JournalItem, OfflineReport, ResourceId};
+use clowder_core::{Event, EventClass, GameState, JournalItem, OfflineReport, ResourceId, Timer};
 use ratatui::style::{Modifier, Style};
-use ratatui::text::Line;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::{layout::Rect, Frame};
 
@@ -196,7 +196,12 @@ fn resource_piece(r: ResourceId) -> Piece {
 /// Pieces drawn as one line in `base`, each resource's name in its coat and
 /// at full strength (TUI-THEME-023), never fitted: the region clips it.
 fn line_of(pieces: &[Piece], base: Style) -> Line<'static> {
-    line_from_pieces(pieces, base, true, usize::MAX)
+    line_of_width(pieces, base, usize::MAX)
+}
+
+/// As `line_of`, fitted to `width` with an ellipsis (TUI-RENDER-014).
+fn line_of_width(pieces: &[Piece], base: Style, width: usize) -> Line<'static> {
+    line_from_pieces(pieces, base, true, width)
 }
 
 /// A wall-clock span, humanized coarsely enough that two spans differing by
@@ -299,29 +304,109 @@ pub fn too_small(f: &mut Frame, area: Rect) {
     f.render_widget(Paragraph::new(Line::raw(TOO_SMALL_LINE)), row);
 }
 
-/// The dim one-line ticker. Flavour is quieter than mechanical; milestones are
-/// marked. Prominence comes from the core's classification, never from this
-/// module deciding which events matter. The quiet is the line's own: a
-/// resource it names wears its coat at full strength, as everywhere.
-/// @spec TUI-NAV-026, TUI-NAV-057, TUI-THEME-024
+/// The ticker's line: the newest entry on the left, drawn plainly — flavour
+/// in `dim`, everything else in the inherited foreground, no faint attribute —
+/// and the lights right-aligned on the right, each a timed state the core
+/// lists with its clock. The entry takes what the lights leave, less two
+/// blank columns, shortened with an ellipsis where it is longer; no light is
+/// ever cut. Prominence comes from the core's classification, and what runs
+/// on a clock from the core's timers, never from this module.
+/// @spec TUI-NAV-026, TUI-NAV-057, TUI-NAV-150, TUI-THEME-024, TUI-THEME-025
 pub fn ticker(f: &mut Frame, area: Rect, state: &GameState) {
     let entries = state.journal.iter_chronological();
-    let pieces: Vec<Piece> = match entries.last().map(|e| &e.item) {
-        Some(JournalItem::Happened(event)) => event_line(event),
+    let (pieces, base): (Vec<Piece>, Style) = match entries.last().map(|e| &e.item) {
+        Some(JournalItem::Happened(event)) => {
+            let base = if event.class() == EventClass::Flavor {
+                crate::render::style_for(Role::Dim)
+            } else {
+                Style::default()
+            };
+            (event_line(event), base)
+        }
         Some(JournalItem::Away(report)) => {
             let mut out = vec![Piece::plain(format!(
                 "\u{2605} while you were away ({}): ",
                 format_span(report.elapsed_seconds)
             ))];
             out.extend(gains_pieces(report));
-            out
+            (out, Style::default())
         }
-        None => Vec::new(),
+        None => (Vec::new(), Style::default()),
     };
-    let style = Style::default()
-        .fg(Role::Dim.color().expect("Dim carries a colour"))
-        .add_modifier(Modifier::DIM);
-    f.render_widget(Paragraph::new(line_of(&pieces, style)), area);
+
+    const GAP: usize = 2;
+    let lights = lights(state);
+    let width = area.width as usize;
+    let cluster: usize =
+        lights.iter().map(Line::width).sum::<usize>() + GAP * lights.len().saturating_sub(1);
+    let room = if lights.is_empty() {
+        width
+    } else {
+        width.saturating_sub(cluster + GAP)
+    };
+
+    let left = Rect::new(area.x, area.y, room as u16, area.height.min(1));
+    f.render_widget(Paragraph::new(line_of_width(&pieces, base, room)), left);
+
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    for (i, light) in lights.into_iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::raw(" ".repeat(GAP)));
+        }
+        spans.extend(light.spans);
+    }
+    let drawn = cluster.min(width) as u16;
+    let right = Rect::new(area.right() - drawn, area.y, drawn, area.height.min(1));
+    f.render_widget(Paragraph::new(Line::from(spans)), right);
+}
+
+/// One light for each timed state the core lists that a glance can use, in
+/// the core's order: the sky's as its chip's glyph and word, its clock, and
+/// its key, all in `attention`; the others as `◇`, their word, and their
+/// clock, the clock in `dim`. A déjà-vu day lasts too short a time to read,
+/// so it has none.
+/// @spec TUI-NAV-151, TUI-NAV-152, TUI-THEME-015, TUI-THEME-026
+fn lights(state: &GameState) -> Vec<Line<'static>> {
+    let running = |word: &str, clock: String| {
+        Line::from(vec![
+            Span::raw(format!("\u{25c7} {word} ")),
+            Span::styled(clock, crate::render::style_for(Role::Dim)),
+        ])
+    };
+    state
+        .timers()
+        .into_iter()
+        .filter_map(|(timer, left)| {
+            let clock = clock(left, state.speed);
+            match timer {
+                Timer::SkyEvent => Some(Line::from(Span::styled(
+                    format!("!sky {clock} (o)"),
+                    crate::render::style_for(Role::Attention),
+                ))),
+                Timer::WhaleVisit => Some(running("whale", clock)),
+                Timer::Jamboree => Some(running("jamboree", clock)),
+                Timer::Zoomies => Some(running("zoomies", clock)),
+                Timer::DejaVuDay => None,
+            }
+        })
+        .collect()
+}
+
+/// How long `ticks` last in real time at `speed`, rounded down to a coarse
+/// step — `<10s`, tens of seconds, whole minutes, whole hours — so a clock
+/// never promises more time than there is and stays still between glances.
+/// @spec TUI-NAV-153
+fn clock(ticks: u64, speed: f64) -> String {
+    let seconds = ticks as f64 / (clowder_core::content::TICKS_PER_SECOND as f64 * speed);
+    if seconds < 10.0 {
+        "<10s".to_string()
+    } else if seconds < 60.0 {
+        format!("{}s", (seconds / 10.0).floor() as u64 * 10)
+    } else if seconds < 3600.0 {
+        format!("{}m", (seconds / 60.0).floor() as u64)
+    } else {
+        format!("{}h", (seconds / 3600.0).floor() as u64)
+    }
 }
 
 /// Full scrollback over the retained journal, grouped by day — with every
@@ -520,6 +605,7 @@ pub fn help(f: &mut Frame, area: Rect) {
         ("\u{25c6}", "the Elder"),
         ("~", "unread offline report"),
         ("!", "open sky-event window"),
+        ("\u{25c7}", "running on a clock, with its time left"),
     ];
 
     let width = area.width as usize;
