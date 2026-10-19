@@ -22,6 +22,7 @@ Jess (the player-owner) wants to **discover the game's content by playing it**. 
 ## Conventions
 
 - Version control is **jj** (Jujutsu), colocated with git. Prefer `jj` commands over bare `git`.
+- Commit liberally: commit each coherent step with `jj commit` as soon as it is complete and its tests pass, without waiting to be asked and without batching unrelated work into one change.
 - Content (buildings, jobs, upgrades, resources) lives in typed Rust tables in `clowder-core`, not external data files.
 - The theme assumes 24-bit truecolor; no low-color fallback palettes.
 - Keybindings must coexist with default tmux bindings: plain printable keys, Tab, and arrows only — no Ctrl chords (except Ctrl-C), no Alt/Meta, no function keys.
