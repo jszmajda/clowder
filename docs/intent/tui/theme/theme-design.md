@@ -50,14 +50,15 @@ Mood takes no colour at all. The navigation leaf already renders it as a word (T
 
 `attention` means one thing — *this wants you* — and the glance contract depends on it meaning nothing else. An empty chip cluster and no `full` tag or full count is how the player reads, in two seconds, that nothing needs them, and the eye can only learn that if orange appearing is always that signal. So the role is not subdivided by surface, and it is not lent to anything that is merely information.
 
-Four elements wear it, each on exactly the mark that says it wants notice:
+Five elements wear it, each on exactly the mark that says it wants notice:
 
 - **An attention chip, whole.** Its glyph, its count where it has one, and its word all wear `attention`; the blank columns between chips, and the header's facts beside them, do not. This holds at every width step the header takes (TUI-NAV-086) — a chip that has shed its count is still a chip — and for every chip alike, the `★N new` chip included. That chip counts tabs wearing the `milestone` ★, but the chip itself is asking for the player, and a cluster in two colours would leave the eye to work out which colour means "come look".
 - **The `full` tag on a capped store, and only the tag.** The store's name wears its coat, and its figures, fill bar, and rate are drawn as any store's are. The tag is present exactly while the store is capped (TUI-NAV-022), whereas the bar's cells can read full a little before the cap is reached, so the word is the state's exact mark and the colour sits on it.
 - **A sidebar note's full count, and only that.** Where the sidebar is scrolled and stores stand out of view, a note at its head or foot counts them, and where any of them is capped it goes on to say how many, `· 2 full` (render leaf: Which stores it draws). The `2 full` wears `attention`, as the `full` tag it stands in for does; the note's triangle, its count of stores, its `more`, and the `·` before the full count stay `dim`, since they are information about the scroll and want nothing.
 - **An armed row's expansion.** The summary lines beneath the row, and their copy in the inspector while the narrow-mode swap holds the list's space — never the row's own line (The compressed run). Where the layout leaves part of the expansion out of view, the colour stays on what is drawn of it and does not move onto the row's line or the hint bar in its place. The hint bar's armed keys are drawn as any hint is: they are the arming's word channel, not a second coloured mark.
+- **The ticker's sky light, whole.** Its glyph, its word, its clock, and its key all wear `attention`, as the chip it gives a clock to wears it (navigation leaf: The ticker's line); the blank columns around it do not. The light and the chip are one opportunity, and one opportunity in two colours would be two things to learn. The ticker's other lights want nothing and wear none of it (The ticker, below).
 
-All four wear the same `attention` value, whichever surface draws them, so there is one orange to learn.
+All five wear the same `attention` value, whichever surface draws them, so there is one orange to learn.
 
 Nothing else wears `attention`. A footer note — the reply to a key just pressed (TUI-NAV-014) — is ordinary prose in the inherited foreground. It is drawn where the player is already looking and lasts seconds, so it needs no colour to be seen; in orange it would be one more thing the glance has to rule out before concluding nothing needs the player, and a refused keypress drawn in the colour of an opportunity would read as a scolding.
 
@@ -99,15 +100,16 @@ The fields:
 - the store's name on its row in the stores group;
 - the name of each component in a list row's cost field (TUI-RENDER-020), and in an open count prompt's preview, on the row and in the narrow swap's inspector alike (TUI-RENDER-021);
 - in the inspector: the name line of a stores row, and the name at the head of each need-and-have cost line, unit-price line, and preview component (TUI-NAV-018, TUI-NAV-078, TUI-NAV-067);
-- a store's result line in the find palette (TUI-NAV-063).
+- a store's result line in the find palette (TUI-NAV-063);
+- in the inspector, the name on each line of what an act brought home last time (TUI-NAV-148).
 
 The inspector's cost lines are drawn in the inherited foreground whatever a component's shortfall — the shortfall is said in words beside the figures (TUI-NAV-078) — so a coat is worn there whether or not the store is short, which is exactly where the matching matters.
 
 The sentences:
 
 - the inspector's description of a row — each resource named in the mechanical statement (TUI-NAV-018), whether the statement is stated from the definition's fields or is a blurb, whose marks say which of its words name a resource (curiosity leaf: Blurbs), and each resource named in the plain reason an item is held back (TUI-NAV-079);
-- the ticker, where its line names a resource — the gains of a time away;
-- the Journal, where its lines name one — each changed store in a pinned or kept away report;
+- the ticker, where its line names a resource — the gains of a time away, or what an act brought home;
+- the Journal, where its lines name one — each changed store in a pinned or kept away report, and each store an act brought home;
 - a footer note, where it names one — the store a refused command is short of (TUI-NAV-014);
 - and any line added later that names a resource: the rule is the name, not the surface.
 
@@ -119,7 +121,7 @@ Only the name wears the coat. The figures beside it, the `/` between a stock and
 
 ### Which lines a coat may sit on
 
-A coat is worn on a line drawn in the inherited foreground, in `ready`, or in `partial`, and in the ticker, whose `dim` is its quiet rather than a state. On a ready or partial row the marker and the row's own name say the row's state and keep the row's colour, and the names in its cost field wear their coats: a state that says *you can act* loses nothing to a coat beside it, and the marker, which is the state's exact mark, never wears one.
+A coat is worn on a line drawn in the inherited foreground, in `ready`, or in `partial`, and on the ticker's newest event, whose `dim`, where a flavor event wears it, is its quiet rather than a state. On a ready or partial row the marker and the row's own name say the row's state and keep the row's colour, and the names in its cost field wear their coats: a state that says *you can act* loses nothing to a coat beside it, and the marker, which is the state's exact mark, never wears one.
 
 A coat is not worn on three kinds of line, each of which is already saying one thing with its whole colour:
 
@@ -130,6 +132,12 @@ A coat is not worn on three kinds of line, each of which is already saying one t
 ### A shortened name
 
 Where a name is shortened with an ellipsis (TUI-RENDER-014), each character kept wears the colour it has in the whole name, and the ellipsis — one cell — wears the colour of the character at its position in the whole name. A store's first letters therefore wear the same colours at every width the sidebar takes, so a store looks like itself whether or not it was cut.
+
+## The Ticker
+
+The ticker's line is read at a glance, so it is drawn plainly. Its newest event is in the inherited foreground, and only a flavor event, which changes nothing, recedes into `dim`, as flavor does in the Journal. No faint attribute is laid over either: `dim` already sits at the contrast floor, and a faint attribute over it sinks below the floor on many terminals, leaving a line the player has to lean in to read. The names in it wear their coats (Where a coat is worn).
+
+The lights at the line's right end say what runs on a clock (navigation leaf: The ticker's line). The sky's light wears `attention` whole, being its chip's clock (What wears `attention`). Every other light is a running effect that wants nothing of the player: its glyph and word are in the inherited foreground, and its clock in `dim`, the words saying what runs and the clock being the detail. A running light never takes a colour of its own: that would be a sixth state colour to learn for something its glyph and word already say, and the glance contract needs every colour that appears in the chrome to be either a coat, the season's accent, or one of the five states.
 
 ## The Signature: the Pane Keeps the Season
 
@@ -174,7 +182,7 @@ Turn every colour off and the game is still completely playable — which is the
 
 The palette's riskiest axis for colour vision is `ready` against `partial` against `attention`, the green–amber–orange run that red-green deficiencies compress. For a player with such a deficiency these three colours are close to one colour, so between these three states the glyph is not a courtesy but the whole distinction. Two rules keep it whole.
 
-**Each of the three has a non-colour channel the other two never use.** Affordable is `●`. Partially affordable is `◐`. Attention is carried by each chip's own glyph (TUI-NAV-020), by a word — the `full` tag, or the `full` of a sidebar note's count — or, on an armed row, by the row's expansion beneath itself, whose summary is words (TUI-NAV-077); none of these is ever `●` or `◐`. Every glyph among them is a different single-width character (TUI-NAV-021); none differs from another only by its colour.
+**Each of the three has a non-colour channel the other two never use.** Affordable is `●`. Partially affordable is `◐`. Attention is carried by each chip's own glyph (TUI-NAV-020), and by the same glyph and word on the ticker's sky light (TUI-NAV-152), by a word — the `full` tag, or the `full` of a sidebar note's count — or, on an armed row, by the row's expansion beneath itself, whose summary is words (TUI-NAV-077); none of these is ever `●` or `◐`. Every glyph among them is a different single-width character (TUI-NAV-021); none differs from another only by its colour.
 
 **Among the three colours, each glyph wears only its own.** `●` is never drawn in `partial` or `attention`, `◐` never in `ready` or `attention`, and a chip's glyph never in `ready` or `partial`. If any glyph could appear in a neighbour's colour, the two pairings would be one appearance to exactly the player this section is for — an amber `◐` and an orange `◐` are the same mark once amber and orange are the same colour. Dim lies outside the run and still recedes a marker as TUI-NAV-009 asks: a Teased row's `◐` is drawn dim. A coat lies outside the run too, and no glyph ever wears one: coats sit on letters, and a marker is never a letter.
 
@@ -207,6 +215,8 @@ Both rules hold whatever values the palette settles on (Deferred 1). Retuning th
 | A blend's path | Piecewise linear in OKLab, equal share per segment, evenly spaced positions, a space counting as a position | A smooth curve; arc-length spacing; spaces skipped | A straight segment is the shortest path between two stops, so its intermediates stay nearest the stops; equal shares and counted spaces keep the rule the same under every dressing |
 | Which lines carry a coat | Inherited, `ready`, and `partial` lines and the ticker; never a `dim` row, an `attention` or `milestone` line, or a reversal | Every line; inherited lines only | A dim row recedes whole, an expansion or a milestone line is one signal, and a reversal turns a text colour into a ground. The ticker's dim is its quiet, not a state, so its names wear their coats as everywhere. Inherited lines only would leave every priced row's cost uncoloured, since a priced row always wears its marker's colour |
 | Where a coat is worn | On every resource name drawn, in fields and in sentences alike, except on a line whose whole colour says one thing | Fields only; fields and the inspector's description only; the sidebar alone | A resource is one thing and should look like one thing wherever it is named; a name coated on one surface and plain on another reads as two things, and leaves the player to learn which surfaces colour. A coloured word in a report draws the eye to it, which is accepted: the resource is usually what the line is about. The sidebar alone leaves the prices, where the matching happens, uncoloured |
+| The colour of the ticker's lights | The sky's in `attention`, as its chip; every other light's glyph and word in the inherited foreground and its clock in `dim` | A colour of its own for running lights; every light in `attention` | A running effect wants nothing, so `attention` on it would light the corner whenever a boost ran and break the glance contract; a colour of its own is one more state to learn for what the glyph and word already say |
+| The ticker's newest event | Inherited foreground, a flavor event in `dim`; no faint attribute | `dim` with the terminal's faint attribute over every line | `dim` alone sits at the contrast floor, and the faint attribute over it falls below the floor on many terminals: a line the player must lean in to read is not glanceable |
 | A coat on a quiet line | Full strength, the line's quiet kept on its own words | The coat dimmed or faint with the line | The same coat in every place is the point of a coat; a faint coat in the ticker is a second look for the same store |
 | A name a sentence spells otherwise | The coat laid across the characters as the sentence spells them | Coat only a spelling that matches the stores' exactly; compute the coat over the stores' spelling and cut it to the word | Sentences say "a twig" and "catnip"; coating only exact spellings leaves most of a blurb's resources plain. Laying the dressing across the word as written keeps each dressing's look on every spelling, where a cut coat would stop a blend partway |
 | What beside the name wears the coat | Nothing: figures, separators, and blanks wear the line's colour | The whole component, figure and name | A column of figures in mixed colours reads as several columns |
