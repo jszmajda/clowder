@@ -109,6 +109,11 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
         Action::Mnemonic(c) => handle_mnemonic(view, state, c),
         Action::AppointElder => handle_appoint_elder(view, state),
         Action::ToggleDone => handle_toggle_done(view, state),
+        // A sidebar scroll moves from where the last frame drew the sidebar,
+        // which only that frame's record holds (`sidebar_key`, which the loop
+        // runs first); with no record there is nothing to move from, and the
+        // view stands. @spec TUI-NAV-144
+        Action::SidebarUp | Action::SidebarDown => Outcome::Handled,
         Action::Type(c) => handle_type(view, c),
         Action::Erase => handle_erase(view),
         Action::Dismiss => handle_dismiss(view),

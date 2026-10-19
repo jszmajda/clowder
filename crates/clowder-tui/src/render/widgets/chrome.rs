@@ -17,6 +17,7 @@ use ratatui::{
 use crate::nav::mnemonics::{self, MnemonicKind};
 use crate::nav::rows::{rows, tab_sections, Row, RowKey, RowKind};
 use crate::nav::{Overlay, Section, ViewState};
+use crate::render::pointer::SidebarRecord;
 use crate::render::{fmt, style_for};
 use crate::theme::Role;
 
@@ -410,33 +411,6 @@ fn listed_stores(state: &GameState) -> Vec<ResourceId> {
         .collect()
 }
 
-/// As many of `listed`'s stores as `capacity` two-line slots hold, chosen
-/// first from those wearing `full` and then from the rest, each in the
-/// stores group's order — then handed back in that same order, so a store
-/// chosen for room is still drawn where the group places it.
-/// @spec TUI-RENDER-022
-fn choose_stores(state: &GameState, listed: &[ResourceId], capacity: usize) -> Vec<ResourceId> {
-    let mut chosen: Vec<ResourceId> = listed
-        .iter()
-        .copied()
-        .filter(|r| wears_full(state, *r))
-        .take(capacity)
-        .collect();
-    let room = capacity - chosen.len();
-    chosen.extend(
-        listed
-            .iter()
-            .copied()
-            .filter(|r| !wears_full(state, *r))
-            .take(room),
-    );
-    listed
-        .iter()
-        .copied()
-        .filter(|r| chosen.contains(r))
-        .collect()
-}
-
 /// A store's two lines: its name, stock, `/`, and cap at the right edge; then
 /// its fill bar, its rate, and — while capped — the `full` tag. The name
 /// wears its coat (TUI-THEME-019); only the `full` tag wears `attention`
@@ -493,41 +467,107 @@ fn store_lines(
     [first, Line::from(spans)]
 }
 
-/// A curated glance: the stores the stores group lists, each drawn whole
-/// (TUI-RENDER-019) or not at all, standing in the stores group's order. Where
-/// the sidebar's lines cannot hold every listed store, the last line is a
-/// `dim` note naming how many are left out, and the stores drawn are chosen
-/// first from those wearing `full`. Display-only — the complete table is a
-/// list in the home section.
-/// @spec TUI-NAV-019, TUI-NAV-022, TUI-NAV-049, TUI-RENDER-019, TUI-RENDER-022,
-/// TUI-THEME-015
-pub fn sidebar(f: &mut Frame, area: Rect, state: &GameState) {
+/// Whether a sidebar `height` lines tall holds stores out of view: whether
+/// the stores the stores group lists outrun its lines at two lines each.
+/// @spec TUI-RENDER-022
+pub fn stores_out_of_view(state: &GameState, height: u16) -> bool {
+    2 * listed_stores(state).len() > height as usize
+}
+
+/// Where the window onto `k` stores stands in a sidebar `h` lines tall, the
+/// view wanting it to begin at place `want`: its first store's place, how
+/// many stores it draws, and the furthest place its first store can stand —
+/// the earliest from which every store through the last fits beneath the
+/// head note — or none where every store fits.
+fn window(k: usize, h: usize, want: usize) -> (usize, usize, Option<usize>) {
+    if 2 * k <= h {
+        return (0, k, None);
+    }
+    let max_start = k - h.saturating_sub(1) / 2;
+    let start = want.min(max_start);
+    let avail = h.saturating_sub(usize::from(start > 0));
+    let drawn = if 2 * (k - start) <= avail {
+        k - start
+    } else {
+        avail.saturating_sub(1) / 2
+    };
+    (start, drawn, Some(max_start))
+}
+
+/// A note counting `n` stores out of view on one side, and how many of them
+/// wear `full`: `▾ 6 more · 2 full`, in `dim` save the full count, which wears
+/// `attention`. Where the sidebar is narrower than the whole note, its
+/// ` more` gives way. @spec TUI-RENDER-027, TUI-THEME-015
+fn sidebar_note(glyph: char, n: usize, full: usize, width: usize) -> Line<'static> {
+    let count = format!("{glyph} {n}");
+    let full_part = (full > 0).then(|| format!("{full} full"));
+    let whole = count.chars().count()
+        + " more".len()
+        + full_part
+            .as_ref()
+            .map_or(0, |f| " · ".chars().count() + f.chars().count());
+    let mut spans = vec![Span::styled(count, style_for(Role::Dim))];
+    if whole <= width {
+        spans.push(Span::styled(" more", style_for(Role::Dim)));
+    }
+    if let Some(f) = full_part {
+        spans.push(Span::styled(" · ", style_for(Role::Dim)));
+        spans.push(Span::styled(f, style_for(Role::Attention)));
+    }
+    Line::from(spans)
+}
+
+/// The stores the stores group lists, each drawn whole (TUI-RENDER-019) or
+/// not at all, in the stores group's order. Where the sidebar's lines cannot
+/// hold every one, it draws a window onto them from the store the view is
+/// scrolled to — the top where the view holds none, or one no longer listed
+/// — never running past the last store, with a note at its head and its foot
+/// counting the stores out of view on that side. Returns the window drawn, for
+/// the frame's pointer record. Display-only — the complete table is a list in
+/// the home section.
+/// @spec TUI-NAV-019, TUI-NAV-022, TUI-NAV-049, TUI-NAV-140, TUI-RENDER-019,
+/// TUI-RENDER-022, TUI-RENDER-027, TUI-THEME-015
+pub fn sidebar(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) -> SidebarRecord {
     let width = area.width as usize;
     let height = area.height as usize;
     let name_col = width.saturating_sub(14).max(1);
 
     let listed = listed_stores(state);
     let k = listed.len();
-    let capacity_rows = 2 * k;
-    let (drawn_n, note) = if capacity_rows <= height {
-        (k, false)
-    } else {
-        (height.saturating_sub(1) / 2, true)
+    let want = view
+        .sidebar_top
+        .and_then(|top| listed.iter().position(|r| *r == top))
+        .unwrap_or(0);
+    let (start, drawn, max_start) = window(k, height, want);
+    let full_in = |range: std::ops::Range<usize>| {
+        listed[range]
+            .iter()
+            .filter(|r| wears_full(state, **r))
+            .count()
     };
-    let chosen = choose_stores(state, &listed, drawn_n);
 
     let mut lines: Vec<Line<'static>> = Vec::with_capacity(height);
-    for r in &chosen {
+    if start > 0 {
+        lines.push(sidebar_note('▴', start, full_in(0..start), width));
+    }
+    for r in &listed[start..start + drawn] {
         lines.extend(store_lines(state, *r, name_col, width));
     }
-    if note {
+    let below = k - start - drawn;
+    if below > 0 {
         while lines.len() + 1 < height {
             lines.push(Line::from(""));
         }
-        let left = k - chosen.len();
-        lines.push(Line::styled(format!("+{left} more"), style_for(Role::Dim)));
+        lines.push(sidebar_note('▾', below, full_in(start + drawn..k), width));
     }
     f.render_widget(Paragraph::new(lines), area);
+    SidebarRecord {
+        region: area,
+        stores: listed,
+        start,
+        drawn,
+        max_start,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -551,7 +591,7 @@ fn focused_row(state: &GameState, view: &ViewState) -> Option<Row> {
 /// showing the moment the arming itself ends, whether by expiry or by its
 /// row leaving every list. @spec TUI-NAV-023, TUI-NAV-024, TUI-NAV-045,
 /// TUI-NAV-046, TUI-NAV-066, TUI-NAV-074, TUI-NAV-076, TUI-NAV-077
-pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
+pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState, stores_hidden: bool) {
     const HELP: &str = "? help";
 
     // A full-screen overlay (Journal or help) holds the keyboard too, the
@@ -659,6 +699,12 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
         add_mnemonics(&mut items, state, view);
         add_appoint_elder(&mut items, state, view);
         add_done_key(&mut items, state, view);
+        // The sidebar's scroll keys come last, so they are the first given up
+        // when the width runs short: the sidebar's own notes already say there
+        // is more. @spec TUI-NAV-146
+        if stores_hidden {
+            items.push("{} stores".to_string());
+        }
         items
     };
 

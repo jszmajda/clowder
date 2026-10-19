@@ -4,7 +4,7 @@
 
 use std::time::Instant;
 
-use clowder_core::Command;
+use clowder_core::{Command, ResourceId};
 
 use super::rows::RowKey;
 use super::section::Section;
@@ -129,4 +129,7 @@ pub struct ViewState {
     /// with it folded, nothing of it is saved, and it folds again whenever
     /// the group stops being listed. @spec TUI-NAV-112, TUI-NAV-113
     pub done_open: bool,
+    /// The first store the sidebar is scrolled to, by identity, or `None` for
+    /// the top. Every sitting begins at the top, and nothing of it is saved.
+    pub sidebar_top: Option<ResourceId>,
 }

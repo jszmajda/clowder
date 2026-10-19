@@ -622,6 +622,15 @@ impl App {
                     ) {
                         continue;
                     }
+                    // So does the sidebar's: it moves from where the last
+                    // frame drew it. @spec TUI-NAV-141, TUI-NAV-142
+                    if crate::nav::sidebar_key(
+                        &action,
+                        &mut self.view,
+                        self.pointer_record.as_ref(),
+                    ) {
+                        continue;
+                    }
                     match crate::nav::update(action, &mut self.view, &self.state) {
                         crate::nav::Outcome::Handled => {}
                         crate::nav::Outcome::Quit => self.quitting = true,

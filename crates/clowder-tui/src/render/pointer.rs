@@ -6,9 +6,23 @@
 //! The record is an output of drawing and never an input to it.
 //! @spec TUI-RENDER-025, TUI-RENDER-026
 
+use clowder_core::ResourceId;
 use ratatui::layout::Rect;
 
 use crate::nav::{RowKey, Section};
+
+/// Where one frame drew the stores sidebar's window: its region, the stores
+/// it drew from in their order, the place in that order of the first store it
+/// drew, how many it drew, and the furthest place the first store can stand —
+/// none where every store fits. A scroll moves from here.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SidebarRecord {
+    pub region: Rect,
+    pub stores: Vec<ResourceId>,
+    pub start: usize,
+    pub drawn: usize,
+    pub max_start: Option<usize>,
+}
 
 /// What one frame drew that a pointer can address, and the terminal size it
 /// was drawn at. A record names only what its frame drew.
@@ -19,6 +33,7 @@ pub struct PointerRecord {
     rows: Vec<(Rect, Section, RowKey)>,
     list: Option<(Rect, Section)>,
     journal: Option<(Rect, Option<usize>)>,
+    sidebar: Option<SidebarRecord>,
 }
 
 fn within(r: &Rect, x: u16, y: u16) -> bool {
@@ -47,6 +62,10 @@ impl PointerRecord {
         self.journal = Some((region, max_scroll));
     }
 
+    pub(crate) fn record_sidebar(&mut self, sidebar: SidebarRecord) {
+        self.sidebar = Some(sidebar);
+    }
+
     /// The terminal size the frame was drawn at.
     pub fn size(&self) -> (u16, u16) {
         self.size
@@ -58,6 +77,7 @@ impl PointerRecord {
             && self.rows.is_empty()
             && self.list.is_none()
             && self.journal.is_none()
+            && self.sidebar.is_none()
     }
 
     /// The section whose tab label stands over this cell.
@@ -93,5 +113,17 @@ impl PointerRecord {
     /// region, or none where every line fits or no Journal was drawn.
     pub fn journal_max_scroll(&self) -> Option<usize> {
         self.journal.as_ref().and_then(|(_, m)| *m)
+    }
+
+    /// The sidebar's window as this frame drew it, where it drew one.
+    pub fn sidebar(&self) -> Option<&SidebarRecord> {
+        self.sidebar.as_ref()
+    }
+
+    /// Whether this cell is in the sidebar's region.
+    pub fn sidebar_at(&self, x: u16, y: u16) -> bool {
+        self.sidebar
+            .as_ref()
+            .is_some_and(|s| within(&s.region, x, y))
     }
 }

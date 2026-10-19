@@ -530,6 +530,9 @@ fn every_piece_of_the_chrome_is_the_widget_that_owns_it() {
         let (w, h) = size;
         let d = cold(&state, &view, w, h);
         let l = d.layout;
+        // Whether the frame's sidebar holds stores out of view, which the hint
+        // bar names (TUI-NAV-146).
+        let hidden = chrome::stores_out_of_view(&state, sidebar_rect(&l).height);
 
         // Each of the three view-reading pieces really does read it, so the
         // comparisons below cannot pass by both sides ignoring the view.
@@ -551,8 +554,8 @@ fn every_piece_of_the_chrome_is_the_widget_that_owns_it() {
             size,
             l.hints,
             "chrome::hints",
-            |f| chrome::hints(f, l.hints, &state, &view),
-            |f| chrome::hints(f, l.hints, &state, &other),
+            |f| chrome::hints(f, l.hints, &state, &view, hidden),
+            |f| chrome::hints(f, l.hints, &state, &other, hidden),
         );
 
         assert_region_is(&d, l.header, size, "header row", "chrome::header", |f| {
@@ -567,7 +570,9 @@ fn every_piece_of_the_chrome_is_the_widget_that_owns_it() {
             size,
             "resource sidebar",
             "chrome::sidebar",
-            |f| chrome::sidebar(f, sidebar_rect(&l), &state),
+            |f| {
+                chrome::sidebar(f, sidebar_rect(&l), &state, &view);
+            },
         );
         assert_region_is(
             &d,
@@ -578,7 +583,7 @@ fn every_piece_of_the_chrome_is_the_widget_that_owns_it() {
             |f| overlays::ticker(f, l.ticker, &state),
         );
         assert_region_is(&d, l.hints, size, "hint bar", "chrome::hints", |f| {
-            chrome::hints(f, l.hints, &state, &view)
+            chrome::hints(f, l.hints, &state, &view, hidden)
         });
     }
 }

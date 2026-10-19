@@ -87,6 +87,11 @@ pub fn resolve(key: KeyEvent, view: &ViewState) -> Action {
         KeyCode::Left => Action::SectionPrev,
         KeyCode::Char('[') => Action::GroupPrev,
         KeyCode::Char(']') => Action::GroupNext,
+        // The braces are the shifted brackets: the brackets move the list by
+        // groups, the braces move the stores sidebar. @spec TUI-NAV-141,
+        // TUI-NAV-142
+        KeyCode::Char('{') => Action::SidebarUp,
+        KeyCode::Char('}') => Action::SidebarDown,
         KeyCode::Enter => Action::Activate,
         KeyCode::Char(' ') => Action::ToggleInspector,
         KeyCode::Char('i') => Action::ToggleInspector,

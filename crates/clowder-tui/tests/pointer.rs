@@ -605,7 +605,7 @@ fn settled(view: &ViewState) -> String {
 
 /// The view with everything a pointer event may change set aside: the
 /// section, the cursor, the visits a section move records, an arming a move
-/// ends, the Journal's scroll, and the held-press guard.
+/// ends, the Journal's and the sidebar's scroll, and the held-press guard.
 fn untouchable(view: &ViewState) -> String {
     let mut v = view.clone();
     v.section = None;
@@ -617,6 +617,7 @@ fn untouchable(view: &ViewState) -> String {
     if let Some(Overlay::Journal { anchor }) = v.overlay.as_mut() {
         *anchor = 0;
     }
+    v.sidebar_top = None;
     format!("{v:?}")
 }
 
@@ -1393,7 +1394,7 @@ fn a_pointer_event_after_a_resize_no_frame_was_drawn_for_does_nothing() {
 }
 
 /// A pointer event at cells where the record names no target does nothing:
-/// every cell of the frame that holds no tab, row, list or Journal, swept
+/// every cell of the frame that holds no tab, row, list, Journal or sidebar, swept
 /// with a left press and a wheel step either way, in every section at both
 /// sizes, the banner showing.
 ///
@@ -1412,6 +1413,7 @@ fn a_pointer_event_where_the_record_names_no_target_does_nothing() {
                     || r.row_at(x, y).is_some()
                     || r.list_at(x, y).is_some()
                     || r.journal_at(x, y)
+                    || r.sidebar_at(x, y)
                 {
                     continue;
                 }
@@ -1485,11 +1487,12 @@ fn every_context(state: &GameState) -> Vec<(String, ViewState)> {
 /// No pointer event ever asks the core for anything, in any context, and none
 /// touches a field, an overlay, an arming, the footer, the banner, the
 /// inspector call or the done group: it changes nothing but the section, the
-/// cursor (an arming ending with a move), and the Journal's scroll. Swept over
+/// cursor (an arming ending with a move), and the Journal's or the sidebar's
+/// scroll. Swept over
 /// every context a click could find the player in, at both sizes, over every
 /// tab label, every line of the list, and a grid of every other cell.
 ///
-/// @spec TUI-NAV-127
+/// @spec TUI-NAV-127, TUI-NAV-145
 #[test]
 fn no_pointer_event_asks_the_core_for_anything_or_touches_anything_but_the_cursor() {
     let state = mid_game();
@@ -1526,7 +1529,7 @@ fn no_pointer_event_asks_the_core_for_anything_or_touches_anything_but_the_curso
                     assert_eq!(
                         untouchable(&v),
                         untouchable(&view),
-                        "{what} at {size:?}: {e:?} changed something besides the cursor, the section and the Journal's scroll"
+                        "{what} at {size:?}: {e:?} changed something besides the cursor, the section and the Journal's or the sidebar's scroll"
                     );
                     let moved_now = v.section != view.section || v.focus != view.focus;
                     if moved_now {
@@ -2112,10 +2115,11 @@ fn a_wheel_step_over_a_list_with_no_row_to_rest_on_does_nothing() {
     }
 }
 
-/// A press or a step over the sidebar, the header, the report banner, the
-/// ticker, the hint bar, a pane divider, or the inspector — as a pane, or as
-/// the narrow-mode swap in the list's place — does nothing: swept over every
-/// cell of each, at both sizes.
+/// A press over the sidebar, and a press or a step over the header, the
+/// report banner, the ticker, the hint bar, a pane divider, or the inspector —
+/// as a pane, or as the narrow-mode swap in the list's place — does nothing:
+/// swept over every cell of each, at both sizes. (A step over the sidebar
+/// scrolls it, TUI-NAV-145.)
 ///
 /// @spec TUI-NAV-130
 #[test]
@@ -2160,7 +2164,12 @@ fn a_press_or_step_over_the_chrome_the_dividers_or_the_inspector_does_nothing() 
             for (what, rect) in inert {
                 regions.insert(what);
                 for (x, y) in cells_of(rect) {
-                    for e in answering(x, y) {
+                    let events: Vec<MouseEvent> = if what == "sidebar" {
+                        vec![click(x, y)]
+                    } else {
+                        answering(x, y).to_vec()
+                    };
+                    for e in events {
                         assert_nothing(e, &view, &state, &shot, &format!("the {what} at {size:?}"));
                     }
                 }

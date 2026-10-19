@@ -1179,7 +1179,7 @@ pub fn frame_recorded(
         None => match layout.body {
             Body::TooSmall(_) => unreachable!("handled above"),
             Body::Narrow { sidebar, main } => {
-                widgets::chrome::sidebar(f, sidebar, state);
+                record.record_sidebar(widgets::chrome::sidebar(f, sidebar, state, view));
                 let space = left_of_divider(main);
                 // TUI-NAV-035: swapped in over the list, the inspector still
                 // follows the underlying cursor.
@@ -1196,7 +1196,7 @@ pub fn frame_recorded(
                 list,
                 inspector,
             } => {
-                widgets::chrome::sidebar(f, sidebar, state);
+                record.record_sidebar(widgets::chrome::sidebar(f, sidebar, state, view));
                 let space = left_between_dividers(list);
                 let drawn = draw_list(f, space, state, section, view);
                 record.record_list(space, section, drawn);
@@ -1242,7 +1242,15 @@ pub fn frame_recorded(
             )),
             layout.hints,
         ),
-        None => widgets::chrome::hints(f, layout.hints, state, view),
+        // The hint bar names the sidebar's scroll keys while this frame's
+        // sidebar holds stores out of view. @spec TUI-NAV-146
+        None => widgets::chrome::hints(
+            f,
+            layout.hints,
+            state,
+            view,
+            record.sidebar().is_some_and(|s| s.max_start.is_some()),
+        ),
     }
 
     (layout, record)

@@ -1,7 +1,8 @@
 //! What a pointer event means: it moves around and does nothing more.
 //!
 //! A left press puts the cursor on a tab or a row; the wheel moves the cursor
-//! through a list, or scrolls the Journal. No pointer event ever becomes a
+//! through a list, or scrolls the Journal or the stores sidebar. No pointer
+//! event ever becomes a
 //! core command, opens or closes anything, or retires the report banner —
 //! tmux hands the program the click that merely focused its pane. Events are
 //! resolved against the record of the last frame drawn, never a layout worked
@@ -14,7 +15,51 @@ use super::action::Action;
 use super::rows::{cursor_index, drawn_rows, has_tab};
 use super::update::{enter_section, guard_after_field, move_cursor, Outcome};
 use super::view::{Overlay, ViewState};
-use crate::render::pointer::PointerRecord;
+use crate::render::pointer::{PointerRecord, SidebarRecord};
+
+/// How many stores a press of `{` or `}` moves the sidebar, its window
+/// holding `drawn` stores: three, or one fewer than the window holds where
+/// that is fewer, so the store at the window's leading edge stays in view —
+/// and never fewer than one. @spec TUI-NAV-143
+pub fn sidebar_step(drawn: usize) -> usize {
+    3.min(drawn.saturating_sub(1)).max(1)
+}
+
+/// Move the sidebar `by` stores toward its last store (`down`) or its first,
+/// from where `drawn` says the last frame drew it, stopping at either end.
+/// Scrolled back to the first store, the view holds the top rather than a
+/// store. Nothing changes where the sidebar has nowhere to go.
+fn scroll_sidebar(view: &mut ViewState, drawn: &SidebarRecord, down: bool, by: usize) {
+    let Some(max) = drawn.max_start else {
+        return;
+    };
+    let next = if down {
+        (drawn.start + by).min(max)
+    } else {
+        drawn.start.saturating_sub(by)
+    };
+    if next != drawn.start {
+        view.sidebar_top = (next > 0).then(|| drawn.stores[next]);
+    }
+}
+
+/// `{` and `}`: scroll the stores sidebar by the step, from where the last
+/// frame drew it, which only that frame's record holds. True where `action`
+/// is one of those keys, whether or not it moved. A scroll is neither an act
+/// nor navigation: it ends no arming, retires no banner, counts as no visit,
+/// and touches nothing but the sidebar's scroll. @spec TUI-NAV-140,
+/// TUI-NAV-141, TUI-NAV-142, TUI-NAV-144
+pub fn sidebar_key(action: &Action, view: &mut ViewState, record: Option<&PointerRecord>) -> bool {
+    let down = match action {
+        Action::SidebarDown => true,
+        Action::SidebarUp => false,
+        _ => return false,
+    };
+    if let Some(drawn) = record.and_then(PointerRecord::sidebar) {
+        scroll_sidebar(view, drawn, down, sidebar_step(drawn.drawn));
+    }
+    true
+}
 
 /// The open Journal's own scrolling by key: `↓`/`j` and `↑`/`k` one line, as a
 /// wheel step moves it, `[` to its top and `]` to its foot, never past where
@@ -43,7 +88,7 @@ pub fn journal_key(action: &Action, view: &mut ViewState, record: Option<&Pointe
 /// Resolve one mouse event against `record`, the last frame drawn, at the
 /// terminal's `present_size`. Always `Handled`: nothing here reaches the core.
 /// @spec TUI-NAV-125, TUI-NAV-126, TUI-NAV-127, TUI-NAV-128, TUI-NAV-129,
-/// TUI-NAV-130, TUI-NAV-131, TUI-NAV-132, TUI-NAV-133
+/// TUI-NAV-130, TUI-NAV-131, TUI-NAV-132, TUI-NAV-133, TUI-NAV-145
 pub fn pointer_event(
     event: MouseEvent,
     view: &mut ViewState,
@@ -88,6 +133,14 @@ pub fn pointer_event(
         None => {}
     }
     if view.prompt.is_some() {
+        return Outcome::Handled;
+    }
+    // The wheel over the sidebar scrolls it one store; a press there does
+    // nothing. @spec TUI-NAV-145
+    if record.sidebar_at(x, y) {
+        if let (Some(step), Some(drawn)) = (step, record.sidebar()) {
+            scroll_sidebar(view, drawn, step > 0, 1);
+        }
         return Outcome::Handled;
     }
     let Some(focus) = view.section else {

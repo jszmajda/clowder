@@ -301,6 +301,16 @@ fn global_bindings() -> Vec<(KeyEvent, Action, &'static str)> {
             "] jumps to the next group header",
         ),
         (
+            ch('{'),
+            Action::SidebarUp,
+            "{ scrolls the stores sidebar up",
+        ),
+        (
+            ch('}'),
+            Action::SidebarDown,
+            "} scrolls the stores sidebar down",
+        ),
+        (
             k(KeyCode::Enter),
             Action::Activate,
             "Enter performs the focused row's primary action",

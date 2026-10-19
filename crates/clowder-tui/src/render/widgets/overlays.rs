@@ -400,13 +400,14 @@ fn away_report_lines(report: &OfflineReport) -> Vec<Line<'static>> {
 }
 
 /// The complete key map and glyph legend. There is no manual; this and the
-/// hint bar are the manual. @spec TUI-NAV-025, TUI-NAV-090
+/// hint bar are the manual. @spec TUI-NAV-025, TUI-NAV-090, TUI-NAV-146
 pub fn help(f: &mut Frame, area: Rect) {
     const KEYS: &[(&str, &str)] = &[
         ("1-9, 0", "Jump to that section"),
         ("Tab / BackTab", "Next / previous revealed section"),
         ("Arrows / hjkl", "Move the cursor, cycle sections"),
         ("[ / ]", "Previous / next group header"),
+        ("{ / }", "Scroll the stores sidebar up / down"),
         ("Enter", "Row's primary action; commits an armed row"),
         ("Space / i", "Toggle the inspector"),
         ("x", "Open the count prompt; Enter applies xN"),

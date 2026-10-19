@@ -387,14 +387,16 @@ fn tab_line(state: &GameState, view: &ViewState, w: u16) -> String {
 }
 
 fn hint_line(state: &GameState, view: &ViewState, w: u16) -> String {
-    one_line(w, |f, area| chrome::hints(f, area, state, view))
+    one_line(w, |f, area| chrome::hints(f, area, state, view, false))
 }
 
 fn sidebar_lines(state: &GameState, w: u16, h: u16) -> Vec<String> {
     let (_, _, side, _) = regions(w, h);
     let mut term = terminal(w, h);
-    term.draw(|f| chrome::sidebar(f, side, state))
-        .expect("TestBackend is infallible");
+    term.draw(|f| {
+        chrome::sidebar(f, side, state, &ViewState::default());
+    })
+    .expect("TestBackend is infallible");
     region_lines(term.backend().buffer(), side)
 }
 
@@ -588,8 +590,8 @@ fn every_piece_of_the_chrome_is_drawn_at_every_supported_size() {
         term.draw(|f| {
             chrome::header(f, header, &state, &view);
             chrome::tabs(f, tabs, &state, &view);
-            chrome::sidebar(f, sidebar, &state);
-            chrome::hints(f, hints, &state, &view);
+            let side = chrome::sidebar(f, sidebar, &state, &view);
+            chrome::hints(f, hints, &state, &view, side.max_start.is_some());
         })
         .expect("TestBackend is infallible");
         let buffer = term.backend().buffer().clone();
@@ -1919,8 +1921,8 @@ fn every_symbol_the_chrome_draws_is_a_single_width_character() {
     term.draw(|f| {
         chrome::header(f, header, &busy, &busy_view);
         chrome::tabs(f, tabs, &busy, &busy_view);
-        chrome::sidebar(f, sidebar, &busy);
-        chrome::hints(f, hints, &busy, &busy_view);
+        let side = chrome::sidebar(f, sidebar, &busy, &busy_view);
+        chrome::hints(f, hints, &busy, &busy_view, side.max_start.is_some());
     })
     .expect("TestBackend is infallible");
     let buffer = term.backend().buffer().clone();
@@ -2839,8 +2841,10 @@ fn a_capped_store_wears_attention_on_its_full_tag_and_nowhere_else() {
             for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE_W, WIDE_H)] {
                 let (_, _, side, _) = regions(w, h);
                 let mut term = terminal(w, h);
-                term.draw(|f| chrome::sidebar(f, side, &state))
-                    .expect("TestBackend is infallible");
+                term.draw(|f| {
+                    chrome::sidebar(f, side, &state, &ViewState::default());
+                })
+                .expect("TestBackend is infallible");
                 let buf = term.backend().buffer();
                 let lines = region_lines(buf, side);
 
@@ -3011,6 +3015,9 @@ fn calm_meadow() -> (GameState, ViewState) {
 /// only decides which cells wear the colour, never whether the tag fits
 /// whole.
 ///
+/// A sidebar note's full count, `M full`, is the tags out of view standing
+/// in one place, and wears attention as they would.
+///
 /// @spec TUI-THEME-015
 #[test]
 fn nothing_but_a_chip_or_a_full_tag_wears_attention_in_a_frame_with_nothing_armed() {
@@ -3125,6 +3132,19 @@ fn nothing_but_a_chip_or_a_full_tag_wears_attention_in_a_frame_with_nothing_arme
                             marks += 1;
                             for x in span {
                                 allowed[side.x as usize + x] = true;
+                            }
+                        }
+                        // A sidebar note's full count — its figure as well as
+                        // its word — stands for the tags out of view
+                        // (TUI-RENDER-027).
+                        let text: String = side_symbols.concat();
+                        if text.trim_start().starts_with(['▴', '▾']) {
+                            if let Some(dot) = text.find(" · ") {
+                                let from = text[..dot + " · ".len()].chars().count();
+                                let to = text.trim_end().chars().count();
+                                for x in from..to {
+                                    allowed[side.x as usize + x] = true;
+                                }
                             }
                         }
                     }
@@ -5605,8 +5625,10 @@ fn wears_full(state: &GameState, r: ResourceId) -> bool {
 /// Draw the sidebar alone into a rectangle of exactly `w` × `h`.
 fn sidebar_in(state: &GameState, w: u16, h: u16) -> (Vec<String>, Buffer) {
     let mut term = terminal(w, h);
-    term.draw(|f| chrome::sidebar(f, Rect::new(0, 0, w, h), state))
-        .expect("TestBackend is infallible");
+    term.draw(|f| {
+        chrome::sidebar(f, Rect::new(0, 0, w, h), state, &ViewState::default());
+    })
+    .expect("TestBackend is infallible");
     let buf = term.backend().buffer().clone();
     (region_lines(&buf, Rect::new(0, 0, w, h)), buf)
 }
@@ -5764,152 +5786,6 @@ fn every_store_in_the_sidebar_stands_field_by_field_at_one_column() {
         uncapped_seen && full_seen,
         "fixture: uncapped and full stores both drawn"
     );
-}
-
-/// The sidebar draws the stores the stores group lists, in its order, each
-/// whole or not at all. Where its lines cannot hold every listed store, its
-/// last line is `+N more` in `dim`, N written in full, and the stores drawn are
-/// as many as the lines above the note hold — chosen first from the stores
-/// wearing `full`, then from the rest, each in the stores group's order, and
-/// drawn in that order. Checked at every sidebar height from one line to room
-/// for all, over meadows whose full stores sit early, late, and nowhere.
-/// @spec TUI-RENDER-022
-#[test]
-fn the_sidebar_draws_whole_stores_full_ones_first_and_counts_the_rest() {
-    let names: std::collections::HashMap<ResourceId, String> =
-        stores_row_names().into_iter().collect();
-    let dim = clowder_tui::theme::Role::Dim.color();
-    let (_, _, side, _) = regions(FLOOR_W, FLOOR_H);
-    let width = side.width as usize;
-    let name_col = width.saturating_sub(14).max(1);
-
-    let mut meadows: Vec<GameState> = (0..3).map(every_store_held).collect();
-    // Only the last capped stores full, the rest held below their caps, and a
-    // handful of stores held at all.
-    let mut late = GameState::new(11);
-    let capped: Vec<ResourceId> = ResourceId::ALL
-        .into_iter()
-        .filter(|r| late.cap(*r).is_finite() && late.cap(*r) > 0.0)
-        .collect();
-    for r in ResourceId::ALL {
-        late.resources[r.ix()] = 0.0;
-    }
-    for (i, r) in capped.iter().enumerate() {
-        late.resources[r.ix()] = if i + 2 >= capped.len() {
-            late.cap(*r)
-        } else {
-            late.cap(*r) / 2.0
-        };
-    }
-    let uncapped: Vec<ResourceId> = ResourceId::ALL
-        .into_iter()
-        .filter(|r| late.cap(*r).is_infinite())
-        .take(5)
-        .collect();
-    for r in uncapped {
-        late.resources[r.ix()] = 7.0;
-    }
-    meadows.push(late);
-    // Nothing full at all.
-    let mut none_full = GameState::new(11);
-    for r in ResourceId::ALL {
-        let cap = none_full.cap(r);
-        none_full.resources[r.ix()] = if cap.is_finite() && cap > 0.0 {
-            cap / 3.0
-        } else {
-            2.0
-        };
-    }
-    meadows.push(none_full);
-
-    for state in &meadows {
-        let listed = listed_stores(state);
-        let k = listed.len();
-        assert!(
-            k >= 4,
-            "fixture: enough stores listed to overflow a short sidebar"
-        );
-        for height in 1..=(2 * k + 3) {
-            let (lines, buf) = sidebar_in(state, side.width, height as u16);
-            let drawn_n = if 2 * k <= height { k } else { (height - 1) / 2 };
-            let chosen: Vec<ResourceId> = {
-                let mut pick: Vec<ResourceId> = listed
-                    .iter()
-                    .copied()
-                    .filter(|r| wears_full(state, *r))
-                    .take(drawn_n)
-                    .collect();
-                let room = drawn_n - pick.len();
-                pick.extend(
-                    listed
-                        .iter()
-                        .copied()
-                        .filter(|r| !wears_full(state, *r))
-                        .take(room),
-                );
-                listed
-                    .iter()
-                    .copied()
-                    .filter(|r| pick.contains(r))
-                    .collect()
-            };
-            for (i, r) in chosen.iter().enumerate() {
-                let head = fmt::fit(&names[r], name_col);
-                assert!(
-                    lines[2 * i].starts_with(&head),
-                    "height {height}: line {} should begin store {i} of those drawn, {r:?}, chosen \
-                     first from the stores wearing `full` and kept in the stores group's order \
-                     (TUI-RENDER-022); it read {:?}.\n{}",
-                    2 * i,
-                    lines[2 * i],
-                    lines.join("\n")
-                );
-                assert!(
-                    draws_fill_bar(&lines[2 * i + 1]),
-                    "height {height}: {r:?} is drawn whole — its second line too (TUI-RENDER-022).\n{}",
-                    lines.join("\n")
-                );
-            }
-            let below_stores = &lines[2 * drawn_n..];
-            if drawn_n == k {
-                assert!(
-                    below_stores.iter().all(|l| l.trim().is_empty()),
-                    "height {height}: every listed store fits, so nothing follows them.\n{}",
-                    lines.join("\n")
-                );
-                continue;
-            }
-            let note = format!("+{} more", k - drawn_n);
-            let last = lines.last().expect("a sidebar has lines");
-            assert_eq!(
-                last.trim(),
-                note,
-                "height {height}: {k} stores listed and {drawn_n} drawn, so the last line is the \
-                 note {note:?} (TUI-RENDER-022).\n{}",
-                lines.join("\n")
-            );
-            assert!(
-                below_stores[..below_stores.len() - 1]
-                    .iter()
-                    .all(|l| l.trim().is_empty()),
-                "height {height}: only the note stands below the stores drawn — no store is drawn \
-                 in part.\n{}",
-                lines.join("\n")
-            );
-            let y = (height - 1) as u16;
-            for x in 0..side.width {
-                let cell = &buf[(x, y)];
-                if !cell.symbol().trim().is_empty() {
-                    assert_eq!(
-                        cell.fg,
-                        dim.unwrap_or(cell.fg),
-                        "height {height}: the note wears `dim` (TUI-RENDER-022)"
-                    );
-                }
-            }
-            assert!(dim.is_some(), "fixture: dim carries a colour");
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -6113,10 +5989,13 @@ fn stores_at_nothing_stay_among_the_stores_the_sidebar_chooses_from_and_counts()
             "fixture: at {w}x{h} the sidebar cannot hold every store"
         );
         let lines = sidebar_lines(&state, w, h);
-        let note = format!("+{} more", k - (height - 1) / 2);
-        assert_eq!(
-            lines.last().expect("a sidebar has lines").trim(),
-            note,
+        let note = format!("▾ {} more", k - (height - 1) / 2);
+        assert!(
+            lines
+                .last()
+                .expect("a sidebar has lines")
+                .trim()
+                .starts_with(&note),
             "at {w}x{h}: {k} stores are listed, {} of them at nothing, so the note counts them \
              all.\n{}",
             spent.len(),

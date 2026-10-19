@@ -43,6 +43,10 @@ pub enum Action {
     /// `d` — open or fold the Ideas section's done group; an unbound key
     /// wherever the group is not live. @spec TUI-NAV-115
     ToggleDone,
+    /// `{` — scroll the stores sidebar toward its first store.
+    SidebarUp,
+    /// `}` — scroll the stores sidebar toward its last store.
+    SidebarDown,
     /// A printable character routed into an open field rather than to its
     /// global binding — which is exactly what stops a digit jumping sections
     /// mid-type. @spec TUI-NAV-037, TUI-NAV-038
