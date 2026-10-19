@@ -1,5 +1,6 @@
 use crate::content;
 use crate::events::Event;
+use crate::query::{credit, FlowLedger, FlowSource};
 use crate::state::{
     season_of_day, AdventureId, GameState, IdeaId, JobId, Location, ResourceId, StructureId,
     EPSILON,
@@ -31,19 +32,25 @@ impl GameState {
     /// structure — silently wrong the moment a phase is added here and not
     /// there, which is the exact drift SIM-ENG-030 forbids. Adding a
     /// stock-moving phase means adding it here, once.
+    ///
+    /// Every stock move is credited to the one source it is made for, at the
+    /// amount it actually moved the stock, into `ledger` where the caller
+    /// keeps one (the flows query); a multiplier is never a source, its share
+    /// riding inside the move it scales. A tick passes no ledger.
     // @spec SIM-ENG-004, SIM-ENG-030
-    pub(crate) fn resource_phases(&mut self) -> (f64, bool) {
+    // @spec SIM-ENG-063, SIM-ENG-064, SIM-ENG-065
+    pub(crate) fn resource_phases(&mut self, ledger: &mut Option<&mut FlowLedger>) -> (f64, bool) {
         // ---- Phase 2: production (structures, jobs, converters) ----
-        let mess_accrual = self.produce();
+        let mess_accrual = self.produce(ledger);
         // ---- Phase 2b: dreaming (mystic drift, per tick) ----
         // Only Arch upgrades drive drift, so the arch-free hot path skips it.
         // @spec SIM-UNI-007, SIM-UNI-008
         if !self.arches_bought.is_empty() {
-            self.dream_step();
+            self.dream_step(ledger);
         }
         // ---- Phase 3: consumption (food, then luxury drain) ----
         // @spec SIM-ECO-020, SIM-ECO-021
-        let shortfall = self.consume();
+        let shortfall = self.consume(ledger);
         (mess_accrual, shortfall)
     }
 
@@ -89,7 +96,7 @@ impl GameState {
 
         // ---- Phases 2, 2b, 3: everything that moves a stock ----
         self.ratchet_roster();
-        let (mess_accrual, shortfall) = self.resource_phases();
+        let (mess_accrual, shortfall) = self.resource_phases(&mut None);
 
         // ---- Phase 4: mood, famine flag & mess recompute ----
         // @spec SIM-KIT-013
@@ -403,7 +410,7 @@ impl GameState {
     /// energy deficit; mess multiplies catnip growth last. Returns the tick's
     /// mess accrual (applied in phase 4).
     // @spec SIM-ENG-021, SIM-ECO-023, SIM-ECO-025, SIM-ECO-032, SIM-ECO-036
-    pub(crate) fn produce(&mut self) -> f64 {
+    pub(crate) fn produce(&mut self, ledger: &mut Option<&mut FlowLedger>) -> f64 {
         // A déjà-vu day pauses production entirely — a strange half-remembered
         // day where the meadow simply holds still (no growth, no mess).
         // @spec SIM-DREAM-004
@@ -532,6 +539,7 @@ impl GameState {
                         1.0 + self.effect(crate::effects::Effect::SeasonResourceRatio(season, *r));
                 }
                 self.resources[r.ix()] += flow;
+                credit(ledger, FlowSource::Structure(s), *r, flow);
             }
         }
 
@@ -550,6 +558,7 @@ impl GameState {
             let add = self.effect(crate::effects::Effect::StructureOutputAdd(s, r));
             if add != 0.0 {
                 self.resources[r.ix()] += add * count as f64;
+                credit(ledger, FlowSource::Structure(s), r, add * count as f64);
             }
         }
 
@@ -613,6 +622,7 @@ impl GameState {
             // @spec SIM-ADV-002
             flow *= job_twist;
             self.resources[r.ix()] += flow;
+            credit(ledger, FlowSource::Job(j), r, flow);
         }
 
         // ---- Skills: employed Home kittens learn; other skills fade ----
@@ -642,8 +652,8 @@ impl GameState {
         }
 
         // ---- Converters (throttled), then Tinkerers, accruing mess ----
-        let mess = self.run_converters();
-        self.run_tinkerers();
+        let mess = self.run_converters(ledger);
+        self.run_tinkerers(ledger);
         mess * tidy_mult
     }
 
@@ -653,7 +663,7 @@ impl GameState {
     /// output riding the craft ratio. No mood or zoomies factor. An Away
     /// Tinkerer's recipe idles; its binding (and seat) persist.
     // @spec SIM-ECO-043, SIM-KIT-026
-    fn run_tinkerers(&mut self) {
+    fn run_tinkerers(&mut self, ledger: &mut Option<&mut FlowLedger>) {
         let speed = 1.0 + self.effect(crate::effects::Effect::TinkererSpeed);
         for ix in 0..self.kittens.len() {
             let k = &self.kittens[ix];
@@ -676,14 +686,19 @@ impl GameState {
             if fraction <= 0.0 {
                 continue; // a starved Tinkerer idles quietly, still bound
             }
+            let src = FlowSource::Craft(recipe);
             for (r, demand) in &demands {
                 let rix = r.ix();
-                self.resources[rix] = (self.resources[rix] - demand * fraction).max(0.0);
+                let before = self.resources[rix];
+                self.resources[rix] = (before - demand * fraction).max(0.0);
+                credit(ledger, src, *r, self.resources[rix] - before);
             }
             let output = content::craft_output(recipe);
             let boosted = rate * fraction * (1.0 + self.craft_ratio_for(recipe));
             let oix = output.ix();
-            self.resources[oix] = (self.resources[oix] + boosted).min(self.cap(output));
+            let before = self.resources[oix];
+            self.resources[oix] = (before + boosted).min(self.cap(output));
+            credit(ledger, src, output, self.resources[oix] - before);
         }
     }
 
@@ -691,7 +706,7 @@ impl GameState {
     /// mess: converters dirty in proportion to their throughput, everything
     /// else per active copy.
     // @spec SIM-ECO-029, SIM-ECO-037
-    fn run_converters(&mut self) -> f64 {
+    fn run_converters(&mut self, ledger: &mut Option<&mut FlowLedger>) -> f64 {
         let mut mess_accrual = 0.0;
         for s in StructureId::ALL {
             let count = self.structures[s.ix()];
@@ -717,12 +732,16 @@ impl GameState {
             if fraction <= 0.0 {
                 continue; // a starved converter idles quietly
             }
+            let src = FlowSource::Structure(s);
             for (r, demand) in &demands {
                 let ix = r.ix();
-                self.resources[ix] = (self.resources[ix] - demand * fraction).max(0.0);
+                let before = self.resources[ix];
+                self.resources[ix] = (before - demand * fraction).max(0.0);
+                credit(ledger, src, *r, self.resources[ix] - before);
             }
             for (r, out) in converter.outputs {
                 self.resources[r.ix()] += out * count as f64 * fraction;
+                credit(ledger, src, *r, out * count as f64 * fraction);
             }
             // Refinement-granted extra outputs ride the same throttle (the
             // Bellows and Ember Beds stoke the Hearth). @spec SIM-CUR-010
@@ -733,16 +752,19 @@ impl GameState {
                 let add = self.effect(crate::effects::Effect::StructureOutputAdd(s, r));
                 if add != 0.0 {
                     self.resources[r.ix()] += add * count as f64 * fraction;
+                    credit(ledger, src, r, add * count as f64 * fraction);
                 }
             }
             // The Treat Bakery's outputs ride the pep *cap* (mpr), not a
             // recipe table. @spec SIM-ECO-030
             if s == StructureId::TreatBakery {
                 let mpr = self.cap(ResourceId::Pep) * content::BAKERY_MPR_PER_PEP_CAP;
-                self.resources[ResourceId::Feathers.ix()] +=
-                    content::BAKERY_FEATHERS_MPR * mpr * count as f64 * fraction;
-                self.resources[ResourceId::Bells.ix()] +=
-                    content::BAKERY_BELLS_MPR * mpr * count as f64 * fraction;
+                let feathers = content::BAKERY_FEATHERS_MPR * mpr * count as f64 * fraction;
+                let bells = content::BAKERY_BELLS_MPR * mpr * count as f64 * fraction;
+                self.resources[ResourceId::Feathers.ix()] += feathers;
+                self.resources[ResourceId::Bells.ix()] += bells;
+                credit(ledger, src, ResourceId::Feathers, feathers);
+                credit(ledger, src, ResourceId::Bells, bells);
             }
         }
         mess_accrual
@@ -752,7 +774,7 @@ impl GameState {
     /// first, then the luxury drain — which floors at zero and never
     /// shortfalls: an empty shelf just drops its happiness bonus.
     // @spec SIM-ECO-020, SIM-ECO-021, SIM-ECO-026
-    pub(crate) fn consume(&mut self) -> bool {
+    pub(crate) fn consume(&mut self, ledger: &mut Option<&mut FlowLedger>) -> bool {
         // A déjà-vu day pauses consumption too, so the dreamy pause never causes
         // a shortfall (Tenet 1). @spec SIM-DREAM-004
         if self.deja_vu_until > self.ticks {
@@ -776,6 +798,12 @@ impl GameState {
             self.resources[ix] = (stock - demand).max(0.0);
             false
         };
+        credit(
+            ledger,
+            FlowSource::Kittens,
+            ResourceId::Catnip,
+            self.resources[ix] - stock,
+        );
 
         // Luxury drain, per Home kitten, eased by demand effects and raised
         // by an active jamboree (celebrations consume), floored at zero.
@@ -795,7 +823,9 @@ impl GameState {
             for (r, per_kitten) in content::LUXURY_DRAINS {
                 let ix = r.ix();
                 let drain = per_kitten * home as f64 * scale;
-                self.resources[ix] = (self.resources[ix] - drain).max(0.0);
+                let before = self.resources[ix];
+                self.resources[ix] = (before - drain).max(0.0);
+                credit(ledger, FlowSource::Kittens, r, self.resources[ix] - before);
             }
         }
 
@@ -912,13 +942,19 @@ impl GameState {
     /// into a dreamcorn — never the last prism. A Sky Arch adds a steady prism
     /// drift.
     // @spec SIM-UNI-007, SIM-UNI-008
-    fn dream_step(&mut self) {
+    fn dream_step(&mut self, ledger: &mut Option<&mut FlowLedger>) {
         use crate::state::ArchId;
         if self.arches_bought.is_empty() {
             return; // no Sky/Memory Arch: no drift, the common hot-path case
         }
         if self.arches_bought.contains(&ArchId::SkyArch) {
             self.resources[ResourceId::Prisms.ix()] += content::SKY_ARCH_PRISM_DRIFT;
+            credit(
+                ledger,
+                FlowSource::Arch(ArchId::SkyArch),
+                ResourceId::Prisms,
+                content::SKY_ARCH_PRISM_DRIFT,
+            );
         }
         // The Memory Arch upgrade ENABLES the engine; the drift RATE scales with
         // the buildable Rainbow Arch structure count, so the engine grows as the
@@ -939,6 +975,9 @@ impl GameState {
             self.dream_drift -= 1.0;
             self.resources[ResourceId::Prisms.ix()] -= 1.0;
             self.resources[ResourceId::Dreamcorns.ix()] += 1.0;
+            let src = FlowSource::Arch(ArchId::MemoryArch);
+            credit(ledger, src, ResourceId::Prisms, -1.0);
+            credit(ledger, src, ResourceId::Dreamcorns, 1.0);
         }
     }
 

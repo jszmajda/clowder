@@ -5,15 +5,16 @@
 //! lose a decision because a name was cute. Every fact stated here is a core
 //! query or a content definition's own field, never a rule worked out in the
 //! shell: no total for copies owned, no yield after mood, no coverage inferred
-//! from stock, no wait where the core reports no reason to wait.
+//! from stock, no wait where the core reports no reason to wait, no flow
+//! credited to a source by the shell's own reckoning.
 //! Layout is not decided here. TUI-NAV-047's dead-band and TUI-NAV-048's
 //! three-column split are breakpoints, and live in `render::layout` beside the
 //! render specs that state them a second time.
 //! @spec TUI-NAV-017, TUI-NAV-018, TUI-NAV-029, TUI-NAV-078, TUI-NAV-079,
-//!       TUI-NAV-080, TUI-NAV-108
+//!       TUI-NAV-080, TUI-NAV-108, TUI-NAV-135
 
 use clowder_core::content::{self, TICKS_PER_SECOND};
-use clowder_core::{ContentId, GameState, LockReason, ResourceId};
+use clowder_core::{ContentId, FlowSource, GameState, LockReason, ResourceId};
 use ratatui::{
     layout::Rect,
     text::Line,
@@ -576,11 +577,40 @@ fn bound_tinkerers(state: &GameState, c: clowder_core::CraftId) -> usize {
         .count()
 }
 
+/// A store's rate in the inspector: the exact form of its size behind `+`
+/// where it is above zero and `-` where it is below, with no sign where it
+/// reads `0`. @spec TUI-RENDER-012
+fn signed_rate(rate: f64) -> String {
+    let size = fmt::exact(rate.abs());
+    if size == "0" {
+        size
+    } else if rate > 0.0 {
+        format!("+{size}")
+    } else {
+        format!("-{size}")
+    }
+}
+
+/// The name a stores row gives a flow's source: an item as its own row names
+/// it, the kittens themselves by the roster's word for them.
+fn flow_source_name(src: FlowSource) -> String {
+    match src {
+        FlowSource::Structure(s) => content_name(ContentId::Structure(s)),
+        FlowSource::Job(j) => content_name(ContentId::Job(j)),
+        FlowSource::Craft(c) => content_name(ContentId::Craft(c)),
+        FlowSource::Arch(a) => content_name(ContentId::Arch(a)),
+        FlowSource::Kittens => "kittens".to_string(),
+    }
+}
+
 /// A stores row: the resource's exact stock, the cap the core reports or that
-/// it has none, and the core's net rate for it per game second — the exact
-/// form of its size behind `+` where it is above zero and `-` where it is
-/// below, with no sign where it stands still. @spec TUI-NAV-080,
-/// TUI-RENDER-012
+/// it has none, and the core's net rate for it per game second; then what
+/// moves it — the core's flows by source, those adding to the store under an
+/// In heading and those drawing it down under an Out heading, each as its
+/// source's name and its signed rate, in the core's order. A flow that reads
+/// `0` has no line, and a heading stands only above a line.
+/// @spec TUI-NAV-080, TUI-RENDER-012
+/// @spec TUI-NAV-135, TUI-NAV-136, TUI-NAV-137, TUI-NAV-138, TUI-NAV-139
 fn store_lines(state: &GameState, r: ResourceId) -> Vec<Pieces> {
     let cap = state.cap(r);
     let cap_text = if cap.is_finite() {
@@ -588,19 +618,38 @@ fn store_lines(state: &GameState, r: ResourceId) -> Vec<Pieces> {
     } else {
         "none".to_string()
     };
-    let rate = state.net_rate(r);
-    let size = fmt::exact(rate.abs());
-    let rate_text = if size == "0" {
-        size
-    } else if rate > 0.0 {
-        format!("+{size}")
-    } else {
-        format!("-{size}")
-    };
-    vec![plain(format!(
-        "Stock: {}. Cap: {cap_text}. Net rate: {rate_text} per game second.",
+    let mut lines = vec![plain(format!(
+        "Stock: {}. Cap: {cap_text}. Net rate: {} per game second.",
         fmt::exact(state.stock(r)),
-    ))]
+        signed_rate(state.net_rate(r)),
+    ))];
+
+    let mut ins = Vec::new();
+    let mut outs = Vec::new();
+    for (src, rate) in state.flows(r) {
+        let text = signed_rate(rate);
+        if text == "0" {
+            continue;
+        }
+        let line = plain(format!("{} {text}", flow_source_name(src)));
+        if rate > 0.0 {
+            ins.push(line);
+        } else {
+            outs.push(line);
+        }
+    }
+    if !ins.is_empty() || !outs.is_empty() {
+        lines.push(Vec::new());
+    }
+    if !ins.is_empty() {
+        lines.push(plain("In, per game second:".to_string()));
+        lines.extend(ins);
+    }
+    if !outs.is_empty() {
+        lines.push(plain("Out, per game second:".to_string()));
+        lines.extend(outs);
+    }
+    lines
 }
 
 /// The whole of the inspector's content for one row. While an open count

@@ -3,9 +3,54 @@
 //! The shell renders; the core rules. Anything whose answer is a rule is
 //! answered here even where a caller could assemble it from public state — a
 //! second copy of a rule drifts from the first the moment the rule changes.
-//! @spec SIM-ENG-030, SIM-ENG-031, SIM-ENG-032, SIM-ENG-033
+//! @spec SIM-ENG-030, SIM-ENG-031, SIM-ENG-032, SIM-ENG-033, SIM-ENG-062
 
-use crate::state::{GameState, ResourceId, RESOURCE_COUNT};
+use std::collections::BTreeMap;
+
+use crate::state::{ArchId, CraftId, GameState, JobId, ResourceId, StructureId, RESOURCE_COUNT};
+
+/// What a stock move is made for: the one thing a flow is credited to.
+///
+/// The variant order, and each id's own order within its variant, is the
+/// order the flows of a resource are listed in — structures, jobs, the
+/// kittens, crafts, arch upgrades, each kind in its table's order — so the
+/// derived `Ord` is load-bearing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum FlowSource {
+    Structure(StructureId),
+    Job(JobId),
+    /// The kittens themselves: their appetite and the luxuries they use.
+    Kittens,
+    /// The tinkerers bound to a recipe.
+    Craft(CraftId),
+    Arch(ArchId),
+}
+
+/// The stock moves of one run of the resource phases, summed per source. Kept
+/// only by the flows query; a tick passes none.
+#[derive(Debug, Default)]
+pub(crate) struct FlowLedger {
+    by_source: BTreeMap<FlowSource, [f64; RESOURCE_COUNT]>,
+}
+
+impl FlowLedger {
+    pub(crate) fn credit(&mut self, src: FlowSource, r: ResourceId, moved: f64) {
+        self.by_source.entry(src).or_insert([0.0; RESOURCE_COUNT])[r.ix()] += moved;
+    }
+}
+
+/// Credit `moved` of `r` to `src`, where the run is keeping a ledger.
+#[inline]
+pub(crate) fn credit(
+    ledger: &mut Option<&mut FlowLedger>,
+    src: FlowSource,
+    r: ResourceId,
+    moved: f64,
+) {
+    if let Some(l) = ledger {
+        l.credit(src, r, moved);
+    }
+}
 
 /// Why a piece of content is not currently actionable — data, not prose, on
 /// the same principle as the event vocabulary.
@@ -65,12 +110,35 @@ impl GameState {
         // (SIM-ENG-035). `self` is untouched: probing is free.
         let before = self.resources;
         let mut probe = self.clone();
-        probe.resource_phases();
+        probe.resource_phases(&mut None);
         let per_second = crate::content::TICKS_PER_SECOND as f64;
         let mut out = [0.0; RESOURCE_COUNT];
         for i in 0..RESOURCE_COUNT {
             out[i] = (probe.resources[i] - before[i]) * per_second;
         }
         out
+    }
+
+    /// The net rate of `r` taken apart by what moves it: each source's signed
+    /// rate per game second, in the fixed listing order, every source that
+    /// moved `r` by nothing left out.
+    ///
+    /// The same probe as `net_rates` — a scratch clone running the pipeline's
+    /// own resource phases — but keeping a ledger, so every figure is a move
+    /// the pipeline made, credited where it made it. The figures therefore sum
+    /// to the net rate. Speed-free and advisory, as the net rate is; `self` is
+    /// untouched. @spec SIM-ENG-062, SIM-ENG-064, SIM-ENG-066, SIM-ENG-067,
+    /// SIM-ENG-068
+    pub fn flows(&self, r: ResourceId) -> Vec<(FlowSource, f64)> {
+        let mut ledger = FlowLedger::default();
+        let mut probe = self.clone();
+        probe.resource_phases(&mut Some(&mut ledger));
+        let per_second = crate::content::TICKS_PER_SECOND as f64;
+        ledger
+            .by_source
+            .iter()
+            .filter(|(_, moved)| moved[r.ix()] != 0.0)
+            .map(|(src, moved)| (*src, moved[r.ix()] * per_second))
+            .collect()
     }
 }

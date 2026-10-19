@@ -3052,10 +3052,14 @@ fn a_stores_row_states_its_exact_stock_its_cap_or_none_and_its_net_rate_per_game
             on_screen.contains(&rate),
             "{r:?}: the net rate per game second {rate}; it read:\n{shown}"
         );
+        // The flows beneath the net rate state figures of their own
+        // (TUI-NAV-135); the facts this test is about stand above them.
         let mut allowed: BTreeSet<String> = [stock, rate].into_iter().collect();
+        allowed.extend(state.flows(r).iter().map(|(_, f)| bare(*f)));
         let body: Vec<String> = lines_of(&shown)
             .into_iter()
             .skip(1)
+            .take_while(|l| l != FLOWS_IN && l != FLOWS_OUT)
             .map(|l| masked(&l))
             .collect();
         if cap.is_finite() {
@@ -3094,6 +3098,236 @@ fn a_stores_row_states_its_exact_stock_its_cap_or_none_and_its_net_rate_per_game
             "{r:?}: saying there is no cap must not read as a cap; it read:\n{shown}"
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-135 – TUI-NAV-139 — what moves a store
+// ---------------------------------------------------------------------------
+
+const FLOWS_IN: &str = "In, per game second:";
+const FLOWS_OUT: &str = "Out, per game second:";
+
+/// Tall enough that a store with many sources is never cut at the pane's foot,
+/// so a test about which lines are stated is never a test about height.
+const FLOWS_TALL: u16 = 90;
+
+/// The name a stores row gives a flow's source: an item by its flavor name,
+/// the kittens themselves by the roster's word for them.
+fn source_name(src: clowder_core::FlowSource) -> String {
+    use clowder_core::{content, FlowSource};
+    match src {
+        FlowSource::Structure(s) => structure_def(s).name.to_string(),
+        FlowSource::Job(j) => content::job_def(j).name.to_string(),
+        FlowSource::Craft(c) => content::craft_def(c).name.to_string(),
+        FlowSource::Arch(a) => content::arch_def(a).name.to_string(),
+        FlowSource::Kittens => "kittens".to_string(),
+    }
+}
+
+/// The In and Out lines a stores row should state for `r`: every flow the
+/// core reports that does not read `0`, as its name and its signed exact
+/// figure, in the core's order.
+fn expected_flow_lines(state: &GameState, r: ResourceId) -> (Vec<String>, Vec<String>) {
+    let mut ins = Vec::new();
+    let mut outs = Vec::new();
+    for (src, f) in state.flows(r) {
+        let size = fmt::exact(f.abs());
+        if size == "0" {
+            continue;
+        }
+        if f > 0.0 {
+            ins.push(format!("{} +{size}", source_name(src)));
+        } else {
+            outs.push(format!("{} -{size}", source_name(src)));
+        }
+    }
+    (ins, outs)
+}
+
+/// The lines a drawn stores row stands under each flow heading, and where the
+/// headings stand, if they do.
+struct DrawnFlows {
+    in_at: Option<usize>,
+    out_at: Option<usize>,
+    ins: Vec<String>,
+    outs: Vec<String>,
+    headings: usize,
+}
+
+fn drawn_flows(shown: &str) -> DrawnFlows {
+    let lines = lines_of(shown);
+    let in_at = lines.iter().position(|l| l == FLOWS_IN);
+    let out_at = lines.iter().position(|l| l == FLOWS_OUT);
+    let headings = lines
+        .iter()
+        .filter(|l| *l == FLOWS_IN || *l == FLOWS_OUT)
+        .count();
+    let ins = match in_at {
+        Some(i) => lines[i + 1..out_at.unwrap_or(lines.len()).max(i + 1)].to_vec(),
+        None => Vec::new(),
+    };
+    let outs = match out_at {
+        Some(o) => lines[o + 1..].to_vec(),
+        None => Vec::new(),
+    };
+    DrawnFlows {
+        in_at,
+        out_at,
+        ins,
+        outs,
+        headings,
+    }
+}
+
+/// [`world`] with kittens at work — one at a yielding job, one tinkering a
+/// recipe — and an arch upgrade whose drift moves a store, so jobs, crafts,
+/// and arches move stores beside the structures and the kittens themselves.
+fn working_world() -> GameState {
+    let mut s = world(true);
+    s.kittens[0].job = Some(JobId::Gardener);
+    s.kittens[1].job = Some(JobId::Tinkerer);
+    s.kittens[1].tinkering = Some(clowder_core::CraftId::Wands);
+    s.arches_bought.insert(clowder_core::ArchId::SkyArch);
+    s
+}
+
+fn stores_row_text(state: &GameState, r: ResourceId) -> String {
+    let key = RowKey::Resource(r);
+    assert_is_a_row(state, Section::Meadow, &key);
+    pane_text(state, &looking_at(Section::Meadow, key), WIDE, FLOWS_TALL)
+}
+
+/// Beneath the net rate, one line for each flow the core reports that does not
+/// read `0`: the source's name, spelled as its own row names it, and the
+/// core's own figure, signed as the net rate is — nothing added, split, or
+/// moved between sources. Quantified over every resource of a meadow where
+/// every kind of source moves some store.
+/// @spec TUI-NAV-135, TUI-NAV-138, TUI-NAV-139
+#[test]
+fn a_stores_row_states_each_flow_the_core_reports_by_its_sources_name_and_figure() {
+    use clowder_core::FlowSource;
+    let state = working_world();
+    let mut kinds_named: BTreeSet<&str> = BTreeSet::new();
+    for r in ResourceId::ALL {
+        let shown = stores_row_text(&state, r);
+        let (ins, outs) = expected_flow_lines(&state, r);
+        let drawn = drawn_flows(&shown);
+        assert_eq!(
+            drawn.ins, ins,
+            "{r:?}: the In lines are the core's flows above zero; it read:\n{shown}"
+        );
+        assert_eq!(
+            drawn.outs, outs,
+            "{r:?}: the Out lines are the core's flows below zero; it read:\n{shown}"
+        );
+        for (src, f) in state.flows(r) {
+            if fmt::exact(f.abs()) == "0" {
+                continue;
+            }
+            kinds_named.insert(match src {
+                FlowSource::Structure(_) => "structure",
+                FlowSource::Job(_) => "job",
+                FlowSource::Kittens => "kittens",
+                FlowSource::Craft(_) => "craft",
+                FlowSource::Arch(_) => "arch",
+            });
+        }
+    }
+    assert_eq!(
+        kinds_named.len(),
+        5,
+        "fixture: every kind of source should move some store; only {kinds_named:?} did"
+    );
+}
+
+/// In above Out, each heading only above a line of its own, and a store
+/// nothing moves stating its net rate alone.
+/// @spec TUI-NAV-136
+#[test]
+fn a_stores_row_heads_its_in_and_out_lines_and_draws_no_heading_above_nothing() {
+    let state = working_world();
+    let (mut both, mut one, mut neither) = (false, false, false);
+    for r in ResourceId::ALL {
+        let shown = stores_row_text(&state, r);
+        let (ins, outs) = expected_flow_lines(&state, r);
+        let drawn = drawn_flows(&shown);
+        assert_eq!(
+            drawn.in_at.is_some(),
+            !ins.is_empty(),
+            "{r:?}: the In heading stands exactly while a flow above zero does; it read:\n{shown}"
+        );
+        assert_eq!(
+            drawn.out_at.is_some(),
+            !outs.is_empty(),
+            "{r:?}: the Out heading stands exactly while a flow below zero does; it read:\n{shown}"
+        );
+        assert!(
+            drawn.headings <= 2,
+            "{r:?}: each heading stands once; it read:\n{shown}"
+        );
+        if let (Some(i), Some(o)) = (drawn.in_at, drawn.out_at) {
+            assert!(i < o, "{r:?}: In stands before Out; it read:\n{shown}");
+        }
+        match (ins.is_empty(), outs.is_empty()) {
+            (false, false) => both = true,
+            (true, true) => neither = true,
+            _ => one = true,
+        }
+    }
+    assert!(
+        both && one && neither,
+        "fixture: some store moved both ways, some one way, and some not at all \
+         (both {both}, one {one}, neither {neither})"
+    );
+}
+
+/// The lines keep the core's order whatever their figures: a structure stands
+/// before a job even where the job moves the store many times more.
+/// @spec TUI-NAV-137
+#[test]
+fn a_stores_rows_flow_lines_keep_the_cores_order_never_their_figures() {
+    use clowder_core::FlowSource;
+    let mut state = GameState::new(3);
+    state.structures[StructureId::CatnipPatch.ix()] = 1;
+    state.kittens = (0..6).map(named_kitten).collect();
+    for k in &mut state.kittens {
+        k.job = Some(JobId::Gardener);
+    }
+    state.resources[ResourceId::Catnip.ix()] = 1000.0;
+    let flows = state.flows(ResourceId::Catnip);
+    let patch = flows
+        .iter()
+        .find(|(s, _)| *s == FlowSource::Structure(StructureId::CatnipPatch))
+        .expect("fixture: the patch grows catnip")
+        .1;
+    let gardeners = flows
+        .iter()
+        .find(|(s, _)| *s == FlowSource::Job(JobId::Gardener))
+        .expect("fixture: the gardeners gather catnip")
+        .1;
+    assert!(
+        gardeners > patch,
+        "fixture: the gardeners should outpace the patch ({gardeners} vs {patch})"
+    );
+    let shown = stores_row_text(&state, ResourceId::Catnip);
+    let drawn = drawn_flows(&shown);
+    let names: Vec<String> = drawn
+        .ins
+        .iter()
+        .map(|l| {
+            l.rsplit_once(' ')
+                .map(|(n, _)| n.to_string())
+                .unwrap_or_default()
+        })
+        .collect();
+    assert_eq!(
+        names,
+        vec![
+            source_name(FlowSource::Structure(StructureId::CatnipPatch)),
+            source_name(FlowSource::Job(JobId::Gardener)),
+        ],
+        "the In lines stand in the core's order, the smaller flow first; it read:\n{shown}"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -3146,7 +3380,8 @@ fn ragged_world() -> GameState {
 
 /// On a stores row, the store's net rate is drawn in the exact form of its
 /// size behind `+` where it is above zero and `-` where it is below, and with
-/// no sign where it is zero — the one signed figure the row states.
+/// no sign where it is zero — the one signed figure the row states above the
+/// flows it is made of (TUI-NAV-135), whose lines carry signs of their own.
 /// Quantified over every resource, in meadows where stores gain, drain, and
 /// stand still.
 /// @spec TUI-RENDER-012
@@ -3163,7 +3398,12 @@ fn a_stores_rows_net_rate_is_its_exact_size_behind_its_sign() {
             let key = RowKey::Resource(r);
             assert_is_a_row(&state, Section::Meadow, &key);
             let shown = pane_text(&state, &looking_at(Section::Meadow, key), WIDE, TALL);
-            let signed: Vec<String> = signed_numbers(&shown)
+            let above_flows: String = shown
+                .lines()
+                .take_while(|l| l.trim() != FLOWS_IN && l.trim() != FLOWS_OUT)
+                .collect::<Vec<_>>()
+                .join("\n");
+            let signed: Vec<String> = signed_numbers(&above_flows)
                 .into_iter()
                 .filter(|t| t.starts_with('+') || t.starts_with('-'))
                 .collect();
