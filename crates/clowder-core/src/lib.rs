@@ -20,7 +20,7 @@ pub use command::{Command, CommandError};
 pub use effects::{limited_dr, unlimited_dr, Effect};
 pub use events::{Event, EventClass};
 pub use journal::{Journal, JournalEntry, JournalItem};
-pub use query::{FlowSource, LockReason};
+pub use query::{FlowSource, LockReason, Timer};
 pub use rng::Pcg32;
 pub use save::{
     begin_load, default_save_path, load_string, read_save, save_string, save_string_carrying,

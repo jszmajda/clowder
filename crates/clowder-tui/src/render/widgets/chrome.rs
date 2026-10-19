@@ -87,13 +87,13 @@ fn idle_here_count(state: &GameState) -> usize {
         .count()
 }
 
-/// Whether the sky-observation window is open right now — the core's own
-/// notion of "live", not merely "was set": a faded window is `Locked`.
-/// @spec TUI-NAV-020
+/// Whether a sky event waits to be observed right now — the core's own answer,
+/// so a window it has let fade is never drawn as live. @spec TUI-NAV-020
 fn sky_live(state: &GameState) -> bool {
     state
-        .pending_sky_event
-        .is_some_and(|expiry| state.ticks < expiry)
+        .timers()
+        .iter()
+        .any(|(t, _)| *t == clowder_core::Timer::SkyEvent)
 }
 
 /// The four attention opportunities, in the fixed order idle, sky, new, away,

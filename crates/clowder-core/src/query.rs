@@ -3,7 +3,8 @@
 //! The shell renders; the core rules. Anything whose answer is a rule is
 //! answered here even where a caller could assemble it from public state — a
 //! second copy of a rule drifts from the first the moment the rule changes.
-//! @spec SIM-ENG-030, SIM-ENG-031, SIM-ENG-032, SIM-ENG-033, SIM-ENG-062
+//! @spec SIM-ENG-030, SIM-ENG-031, SIM-ENG-032, SIM-ENG-033, SIM-ENG-062,
+//! SIM-ENG-069
 
 use std::collections::BTreeMap;
 
@@ -50,6 +51,19 @@ pub(crate) fn credit(
     if let Some(l) = ledger {
         l.credit(src, r, moved);
     }
+}
+
+/// A timed state the meadow can hold. The variant order is the order the
+/// timers query lists them in, so the derived `Ord` is load-bearing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Timer {
+    /// A visible sky event waiting to be observed.
+    SkyEvent,
+    /// A Star Whale's visit.
+    WhaleVisit,
+    Jamboree,
+    Zoomies,
+    DejaVuDay,
 }
 
 /// Why a piece of content is not currently actionable — data, not prose, on
@@ -140,5 +154,31 @@ impl GameState {
             .filter(|(_, moved)| moved[r.ix()] != 0.0)
             .map(|(src, moved)| (*src, moved[r.ix()] * per_second))
             .collect()
+    }
+
+    /// Every timed state running at the current tick, in `Timer` order, each
+    /// with the ticks until the first tick on which the rule that decides it
+    /// no longer holds, were nothing done meanwhile. Ticks, not seconds: how
+    /// long a tick lasts is the shell's cadence. @spec SIM-ENG-069, SIM-ENG-070
+    pub fn timers(&self) -> Vec<(Timer, u64)> {
+        let now = self.ticks;
+        let until = |end: u64| (now < end).then(|| end - now);
+        let year = crate::content::DAYS_PER_YEAR * crate::content::TICKS_PER_DAY;
+        // A visit loses a year at each year close; it ends at the close that
+        // takes its last. One standing on a close has already been counted.
+        let whale = (self.whale_visit_years > 0).then(|| {
+            let next_close = (now / year + 1) * year;
+            next_close - now + u64::from(self.whale_visit_years - 1) * year
+        });
+        [
+            (Timer::SkyEvent, self.pending_sky_event.and_then(until)),
+            (Timer::WhaleVisit, whale),
+            (Timer::Jamboree, until(self.jamboree_until)),
+            (Timer::Zoomies, until(self.zoomies_until)),
+            (Timer::DejaVuDay, until(self.deja_vu_until)),
+        ]
+        .into_iter()
+        .filter_map(|(t, left)| left.map(|n| (t, n)))
+        .collect()
     }
 }
