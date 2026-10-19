@@ -23,7 +23,10 @@ fn meadow() -> GameState {
 }
 
 fn left(s: &GameState, t: Timer) -> Option<u64> {
-    s.timers().into_iter().find(|(k, _)| *k == t).map(|(_, n)| n)
+    s.timers()
+        .into_iter()
+        .find(|(k, _)| *k == t)
+        .map(|(_, n)| n)
 }
 
 // @spec SIM-ENG-069
