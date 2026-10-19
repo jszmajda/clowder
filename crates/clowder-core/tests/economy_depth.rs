@@ -1466,14 +1466,20 @@ fn ideas_grant_their_tabled_unlocks_as_pure_lookups() {
 fn sky_events_roll_daily_per_ledge_and_sometimes_self_observe() {
     // 10 Ledges: 2% event chance per day close, 10% auto-observe. Over 6000
     // days expect ~120 events, ~12 auto-observed (~108 visible). Bounds stay
-    // generous against seed luck.
+    // generous against seed luck. A waiting event blocks the roll, so each
+    // one is let go the day it appears, to measure the roll and not the
+    // window.
     let mut s = GameState::new(156);
     grant(&mut s, StructureId::StargazingLedge, 10);
-    let events = run_days(&mut s, 6000);
-    let visible = events
-        .iter()
-        .filter(|e| matches!(e, Event::SkyEventVisible))
-        .count();
+    let mut visible = 0;
+    for _ in 0..6000 {
+        let events = run_days(&mut s, 1);
+        visible += events
+            .iter()
+            .filter(|e| matches!(e, Event::SkyEventVisible))
+            .count();
+        s.pending_sky_event = None;
+    }
     assert!(
         (50..=170).contains(&visible),
         "visible sky events over 6000 days: {visible}"
@@ -1537,18 +1543,59 @@ fn observe_sky_works_in_the_window_and_expired_events_fade() {
         CommandError::Locked
     );
 
-    // Left alone past the end of the next day, the event simply fades. Run
-    // forward until a 30-day stretch passes with no fresh visible event, so
-    // the only candidate is long expired.
-    let mut faded = s.clone();
-    loop {
-        let events = run_days(&mut faded, 30);
-        if !events.iter().any(|e| matches!(e, Event::SkyEventVisible)) {
-            break;
+    let err = faded_after_a_year();
+    assert_eq!(err, CommandError::Locked, "an expired event has faded");
+}
+
+/// Hunt a visible sky event tick by tick, so the tick of the day close that
+/// raised it is known exactly.
+fn visible_sky_event(seed: u64) -> (GameState, u64) {
+    let mut s = GameState::new(seed);
+    grant(&mut s, StructureId::StargazingLedge, 10);
+    for _ in 0..200_000 {
+        let events = run_ticks(&mut s, 1);
+        if events.iter().any(|e| matches!(e, Event::SkyEventVisible)) {
+            let raised = s.ticks;
+            return (s, raised);
         }
     }
-    let err = faded.apply(Command::ObserveSky).unwrap_err();
-    assert_eq!(err, CommandError::Locked, "an expired event has faded");
+    panic!("a 2%-per-day event must fire within 20000 days");
+}
+
+const YEAR_TICKS: u64 = content::DAYS_PER_YEAR * content::TICKS_PER_DAY;
+
+/// Left alone a full game year from the day close that raised it, the event
+/// simply fades.
+fn faded_after_a_year() -> CommandError {
+    let (mut s, _) = visible_sky_event(158);
+    run_ticks(&mut s, YEAR_TICKS);
+    s.apply(Command::ObserveSky).unwrap_err()
+}
+
+// @spec SIM-ENG-025
+#[test]
+fn a_visible_sky_event_stays_observable_for_one_game_year() {
+    let (s, raised) = visible_sky_event(158);
+    assert_eq!(raised % content::TICKS_PER_DAY, 0, "raised at a day close");
+
+    // The last tick of the year: still there to observe.
+    let mut late = s.clone();
+    run_ticks(&mut late, YEAR_TICKS - 1);
+    assert_eq!(late.ticks, raised + YEAR_TICKS - 1);
+    let skymaps_before = late.stock(ResourceId::Skymaps);
+    late.apply(Command::ObserveSky)
+        .expect("observable on the year's last tick");
+    assert!(late.stock(ResourceId::Skymaps) > skymaps_before);
+
+    // A year on, it has faded, and observing is a perfect no-op.
+    let mut gone = s.clone();
+    run_ticks(&mut gone, YEAR_TICKS);
+    let snapshot = gone.clone();
+    assert_eq!(
+        gone.apply(Command::ObserveSky).unwrap_err(),
+        CommandError::Locked
+    );
+    assert_eq!(gone, snapshot);
 }
 
 // =====================================================================

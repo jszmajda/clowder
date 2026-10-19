@@ -121,6 +121,9 @@ pub const SKY_EVENT_CHANCE_PER_LEDGE: f64 = 0.002; // per day close
 pub const SKY_AUTO_OBSERVE_PER_LEDGE: f64 = 0.01;
 pub const SKY_OBSERVE_CURIOSITY: f64 = 25.0; // × (1 + curiosity ratios)
 pub const SKY_OBSERVE_SKYMAPS: f64 = 1.0;
+/// How long a visible sky event stays observable: one game year from the
+/// day close that raised it — minutes of real time, long enough for a glance.
+pub const SKY_WINDOW_TICKS: u64 = DAYS_PER_YEAR * TICKS_PER_DAY;
 
 // ---- Energy ----
 // @spec SIM-ECO-035

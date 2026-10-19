@@ -1008,8 +1008,8 @@ impl GameState {
             // Someone happened to be looking up.
             self.grant_sky_observation();
         } else {
-            // Observable until the end of the next day.
-            self.pending_sky_event = Some((self.day() + 1) * content::TICKS_PER_DAY);
+            // Observable for a game year from this day close.
+            self.pending_sky_event = Some(self.ticks + content::SKY_WINDOW_TICKS);
             events.push(Event::SkyEventVisible);
         }
     }
