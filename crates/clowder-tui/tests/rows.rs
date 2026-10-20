@@ -1144,7 +1144,12 @@ fn marker_the_core_gives(state: &GameState, row: &Row) -> Option<char> {
     use clowder_core::LockReason;
     match (&row.kind, &row.key) {
         (RowKind::Display, _) => None,
-        (_, RowKey::Content(_, "tinker")) => Some('●'),
+        (_, RowKey::Content(ContentId::Craft(c), "tinker")) => {
+            Some(match state.tinkerer_bind_reason(*c) {
+                None => '●',
+                Some(_) => '○',
+            })
+        }
         (_, RowKey::Content(id, _)) => Some(match state.lock_reason(*id) {
             Some(LockReason::AlreadyYours) => '✓',
             None => '●',
@@ -1417,7 +1422,7 @@ fn every_row_the_core_reports_no_lock_reason_for_wears_ready_whatever_the_stock(
                     }
                     "a craft's tinkerer count row"
                 }
-                RowKey::Content(..) => continue,
+                RowKey::Content(..) | RowKey::Bench => continue,
                 RowKey::Fixed("Pounce") => "the fixed count-taking row priced per unit",
                 RowKey::Fixed(_) => "a fixed action row",
                 RowKey::Kitten(..) => "a kitten's row",
@@ -2627,6 +2632,8 @@ enum GroupKind {
     Ideas,
     Refinements,
     Rules,
+    /// The tinkerers' bench (TUI-NAV-156).
+    Tinkerers,
     Crafts,
     Rites,
     Arches,
@@ -2672,6 +2679,7 @@ fn group_kind(row: &Row) -> Option<GroupKind> {
         RowKey::Colony(..) => GroupKind::Colonies,
         RowKey::Site(_) => GroupKind::Sites,
         RowKey::Adventure(_) => GroupKind::Adventures,
+        RowKey::Bench => GroupKind::Tinkerers,
     })
 }
 
@@ -2682,7 +2690,7 @@ fn design_groups(section: Section) -> Vec<GroupKind> {
         Section::Meadow => vec![ThingsToDo, Structures, Stores],
         Section::Clowder => vec![Jobs, ThingsToDo, Kittens],
         Section::Ideas => vec![Ideas, Refinements, Rules, Done],
-        Section::Crafts => vec![Crafts],
+        Section::Crafts => vec![Tinkerers, Crafts],
         Section::Sunbeams => vec![ThingsToDo, Rites],
         Section::Wonders => vec![ThingsToDo, Arches],
         Section::Friends => vec![Colonies, ThingsToDo],
@@ -2769,6 +2777,7 @@ fn place_in_group(state: &GameState, section: Section, row: &Row) -> Option<usiz
         RowKey::Site(s) => Some(position_in(&SiteId::ALL, s)),
         RowKey::Adventure(None) => Some(0),
         RowKey::Adventure(Some(a)) => Some(1 + position_in(&clowder_core::AdventureId::ALL, a)),
+        RowKey::Bench => Some(0),
     }
 }
 
@@ -3004,7 +3013,7 @@ fn a_sections_groups_stand_in_the_designs_fixed_order_whichever_are_listed() {
 /// after every gate the core reports, a teased row counting — is headed by
 /// exactly one header directly above its first row, the first group included;
 /// no header stands above an empty group, so none stands alone, at the list's
-/// end, or above another header; and the one-group section (Crafts) lists no
+/// end, or above another header; and a one-group section, were there one, lists no
 /// header at all. A section that lists no row the cursor can land on lists
 /// nothing. Quantified over every section of every meadow in the spread — which
 /// reaches a group listing only a teased row and a group whose rows are all

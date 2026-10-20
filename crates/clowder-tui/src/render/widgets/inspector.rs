@@ -89,6 +89,7 @@ fn full_name(state: &GameState, key: &RowKey) -> String {
                 name.to_string()
             }
         }
+        RowKey::Bench => crate::nav::rows::BENCH_NAME.to_string(),
         RowKey::Fixed(tag) => humanize(tag),
     }
 }
@@ -183,6 +184,13 @@ fn structure_statement(s: clowder_core::StructureId) -> Pieces {
 
     if d.housing != 0 {
         parts.push(plain(format!("Houses {} kittens.", d.housing)));
+    }
+    if d.tinkerer_seats != 0 {
+        parts.push(plain(format!(
+            "Seats {} {}.",
+            d.tinkerer_seats,
+            tinkerer_noun(d.tinkerer_seats)
+        )));
     }
     for (r, amt) in d.cap_bonuses {
         parts.push(vec![
@@ -544,8 +552,13 @@ fn content_lines(
                 state, row, &p.digits,
             ));
         }
-        // A tinkerer count row binds rather than makes: no next cost, no
-        // reason — the core reports neither for it.
+        // A tinkerer count row binds rather than makes: no next cost, and the
+        // bind's own reason rather than the recipe's. @spec TUI-NAV-160
+        if let ContentId::Craft(c) = id {
+            if let Some(reason) = state.tinkerer_bind_reason(c) {
+                out.push(bind_reason_pieces(&reason));
+            }
+        }
         return out;
     }
 
@@ -566,6 +579,79 @@ fn content_lines(
         out.push(lock_reason_pieces(r));
     }
 
+    out
+}
+
+/// Why a bind would be refused, in the bind's own words: its no-one-free and
+/// no-room mean a kitten holding the Tinkerer job and a seat, not a kitten
+/// free for any job or room in general. @spec TUI-NAV-160
+fn bind_reason_pieces(reason: &LockReason) -> Pieces {
+    match reason {
+        LockReason::NoOneFree => plain("No tinkerer is waiting for a seat.".to_string()),
+        LockReason::NoRoom => plain("Every seat at the bench is taken.".to_string()),
+        other => lock_reason_pieces(other),
+    }
+}
+
+/// `tinkerer` for one, `tinkerers` for any other count.
+fn tinkerer_noun(n: u32) -> &'static str {
+    if n == 1 {
+        "tinkerer"
+    } else {
+        "tinkerers"
+    }
+}
+
+/// Two blank columns that wrapping never trims, so a line set in beneath a
+/// heading keeps its indent.
+const INDENT: &str = "\u{a0}\u{a0}";
+
+/// The tinkerers' bench, read from the core's bench query and the kittens'
+/// names and homes as state holds them: the seats; each revealed structure
+/// that gives seats, with its seats per copy and its copies; who sits where;
+/// and who waits. @spec TUI-NAV-158, TUI-NAV-159
+fn bench_lines(state: &GameState) -> Vec<Pieces> {
+    let bench = state.bench();
+    let taken = bench.seated.len() as u32;
+    let mut out = vec![plain(format!(
+        "Seats: {} — {} taken, {} free.",
+        bench.seats,
+        taken,
+        bench.seats.saturating_sub(taken)
+    ))];
+    for s in clowder_core::StructureId::ALL {
+        let per = content::structure_def(s).tinkerer_seats;
+        let id = ContentId::Structure(s);
+        if per == 0 || state.availability(id) == clowder_core::Availability::Hidden {
+            continue;
+        }
+        out.push(plain(format!(
+            "Each {} seats {per} {}. Owned: {}.",
+            content_name(id),
+            tinkerer_noun(per),
+            state.structures[s.ix()]
+        )));
+    }
+    if !bench.seated.is_empty() {
+        out.push(plain("At the bench:".to_string()));
+        for (ix, c) in &bench.seated {
+            let away = state.kittens[*ix].location != clowder_core::Location::Home;
+            out.push(plain(format!(
+                "{INDENT}{} — {}{}",
+                full_name(state, &RowKey::Kitten(*ix, "")),
+                content_name(ContentId::Craft(*c)),
+                if away { " (visiting)" } else { "" }
+            )));
+        }
+    }
+    if !bench.waiting.is_empty() {
+        let names: Vec<String> = bench
+            .waiting
+            .iter()
+            .map(|ix| full_name(state, &RowKey::Kitten(*ix, "")))
+            .collect();
+        out.push(plain(format!("Waiting for a seat: {}.", names.join(", "))));
+    }
     out
 }
 
@@ -801,6 +887,10 @@ fn draw_body(
         RowKey::Resource(r) => {
             lines.push(Vec::new());
             lines.extend(store_lines(state, *r));
+        }
+        RowKey::Bench => {
+            lines.push(Vec::new());
+            lines.extend(bench_lines(state));
         }
         _ => {
             if let Some(p) = on_this_row {

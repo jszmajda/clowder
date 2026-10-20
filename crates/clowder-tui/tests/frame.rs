@@ -883,9 +883,8 @@ fn header_words_for(row: &Row) -> &'static str {
         RowKey::Content(ContentId::Arch(_), _) => "arches",
         RowKey::Content(ContentId::Tradition(_), _) => "traditions",
         RowKey::Content(ContentId::DreamLoom(_), _) => "loom upgrades",
-        RowKey::Content(ContentId::Craft(_), _) => {
-            panic!("the one-group section's rows wear no header")
-        }
+        RowKey::Content(ContentId::Craft(_), _) => "crafts",
+        RowKey::Bench => "tinkerers",
         RowKey::Resource(_) => "stores",
         RowKey::Kitten(..) => "kittens",
         RowKey::Colony(..) => "colonies",
@@ -896,10 +895,11 @@ fn header_words_for(row: &Row) -> &'static str {
 
 /// Every (section, header words) the design gives a several-group section.
 fn designed_headers() -> BTreeSet<(usize, &'static str)> {
-    let table: [(Section, &[&str]); 9] = [
+    let table: [(Section, &[&str]); 10] = [
         (Section::Meadow, &["things to do", "structures", "stores"]),
         (Section::Clowder, &["jobs", "things to do", "kittens"]),
         (Section::Ideas, &["ideas", "refinements", "rules"]),
+        (Section::Crafts, &["tinkerers", "crafts"]),
         (Section::Sunbeams, &["things to do", "rites"]),
         (Section::Wonders, &["things to do", "arches"]),
         (Section::Friends, &["colonies", "things to do"]),
@@ -1877,13 +1877,14 @@ fn every_list_row_draws_its_count_and_cost_in_fixed_fields_at_its_right() {
                                 "{at}: a blank column before the first field.\n{drawn:?}"
                             );
                         }
-                        if matches!(row.key, RowKey::Kitten(..)) {
+                        if matches!(row.key, RowKey::Kitten(..) | RowKey::Bench) {
                             // A kitten's row states neither heading; its
                             // fields' place carries the kitten's state
                             // instead, swept over every state, width, and
                             // cursor by
                             // `every_kitten_row_names_its_one_state_whole_in_its_fields_place`
-                            // (TUI-RENDER-024).
+                            // (TUI-RENDER-024). The bench's carries its
+                            // seats, swept in `bench.rs` (TUI-RENDER-028).
                             continue;
                         }
                         if counted {

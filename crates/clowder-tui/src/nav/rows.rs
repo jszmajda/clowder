@@ -38,6 +38,9 @@ pub enum RowKey {
     /// pair can never be focused, remembered, or inspected, because the cursor
     /// resolves by first match.
     Kitten(usize, &'static str),
+    /// The tinkerers' bench: the one row about the tinkerers as a whole.
+    /// @spec TUI-NAV-156
+    Bench,
     /// A group header or a fixed row that is not content.
     Fixed(&'static str),
 }
@@ -78,6 +81,10 @@ impl Row {
         !matches!(self.kind, RowKind::Group)
     }
 }
+
+/// The tinkerers' bench's name — what its row draws, the palette finds, and
+/// the inspector names. @spec TUI-NAV-156
+pub const BENCH_NAME: &str = "Tinkerers' bench";
 
 /// The plain-word label a later row of a multi-row item draws in its name
 /// column, and states in the inspector beneath the item's name, in place of
@@ -391,7 +398,24 @@ pub fn ideas_place(key: &RowKey) -> Option<(usize, usize)> {
     }
 }
 
+/// The Crafts list: the tinkerers' bench in a group of its own, listed while
+/// the Tinkerer job is, then every revealed craft's make and tinkerer rows.
+/// @spec TUI-NAV-156, TUI-NAV-098
 fn crafts_rows(state: &GameState) -> Vec<Row> {
+    let mut bench = Vec::new();
+    if revealed(state, ContentId::Job(JobId::Tinkerer)) {
+        bench.push(Row {
+            key: RowKey::Bench,
+            kind: RowKind::Display,
+            heavy: false,
+        });
+    }
+    let mut out = headed_group(state, "tinkerers", bench);
+    out.extend(headed_group(state, "crafts", craft_rows(state)));
+    out
+}
+
+fn craft_rows(state: &GameState) -> Vec<Row> {
     let mut out = Vec::new();
     for c in CraftId::ALL {
         let id = ContentId::Craft(c);

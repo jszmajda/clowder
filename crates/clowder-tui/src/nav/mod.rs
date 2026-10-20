@@ -37,6 +37,19 @@ fn spaced_lower(tag: &str) -> String {
     out
 }
 
+/// A refusal of `cmd` in words a player can act on: the error's own wording,
+/// save where an error means something narrower for this command — a bind
+/// wants a kitten already holding the Tinkerer job, and a seat, not any kitten
+/// free for any job. @spec TUI-NAV-161, TUI-NAV-014
+pub fn plain_rejection(cmd: &clowder_core::Command, e: &clowder_core::CommandError) -> String {
+    use clowder_core::{Command as C, CommandError as E};
+    match (cmd, e) {
+        (C::AssignTinkerer(_), E::NoIdleKittens) => "no tinkerer is waiting for a seat".into(),
+        (C::AssignTinkerer(_), E::NoSeats) => "no room at the bench".into(),
+        _ => plain_error(e),
+    }
+}
+
 /// A command rejection in words a player can act on.
 ///
 /// The core reports rejections as typed data precisely so the shell can say

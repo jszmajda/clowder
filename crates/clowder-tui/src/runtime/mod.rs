@@ -648,7 +648,7 @@ impl App {
                             }
                             Err(e) => {
                                 self.view.footer = Some((
-                                    crate::nav::plain_error(&e),
+                                    crate::nav::plain_rejection(&cmd, &e),
                                     Instant::now() + std::time::Duration::from_secs(4),
                                 ));
                             }
@@ -674,7 +674,7 @@ impl App {
                                 }
                             }
                             if let Some(e) = rejection {
-                                let why = crate::nav::plain_error(&e);
+                                let why = crate::nav::plain_rejection(&cmd, &e);
                                 let message = if done == 0 {
                                     why
                                 } else if n == crate::nav::update::MAX_AFFORDABLE_CAP {

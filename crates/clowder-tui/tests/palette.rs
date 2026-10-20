@@ -200,6 +200,7 @@ enum Item {
     Site(SiteId),
     Adventure(Option<AdventureId>),
     Kitten(usize),
+    Bench,
     Fixed(&'static str),
 }
 
@@ -211,6 +212,7 @@ fn item_of(key: &RowKey) -> Item {
         RowKey::Site(s) => Item::Site(*s),
         RowKey::Adventure(a) => Item::Adventure(*a),
         RowKey::Kitten(ix, _) => Item::Kitten(*ix),
+        RowKey::Bench => Item::Bench,
         RowKey::Fixed(tag) => Item::Fixed(tag),
     }
 }

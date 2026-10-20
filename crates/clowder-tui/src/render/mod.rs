@@ -186,11 +186,17 @@ fn marker_for(state: &GameState, row: &Row) -> Option<(&'static str, Role)> {
     let RowKey::Content(id, tag) = &row.key else {
         return Some(("●", Role::Ready));
     };
-    // A craft's tinkerer count row carries no price of its own to fall short
-    // on — it wears the same marker as any actionable row with no content
-    // item, whatever the craft's own lock reason.
+    // A craft's tinkerer count row binds rather than makes: its marker is the
+    // bind's, whatever the craft's own lock reason, and a bind has no price
+    // to cover in part. @spec TUI-NAV-053
     if *tag == "tinker" {
-        return Some(("●", Role::Ready));
+        let ContentId::Craft(c) = id else {
+            return Some(("●", Role::Ready));
+        };
+        return Some(match state.tinkerer_bind_reason(*c) {
+            None => ("●", Role::Ready),
+            Some(_) => ("○", Role::Dim),
+        });
     }
     let (glyph, role) = match state.lock_reason(*id) {
         Some(LockReason::AlreadyYours) => ("✓", Role::Dim),
@@ -499,6 +505,7 @@ fn row_label(state: &GameState, row: &Row) -> String {
                 name.to_string()
             }
         }
+        RowKey::Bench => crate::nav::rows::BENCH_NAME.to_string(),
         RowKey::Fixed(tag) => humanize(tag),
     }
 }
@@ -813,6 +820,15 @@ fn row_line(
             " {:<place$}",
             kitten_state_word(state, ix)
         )));
+    } else if row.key == RowKey::Bench {
+        // The bench states no count or cost either; its seats stand in their
+        // place, as a kitten's word does. @spec TUI-RENDER-028
+        let total = fixed - (cursor.chars().count() + 2);
+        let place = total.saturating_sub(1);
+        suffix.push(Piece::plain(format!(
+            " {:<place$}",
+            bench_summary(state, place)
+        )));
     } else {
         if counted {
             suffix.push(Piece::plain(format!(
@@ -935,6 +951,26 @@ fn kitten_state_word(state: &GameState, ix: usize) -> String {
         content::job_def(j).name.to_string()
     } else {
         IDLE_WORD.to_string()
+    }
+}
+
+/// The tinkerers' bench at a glance: the bindings, the seats, and — where any
+/// Tinkerer waits — how many, as the core's bench query reports them. Where
+/// the place cannot hold it all, the waiting clause gives way whole, the
+/// inspector naming every waiting kitten; the seats are cut only as a name is.
+/// @spec TUI-NAV-157, TUI-RENDER-028
+fn bench_summary(state: &GameState, place: usize) -> String {
+    let bench = state.bench();
+    let seats = format!("{}/{} seats taken", bench.seated.len(), bench.seats);
+    let full = if bench.waiting.is_empty() {
+        seats.clone()
+    } else {
+        format!("{seats} · {} waiting", bench.waiting.len())
+    };
+    if full.chars().count() <= place {
+        full
+    } else {
+        fmt::fit(&seats, place)
     }
 }
 

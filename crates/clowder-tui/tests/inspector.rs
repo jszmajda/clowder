@@ -1852,6 +1852,9 @@ fn structure_fields(s: StructureId) -> Vec<(String, Vec<String>)> {
     if d.housing != 0 {
         out.push(("housing".into(), vec![bare(d.housing as f64)]));
     }
+    if d.tinkerer_seats != 0 {
+        out.push(("tinkerer seats".into(), vec![bare(d.tinkerer_seats as f64)]));
+    }
     for (r, a) in d.cap_bonuses {
         out.push((format!("storage for {r:?}"), vec![bare(*a)]));
     }
@@ -2452,7 +2455,8 @@ fn rows_whose_definition_states_nothing_carry_no_statement_and_no_stand_in() {
 }
 
 /// A row whose action has no content definition — a fixed action, a kitten's
-/// rows, a site, an adventure, a pen pal — has nothing to state beyond its name:
+/// rows, a site, an adventure, a pen pal — has nothing to state beyond its name
+/// (the tinkerers' bench, which states the seats, is swept in `bench.rs`):
 /// no statement, no stand-in, no price, no reason — save, on a row the list
 /// draws with a label in its name's place, that label (TUI-NAV-091). (Pounce
 /// and Trade rows state the core's one-unit price instead, TUI-NAV-073.)
@@ -2463,7 +2467,10 @@ fn a_row_with_no_definition_states_only_its_name() {
     let mut checked = 0;
     for state in [world(true), world(false)] {
         for (section, row) in every_row(&state) {
-            if matches!(row.key, RowKey::Content(..) | RowKey::Resource(_)) {
+            if matches!(
+                row.key,
+                RowKey::Content(..) | RowKey::Resource(_) | RowKey::Bench
+            ) {
                 continue;
             }
             if let RowKind::Act { command, .. } = &row.kind {
