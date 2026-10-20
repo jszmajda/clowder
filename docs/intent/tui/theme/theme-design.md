@@ -38,7 +38,7 @@ Six roles. Every value sits in a mid-luminance band so it clears the contrast fl
 | Role | Value | Carries |
 |---|---|---|
 | *(inherited)* | terminal foreground | All ordinary text — counts, costs, prose, and every name that wears no coat |
-| `dim` | `#7C7873` | Revealed but not actionable, owned and done, flavour events, a list's group-header rules, spent hints |
+| `dim` | `#7C7873` | Revealed but not actionable, owned and done, flavour events, a list's group-header rules and the inspector's `last time` divider, spent hints |
 | `ready` | `#3E8E5A` | ● affordable now |
 | `partial` | `#A8802F` | ◐ partially affordable |
 | `attention` | `#C0663A` | Each attention chip whole, the `full` tag on a capped store, a sidebar note's count of capped stores out of view, an armed row's expansion beneath it — and nothing else |

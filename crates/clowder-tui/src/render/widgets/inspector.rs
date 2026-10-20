@@ -654,18 +654,20 @@ fn store_lines(state: &GameState, r: ResourceId) -> Vec<Pieces> {
     lines
 }
 
-/// What the row's act brought home the newest time the core's journal holds
-/// it: on the Pounce row the newest pounce, on a Trade row the newest trade
-/// with the row's colony. Read from the journal every frame, so nothing is
-/// kept here, and nothing is stated where the journal holds no such act.
+/// What the row's act brought home the last time it was taken: its newest
+/// return in the core's journal — on the Pounce row a pounce's, on a Trade row
+/// a trade's with the row's colony — added up with every other return of that
+/// act at the same tick, since one press (`X` making one call per unit) takes
+/// all its calls between two ticks. Read from the journal every frame, so
+/// nothing is kept here; nothing is stated where the journal holds no such
+/// act. The caller sets the lines beneath the `last time` divider.
 /// @spec TUI-NAV-148, TUI-NAV-149, TUI-THEME-019
 fn last_time_lines(state: &GameState, command: &Command) -> Vec<Pieces> {
-    let newest = state
-        .journal
-        .iter_chronological()
-        .into_iter()
-        .rev()
-        .find_map(|entry| match (&entry.item, command) {
+    // One return of the row's act: squads or caravans sent, what it raised,
+    // caravans napped.
+    type Return = (u32, Vec<(ResourceId, f64)>, u32);
+    let returned = |item: &JournalItem| -> Option<Return> {
+        match (item, command) {
             (
                 JournalItem::Happened(Event::PounceReturned {
                     squads,
@@ -676,7 +678,6 @@ fn last_time_lines(state: &GameState, command: &Command) -> Vec<Pieces> {
                 }),
                 Command::Pounce(_),
             ) => Some((
-                "squad",
                 *squads,
                 super::overlays::pounce_haul(*feathers, *bells, *shinies, *unicorns),
                 0,
@@ -689,17 +690,46 @@ fn last_time_lines(state: &GameState, command: &Command) -> Vec<Pieces> {
                     goods,
                 }),
                 Command::Trade(row_colony, _),
-            ) if colony == row_colony => Some(("caravan", *caravans, goods.clone(), *napped)),
+            ) if colony == row_colony => Some((*caravans, goods.clone(), *napped)),
             _ => None,
-        });
-    let Some((noun, sent, goods, napped)) = newest else {
+        }
+    };
+    let noun = match command {
+        Command::Pounce(_) => "squad",
+        _ => "caravan",
+    };
+
+    let entries = state.journal.iter_chronological();
+    let Some(tick) = entries
+        .iter()
+        .rev()
+        .find(|e| returned(&e.item).is_some())
+        .map(|e| e.tick)
+    else {
         return Vec::new();
     };
+    let (mut sent, mut napped) = (0u32, 0u32);
+    let mut raised = [0.0f64; ResourceId::ALL.len()];
+    for (n, goods, slept) in entries
+        .iter()
+        .filter(|e| e.tick == tick)
+        .filter_map(|e| returned(&e.item))
+    {
+        sent += n;
+        napped += slept;
+        for (r, amount) in goods {
+            raised[r.ix()] += amount;
+        }
+    }
+    let goods: Vec<(ResourceId, f64)> = ResourceId::ALL
+        .into_iter()
+        .map(|r| (r, raised[r.ix()]))
+        .filter(|(_, amount)| *amount > 0.0)
+        .collect();
+
     let plural = if sent == 1 { "" } else { "s" };
     let close = if goods.is_empty() { "." } else { " with:" };
-    let mut out = vec![plain(format!(
-        "Last time, {sent} {noun}{plural} came home{close}"
-    ))];
+    let mut out = vec![plain(format!("{sent} {noun}{plural} came home{close}"))];
     for (r, amount) in goods {
         out.push(vec![
             resource(r),
@@ -751,6 +781,7 @@ fn draw_body(
     // there — never on its own line, only on what it expands to.
     // @spec TUI-NAV-077, TUI-THEME-011
     let mut attention_rows: Option<std::ops::Range<usize>> = None;
+    let mut dim_rows: Vec<usize> = Vec::new();
     if let Some(armed) = armed.filter(|a| a.key == *key && crate::render::armed_is_live(a)) {
         let start = lines.len();
         lines.push(Vec::new());
@@ -784,9 +815,16 @@ fn draw_body(
                 }
             }
             if let RowKind::Act { command, .. } = &row.kind {
+                // The history is set apart from what the row is by a dim
+                // divider drawn as a list's group header. @spec TUI-NAV-148
                 let last = last_time_lines(state, command);
                 if !last.is_empty() {
                     lines.push(Vec::new());
+                    dim_rows.push(lines.len());
+                    lines.push(plain(fmt::group_header_line(
+                        "last time",
+                        area.width as usize,
+                    )));
                     lines.extend(last);
                 }
             }
@@ -794,14 +832,18 @@ fn draw_body(
     }
 
     // An attention line wears attention whole, every name in it included
-    // (TUI-THEME-020); every other line is the inherited foreground with each
-    // resource's name in its coat (TUI-THEME-019).
+    // (TUI-THEME-020); the divider wears `dim` whole, as a group header does;
+    // every other line is the inherited foreground with each resource's name
+    // in its coat (TUI-THEME-019).
     let out: Vec<Line<'static>> = lines
         .into_iter()
         .enumerate()
         .map(|(i, l)| match &attention_rows {
             Some(r) if r.contains(&i) => {
                 Line::styled(pieces_text(&l), crate::render::style_for(Role::Attention))
+            }
+            _ if dim_rows.contains(&i) => {
+                Line::styled(pieces_text(&l), crate::render::style_for(Role::Dim))
             }
             _ => line_from_pieces(&l, ratatui::style::Style::default(), true, usize::MAX),
         })

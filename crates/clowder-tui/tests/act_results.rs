@@ -272,16 +272,30 @@ fn trade_row(c: ColonyId) -> RowKey {
     RowKey::Colony(c, "trade")
 }
 
-/// The lines from `Last time` down, as drawn.
+/// Where the divider stands among the inspector's lines, if it is drawn.
+fn divider_at(lines: &[String]) -> Option<usize> {
+    lines.iter().position(|l| l.starts_with("── last time"))
+}
+
+/// The lines beneath the divider, down to the first blank.
 fn last_time(lines: &[String]) -> Vec<String> {
-    match lines.iter().position(|l| l.starts_with("Last time")) {
-        Some(at) => lines[at..]
+    match divider_at(lines) {
+        Some(at) => lines[at + 1..]
             .iter()
             .take_while(|l| !l.is_empty())
             .cloned()
             .collect(),
         None => Vec::new(),
     }
+}
+
+/// A meadow whose journal holds each event at its own tick.
+fn journaled_at(events: &[(u64, Event)]) -> GameState {
+    let mut s = journaled(&[]);
+    for (tick, e) in events {
+        s.journal.record(*tick, e);
+    }
+    s
 }
 
 /// The Pounce row states the newest pounce's haul — never an older one's —
@@ -293,10 +307,72 @@ fn the_pounce_row_states_what_the_newest_pounce_brought_home() {
     let state = journaled(&[pounce(9, 50.0, 50.0, 50.0, 5), pounce(3, 12.5, 4.0, 0.0, 1)]);
     let got = last_time(&inspector_lines(&state, Section::Clowder, pounce_row()));
     let want = vec![
-        "Last time, 3 squads came home with:".to_string(),
+        "3 squads came home with:".to_string(),
         format!("{} +{}", label(ResourceId::Feathers), fmt::exact(12.5)),
         format!("{} +{}", label(ResourceId::Bells), fmt::exact(4.0)),
         format!("{} +{}", label(ResourceId::Unicorns), fmt::exact(1.0)),
+    ];
+    assert_eq!(got, want);
+}
+
+/// One press of `X` makes one call per squad, every one at the same tick: the
+/// last time adds up all of them, and none from an earlier press.
+/// @spec TUI-NAV-148
+#[test]
+fn the_last_time_adds_up_every_return_of_the_newest_press() {
+    let state = journaled_at(&[
+        (100, pounce(1, 9.0, 9.0, 9.0, 9)),
+        (200, pounce(1, 3.0, 0.0, 0.5, 0)),
+        (
+            200,
+            trade(ColonyId::Otters, 1, 0, &[(ResourceId::Twigs, 5.0)]),
+        ),
+        (200, pounce(1, 4.0, 2.0, 0.0, 1)),
+    ]);
+    let got = last_time(&inspector_lines(&state, Section::Clowder, pounce_row()));
+    let want = vec![
+        "2 squads came home with:".to_string(),
+        format!("{} +{}", label(ResourceId::Shinies), fmt::exact(0.5)),
+        format!("{} +{}", label(ResourceId::Feathers), fmt::exact(7.0)),
+        format!("{} +{}", label(ResourceId::Bells), fmt::exact(2.0)),
+        format!("{} +{}", label(ResourceId::Unicorns), fmt::exact(1.0)),
+    ];
+    assert_eq!(got, want);
+
+    let state = journaled_at(&[
+        (
+            100,
+            trade(ColonyId::Otters, 1, 0, &[(ResourceId::Catnip, 99.0)]),
+        ),
+        (
+            200,
+            trade(ColonyId::Otters, 1, 0, &[(ResourceId::Twigs, 5.0)]),
+        ),
+        (
+            200,
+            trade(ColonyId::Foxes, 1, 0, &[(ResourceId::Pebbles, 8.0)]),
+        ),
+        (200, trade(ColonyId::Otters, 1, 1, &[])),
+        (
+            200,
+            trade(
+                ColonyId::Otters,
+                1,
+                0,
+                &[(ResourceId::Catnip, 2.0), (ResourceId::Twigs, 1.5)],
+            ),
+        ),
+    ]);
+    let got = last_time(&inspector_lines(
+        &state,
+        Section::Friends,
+        trade_row(ColonyId::Otters),
+    ));
+    let want = vec![
+        "3 caravans came home with:".to_string(),
+        format!("{} +{}", label(ResourceId::Catnip), fmt::exact(2.0)),
+        format!("{} +{}", label(ResourceId::Twigs), fmt::exact(6.5)),
+        "1 of them napped.".to_string(),
     ];
     assert_eq!(got, want);
 }
@@ -312,7 +388,7 @@ fn one_squad_or_caravan_is_counted_in_the_singular() {
     let p = last_time(&inspector_lines(&state, Section::Clowder, pounce_row()));
     assert_eq!(
         p.first().map(String::as_str),
-        Some("Last time, 1 squad came home with:")
+        Some("1 squad came home with:")
     );
     let t = last_time(&inspector_lines(
         &state,
@@ -321,7 +397,7 @@ fn one_squad_or_caravan_is_counted_in_the_singular() {
     ));
     assert_eq!(
         t.first().map(String::as_str),
-        Some("Last time, 1 caravan came home with:")
+        Some("1 caravan came home with:")
     );
 }
 
@@ -346,7 +422,7 @@ fn a_trade_row_states_its_own_colonys_newest_trade() {
         trade_row(ColonyId::Otters),
     ));
     let want = vec![
-        "Last time, 5 caravans came home with:".to_string(),
+        "5 caravans came home with:".to_string(),
         format!("{} +{}", label(ResourceId::Catnip), fmt::exact(30.0)),
         format!("{} +{}", label(ResourceId::Twigs), fmt::exact(120.0)),
         "2 of them napped.".to_string(),
@@ -371,25 +447,22 @@ fn an_act_that_raised_nothing_says_only_that_it_came_home() {
     assert_eq!(
         t,
         vec![
-            "Last time, 5 caravans came home.".to_string(),
+            "5 caravans came home.".to_string(),
             "5 of them napped.".to_string()
         ]
     );
     let p = last_time(&inspector_lines(&state, Section::Clowder, pounce_row()));
-    assert_eq!(p, vec!["Last time, 2 squads came home.".to_string()]);
+    assert_eq!(p, vec!["2 squads came home.".to_string()]);
 }
 
-/// The last time stands beneath the row's price: below every other line the
-/// inspector draws for the row.
+/// The last time stands beneath the row's price, set apart by its divider:
+/// below every other line the inspector draws for the row.
 /// @spec TUI-NAV-148
 #[test]
-fn the_last_time_stands_beneath_the_price() {
+fn the_last_time_stands_beneath_the_price_under_its_divider() {
     let state = journaled(&[pounce(3, 12.5, 4.0, 0.0, 1)]);
     let all = inspector_lines(&state, Section::Clowder, pounce_row());
-    let at = all
-        .iter()
-        .position(|l| l.starts_with("Last time"))
-        .expect("a last time is stated");
+    let at = divider_at(&all).expect("a divider stands above the last time");
     let price = all
         .iter()
         .position(|l| l.contains(&label(ResourceId::Pep)))
@@ -400,15 +473,39 @@ fn the_last_time_stands_beneath_the_price() {
         all.join("\n")
     );
     let block = last_time(&all).len();
+    assert!(block > 0, "lines stand beneath the divider");
     assert!(
-        all[at + block..].iter().all(|l| l.is_empty()),
+        all[at + 1 + block..].iter().all(|l| l.is_empty()),
         "nothing is drawn beneath the last time:\n{}",
         all.join("\n")
     );
 }
 
-/// Where the journal holds no such act, the row states no last time — not
-/// another act's, and not another colony's.
+/// The divider is a group header's line across the inspector's width, with
+/// the words `last time`, every cell in `dim`.
+/// @spec TUI-NAV-148
+#[test]
+fn the_divider_is_a_dim_group_header_across_the_inspector() {
+    let state = journaled(&[pounce(3, 12.5, 4.0, 0.0, 1)]);
+    let rect = inspector_rect();
+    let buf = inspector_buf(&state, Section::Clowder, pounce_row());
+    let all = lines(&buf, rect);
+    let at = divider_at(&all).expect("a divider");
+    assert_eq!(
+        all[at],
+        fmt::group_header_line("last time", rect.width as usize)
+    );
+    let dim = clowder_tui::theme::Role::Dim
+        .color()
+        .expect("dim has a colour");
+    for x in rect.x..rect.right() {
+        let cell = buf.cell((x, rect.y + at as u16)).expect("a cell");
+        assert_eq!(cell.fg, dim, "column {x} of the divider");
+    }
+}
+
+/// Where the journal holds no such act, the row draws no divider and states
+/// no last time — not another act's, and not another colony's.
 /// @spec TUI-NAV-149
 #[test]
 fn a_row_whose_act_the_journal_does_not_hold_states_no_last_time() {
@@ -419,11 +516,88 @@ fn a_row_whose_act_the_journal_does_not_hold_states_no_last_time() {
     ] {
         let all = inspector_lines(&state, section, key.clone());
         assert!(
-            last_time(&all).is_empty(),
+            divider_at(&all).is_none() && !all.iter().any(|l| l.contains("came home")),
             "{key:?} states a last time the journal does not hold:\n{}",
             all.join("\n")
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-147, TUI-NAV-155 — watching the sky is answered on the ticker
+// ---------------------------------------------------------------------------
+
+/// A sky observation's line names each store the sky raised, with its amount,
+/// in resource order, and says differently whether the clowder looked up or
+/// a kitten happened to.
+/// @spec TUI-NAV-147
+#[test]
+fn a_sky_observations_line_names_what_the_sky_gave() {
+    let watched = journaled(&[Event::SkyObserved {
+        curiosity: 87.5,
+        skymaps: 1.0,
+        by_chance: false,
+    }]);
+    let lucky = journaled(&[Event::SkyObserved {
+        curiosity: 87.5,
+        skymaps: 1.0,
+        by_chance: true,
+    }]);
+    let want: Vec<String> = [(ResourceId::Curiosity, 87.5), (ResourceId::Skymaps, 1.0)]
+        .iter()
+        .map(|(r, a)| format!("+{} {}", fmt::compact(*a), label(*r)))
+        .collect();
+    for (what, text) in [
+        ("the ticker", ticker_text(&watched)),
+        ("the Journal", journal_text(&watched)),
+        ("the ticker by chance", ticker_text(&lucky)),
+    ] {
+        let at = positions(what, &text, &want);
+        assert!(ascending(&at), "{what}: resource order:\n{text}");
+    }
+    assert_ne!(ticker_text(&watched), ticker_text(&lucky));
+
+    let capped = journaled(&[Event::SkyObserved {
+        curiosity: 87.5,
+        skymaps: 0.0,
+        by_chance: false,
+    }]);
+    let text = ticker_text(&capped);
+    assert!(
+        !text.contains(&label(ResourceId::Skymaps)),
+        "a store the sky did not raise is not named:\n{text}"
+    );
+}
+
+/// An accepted `o` leaves no footer note: the observation's line answers it.
+/// @spec TUI-NAV-155
+#[test]
+fn an_accepted_observation_leaves_no_footer_note() {
+    let mut state = GameState::new(5);
+    state.pending_sky_event = Some(state.ticks + 1000);
+    let mut view = ViewState::default();
+    let outcome = clowder_tui::nav::update(clowder_tui::nav::Action::ObserveSky, &mut view, &state);
+    assert!(
+        matches!(
+            outcome,
+            clowder_tui::nav::Outcome::Apply(clowder_core::Command::ObserveSky)
+        ),
+        "{outcome:?}"
+    );
+    assert!(view.footer.is_none(), "{:?}", view.footer);
+    let events = state
+        .apply(clowder_core::Command::ObserveSky)
+        .expect("a waiting sky is observed");
+    assert!(
+        events.iter().any(|e| matches!(
+            e,
+            Event::SkyObserved {
+                by_chance: false,
+                ..
+            }
+        )),
+        "the core answers with the observation: {events:?}"
+    );
 }
 
 /// The names in the last time wear their coats.
@@ -443,4 +617,33 @@ fn the_stores_in_the_last_time_wear_their_coats() {
         inspector_rect(),
         &[ResourceId::Catnip, ResourceId::Twigs],
     );
+}
+
+/// End to end against the core: five calls of one squad each, as one `X`
+/// press makes them, read back as five squads and everything they raised.
+/// @spec TUI-NAV-148
+#[test]
+fn five_calls_of_one_press_read_back_as_five_squads() {
+    let mut state = journaled(&[]);
+    let pep = 5.0 * content::POUNCE_PEP_PER_SQUAD;
+    state.resources[ResourceId::Pep.ix()] = pep;
+    let before = state.resources;
+    for _ in 0..5 {
+        state
+            .apply(clowder_core::Command::Pounce(1))
+            .expect("five squads are paid for");
+    }
+    let got = last_time(&inspector_lines(&state, Section::Clowder, pounce_row()));
+    assert_eq!(
+        got.first().map(String::as_str),
+        Some("5 squads came home with:")
+    );
+    for line in &got[1..] {
+        let r = ResourceId::ALL
+            .into_iter()
+            .find(|r| line.starts_with(&format!("{} +", label(*r))))
+            .unwrap_or_else(|| panic!("a store's line: {line:?}"));
+        let rose = state.resources[r.ix()] - before[r.ix()];
+        assert_eq!(line, &format!("{} +{}", label(r), fmt::exact(rose)));
+    }
 }

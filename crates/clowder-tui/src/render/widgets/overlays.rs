@@ -71,6 +71,30 @@ pub(crate) fn event_line(event: &Event) -> Vec<Piece> {
                 out.push(Piece::plain(format!("; {napped} napped on the way")));
             }
         }
+        Event::SkyObserved {
+            curiosity,
+            skymaps,
+            by_chance,
+        } => {
+            let who = if *by_chance {
+                "a kitten happened to look up"
+            } else {
+                "the clowder looked up together"
+            };
+            let gave: Vec<(ResourceId, f64)> = [
+                (ResourceId::Curiosity, *curiosity),
+                (ResourceId::Skymaps, *skymaps),
+            ]
+            .into_iter()
+            .filter(|(_, a)| *a > 0.0)
+            .collect();
+            if gave.is_empty() {
+                out.push(Piece::plain(who));
+            } else {
+                out.push(Piece::plain(format!("{who}: ")));
+                out.extend(goods_pieces(&gave));
+            }
+        }
         other => out.push(Piece::plain(event_words(other))),
     }
     out
