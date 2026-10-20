@@ -385,6 +385,8 @@ pub struct StructureDef {
     pub outdoor_ratio: f64,
     /// Per-copy Long Sun cap extension (Aurora Lantern). @spec SIM-SKY-005
     pub long_sun_cap: f64,
+    /// Tinkerer seats per copy (Toy Workshop). @spec SIM-ECO-045
+    pub tinkerer_seats: u32,
 }
 
 /// Baseline for the table: every field its "nothing special" value.
@@ -414,6 +416,7 @@ const BLD: StructureDef = StructureDef {
     outdoor: false,
     outdoor_ratio: 0.0,
     long_sun_cap: 0.0,
+    tinkerer_seats: 0,
 };
 
 // @spec SIM-ECO-008, SIM-ECO-009, SIM-ECO-010, SIM-ECO-011, SIM-ECO-012, SIM-ECO-013, SIM-ECO-014
@@ -626,6 +629,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         craft_ratio: 0.05,
         energy_cons: 2.0,
         mess: 2.0, // the Tidy rota flips this — society wave
+        tinkerer_seats: 1,
         gate: StructureGate::Idea(IdeaId::Toymaking),
         ..BLD
     },

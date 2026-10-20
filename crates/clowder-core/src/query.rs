@@ -8,7 +8,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::state::{ArchId, CraftId, GameState, JobId, ResourceId, StructureId, RESOURCE_COUNT};
+use crate::state::{
+    ArchId, CraftId, GameState, JobId, Location, ResourceId, StructureId, RESOURCE_COUNT,
+};
 
 /// What a stock move is made for: the one thing a flow is credited to.
 ///
@@ -91,7 +93,75 @@ pub enum LockReason {
     ShortBy { missing: Vec<(ResourceId, f64)> },
 }
 
+/// The tinkerers' bench: the meadow's seats, who holds them, and who waits
+/// for one. @spec SIM-ENG-073
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Bench {
+    /// Seats the meadow's structures give.
+    pub seats: u32,
+    /// Every binding — an away kitten's included, since it keeps its seat —
+    /// as (roster position, recipe), in roster order.
+    pub seated: Vec<(usize, CraftId)>,
+    /// Every kitten at home holding the Tinkerer job and no binding, by
+    /// roster position in roster order: the kittens a bind can take.
+    pub waiting: Vec<usize>,
+}
+
 impl GameState {
+    /// The tinkerers' bench: the seats the meadow's structures give, every
+    /// binding, and every Tinkerer at home waiting for one.
+    ///
+    /// Who a bind can take and how many seats there are are both rules, so a
+    /// shell reads them here rather than picking kittens out by job, home,
+    /// and binding, or counting the structures that seat them.
+    /// @spec SIM-ENG-073, SIM-ECO-045
+    pub fn bench(&self) -> Bench {
+        let seats = StructureId::ALL
+            .iter()
+            .map(|s| crate::content::structure_def(*s).tinkerer_seats * self.structures[s.ix()])
+            .sum();
+        let seated = self
+            .kittens
+            .iter()
+            .enumerate()
+            .filter_map(|(ix, k)| k.tinkering.map(|c| (ix, c)))
+            .collect();
+        let waiting = self
+            .kittens
+            .iter()
+            .enumerate()
+            .filter(|(_, k)| {
+                k.location == Location::Home
+                    && k.job == Some(JobId::Tinkerer)
+                    && k.tinkering.is_none()
+            })
+            .map(|(ix, _)| ix)
+            .collect();
+        Bench {
+            seats,
+            seated,
+            waiting,
+        }
+    }
+
+    /// Why AssignTinkerer(c) would be refused now, or `None` where it would
+    /// bind — the command's own checks in its own precedence, which the
+    /// command reads back, so the reason shown and the refusal returned can
+    /// never name different causes. @spec SIM-ENG-072, SIM-ENG-006
+    pub fn tinkerer_bind_reason(&self, c: CraftId) -> Option<LockReason> {
+        if !self.craft_unlocked(c) {
+            return Some(LockReason::Prerequisite);
+        }
+        let bench = self.bench();
+        if bench.waiting.is_empty() {
+            return Some(LockReason::NoOneFree);
+        }
+        if bench.seated.len() as u32 >= bench.seats {
+            return Some(LockReason::NoRoom);
+        }
+        None
+    }
+
     /// Net stock change per game second at current state: production less
     /// consumption, throttling included.
     ///

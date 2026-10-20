@@ -366,6 +366,11 @@ impl GameState {
             // The ladder is bought with what only a Move can grant, so a meadow
             // that has never moved has nothing to spend and nothing to see.
             C::BuyTradition(_) => self.generation >= 1,
+            // A bind wants a kitten holding the Tinkerer job; before the job
+            // exists no press could ever make one. @spec SIM-ECO-046
+            C::AssignTinkerer(_) | C::UnassignTinkerer(_) => {
+                self.job_unlocked(crate::state::JobId::Tinkerer)
+            }
 
             // Everything below is deliberately open, and listed rather than
             // caught by a wildcard. `Command` grows every time an action is
@@ -393,9 +398,7 @@ impl GameState {
             | C::ObserveSky
             | C::SetSpeed(_)
             | C::Trade(..)
-            | C::SendPenPal(_)
-            | C::AssignTinkerer(_)
-            | C::UnassignTinkerer(_) => true,
+            | C::SendPenPal(_) => true,
         }
     }
 }

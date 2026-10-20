@@ -1,5 +1,6 @@
 use crate::content;
 use crate::events::Event;
+use crate::query::LockReason;
 use crate::state::{
     AdventureId, ArchId, ArchivedKitten, ColonyId, CraftId, DreamLoomId, GameState, IdeaId, JobId,
     Kitten, Location, Promise, RefinementId, ResourceId, RiteId, RuleId, SiteId, StructureId,
@@ -604,28 +605,23 @@ impl GameState {
     }
 
     /// Bind the most recently arrived unbound Home Tinkerer to a recipe.
-    /// Error precedence: Locked (the recipe), NoIdleKittens (no unbound Home
-    /// Tinkerer), NoSeats (bindings would exceed the Toy Workshop count —
-    /// an absent Tinkerer still holds its seat).
-    // @spec SIM-ECO-043, SIM-ENG-006
+    /// Refused for the reason the bind query reports — Locked (the recipe),
+    /// NoIdleKittens (no unbound Home Tinkerer), NoSeats (every seat the
+    /// meadow's structures give is held, an absent Tinkerer still holding
+    /// its own) — so the query and the command share one set of checks.
+    // @spec SIM-ECO-043, SIM-ENG-006, SIM-ENG-072
     fn assign_tinkerer(&mut self, c: CraftId) -> Result<Vec<Event>, CommandError> {
-        if !self.craft_unlocked(c) {
-            return Err(CommandError::Locked);
+        match self.tinkerer_bind_reason(c) {
+            Some(LockReason::Prerequisite) => return Err(CommandError::Locked),
+            Some(LockReason::NoOneFree) => return Err(CommandError::NoIdleKittens),
+            Some(_) => return Err(CommandError::NoSeats),
+            None => {}
         }
-        let Some(ix) = self.kittens.iter().rposition(|k| {
-            k.location == Location::Home && k.job == Some(JobId::Tinkerer) && k.tinkering.is_none()
-        }) else {
-            return Err(CommandError::NoIdleKittens);
-        };
-        let seats = self.structures[StructureId::ToyWorkshop.ix()];
-        let bound = self
-            .kittens
-            .iter()
-            .filter(|k| k.tinkering.is_some())
-            .count() as u32;
-        if bound + 1 > seats {
-            return Err(CommandError::NoSeats);
-        }
+        let ix = *self
+            .bench()
+            .waiting
+            .last()
+            .expect("a bind with no reason has a Tinkerer waiting");
         self.kittens[ix].tinkering = Some(c);
         Ok(Vec::new())
     }
