@@ -1547,6 +1547,71 @@ fn observe_sky_works_in_the_window_and_expired_events_fade() {
     assert_eq!(err, CommandError::Locked, "an expired event has faded");
 }
 
+// @spec SIM-ENG-071
+#[test]
+fn an_observation_reports_what_the_sky_gave() {
+    // The player's: the event carries each stock's rise, as the stocks moved.
+    let (s, _) = visible_sky_event(158);
+    let mut watched = s.clone();
+    let (c0, m0) = (
+        watched.stock(ResourceId::Curiosity),
+        watched.stock(ResourceId::Skymaps),
+    );
+    let events = watched.apply(Command::ObserveSky).unwrap();
+    let rise = (
+        watched.stock(ResourceId::Curiosity) - c0,
+        watched.stock(ResourceId::Skymaps) - m0,
+    );
+    assert!(
+        rise.0 > 0.0 && rise.1 > 0.0,
+        "fixture: the sky gave something"
+    );
+    assert_eq!(
+        events,
+        vec![Event::SkyObserved {
+            curiosity: rise.0,
+            skymaps: rise.1,
+            by_chance: false,
+        }]
+    );
+
+    // Against a full skymap store, the skymap's rise is what the cap let in.
+    let mut full = s.clone();
+    let cap = full.cap(ResourceId::Skymaps);
+    give(&mut full, ResourceId::Skymaps, cap);
+    let events = full.apply(Command::ObserveSky).unwrap();
+    assert!(matches!(
+        events.as_slice(),
+        [Event::SkyObserved { skymaps, by_chance: false, .. }] if *skymaps == 0.0
+    ));
+
+    // By chance: every lucky observation over a long run is reported, and
+    // the reports add up to all that the stocks gained (the meadow has no
+    // other source of either).
+    let mut s = GameState::new(156);
+    grant(&mut s, StructureId::StargazingLedge, 10);
+    let (mut curiosity, mut skymaps, mut lucky) = (0.0, 0.0, 0);
+    for _ in 0..6000 {
+        for e in run_days(&mut s, 1) {
+            if let Event::SkyObserved {
+                curiosity: c,
+                skymaps: m,
+                by_chance,
+            } = e
+            {
+                assert!(by_chance, "nobody pressed anything");
+                curiosity += c;
+                skymaps += m;
+                lucky += 1;
+            }
+        }
+        s.pending_sky_event = None;
+    }
+    assert!(lucky > 0, "fixture: some kitten looked up by chance");
+    assert!((s.stock(ResourceId::Curiosity) - curiosity).abs() < 1e-6);
+    assert!((s.stock(ResourceId::Skymaps) - skymaps).abs() < 1e-9);
+}
+
 /// Hunt a visible sky event tick by tick, so the tick of the day close that
 /// raised it is known exactly.
 fn visible_sky_event(seed: u64) -> (GameState, u64) {

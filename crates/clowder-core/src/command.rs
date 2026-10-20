@@ -314,9 +314,9 @@ impl GameState {
     fn observe_sky(&mut self) -> Result<Vec<Event>, CommandError> {
         match self.pending_sky_event {
             Some(expiry) if self.ticks < expiry => {
-                self.grant_sky_observation();
+                let seen = self.grant_sky_observation(false);
                 self.pending_sky_event = None;
-                Ok(Vec::new())
+                Ok(vec![seen])
             }
             _ => Err(CommandError::Locked),
         }

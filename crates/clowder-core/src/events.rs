@@ -76,6 +76,14 @@ pub enum Event {
     /// observable via ObserveSky until the end of the next day.
     /// @spec SIM-ENG-025
     SkyEventVisible,
+    /// A sky event was observed — by the player, or by chance at the day
+    /// close that raised it — and how far it raised each stock once its cap
+    /// applied. @spec SIM-ENG-071
+    SkyObserved {
+        curiosity: f64,
+        skymaps: f64,
+        by_chance: bool,
+    },
     // @spec SIM-ENG-024
     SpeedChanged {
         speed: f64,
@@ -231,6 +239,7 @@ impl Event {
             | Event::KittenMood { .. }
             | Event::Revealed { .. }
             | Event::SkyEventVisible
+            | Event::SkyObserved { .. }
             | Event::SpeedChanged { .. }
             | Event::PounceReturned { .. }
             | Event::JamboreeStarted { .. }

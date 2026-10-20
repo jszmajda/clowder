@@ -110,6 +110,11 @@ fn vocabulary() -> Vec<Event> {
         Event::PromiseQuieted { index: 0 },
         Event::PromiseResumed { index: 0 },
         Event::PrismDescended,
+        Event::SkyObserved {
+            curiosity: 25.0,
+            skymaps: 1.0,
+            by_chance: false,
+        },
         Event::TradeReturned {
             colony: ColonyId::Otters,
             caravans: 1,
@@ -193,6 +198,7 @@ fn variant_name(e: &Event) -> &'static str {
         Event::PromiseResumed { .. } => "PromiseResumed",
         Event::PrismDescended => "PrismDescended",
         Event::TradeReturned { .. } => "TradeReturned",
+        Event::SkyObserved { .. } => "SkyObserved",
         Event::PenPalSent { .. } => "PenPalSent",
         Event::ColonyDiscovered { .. } => "ColonyDiscovered",
         Event::MeadowMoved { .. } => "MeadowMoved",

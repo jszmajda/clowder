@@ -1006,7 +1006,8 @@ impl GameState {
             * (1.0 + self.effect(crate::effects::Effect::AutoObserveChanceRatio));
         if self.rng.chance(observe_chance) {
             // Someone happened to be looking up.
-            self.grant_sky_observation();
+            let seen = self.grant_sky_observation(true);
+            events.push(seen);
         } else {
             // Observable for a game year from this day close.
             self.pending_sky_event = Some(self.ticks + content::SKY_WINDOW_TICKS);
@@ -1017,7 +1018,10 @@ impl GameState {
     /// The yields of observing a sky event: curiosity scaled by its
     /// per-source ratios, plus a skymap, both clamped to their caps.
     // @spec SIM-ENG-025
-    pub(crate) fn grant_sky_observation(&mut self) {
+    /// Returns the observation's event: how far each stock rose once its cap
+    /// applied, and whether it was made by chance. @spec SIM-ENG-071
+    pub(crate) fn grant_sky_observation(&mut self, by_chance: bool) -> Event {
+        let before = self.resources;
         let curiosity = content::SKY_OBSERVE_CURIOSITY
             * (1.0 + self.effect(crate::effects::Effect::ResourceRatio(ResourceId::Curiosity)));
         let ix = ResourceId::Curiosity.ix();
@@ -1025,6 +1029,12 @@ impl GameState {
         let ix = ResourceId::Skymaps.ix();
         self.resources[ix] =
             (self.resources[ix] + content::SKY_OBSERVE_SKYMAPS).min(self.cap(ResourceId::Skymaps));
+        let rose = |r: ResourceId| (self.resources[r.ix()] - before[r.ix()]).max(0.0);
+        Event::SkyObserved {
+            curiosity: rose(ResourceId::Curiosity),
+            skymaps: rose(ResourceId::Skymaps),
+            by_chance,
+        }
     }
 
     /// Draw a name from the pool without replacement, cycling with Roman
