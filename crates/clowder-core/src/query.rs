@@ -93,6 +93,108 @@ pub enum LockReason {
     ShortBy { missing: Vec<(ResourceId, f64)> },
 }
 
+/// A fixed act that brings a store in. The variant order is the order the
+/// sources query lists acts in, so the derived `Ord` is load-bearing.
+/// @spec SIM-ENG-074
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Act {
+    GatherCatnip,
+    Forage,
+    Rummage,
+    Pounce,
+    ObserveSky,
+    HoldParade,
+    RefineStarshard,
+    RefineEcho,
+    CondenseJar,
+}
+
+/// What the player would take or meet for a store to rise. The variant
+/// order, and each id's order within its variant, is the order a resource's
+/// sources are listed in, so the derived `Ord` is load-bearing.
+/// @spec SIM-ENG-074
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Source {
+    Structure(StructureId),
+    Job(JobId),
+    Craft(CraftId),
+    Colony(crate::state::ColonyId),
+    Act(Act),
+    Arch(ArchId),
+    Refinement(crate::state::RefinementId),
+    Rite(crate::state::RiteId),
+    Loom(crate::state::DreamLoomId),
+}
+
+impl Act {
+    /// The command the act is taken by, for its gate.
+    pub fn command(self) -> crate::command::Command {
+        use crate::command::Command as C;
+        match self {
+            Act::GatherCatnip => C::GatherCatnip,
+            Act::Forage => C::Forage,
+            Act::Rummage => C::Rummage,
+            Act::Pounce => C::Pounce(1),
+            Act::ObserveSky => C::ObserveSky,
+            Act::HoldParade => C::HoldParade,
+            Act::RefineStarshard => C::RefineStarshard,
+            Act::RefineEcho => C::RefineEcho,
+            Act::CondenseJar => C::CondenseJar,
+        }
+    }
+}
+
+/// The paths that raise a fixed resource by rule rather than by a table —
+/// each restated here beside where the rule lives, and held to the core by
+/// the sources tests, which raise every stock every command and the pipeline
+/// can. @spec SIM-ENG-074
+const RULED_SOURCES: &[(Source, &[ResourceId])] = {
+    use crate::state::{ArchId as A, DreamLoomId as L, RiteId as T, StructureId as S};
+    use ResourceId as R;
+    &[
+        // The bakery's outputs scale by the pep cap (tick.rs, Treat Bakery).
+        (Source::Structure(S::TreatBakery), &[R::Feathers, R::Bells]),
+        // Sky events: seen by chance at a day close (tick.rs, sky events).
+        (
+            Source::Structure(S::StargazingLedge),
+            &[R::Curiosity, R::Skymaps],
+        ),
+        // Prism descent from each Rainbow Arch (effects.rs, PrismDescentChance).
+        (Source::Structure(S::RainbowArch), &[R::Prisms]),
+        // Déjà-vu days fill reverie (effects.rs, DejaVuChance).
+        (Source::Structure(S::MemoryChest), &[R::Reverie]),
+        // The fixed acts (command.rs).
+        (Source::Act(Act::GatherCatnip), &[R::Catnip]),
+        (Source::Act(Act::Forage), &[R::Twigs]),
+        (Source::Act(Act::Rummage), &[R::Pebbles]),
+        (
+            Source::Act(Act::Pounce),
+            &[R::Feathers, R::Bells, R::Shinies, R::Unicorns],
+        ),
+        (Source::Act(Act::ObserveSky), &[R::Curiosity, R::Skymaps]),
+        (Source::Act(Act::HoldParade), &[R::Rainbows]),
+        (Source::Act(Act::RefineStarshard), &[R::Starshards]),
+        (Source::Act(Act::RefineEcho), &[R::Echoes]),
+        (Source::Act(Act::CondenseJar), &[R::JarsOfPurrs]),
+        // The whale's exchange (command.rs, whale_exchange).
+        (
+            Source::Colony(crate::state::ColonyId::StarWhales),
+            &[R::Skymaps, R::Starshards, R::Echoes],
+        ),
+        // Arch upgrades: descent, shower, drift, and dreaming (effects.rs,
+        // arch_effect; tick.rs, dream_step).
+        (Source::Arch(A::CrystalArch), &[R::Prisms]),
+        (Source::Arch(A::PrismArch), &[R::Rainbows]),
+        (Source::Arch(A::SkyArch), &[R::Prisms]),
+        (Source::Arch(A::MemoryArch), &[R::Dreamcorns]),
+        // Rites that grant the altar charm (effects.rs, rite_effect).
+        (Source::Rite(T::StainedSunlight), &[R::Charm]),
+        (Source::Rite(T::GrandBasking), &[R::Charm]),
+        // The loom that brings déjà-vu days (effects.rs, loom_effect).
+        (Source::Loom(L::DreamCatcher), &[R::Reverie]),
+    ]
+};
+
 /// What a colony has shown the clowder, and what it says of the rest.
 /// @spec SIM-TRADE-012
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -123,6 +225,89 @@ pub struct Bench {
 }
 
 impl GameState {
+    /// Every source that can raise `r` during a meadow's play, in the fixed
+    /// listing order, each with whether the player knows it yet.
+    ///
+    /// The tables carry most paths — productions, converter outputs, yields,
+    /// recipe outputs, a colony's goods, a refinement's granted outputs — and
+    /// `RULED_SOURCES` restates the ones the rules decide. Fixed by the
+    /// content: the state decides only what is known. @spec SIM-ENG-074
+    pub fn sources_of(&self, r: ResourceId) -> Vec<(Source, bool)> {
+        use crate::content;
+        use crate::state::{ColonyId, RefinementId};
+        let mut found: std::collections::BTreeSet<Source> = std::collections::BTreeSet::new();
+        for s in StructureId::ALL {
+            let d = content::structure_def(s);
+            let converts = d
+                .converter
+                .as_ref()
+                .is_some_and(|c| c.outputs.iter().any(|(x, _)| *x == r));
+            if converts || d.productions.iter().any(|(x, _)| *x == r) {
+                found.insert(Source::Structure(s));
+            }
+        }
+        for j in JobId::ALL {
+            if content::job_def(j)
+                .yield_per_tick
+                .is_some_and(|(x, _)| x == r)
+            {
+                found.insert(Source::Job(j));
+            }
+        }
+        for c in CraftId::ALL {
+            if content::craft_output(c) == r {
+                found.insert(Source::Craft(c));
+            }
+        }
+        for c in ColonyId::ALL {
+            if content::colony_goods(c).iter().any(|(x, _)| *x == r) {
+                found.insert(Source::Colony(c));
+            }
+        }
+        for f in RefinementId::ALL {
+            let grants = content::refinement_def(f).effects.iter().any(
+                |(e, _)| matches!(e, crate::effects::Effect::StructureOutputAdd(_, x) if *x == r),
+            );
+            if grants {
+                found.insert(Source::Refinement(f));
+            }
+        }
+        for (src, goods) in RULED_SOURCES {
+            if goods.contains(&r) {
+                found.insert(*src);
+            }
+        }
+        found
+            .into_iter()
+            .map(|src| (src, self.knows(src, r)))
+            .collect()
+    }
+
+    /// Whether the player has met `src` as a source of `r`, judged on the
+    /// state at the asking. @spec SIM-ENG-075
+    fn knows(&self, src: Source, r: ResourceId) -> bool {
+        use crate::command::Command as C;
+        use crate::state::{Availability, ColonyId, ContentId};
+        let present = |id: ContentId| self.availability(id) != Availability::Hidden;
+        match src {
+            Source::Structure(s) => present(ContentId::Structure(s)),
+            Source::Job(j) => self.job_unlocked(j),
+            Source::Craft(c) => self.craft_unlocked(c),
+            Source::Colony(ColonyId::StarWhales) => self.command_gate_open(&C::SummonStarWhale),
+            Source::Colony(c) => self.learned_goods.get(&c).is_some_and(|g| g.contains(&r)),
+            // Observing has no gate of its own; the ledge that raises sky
+            // events is what the player meets first.
+            Source::Act(Act::ObserveSky) => {
+                present(ContentId::Structure(StructureId::StargazingLedge))
+            }
+            Source::Act(a) => self.command_gate_open(&a.command()),
+            Source::Arch(a) => present(ContentId::Arch(a)),
+            Source::Refinement(f) => present(ContentId::Refinement(f)),
+            Source::Rite(t) => present(ContentId::Rite(t)),
+            Source::Loom(l) => present(ContentId::DreamLoom(l)),
+        }
+    }
+
     /// What a colony has shown the clowder: whether a caravan has reached it,
     /// the goods caravans have brought home, the goods still unseen with
     /// whether its Pen Pal level has them on offer yet, and whether it is warm

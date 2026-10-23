@@ -511,7 +511,8 @@ fn component_line(
     r: ResourceId,
     need: f64,
     reason: &Option<LockReason>,
-) -> Pieces {
+) -> Vec<Pieces> {
+    let mut comes_from = None;
     let have = state.stock(r);
     let name = resource_label(r);
     let chars = name.chars().count();
@@ -537,6 +538,7 @@ fn component_line(
             let rate = state.net_rate(r);
             if rate <= 0.0 {
                 line.push_str(" — the stock is not growing");
+                comes_from = comes_from_line(state, r);
             } else {
                 let seconds = amount / (rate * state.speed);
                 line.push_str(&format!(" — wait {}", wait_text(seconds)));
@@ -549,7 +551,84 @@ fn component_line(
     }
     // The name heads the line in its coat, short or covered alike; the line
     // is the inherited foreground whatever the shortfall. @spec TUI-THEME-019
-    vec![Piece::name(r, name, chars), Piece::plain(line)]
+    let mut out = vec![vec![Piece::name(r, name, chars), Piece::plain(line)]];
+    out.extend(comes_from);
+    out
+}
+
+/// Where a store can come from, beneath a short component whose store is not
+/// growing: nothing at all where any source the core credits is raising it,
+/// or where the core lists no source. The sources the player knows are named,
+/// in the core's order; the rest are gestured at, once for each kind.
+/// @spec TUI-NAV-163
+fn comes_from_line(state: &GameState, r: ResourceId) -> Option<Pieces> {
+    use clowder_core::Source;
+    if state.flows(r).iter().any(|(_, rate)| *rate > 0.0) {
+        return None;
+    }
+    let sources = state.sources_of(r);
+    if sources.is_empty() {
+        return None;
+    }
+    const PHRASES: [&str; 9] = [
+        "a building you haven't found",
+        "work no kitten knows yet",
+        "a recipe you haven't learned",
+        "trade with a neighbour",
+        "something you can't do yet",
+        "an arch upgrade you haven't found",
+        "a refinement you haven't found",
+        "a rite you haven't learned",
+        "a loom you haven't found",
+    ];
+    let kind = |src: &Source| match src {
+        Source::Structure(_) => 0,
+        Source::Job(_) => 1,
+        Source::Craft(_) => 2,
+        Source::Colony(_) => 3,
+        Source::Act(_) => 4,
+        Source::Arch(_) => 5,
+        Source::Refinement(_) => 6,
+        Source::Rite(_) => 7,
+        Source::Loom(_) => 8,
+    };
+    let mut items: Vec<Pieces> = sources
+        .iter()
+        .filter(|(_, known)| *known)
+        .map(|(src, _)| {
+            // A recipe is named for the store it makes, so its name is that
+            // store's and wears its coat. @spec TUI-THEME-019
+            if let Source::Craft(c) = src {
+                let made = content::craft_output(*c);
+                if content_name(ContentId::Craft(*c)) == resource_label(made) {
+                    return vec![resource(made), Piece::plain(" (recipe)")];
+                }
+            }
+            plain(match src {
+                Source::Structure(b) => content_name(ContentId::Structure(*b)),
+                Source::Job(j) => format!("{} (job)", content_name(ContentId::Job(*j))),
+                Source::Craft(c) => format!("{} (recipe)", content_name(ContentId::Craft(*c))),
+                Source::Colony(c) => format!("trade with {}", content::colony_def(*c).name),
+                Source::Act(a) => humanize(&format!("{a:?}")),
+                Source::Arch(a) => content_name(ContentId::Arch(*a)),
+                Source::Refinement(f) => content_name(ContentId::Refinement(*f)),
+                Source::Rite(t) => content_name(ContentId::Rite(*t)),
+                Source::Loom(l) => content_name(ContentId::DreamLoom(*l)),
+            })
+        })
+        .collect();
+    let mut unknown: Vec<usize> = sources
+        .iter()
+        .filter(|(_, known)| !known)
+        .map(|(src, _)| kind(src))
+        .collect();
+    unknown.sort_unstable();
+    unknown.dedup();
+    items.extend(unknown.into_iter().map(|k| plain(PHRASES[k].to_string())));
+    let mut line = vec![Piece::plain("Comes from: ")];
+    line.extend(join_as_sentence(items));
+    line.push(Piece::plain("."));
+    Some(line)
 }
 
 /// The next cost lines for a content item that takes one: the core's price for
@@ -558,7 +637,7 @@ fn component_line(
 fn cost_lines(state: &GameState, id: ContentId, reason: &Option<LockReason>) -> Vec<Pieces> {
     let cost = state.cost_of_next(id, 1);
     cost.iter()
-        .map(|(r, need)| component_line(state, *r, *need, reason))
+        .flat_map(|(r, need)| component_line(state, *r, *need, reason))
         .collect()
 }
 
