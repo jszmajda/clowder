@@ -3071,6 +3071,16 @@ static COLONIES: [ColonyDef; 8] = [
                 chance: 0.25,
                 ..SELL
             },
+            // A garden colony's garden herb: the trade-only luxury the Tea
+            // House and the Owls' price both name.
+            ColonySell {
+                resource: ResourceId::Mint,
+                amount: 20.0,
+                chance: 0.5,
+                season: Some(Season::Spring),
+                season_bonus: 0.25,
+                ..SELL
+            },
         ],
     },
     ColonyDef {

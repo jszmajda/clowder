@@ -35,7 +35,7 @@ The full id space (append-only; serialized as an enum-indexed array, so **new id
 | 15 | Skymaps | transient | 0 | sky-exploration currency; cap 0 until Stargazing Ledges |
 | 16 | Feathers | luxury | ∞ | drains per kitten; +10 happiness while stocked |
 | 17 | Bells | luxury | ∞ | ditto |
-| 18 | Mint | luxury | ∞ | ditto; from trade |
+| 18 | Mint | luxury | ∞ | ditto; from trade (Rabbits) |
 | 19 | Unicorns | mystic | ∞ | |
 | 20 | Rainbows | mystic | ∞ | arrive in gratitude for Parades |
 | 21 | Prisms | mystic | ∞ | rare descents |
@@ -217,4 +217,4 @@ StorageFull rejection when the yield resource is at cap (unchanged rule).
 - Parent: `../sim-design.md` (tiers, stack, gating philosophy, cozy inversions)
 - Consumes: engine effect/DR/throttle machinery; kittens worker counts & mood; curiosity unlock flags
 - Idea names referenced here are defined in `../curiosity/curiosity-design.md`
-- **Cross-wave obligations:** the colonies leaf owes moonstone trade rates that carry band 3's pacing (the Kiln's native trickle is deliberately slow); the kittens leaf owes the luxury-happiness term and the crowding-relief LDR term in its happiness formula; the cosmic leaf owes a hushfelt cap extender; mint stays trade-only (the Tea House silhouette teases until colonies land — intended).
+- **Cross-wave obligations:** the colonies leaf owes moonstone trade rates that carry band 3's pacing (the Kiln's native trickle is deliberately slow); the kittens leaf owes the luxury-happiness term and the crowding-relief LDR term in its happiness formula; the cosmic leaf owes a hushfelt cap extender; mint is trade-only, the Rabbits selling it (colonies leaf).

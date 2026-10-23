@@ -31,7 +31,7 @@ Buy → sell [amount @ base-chance, in-season]. Standings warm from their start 
 | 1 | **Raccoons** | 0 (neutral) | buttons ×100 | catnip 35000 @ 100% (winter +45%); quills 5 @ 25%, stories 3 @ 15% |
 | 2 | **Foxes** | −0.15 (shy) | twigs ×500 | buttons 250 @ 100% (autumn +35%); brass 25 @ 25%, cogs 5 @ 10%; **moonstone** (kite-scaled, below) |
 | 3 | **Hedgehogs** | 0 | feathers ×500 | pebbles 1000 @ 100% (spring +25%); tiles 5 @ 75%, pavers 1 @ 10% |
-| 4 | **Rabbits** | +0.15 | tiles ×50 | embers 350 @ 100%; dew 100 @ 25% |
+| 4 | **Rabbits** | +0.15 | tiles ×50 | embers 350 @ 100%; dew 100 @ 25%; mint 20 @ 50% (spring +25%) |
 | 5 | **Deer** | 0 | shinies ×250 | moonstone 1 @ 95%; stardust 0.1 @ 50% (needs Pen Pal level ≥ 5) |
 | 6 | **Owls** | −0.10 (shy) | mint ×500 | curiosity 80 @ 100% (a scholarly colony) |
 | 7 | **Star Whales** | visitor (no Pen Pal) | — | see Star Whale arc |
@@ -70,6 +70,7 @@ The gentle-giant visitor arc (the inspiration's leviathans, de-fanged): Star Wha
 | What a trade's event carries | The caravans, how many napped, and each store raised with the amount it rose by | The colony and the caravan count alone | Each caravan's goods are drawn at random, so only the trade knows what came home; an event without them leaves the player no way to tell what a trade earned, and no display a way to find out |
 | What the clowder knows a colony offers | Learned from what caravans bring home, kept per colony in the save | Every colony's basket shown from discovery; learned goods derived from the journal's retained trades | A basket shown from discovery hands over at a glance what trading is for finding out; the journal's trades roll out of its window, so knowledge derived from it would fade |
 | How much a colony says of goods not yet seen | A warm colony names them, each wanted friendship level noted; a neutral or shy one gives only their count | Always the count; always the names; nothing until seen | Disposition already shapes how a colony trades; letting it shape how freely it talks makes warming a colony worth something to a player reading the screen, and the count alone still tells a reserved colony's player there is more to find |
+| Where mint comes from | Rabbits' basket, half their caravans, spring-favoured | A native structure; the Owls' basket; a pounce loot | Mint is a luxury the economy keeps trade-only, and the Tea House and the Owls' buy price both name it; a first-tier, friendly colony puts it within reach of the band that opens the Tea House, at a trickle sized to the luxury's slow drain, and a garden colony suits a garden herb. The Owls buy it, so selling it there would close a loop on itself |
 | Star Whales fed dreamcorns | Lullaby offering raises contentment | Necrocorn-style feeding | Reuses the mystic dreamcorn as a gentle gift rather than the inspiration's grim necrocorn upkeep |
 
 ## Open Questions & Future Decisions

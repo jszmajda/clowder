@@ -391,3 +391,57 @@ fn each_source_is_known_by_its_own_gate() {
         assert!(known(&full, r, src), "{src:?} is known in a full meadow");
     }
 }
+
+// ---------------------------------------------------------------------------
+// SIM-ENG-076 — no price names a store nothing raises
+// ---------------------------------------------------------------------------
+
+/// Every resource a price, a recipe's inputs, or a colony's buy-price names
+/// has at least one source, so nothing can be priced in a store the meadow
+/// can never raise.
+/// @spec SIM-ENG-076
+#[test]
+fn every_priced_store_has_a_source() {
+    let s = everything();
+    let mut ids: Vec<ContentId> = Vec::new();
+    ids.extend(StructureId::ALL.map(ContentId::Structure));
+    ids.extend(IdeaId::ALL.map(ContentId::Idea));
+    ids.extend(RefinementId::ALL.map(ContentId::Refinement));
+    ids.extend(RuleId::ALL.map(ContentId::Rule));
+    ids.extend(RiteId::ALL.map(ContentId::Rite));
+    ids.extend(ArchId::ALL.map(ContentId::Arch));
+    ids.extend(DreamLoomId::ALL.map(ContentId::DreamLoom));
+    ids.extend(CraftId::ALL.map(ContentId::Craft));
+    let mut priced: BTreeSet<ResourceId> = BTreeSet::new();
+    for id in ids {
+        priced.extend(s.cost_of_next(id, 1).into_iter().map(|(r, _)| r));
+    }
+    for c in ColonyId::ALL {
+        if c != ColonyId::StarWhales {
+            priced.insert(content::colony_def(c).buy.0);
+        }
+    }
+    assert!(priced.len() > 15, "fixture: many stores are priced");
+    for r in priced {
+        assert!(
+            !s.sources_of(r).is_empty(),
+            "{r:?} is named in a price, but nothing raises it"
+        );
+    }
+}
+
+/// The Rabbits sell mint: half their caravans, spring-favoured.
+/// @spec SIM-TRADE-003
+#[test]
+fn the_rabbits_sell_mint() {
+    let mint = content::colony_def(ColonyId::Rabbits)
+        .sells
+        .iter()
+        .find(|g| g.resource == ResourceId::Mint)
+        .expect("the Rabbits sell mint");
+    assert!((mint.amount - 20.0).abs() < 1e-9);
+    assert!((mint.chance - 0.5).abs() < 1e-9);
+    assert_eq!(mint.season, Some(Season::Spring));
+    assert!((mint.season_bonus - 0.25).abs() < 1e-9);
+    assert_eq!(mint.min_penpal, 0);
+}
