@@ -2938,6 +2938,22 @@ pub fn colony_def(c: ColonyId) -> &'static ColonyDef {
     &COLONIES[c as usize]
 }
 
+/// Every good a colony offers, with the Pen Pal level each wants: its sell
+/// basket in the table's order, then — for Foxes — the kite-scaled moonstone
+/// their trade adds outside the basket, which wants no level.
+/// @spec SIM-TRADE-012, SIM-TRADE-004
+pub fn colony_goods(c: ColonyId) -> Vec<(ResourceId, u32)> {
+    let mut out: Vec<(ResourceId, u32)> = colony_def(c)
+        .sells
+        .iter()
+        .map(|g| (g.resource, g.min_penpal))
+        .collect();
+    if c == ColonyId::Foxes {
+        out.push((ResourceId::Moonstone, 0));
+    }
+    out
+}
+
 #[allow(clippy::needless_update)]
 static COLONIES: [ColonyDef; 8] = [
     ColonyDef {

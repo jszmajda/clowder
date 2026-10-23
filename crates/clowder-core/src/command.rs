@@ -869,6 +869,9 @@ impl GameState {
                 napped += 1;
                 continue; // a nap: the caravan travelled, cost already paid
             }
+            // Met, whatever the draws bring: a colony that had nothing to
+            // spare has still been reached. @spec SIM-TRADE-010
+            let learned = self.learned_goods.entry(colony).or_default();
             let bonus = st > 0.0 && self.rng.chance(st.min(1.0));
             let bonus_mult = if bonus {
                 content::TRADE_BONUS_MULT
@@ -885,8 +888,11 @@ impl GameState {
                     1.0
                 };
                 let fuzz = 1.0 + (self.rng.uniform() * 2.0 - 1.0) * content::TRADE_FUZZ_WIDTH;
-                self.resources[sell.resource.ix()] +=
-                    sell.amount * trade_ratio * season_mult * bonus_mult * fuzz;
+                let brought = sell.amount * trade_ratio * season_mult * bonus_mult * fuzz;
+                self.resources[sell.resource.ix()] += brought;
+                if brought > 0.0 {
+                    learned.insert(sell.resource);
+                }
             }
             // Foxes' kite-scaled moonstone — the early metal path.
             // @spec SIM-TRADE-004
@@ -898,8 +904,11 @@ impl GameState {
                         + content::FOX_MOONSTONE_AMOUNT_PER_KITE * kites)
                         * (1.0 + st).max(0.0);
                     let fuzz = 1.0 + (self.rng.uniform() * 2.0 - 1.0) * content::TRADE_FUZZ_WIDTH;
-                    self.resources[ResourceId::Moonstone.ix()] +=
-                        amount * trade_ratio * bonus_mult * fuzz;
+                    let brought = amount * trade_ratio * bonus_mult * fuzz;
+                    self.resources[ResourceId::Moonstone.ix()] += brought;
+                    if brought > 0.0 {
+                        learned.insert(ResourceId::Moonstone);
+                    }
                 }
             }
         }
@@ -1104,6 +1113,8 @@ impl GameState {
         self.arches_bought.clear();
         self.promises.clear();
         self.discovered.clear();
+        // The new meadow's neighbours are met afresh. @spec SIM-TRADE-011
+        self.learned_goods.clear();
         self.penpal = [0; 8];
         self.elder = None;
         self.mess = 0.0;

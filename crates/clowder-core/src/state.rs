@@ -1,7 +1,7 @@
 use crate::content;
 use crate::rng::Pcg32;
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The full RES table, in id order. Append-only: serialized as an
 /// enum-indexed array, so new ids only ever append. @spec SIM-ECO-001
@@ -1153,6 +1153,11 @@ pub struct GameState {
     /// Discovered colonies — permanent. @spec SIM-TRADE-008
     #[serde(default)]
     pub discovered: BTreeSet<ColonyId>,
+    /// What each colony has shown the clowder: a key for every colony a
+    /// caravan has reached, holding the goods caravans brought home from it.
+    /// @spec SIM-TRADE-010, SAVE-026
+    #[serde(default)]
+    pub learned_goods: BTreeMap<ColonyId, BTreeSet<ResourceId>>,
     // ---- Wave 5: prestige / the Great Meadow Move (SIM-MOVE) ----
     /// Capped-linear production/storage legacy; earned on a Move, spent on
     /// Traditions and Pass It Down. @spec SIM-MOVE-006, SIM-MOVE-007
@@ -1292,6 +1297,7 @@ impl GameState {
             promises: Vec::new(),
             penpal: [0; 8],
             discovered: BTreeSet::new(),
+            learned_goods: BTreeMap::new(),
             elder_wisdom: 0.0,
             warm_memories: 0.0,
             passed_down_wisdom: 0.0,
@@ -2250,6 +2256,7 @@ mod move_classification {
             promises: _,
             penpal: _,
             discovered: _,
+            learned_goods: _,
             stirred_dreams: _,
             whale_visit_years: _,
             whale_contentment: _,

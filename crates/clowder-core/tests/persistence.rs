@@ -2195,8 +2195,14 @@ fn a_v5_save_migrates_with_everything_else_exact() {
         .collect();
     assert_eq!(
         added,
-        vec!["revealed_resources"],
-        "the one field a v5 save gains is the revealed-resource set"
+        vec!["learned_goods", "revealed_resources"],
+        "a v5 save gains the revealed-resource set, and through v7 what each colony has shown"
+    );
+    assert!(
+        resaved["state"]["learned_goods"]
+            .as_object()
+            .is_some_and(|m| m.is_empty()),
+        "what colonies have shown arrives empty (SAVE-026)"
     );
 }
 

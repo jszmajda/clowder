@@ -136,6 +136,86 @@ fn resource(r: ResourceId) -> Piece {
     Piece::name(r, name, chars)
 }
 
+/// Items joined as a sentence joins them: two by ` and `, three or more by
+/// `, ` with `, and ` before the last.
+fn join_as_sentence(items: Vec<Pieces>) -> Pieces {
+    let n = items.len();
+    let mut out: Pieces = Vec::new();
+    for (i, item) in items.into_iter().enumerate() {
+        if i > 0 {
+            out.push(Piece::plain(match (n, i == n - 1) {
+                (2, _) => " and ",
+                (_, true) => ", and ",
+                _ => ", ",
+            }));
+        }
+        out.extend(item);
+    }
+    out
+}
+
+/// What a colony has shown the clowder, as the core's offers query reports
+/// it: nothing before a caravan has reached it; then its learned goods, the
+/// rest named by a colony warm enough to tell of them — those it keeps for
+/// closer friends marked — or counted by one that is not.
+/// @spec TUI-NAV-162
+fn offer_lines(state: &GameState, c: clowder_core::ColonyId) -> Vec<Pieces> {
+    let offers = state.neighbour_offers(c);
+    if !offers.reached {
+        return Vec::new();
+    }
+    let learned: Vec<Pieces> = offers.learned.iter().map(|r| vec![resource(*r)]).collect();
+    let line = |head: &str, items: Vec<Pieces>| -> Pieces {
+        let mut out = vec![Piece::plain(head.to_string())];
+        out.extend(join_as_sentence(items));
+        out.push(Piece::plain("."));
+        out
+    };
+    let mut out: Vec<Pieces> = Vec::new();
+    let unseen = offers.unseen.len();
+    if offers.tells_by_name {
+        let told = !learned.is_empty();
+        if told {
+            out.push(line("Offers: ", learned));
+        }
+        if unseen > 0 {
+            let named: Vec<Pieces> = offers
+                .unseen
+                .iter()
+                .map(|(r, now)| {
+                    let mut item = vec![resource(*r)];
+                    if !now {
+                        item.push(Piece::plain(" (for closer friends)"));
+                    }
+                    item
+                })
+                .collect();
+            out.push(line(
+                if told {
+                    "Also mentions: "
+                } else {
+                    "Mentions: "
+                },
+                named,
+            ));
+        }
+    } else if learned.is_empty() {
+        if unseen > 0 {
+            let noun = if unseen == 1 { "good" } else { "goods" };
+            out.push(plain(format!(
+                "Offers: {unseen} {noun} you haven't seen yet."
+            )));
+        }
+    } else {
+        let mut items = learned;
+        if unseen > 0 {
+            items.push(plain(format!("{unseen} more")));
+        }
+        out.push(line("Offers: ", items));
+    }
+    out
+}
+
 /// Sentences run together, a blank between each.
 fn sentences(parts: Vec<Pieces>) -> Pieces {
     let mut out: Pieces = Vec::new();
@@ -903,6 +983,9 @@ fn draw_body(
                     lines.push(Vec::new());
                     lines.extend(unit_cost_lines(state, &unit));
                 }
+            }
+            if let RowKey::Colony(c, "trade") = &row.key {
+                lines.extend(offer_lines(state, *c));
             }
             if let RowKind::Act { command, .. } = &row.kind {
                 // The history is set apart from what the row is by a dim

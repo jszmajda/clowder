@@ -15,9 +15,10 @@ use std::path::{Path, PathBuf};
 /// empty journal, which is the honest representation of history it never
 /// recorded.
 /// v6 adds the revealed-resource set (SAVE-023), filled on migration from the
-/// save itself (SAVE-024).
-/// @spec SAVE-013, SAVE-014, SAVE-021, SAVE-023
-pub const SAVE_VERSION: u32 = 6;
+/// save itself (SAVE-024). v7 adds what each colony has shown the clowder
+/// (SAVE-026), arriving empty.
+/// @spec SAVE-013, SAVE-014, SAVE-021, SAVE-023, SAVE-026
+pub const SAVE_VERSION: u32 = 7;
 /// The shortest absence worth reporting. Public for the same reason the cap
 /// is: a caller deciding whether to surface a report must use this value, not
 /// a copy of it. @spec SAVE-015
@@ -441,6 +442,18 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
         if !reward.is_finite() || *reward < 0.0 {
             *reward = 0.0;
         }
+    }
+
+    // What a colony has shown the clowder is kept only for a discovered,
+    // tradeable colony, and only of goods it offers: a stray entry is dropped
+    // rather than the save refused. @spec SAVE-026
+    let discovered = state.discovered.clone();
+    state
+        .learned_goods
+        .retain(|c, _| *c != crate::state::ColonyId::StarWhales && discovered.contains(c));
+    for (c, goods) in state.learned_goods.iter_mut() {
+        let offered = crate::content::colony_goods(*c);
+        goods.retain(|g| offered.iter().any(|(o, _)| o == g));
     }
 
     // v5 -> v6: the revealed-resource set arrives filled by the engine's own

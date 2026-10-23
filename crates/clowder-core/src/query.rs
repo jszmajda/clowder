@@ -93,6 +93,21 @@ pub enum LockReason {
     ShortBy { missing: Vec<(ResourceId, f64)> },
 }
 
+/// What a colony has shown the clowder, and what it says of the rest.
+/// @spec SIM-TRADE-012
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Offers {
+    /// Whether any caravan has reached the colony this meadow.
+    pub reached: bool,
+    /// Goods caravans have brought home from it, in the colony's own order.
+    pub learned: Vec<ResourceId>,
+    /// Goods it offers that no caravan has brought home yet, in that order,
+    /// each with whether it has them to trade at its current Pen Pal level.
+    pub unseen: Vec<(ResourceId, bool)>,
+    /// Whether it tells of its unseen goods by name: a warm colony does.
+    pub tells_by_name: bool,
+}
+
 /// The tinkerers' bench: the meadow's seats, who holds them, and who waits
 /// for one. @spec SIM-ENG-073
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -108,6 +123,33 @@ pub struct Bench {
 }
 
 impl GameState {
+    /// What a colony has shown the clowder: whether a caravan has reached it,
+    /// the goods caravans have brought home, the goods still unseen with
+    /// whether its Pen Pal level has them on offer yet, and whether it is warm
+    /// enough to name those unseen goods — disposition and friendship levels
+    /// being rules, a shell reads them here. @spec SIM-TRADE-012
+    pub fn neighbour_offers(&self, c: crate::state::ColonyId) -> Offers {
+        let Some(learned) = self.learned_goods.get(&c) else {
+            return Offers::default();
+        };
+        let level = self.penpal[c.ix()];
+        let goods = crate::content::colony_goods(c);
+        Offers {
+            reached: true,
+            learned: goods
+                .iter()
+                .filter(|(g, _)| learned.contains(g))
+                .map(|(g, _)| *g)
+                .collect(),
+            unseen: goods
+                .iter()
+                .filter(|(g, _)| !learned.contains(g))
+                .map(|(g, min)| (*g, level >= *min))
+                .collect(),
+            tells_by_name: self.standing(c) > 0.0,
+        }
+    }
+
     /// The tinkerers' bench: the seats the meadow's structures give, every
     /// binding, and every Tinkerer at home waiting for one.
     ///
