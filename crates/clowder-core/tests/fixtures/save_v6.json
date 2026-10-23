@@ -1,0 +1,255 @@
+{
+  "save_version": 6,
+  "saved_at_unix": 1760303600,
+  "owed_ticks": 0,
+  "report_so_far": null,
+  "state": {
+    "ticks": 0,
+    "rng": {
+      "state": 5651250107819020396,
+      "inc": 2885390081777926815
+    },
+    "resources": [
+      0.0,
+      1106.1574753228342,
+      0.0,
+      0.0,
+      1000.0,
+      0.0,
+      308.7269002292305,
+      55.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      350.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      150.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "structures": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      20,
+      5,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "kittens": [],
+    "ideas": [
+      "GiftEconomy"
+    ],
+    "pity": 0,
+    "famine_days": 0,
+    "recovery_days": 0,
+    "grumpy": false,
+    "next_seq": 0,
+    "zoomies_until": 0,
+    "speed": 1.0,
+    "roster_high_water": 0,
+    "revealed": [],
+    "revealed_resources": [
+      "Twigs",
+      "Pebbles",
+      "Embers",
+      "Shinies",
+      "Pep",
+      "Tiles"
+    ],
+    "journal": {
+      "recent": [
+        {
+          "tick": 0,
+          "item": {
+            "Happened": {
+              "TradeReturned": {
+                "colony": "Otters",
+                "caravans": 2,
+                "napped": 0,
+                "goods": [
+                  [
+                    "Twigs",
+                    1106.1574753228342
+                  ]
+                ]
+              }
+            }
+          }
+        },
+        {
+          "tick": 0,
+          "item": {
+            "Happened": {
+              "TradeReturned": {
+                "colony": "Rabbits",
+                "caravans": 1,
+                "napped": 0,
+                "goods": [
+                  [
+                    "Embers",
+                    308.7269002292305
+                  ]
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "kept": []
+    },
+    "kites_high_water": 0.0,
+    "mess": 0.0,
+    "pending_sky": null,
+    "elder": null,
+    "jamboree_until": 0,
+    "refinements": [],
+    "rules": [],
+    "devotion": 0.0,
+    "serenity": 0.0,
+    "peak_devotion": 0.0,
+    "enlightenment_tier": 0,
+    "rites": [],
+    "rite_counts": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "arches_bought": [],
+    "dream_drift": 0.0,
+    "promises": [],
+    "penpal": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "discovered": [
+      "Otters",
+      "Rabbits"
+    ],
+    "elder_wisdom": 0.0,
+    "warm_memories": 0.0,
+    "passed_down_wisdom": 0.0,
+    "generation": 0,
+    "traditions": [],
+    "family_album": [],
+    "armed_adventure": null,
+    "active_adventure": null,
+    "adventure_completions": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "adventure_rewards": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "adventure_done": false,
+    "tidy_progress": 0,
+    "sites_reached": [],
+    "dream_looms": [],
+    "stirred_dreams": 0.0,
+    "distant_dawn": false,
+    "whale_visit_years": 0,
+    "whale_contentment": 0,
+    "deja_vu_until": 0
+  }
+}
