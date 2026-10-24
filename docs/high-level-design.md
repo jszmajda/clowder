@@ -67,6 +67,7 @@ Ordered: when two conflict, the higher one wins.
 1. **Cozy over grim.** When a mechanic needs teeth, reach for moods, absences, and slowdowns — never death, sacrifice, or destruction of something the player loves. (The defensible opposite — real stakes and permanent loss — is a fine game; it is not this game.)
 2. **Idle-respecting.** When a design choice trades away-time against attended-time, favor the player who walked away. Absence is never punished; active play is a bonus, not an obligation.
 3. **Whimsy with clarity.** Flavor names win the label, but the plain mechanical truth is always one keypress away. A player should never lose a decision because a name was cute.
+4. **Kittens are the flavour.** Wherever a surface can show a kitten's personality or a bit of kitten fun, it does: kittens doing their own things, saying their own things, each one unlike the last. (The defensible opposite — a spare ledger where kittens are only a theme — is a fine game; it is not this game.)
 
 ## System Design
 
