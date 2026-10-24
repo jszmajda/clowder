@@ -17,7 +17,7 @@ Pouncing expeditions are the active-play burst: the player spends stored pep on 
 |---|---|
 | Feathers | (8 + 6.5 × pounce_ratio) × IH(squads) — every squad finds some |
 | Bells | hits ~ Binomial(squads, 0.45 + 0.02 × pounce_ratio); (5 + 4 × pounce_ratio) × IH(hits) |
-| Shinies | hits ~ Binomial(squads, 0.25); (0.5 + 0.5 × pounce_ratio) × IH(hits), cap-clamped |
+| Shinies | hits ~ Binomial(squads, 0.40); (1 + 1 × pounce_ratio) × IH(hits), cap-clamped |
 | Unicorns | Binomial(squads, 0.05) — each success is one unicorn who tags along, delighted |
 
 `pounce_ratio` = Σ PounceRatio effects (refinement ladder, the Bold Elder). A `PounceReturned` event reports the squads and the full haul (data, not prose). Yields land immediately (expeditions are a moment, not a timer — the idle tenet keeps clocks out of active play).
@@ -29,6 +29,7 @@ Pouncing expeditions are the active-play burst: the player spends stored pep on 
 | Instant resolution | Yields land on command | Timed expeditions with return events | Timers make active play an obligation to come back — the idle tenet says bursts, not appointments |
 | Irwin–Hall yields | Sum of uniforms per squad | Flat per-squad yield; single big roll | Bell-shaped hauls feel organic; per-squad draws keep big sends exciting without jackpot variance |
 | Unicorns follow home | Rare binomial per squad | Purchase; guaranteed drip | The first unicorn should be a story the player tells; the meadow structure takes it from there |
+| The shinies a pounce brings | A full pep store pounced at a mid-game pounce ratio brings home about one caravan's worth | A sprinkle of a few per hundred squads | A caravan's shinies costing many full pep stores makes pouncing feel like a chore and trading out of reach. The steady supply is the Couch Mine's (economy leaf), so a pounce's shinies are a bonus worth chasing, never the only way to get them (Tenet 2) |
 
 ## Open Questions & Future Decisions
 

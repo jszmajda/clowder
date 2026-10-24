@@ -1686,3 +1686,26 @@ fn v1_saves_zero_fill_the_widened_arrays_and_new_fields() {
     assert!((s.stock(ResourceId::Catnip) - 127.90187499999998).abs() < 1e-12);
     assert_eq!(s.structures[StructureId::CatnipPatch.ix()], 1);
 }
+
+/// Every Couch Mine turns up a little shinies as well as pebbles, so a
+/// meadow has a steady supply of the currency every caravan is priced in.
+/// @spec SIM-ECO-028
+#[test]
+fn couch_mines_turn_up_shinies() {
+    let d = content::structure_def(StructureId::CouchMine);
+    assert!(
+        d.productions.contains(&(ResourceId::Shinies, 0.001)),
+        "{:?}",
+        d.productions
+    );
+    let mut s = GameState::new(1201);
+    s.ideas.insert(IdeaId::CouchSpelunking);
+    grant(&mut s, StructureId::CouchMine, 10);
+    give(&mut s, ResourceId::Shinies, 0.0);
+    run_ticks(&mut s, 1000);
+    let got = s.stock(ResourceId::Shinies);
+    assert!(
+        (got - 10.0).abs() < 0.5,
+        "ten mines over 1000 ticks turn up about 10 shinies, got {got}"
+    );
+}

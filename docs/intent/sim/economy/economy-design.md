@@ -81,7 +81,7 @@ Cost of copy k+1 = `ceil(base × ratio^k)` per component. A gated structure reve
 | 6 | Cat Tree | 30 twigs, 10 fluff | 1.15 | houses 3; +10 fluff cap; +75 pep cap | TwigArchitecture |
 | 7 | Window Perch | 40 catnip, 8 twigs | 1.15 | houses 1; +0.001 curiosity/t; +25 pep cap | CozyCarpentry |
 | 8 | Herb Garden | 60 pebbles | 1.12 | catnip production +3%/bld | Horticulture |
-| 9 | Couch Mine | 90 twigs | 1.15 | +0.01 pebbles/t; pebble production +20%/bld | CouchSpelunking |
+| 9 | Couch Mine | 90 twigs | 1.15 | +0.01 pebbles/t; +0.001 shinies/t (what turns up under the couch); pebble production +20%/bld | CouchSpelunking |
 | 10 | Gravel Pit | 80 tiles, 15 brass | 1.15 | pebble production +35%/bld; +0.004 embers/t; mess 0.25 | Excavation |
 | 11 | Hearth | 45 pebbles, 25 twigs | 1.15 | converter −0.05 twigs −0.10 pebbles → +0.02 buttons/t, +0.001 embers/t; +2 happiness pts; mess 0.1 | Emberkeeping |
 | 12 | Kiln | 4 moonstone, 150 dew, 30 brass | 1.15 | converter −0.5 pebbles −0.024 dew → +0.15 buttons/t, +0.0005 moonstone/t; mess 1.0 | CeramicArts |
@@ -194,6 +194,7 @@ StorageFull rejection when the yield resource is at cap (unchanged rule).
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
+| Where shinies come from | A steady trickle from every Couch Mine, with pouncing as the active bonus on top | Pouncing alone; a new structure of their own | Shinies price every caravan, every promotion, and the rites, so a supply that only active play brings in makes trading an obligation to keep pouncing and lets a converter drain them while the player is away (Tenet 2). The Couch Mine is already built early and is where lost glinting things would be found; a structure of its own would be one more thing to learn for a currency the player needs from the first trade |
 | Id-space growth | Append-only enums; arrays zero-fill on load | Re-orderable ids; map-keyed stocks | Append-only keeps every old save's indexes valid and serialization canonical |
 | Staged rebuilds | None — separate structures | KG-style deltagrades (pasture→solar farm) | Staging recycles UI slots but resets counts and complicates save/undo semantics; a TUI-era decision, revisit after the shell exists |
 | Buttons' early source | Hearth converter (twigs+pebbles→buttons) | Mining-only; trade-only | Mirrors the inspiration's smelter so the early loop teaches converters before the Kiln tier |

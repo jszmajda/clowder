@@ -235,9 +235,9 @@ pub const POUNCE_BELLS_CHANCE: f64 = 0.45; // + 0.02 × pounce_ratio
 pub const POUNCE_BELLS_CHANCE_PER_RATIO: f64 = 0.02;
 pub const POUNCE_BELLS_BASE: f64 = 5.0;
 pub const POUNCE_BELLS_PER_RATIO: f64 = 4.0;
-pub const POUNCE_SHINIES_CHANCE: f64 = 0.25;
-pub const POUNCE_SHINIES_BASE: f64 = 0.5;
-pub const POUNCE_SHINIES_PER_RATIO: f64 = 0.5;
+pub const POUNCE_SHINIES_CHANCE: f64 = 0.40;
+pub const POUNCE_SHINIES_BASE: f64 = 1.0;
+pub const POUNCE_SHINIES_PER_RATIO: f64 = 1.0;
 pub const POUNCE_UNICORN_CHANCE: f64 = 0.05;
 
 // ---- Tinkerer background crafting ----
@@ -498,7 +498,9 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
     StructureDef {
         name: "Couch Mine",
         base_costs: &[(ResourceId::Twigs, 90.0)],
-        productions: &[(ResourceId::Pebbles, 0.01)],
+        // What turns up under the couch: pebbles, and now and then something
+        // that glints — the steady supply of shinies, pouncing the bonus.
+        productions: &[(ResourceId::Pebbles, 0.01), (ResourceId::Shinies, 0.001)],
         resource_ratios: &[(ResourceId::Pebbles, 0.20)],
         gate: StructureGate::Idea(IdeaId::CouchSpelunking),
         ..BLD

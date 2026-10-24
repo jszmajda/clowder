@@ -824,8 +824,8 @@ fn pounce_returns_instantly_with_an_event_matching_the_stock_deltas() {
 #[test]
 fn pounce_yields_match_their_distributions_over_many_squads() {
     // 400 pounces × 5 squads at pounce_ratio 0. Expected per squad:
-    // feathers 8 × 1/2 = 4, bells 5 × 0.45/2 = 1.125, shinies 0.5 × 0.25/2 =
-    // 0.0625, unicorns 0.05. Bounds are generous against seed luck.
+    // feathers 8 × 1/2 = 4, bells 5 × 0.45/2 = 1.125, shinies 1 × 0.40/2 =
+    // 0.2, unicorns 0.05. Bounds are generous against seed luck.
     let mut s = GameState::new(262);
     s.ideas.insert(IdeaId::PouncingPractice);
     let (mut feathers, mut bells, mut shinies, mut unicorns) = (0.0, 0.0, 0.0, 0u32);
@@ -861,7 +861,7 @@ fn pounce_yields_match_their_distributions_over_many_squads() {
         bells / squads
     );
     assert!(
-        (0.04..=0.09).contains(&(shinies / squads)),
+        (0.16..=0.24).contains(&(shinies / squads)),
         "shinies/squad: {}",
         shinies / squads
     );
@@ -899,6 +899,24 @@ fn pounce_ratio_raises_the_haul_and_shinies_clamp_at_cap() {
     assert!(
         (11.0..=16.5).contains(&per_squad),
         "boosted feathers/squad: {per_squad}"
+    );
+
+    // Shinies scale with the ratio too: (1 + 3) × 0.40 / 2 = 0.8 per squad.
+    let mut shinies = 0.0;
+    for _ in 0..100 {
+        give(&mut s, ResourceId::Pep, 400.0);
+        give(&mut s, ResourceId::Shinies, 0.0);
+        let events = s.apply(Command::Pounce(4)).unwrap();
+        for e in &events {
+            if let Event::PounceReturned { shinies: sh, .. } = e {
+                shinies += sh;
+            }
+        }
+    }
+    let per_squad = shinies / 400.0;
+    assert!(
+        (0.6..=1.0).contains(&per_squad),
+        "boosted shinies/squad: {per_squad}"
     );
 
     // Shinies clamp to cap at yield time: pounding away at a full shiny box
