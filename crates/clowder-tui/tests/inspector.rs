@@ -2532,7 +2532,11 @@ fn a_row_with_no_definition_states_only_its_name() {
         for (section, row) in every_row(&state) {
             if matches!(
                 row.key,
-                RowKey::Content(..) | RowKey::Resource(_) | RowKey::Bench
+                RowKey::Content(..)
+                    | RowKey::Resource(_)
+                    | RowKey::Bench
+                    | RowKey::Energy
+                    | RowKey::Mess
             ) {
                 continue;
             }

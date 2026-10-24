@@ -1423,7 +1423,7 @@ fn every_row_the_core_reports_no_lock_reason_for_wears_ready_whatever_the_stock(
                     }
                     "a craft's tinkerer count row"
                 }
-                RowKey::Content(..) | RowKey::Bench => continue,
+                RowKey::Content(..) | RowKey::Bench | RowKey::Energy | RowKey::Mess => continue,
                 RowKey::Fixed("Pounce") => "the fixed count-taking row priced per unit",
                 RowKey::Fixed(_) => "a fixed action row",
                 RowKey::Kitten(..) => "a kitten's row",
@@ -2635,6 +2635,8 @@ enum GroupKind {
     Rules,
     /// The tinkerers' bench (TUI-NAV-156).
     Tinkerers,
+    /// The Meadow's energy and mess readouts (TUI-NAV-167).
+    EnergyMess,
     Crafts,
     Rites,
     Arches,
@@ -2681,6 +2683,7 @@ fn group_kind(row: &Row) -> Option<GroupKind> {
         RowKey::Site(_) => GroupKind::Sites,
         RowKey::Adventure(_) => GroupKind::Adventures,
         RowKey::Bench => GroupKind::Tinkerers,
+        RowKey::Energy | RowKey::Mess => GroupKind::EnergyMess,
     })
 }
 
@@ -2688,7 +2691,7 @@ fn group_kind(row: &Row) -> Option<GroupKind> {
 fn design_groups(section: Section) -> Vec<GroupKind> {
     use GroupKind::*;
     match section {
-        Section::Meadow => vec![ThingsToDo, Structures, Stores],
+        Section::Meadow => vec![ThingsToDo, Structures, EnergyMess, Stores],
         Section::Clowder => vec![Jobs, ThingsToDo, Kittens],
         Section::Ideas => vec![Ideas, Refinements, Rules, Done],
         Section::Crafts => vec![Tinkerers, Crafts],
@@ -2778,7 +2781,8 @@ fn place_in_group(state: &GameState, section: Section, row: &Row) -> Option<usiz
         RowKey::Site(s) => Some(position_in(&SiteId::ALL, s)),
         RowKey::Adventure(None) => Some(0),
         RowKey::Adventure(Some(a)) => Some(1 + position_in(&clowder_core::AdventureId::ALL, a)),
-        RowKey::Bench => Some(0),
+        RowKey::Bench | RowKey::Energy => Some(0),
+        RowKey::Mess => Some(1),
     }
 }
 

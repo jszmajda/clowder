@@ -230,6 +230,22 @@ pub struct BestAt {
     pub bonus: f64,
 }
 
+/// The meadow's mess as a frontend states it. @spec SIM-ECO-049
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MessReport {
+    pub amount: f64,
+    /// None below the first level.
+    pub level: Option<u32>,
+    /// Change per game second at current state: accrual less dissipation.
+    pub rate: f64,
+    /// Catnip growth's multiplier from the level (1.0 with none).
+    pub catnip: f64,
+    /// Arrival chance's multiplier from the level (1.0 with none).
+    pub arrival: f64,
+    /// Happiness points the level costs (0.0 with none).
+    pub happiness: f64,
+}
+
 /// When a kitten joined the clowder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Arrival {
@@ -254,6 +270,55 @@ pub struct Bench {
 }
 
 impl GameState {
+    /// Each built structure that makes or uses energy, in structure order,
+    /// with its signed share at current state: what its copies make, as
+    /// production counts it, or minus what they use, as consumption counts it
+    /// — so the shares add up to both. @spec SIM-ECO-048
+    pub fn energy_shares(&self) -> Vec<(StructureId, f64)> {
+        let ratio = self.energy_consumption_ratio();
+        let mut out = Vec::new();
+        for s in StructureId::ALL {
+            let def = crate::content::structure_def(s);
+            if self.structures[s.ix()] == 0 {
+                continue;
+            }
+            let (made, used) = self.energy_of(s);
+            if def.energy_prod != 0.0 {
+                out.push((s, made));
+            }
+            if used != 0.0 {
+                out.push((s, -used * ratio));
+            }
+        }
+        out
+    }
+
+    /// The meadow's mess, its level, how fast it is changing, and what the
+    /// level slows. @spec SIM-ECO-049
+    pub fn mess_report(&self) -> MessReport {
+        use crate::content;
+        let level = self.mess_level();
+        let mut probe = self.clone();
+        let (accrual, _) = probe.resource_phases(&mut None);
+        let per_tick = accrual - content::MESS_DISSIPATION * self.mess;
+        MessReport {
+            amount: self.mess,
+            level: (level >= 0).then_some(level as u32),
+            rate: per_tick * content::TICKS_PER_SECOND as f64,
+            catnip: self.mess_catnip_factor(),
+            arrival: if level >= 1 {
+                content::MESS_ARRIVAL_FACTOR
+            } else {
+                1.0
+            },
+            happiness: if level >= 2 {
+                content::MESS_HAPPINESS_POINTS * (level - 1) as f64
+            } else {
+                0.0
+            },
+        }
+    }
+
     /// The facts about the kitten at roster position `ix`, or None where no
     /// kitten stands there. @spec SIM-KIT-041
     pub fn kitten_facts(&self, ix: usize) -> Option<KittenFacts> {

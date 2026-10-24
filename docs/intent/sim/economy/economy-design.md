@@ -152,9 +152,14 @@ Craft unlocks ride the idea tree (a craft is `Locked` until its granting idea). 
 
 `EnergyProduction` and consumption are effect sums over *active* structures. Deficit: `deficit_ratio = clamp(production/consumption, 0.25, 1.0)` multiplies the contributions of stack layers 6–8 (global production, Wisdom, Long Sun). Never a shutdown. Surplus: `surplus_ratio = min(production/max(consumption, 1), 1.75)` feeds only effects that name it (Moonlight Stage). Sunning Deck output is seasonal (winter ×0.75, summer ×1.25) — the grid breathes with the year.
 
+
+The core reports the meadow's energy structure by structure: for each built structure that makes or uses energy, in structure order, its signed share — what its copies make, seasonal and fuel-scaled as production is, or what they use, the Yarn Computer's escalation and any consumption ratio included — so the shares add up to the production and consumption above and a frontend can say where the energy goes without a rule of its own (SIM-ECO-048).
+
 ## MESS — Mess
 
 Dirty structures add mess/tick (see table); tidy effects subtract; dissipation is 1e-4 × mess per tick (analytic equilibrium = net_accrual / 1e-4). Mess level = floor(log10(mess / 1e4)) when mess ≥ 1e4, else none. Level effects (all slowdowns): L0+: catnip growth ×0.8 per level step, floored at ×0.25; L1+: arrival chance ×0.75; L2+: −5 happiness points per level above 1. Tidying (Toy Workshop rota refinement, later content) flips signs. Mess never destroys anything.
+
+The core reports mess as a frontend needs to state it: the amount, its level (or none), how fast it is changing per game second at current state — accrual less dissipation, as the next tick would move it — and what the level is slowing: the catnip-growth multiplier, the arrival multiplier, and the happiness points it costs (SIM-ECO-049).
 
 ## Jobs (extended roster)
 

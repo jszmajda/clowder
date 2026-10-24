@@ -41,6 +41,10 @@ pub enum RowKey {
     /// The tinkerers' bench: the one row about the tinkerers as a whole.
     /// @spec TUI-NAV-156
     Bench,
+    /// The meadow's energy, made against used. @spec TUI-NAV-167
+    Energy,
+    /// The meadow's mess. @spec TUI-NAV-167
+    Mess,
     /// A group header or a fixed row that is not content.
     Fixed(&'static str),
 }
@@ -85,6 +89,9 @@ impl Row {
 /// The tinkerers' bench's name — what its row draws, the palette finds, and
 /// the inspector names. @spec TUI-NAV-156
 pub const BENCH_NAME: &str = "Tinkerers' bench";
+/// The readout rows' names. @spec TUI-NAV-167
+pub const ENERGY_NAME: &str = "Energy";
+pub const MESS_NAME: &str = "Mess";
 
 /// The plain-word label a later row of a multi-row item draws in its name
 /// column, and states in the inspector beneath the item's name, in place of
@@ -208,6 +215,28 @@ fn meadow_rows(state: &GameState) -> Vec<Row> {
         }
     }
     out.extend(headed_group(state, "structures", structures));
+
+    // The readouts: energy while anything built makes or uses it, mess while
+    // anything built makes it or any is held. @spec TUI-NAV-167, TUI-NAV-098
+    let mut readouts = Vec::new();
+    if !state.energy_shares().is_empty() {
+        readouts.push(Row {
+            key: RowKey::Energy,
+            kind: RowKind::Display,
+            heavy: false,
+        });
+    }
+    let messy = StructureId::ALL.iter().any(|s| {
+        state.structures[s.ix()] > 0 && clowder_core::content::structure_def(*s).mess != 0.0
+    });
+    if messy || state.mess > 0.0 {
+        readouts.push(Row {
+            key: RowKey::Mess,
+            kind: RowKind::Display,
+            heavy: false,
+        });
+    }
+    out.extend(headed_group(state, "energy & mess", readouts));
 
     // The stores group: every revealed resource as an inspectable row.
     // @spec TUI-NAV-049

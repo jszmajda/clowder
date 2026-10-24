@@ -1823,3 +1823,75 @@ fn every_crafted_good_has_a_use() {
         }
     }
 }
+
+/// The meadow's energy, structure by structure: positive shares add up to
+/// production, negative to consumption, in structure order, the Yarn
+/// Computer's escalation included.
+/// @spec SIM-ECO-048
+#[test]
+fn energy_shares_add_up_to_production_and_consumption() {
+    let mut s = GameState::new(1401);
+    assert!(
+        s.energy_shares().is_empty(),
+        "nothing built, nothing listed"
+    );
+    s.ticks = 1251; // summer
+    grant(&mut s, StructureId::Cogworks, 2);
+    grant(&mut s, StructureId::SunningDeck, 1);
+    grant(&mut s, StructureId::WhiskerLab, 1);
+    grant(&mut s, StructureId::YarnComputer, 3);
+    let shares = s.energy_shares();
+    let ids: Vec<StructureId> = shares.iter().map(|(id, _)| *id).collect();
+    let mut sorted = ids.clone();
+    sorted.sort();
+    assert_eq!(ids, sorted, "structure order");
+    let made: f64 = shares
+        .iter()
+        .filter(|(_, v)| *v > 0.0)
+        .map(|(_, v)| v)
+        .sum();
+    let used: f64 = shares
+        .iter()
+        .filter(|(_, v)| *v < 0.0)
+        .map(|(_, v)| -v)
+        .sum();
+    assert!((made - s.energy_production()).abs() < 1e-9, "{made}");
+    assert!((used - s.energy_consumption()).abs() < 1e-9, "{used}");
+    let yarn = shares
+        .iter()
+        .find(|(id, _)| *id == StructureId::YarnComputer)
+        .unwrap()
+        .1;
+    assert!(
+        (yarn + (2.0 * 3.0 + 9.0 / 2.0)).abs() < 1e-9,
+        "the escalation: {yarn}"
+    );
+}
+
+/// The mess report: amount, level, direction, and what the level slows.
+/// @spec SIM-ECO-049
+#[test]
+fn the_mess_report_says_what_mess_is_doing() {
+    let mut s = GameState::new(1402);
+    let calm = s.mess_report();
+    assert_eq!(calm.level, None);
+    assert_eq!((calm.catnip, calm.arrival, calm.happiness), (1.0, 1.0, 0.0));
+
+    // Level 2: 1e6 mess.
+    s.mess = 1.0e6;
+    let r = s.mess_report();
+    assert_eq!(r.level, Some(2));
+    assert!((r.catnip - 0.8f64.powi(3)).abs() < 1e-9, "{}", r.catnip);
+    assert_eq!(r.arrival, 0.75);
+    assert_eq!(r.happiness, 5.0);
+    assert!(
+        r.rate < 0.0,
+        "with nothing making mess it dissipates: {}",
+        r.rate
+    );
+
+    // Something messy makes it rise while there is little of it.
+    let mut d = GameState::new(1403);
+    grant(&mut d, StructureId::GravelPit, 10);
+    assert!(d.mess_report().rate > 0.0, "{}", d.mess_report().rate);
+}

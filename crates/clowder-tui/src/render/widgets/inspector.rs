@@ -91,6 +91,8 @@ fn full_name(state: &GameState, key: &RowKey) -> String {
             }
         }
         RowKey::Bench => crate::nav::rows::BENCH_NAME.to_string(),
+        RowKey::Energy => crate::nav::rows::ENERGY_NAME.to_string(),
+        RowKey::Mess => crate::nav::rows::MESS_NAME.to_string(),
         RowKey::Fixed(tag) => humanize(tag),
     }
 }
@@ -1052,6 +1054,14 @@ fn draw_body(
             lines.push(Vec::new());
             lines.extend(bench_lines(state));
         }
+        RowKey::Energy => {
+            lines.push(Vec::new());
+            lines.extend(energy_lines(state));
+        }
+        RowKey::Mess => {
+            lines.push(Vec::new());
+            lines.extend(mess_lines(state));
+        }
         _ => {
             if let Some(p) = on_this_row {
                 lines.push(Vec::new());
@@ -1107,6 +1117,96 @@ fn draw_body(
     }
     let para = Paragraph::new(out).wrap(Wrap { trim: true });
     f.render_widget(para, area);
+}
+
+/// The Energy readout: the totals, every structure's share under what it
+/// makes and what it uses, and what the balance means — the core's answers,
+/// stated. @spec TUI-NAV-169
+fn energy_lines(state: &GameState) -> Vec<Pieces> {
+    let (made, used) = (state.energy_production(), state.energy_consumption());
+    let mut out = vec![
+        plain(format!("Made: {}", fmt::exact(made))),
+        plain(format!("Used: {}", fmt::exact(used))),
+    ];
+    let shares = state.energy_shares();
+    for (heading, sign, positive) in [("Makes energy:", "+", true), ("Uses energy:", "-", false)] {
+        let listed: Vec<&(clowder_core::StructureId, f64)> = shares
+            .iter()
+            .filter(|(_, v)| (*v > 0.0) == positive && *v != 0.0)
+            .collect();
+        if listed.is_empty() {
+            continue;
+        }
+        out.push(plain(heading.to_string()));
+        for (s, v) in listed {
+            out.push(plain(format!(
+                "{INDENT}{} \u{d7}{} {sign}{}",
+                content::structure_def(*s).name,
+                state.structures[s.ix()],
+                fmt::exact(v.abs())
+            )));
+        }
+    }
+    out.push(if used > made {
+        plain(format!(
+            "Short of energy: global production, Elder Wisdom, and the Long Sun run at {}%.",
+            (state.energy_deficit_ratio() * 100.0).round()
+        ))
+    } else if made > used {
+        plain(format!(
+            "Enough energy for everything, with {} to spare.",
+            fmt::exact(made - used)
+        ))
+    } else {
+        plain("Exactly enough energy for everything.".to_string())
+    });
+    out
+}
+
+/// The Mess readout: how much, which way it is going, what its level slows,
+/// and where the next level begins. @spec TUI-NAV-170
+fn mess_lines(state: &GameState) -> Vec<Pieces> {
+    let r = state.mess_report();
+    let direction = if r.rate > 0.0 {
+        format!("rising by {}/s.", fmt::exact(r.rate))
+    } else if r.rate < 0.0 {
+        format!("falling by {}/s.", fmt::exact(-r.rate))
+    } else {
+        "holding steady.".to_string()
+    };
+    let mut out = vec![plain(format!(
+        "Mess: {}, {direction}",
+        fmt::exact(r.amount)
+    ))];
+    match r.level {
+        None => out.push(plain("Not enough to slow anything down.".to_string())),
+        Some(_) => {
+            if r.catnip < 1.0 {
+                out.push(plain(format!(
+                    "Catnip grows at {}% of its pace.",
+                    fmt::exact(r.catnip * 100.0)
+                )));
+            }
+            if r.arrival < 1.0 {
+                out.push(plain(format!(
+                    "Kittens arrive at {}% of their pace.",
+                    fmt::exact(r.arrival * 100.0)
+                )));
+            }
+            if r.happiness > 0.0 {
+                out.push(plain(format!(
+                    "Happiness \u{2212}{}.",
+                    fmt::exact(r.happiness)
+                )));
+            }
+        }
+    }
+    let next = r.level.map_or(0, |l| l + 1);
+    out.push(plain(format!(
+        "Level {next} begins at {}.",
+        fmt::exact(clowder_core::content::MESS_LEVEL_UNIT * 10f64.powi(next as i32))
+    )));
+    out
 }
 
 /// A kitten's `about` card, beneath everything else its row states: a dim

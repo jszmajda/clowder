@@ -96,15 +96,18 @@ fn sky_live(state: &GameState) -> bool {
         .any(|(t, _)| *t == clowder_core::Timer::SkyEvent)
 }
 
-/// The four attention opportunities, in the fixed order idle, sky, new, away,
-/// each live or not. Shared by the counted and uncounted chip clusters so the
-/// two never drift on which chips are live.
-fn live_opportunities(state: &GameState, view: &ViewState) -> [bool; 4] {
+/// The five attention opportunities, in the fixed order idle, sky, new,
+/// away, energy, each live or not. Shared by the counted and uncounted chip
+/// clusters so the two never drift on which chips are live. The energy chip
+/// is live exactly while the core reports the meadow using more energy than
+/// it makes. @spec TUI-NAV-020
+fn live_opportunities(state: &GameState, view: &ViewState) -> [bool; 5] {
     [
         idle_here_count(state) > 0,
         sky_live(state),
         new_content_count(state, view) > 0,
         view.reports.iter().any(|r| !r.dismissed),
+        state.energy_consumption() > state.energy_production(),
     ]
 }
 
@@ -125,6 +128,7 @@ fn chip_labels(state: &GameState, view: &ViewState, with_counts: bool) -> Vec<St
             "!sky".to_string(),
             format!("★{new} new"),
             "~away".to_string(),
+            "↯energy".to_string(),
         ]
     } else {
         [
@@ -132,6 +136,7 @@ fn chip_labels(state: &GameState, view: &ViewState, with_counts: bool) -> Vec<St
             "!sky".to_string(),
             "★new".to_string(),
             "~away".to_string(),
+            "↯energy".to_string(),
         ]
     };
     labels

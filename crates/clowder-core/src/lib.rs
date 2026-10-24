@@ -23,7 +23,8 @@ pub use events::{Event, EventClass};
 pub use journal::{Journal, JournalEntry, JournalItem};
 pub use profile::{draw_profile, fur_words};
 pub use query::{
-    Act, Arrival, Bench, BestAt, FlowSource, KittenFacts, LockReason, Offers, Source, Timer,
+    Act, Arrival, Bench, BestAt, FlowSource, KittenFacts, LockReason, MessReport, Offers, Source,
+    Timer,
 };
 pub use rng::Pcg32;
 pub use save::{

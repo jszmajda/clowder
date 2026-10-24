@@ -886,6 +886,7 @@ fn header_words_for(row: &Row) -> &'static str {
         RowKey::Content(ContentId::DreamLoom(_), _) => "loom upgrades",
         RowKey::Content(ContentId::Craft(_), _) => "crafts",
         RowKey::Bench => "tinkerers",
+        RowKey::Energy | RowKey::Mess => "energy & mess",
         RowKey::Resource(_) => "stores",
         RowKey::Kitten(..) => "kittens",
         RowKey::Colony(..) => "colonies",
@@ -897,7 +898,10 @@ fn header_words_for(row: &Row) -> &'static str {
 /// Every (section, header words) the design gives a several-group section.
 fn designed_headers() -> BTreeSet<(usize, &'static str)> {
     let table: [(Section, &[&str]); 10] = [
-        (Section::Meadow, &["things to do", "structures", "stores"]),
+        (
+            Section::Meadow,
+            &["things to do", "structures", "energy & mess", "stores"],
+        ),
         (Section::Clowder, &["jobs", "things to do", "kittens"]),
         (Section::Ideas, &["ideas", "refinements", "rules"]),
         (Section::Crafts, &["tinkerers", "crafts"]),
@@ -1879,7 +1883,10 @@ fn every_list_row_draws_its_count_and_cost_in_fixed_fields_at_its_right() {
                                 "{at}: a blank column before the first field.\n{drawn:?}"
                             );
                         }
-                        if matches!(row.key, RowKey::Kitten(..) | RowKey::Bench) {
+                        if matches!(
+                            row.key,
+                            RowKey::Kitten(..) | RowKey::Bench | RowKey::Energy | RowKey::Mess
+                        ) {
                             // A kitten's row states neither heading; its
                             // fields' place carries the kitten's state
                             // instead, swept over every state, width, and

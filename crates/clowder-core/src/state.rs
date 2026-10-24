@@ -2161,50 +2161,49 @@ impl GameState {
     /// its fuel fraction.
     // @spec SIM-ECO-035
     pub fn energy_production(&self) -> f64 {
-        let mut sum = 0.0;
-        for s in StructureId::ALL {
-            let count = self.structures[s.ix()] as f64;
-            if count == 0.0 {
-                continue;
-            }
-            let base = content::structure_def(s).energy_prod;
-            sum += match s {
-                StructureId::SunningDeck | StructureId::SolarArray => {
-                    base * count * content::sunning_deck_season_factor(self.season())
-                }
-                StructureId::DynamoWheel => base * count * self.dynamo_fuel_fraction(),
-                _ => base * count,
-            };
+        StructureId::ALL.iter().map(|s| self.energy_of(*s).0).sum()
+    }
+
+    /// What one structure's built copies make and use, before the meadow-wide
+    /// consumption ratio: the one statement of the energy rules that
+    /// production, consumption, and the per-structure shares all read.
+    /// @spec SIM-ECO-048
+    pub(crate) fn energy_of(&self, s: StructureId) -> (f64, f64) {
+        let count = self.structures[s.ix()] as f64;
+        if count == 0.0 {
+            return (0.0, 0.0);
         }
-        sum
+        let def = content::structure_def(s);
+        let made = match s {
+            StructureId::SunningDeck | StructureId::SolarArray => {
+                def.energy_prod * count * content::sunning_deck_season_factor(self.season())
+            }
+            StructureId::DynamoWheel => def.energy_prod * count * self.dynamo_fuel_fraction(),
+            _ => def.energy_prod * count,
+        };
+        let used = match s {
+            StructureId::YarnComputer => 2.0 * count + count * count / 2.0,
+            _ => def.energy_cons * count,
+        };
+        (made, used)
+    }
+
+    /// The meadow-wide multiplier on energy use. The Frugal Meadow reward
+    /// (−2% per completion) and its twist (+10% while active) both flow
+    /// through the EnergyConsumptionRatio key, summed together; 1.0 with
+    /// neither active. @spec SIM-ADV-005, SIM-ADV-002
+    pub(crate) fn energy_consumption_ratio(&self) -> f64 {
+        (1.0 + self.effect(crate::effects::Effect::EnergyConsumptionRatio)).max(0.0)
     }
 
     /// Energy consumed by active structures; Yarn Computers draw
     /// 2n + n²/2 in total at n copies.
     // @spec SIM-ECO-035
     pub fn energy_consumption(&self) -> f64 {
-        let mut sum = 0.0;
-        for s in StructureId::ALL {
-            let count = self.structures[s.ix()] as f64;
-            if count == 0.0 {
-                continue;
-            }
-            sum += match s {
-                StructureId::YarnComputer => 2.0 * count + count * count / 2.0,
-                _ => content::structure_def(s).energy_cons * count,
-            };
-        }
-        // The Frugal Meadow reward (−2% per completion) and its twist (+10%
-        // while active) both flow through the EnergyConsumptionRatio key: the
-        // twist raises the draw, the reward lowers it, summed together. The
-        // effect is 1.0 (no change) with neither active — the common hot path.
-        // @spec SIM-ADV-005, SIM-ADV-002
-        sum * (1.0 + self.effect(crate::effects::Effect::EnergyConsumptionRatio)).max(0.0)
+        let sum: f64 = StructureId::ALL.iter().map(|s| self.energy_of(*s).1).sum();
+        sum * self.energy_consumption_ratio()
     }
 
-    /// Brownout multiplier for production-stack layers 6–8:
-    /// clamp(production/consumption, 0.25, 1.0); 1.0 on a quiet grid.
-    // @spec SIM-ECO-036
     pub fn energy_deficit_ratio(&self) -> f64 {
         let consumption = self.energy_consumption();
         if consumption <= EPSILON {

@@ -126,6 +126,16 @@ const SETTLED_TICKS: u64 = 362 * content::TICKS_PER_DAY;
 
 /// A meadow far enough along that every one of the ten sections has at least
 /// one revealed row — the state the tab bar's overflow behaviour is about.
+/// Enough energy for everything built, so the ↯energy chip and the Energy
+/// row's `short` tag stay quiet: the chips these tests measure are the other
+/// four, and the energy chip is measured in `readouts.rs`. Called again after
+/// a fixture moves the calendar, since the season shapes some producers.
+fn power_enough(s: &mut GameState) {
+    while s.energy_consumption() > s.energy_production() {
+        s.structures[StructureId::Cogworks.ix()] += 1;
+    }
+}
+
 fn every_section_revealed() -> GameState {
     let mut s = GameState::new(7);
     s.ticks = SETTLED_TICKS;
@@ -156,6 +166,7 @@ fn every_section_revealed() -> GameState {
             section.title()
         );
     }
+    power_enough(&mut s);
     s
 }
 
@@ -1605,6 +1616,7 @@ fn the_header_draws_the_first_step_that_fits_at_every_width() {
         s.pending_sky_event = Some(s.ticks + 5);
         s.kittens.extend(employed(12_209));
         s.speed = 0.25;
+        power_enough(&mut s);
         (s, v)
     };
     type Case = (
@@ -1727,6 +1739,7 @@ fn the_header_rule_underlines_every_header_cell_at_every_width_step_and_changes_
         s.pending_sky_event = Some(s.ticks + 5);
         s.kittens.extend(employed(12_209));
         s.speed = 0.25;
+        power_enough(&mut s);
         (s, v)
     };
     type Case = ([bool; 4], (usize, usize), (GameState, ViewState));

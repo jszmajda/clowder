@@ -34,6 +34,8 @@ enum Item {
     Adventure(Option<AdventureId>),
     Kitten(usize),
     Bench,
+    Energy,
+    Mess,
     Fixed(&'static str),
 }
 
@@ -46,6 +48,8 @@ fn item_of(key: &RowKey) -> Item {
         RowKey::Adventure(a) => Item::Adventure(*a),
         RowKey::Kitten(ix, _) => Item::Kitten(*ix),
         RowKey::Bench => Item::Bench,
+        RowKey::Energy => Item::Energy,
+        RowKey::Mess => Item::Mess,
         RowKey::Fixed(tag) => Item::Fixed(tag),
     }
 }
@@ -135,6 +139,8 @@ fn name_for(state: &GameState, key: &RowKey) -> String {
             }
         }
         RowKey::Bench => super::rows::BENCH_NAME.to_string(),
+        RowKey::Energy => super::rows::ENERGY_NAME.to_string(),
+        RowKey::Mess => super::rows::MESS_NAME.to_string(),
         RowKey::Fixed(tag) => humanize(tag),
     }
 }

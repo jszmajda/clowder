@@ -45,6 +45,9 @@ pub(crate) fn style_for(role: Role) -> Style {
 pub(crate) struct Piece {
     text: String,
     coat: Option<(ResourceId, usize)>,
+    /// A state colour worn by this run alone, as the `short` tag wears
+    /// attention (TUI-THEME-015) — on a line that lets colour show.
+    role: Option<Role>,
 }
 
 impl Piece {
@@ -52,6 +55,16 @@ impl Piece {
         Piece {
             text: text.into(),
             coat: None,
+            role: None,
+        }
+    }
+
+    /// Words wearing one state colour.
+    pub(crate) fn role(text: impl Into<String>, role: Role) -> Self {
+        Piece {
+            text: text.into(),
+            coat: None,
+            role: Some(role),
         }
     }
 
@@ -61,6 +74,7 @@ impl Piece {
         Piece {
             text: drawn.into(),
             coat: Some((r, full_chars)),
+            role: None,
         }
     }
 }
@@ -110,7 +124,13 @@ pub(crate) fn line_from_pieces(
                     cells.push((c, style));
                 }
             }
-            _ => cells.extend(piece.text.chars().map(|c| (c, base))),
+            _ => match piece.role.and_then(|r| r.color()) {
+                Some(colour) if coats => {
+                    let style = base.fg(colour).remove_modifier(Modifier::DIM);
+                    cells.extend(piece.text.chars().map(|c| (c, style)));
+                }
+                _ => cells.extend(piece.text.chars().map(|c| (c, base))),
+            },
         }
     }
 
@@ -507,6 +527,8 @@ fn row_label(state: &GameState, row: &Row) -> String {
             }
         }
         RowKey::Bench => crate::nav::rows::BENCH_NAME.to_string(),
+        RowKey::Energy => crate::nav::rows::ENERGY_NAME.to_string(),
+        RowKey::Mess => crate::nav::rows::MESS_NAME.to_string(),
         RowKey::Fixed(tag) => humanize(tag),
     }
 }
@@ -821,6 +843,13 @@ fn row_line(
             " {:<place$}",
             kitten_state_word(state, ix)
         )));
+    } else if matches!(row.key, RowKey::Energy | RowKey::Mess) {
+        // The readouts state no count or cost either; their totals stand in
+        // their place, as the bench's seats do. @spec TUI-RENDER-030
+        let total = fixed - (cursor.chars().count() + 2);
+        let place = total.saturating_sub(1);
+        suffix.push(Piece::plain(" "));
+        suffix.extend(readout_pieces(state, &row.key, place));
     } else if row.key == RowKey::Bench {
         // The bench states no count or cost either; its seats stand in their
         // place, as a kitten's word does. @spec TUI-RENDER-028
@@ -972,6 +1001,42 @@ fn bench_summary(state: &GameState, place: usize) -> String {
         full
     } else {
         fmt::fit(&seats, place)
+    }
+}
+
+/// The text a readout row draws in its fields' place, fitted to `place`:
+/// the energy made and used, and ` · short` with `short` in attention while
+/// the meadow uses more than it makes, the clause kept and the figures cut
+/// where the place is short; or the mess level, `tidy` with none.
+/// @spec TUI-NAV-168, TUI-RENDER-030, TUI-THEME-015
+fn readout_pieces(state: &GameState, key: &RowKey, place: usize) -> Vec<Piece> {
+    let pad = |used: usize| Piece::plain(" ".repeat(place.saturating_sub(used)));
+    if *key == RowKey::Mess {
+        let text = match state.mess_report().level {
+            None => "tidy".to_string(),
+            Some(l) => format!("level {l}"),
+        };
+        let text = fmt::fit(&text, place);
+        let used = text.chars().count();
+        return vec![Piece::plain(text), pad(used)];
+    }
+    let (made, used) = (state.energy_production(), state.energy_consumption());
+    let figures = format!("{} made · {} used", fmt::compact(made), fmt::compact(used));
+    if used > made {
+        let clause = " · short";
+        let room = place.saturating_sub(clause.chars().count());
+        let figures = fmt::fit(&figures, room);
+        let n = figures.chars().count() + clause.chars().count();
+        vec![
+            Piece::plain(figures),
+            Piece::plain(" · "),
+            Piece::role("short", Role::Attention),
+            pad(n),
+        ]
+    } else {
+        let figures = fmt::fit(&figures, place);
+        let n = figures.chars().count();
+        vec![Piece::plain(figures), pad(n)]
     }
 }
 
