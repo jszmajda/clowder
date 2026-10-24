@@ -65,7 +65,7 @@ A resource's reveal emits no event and enters no journal. The store's row arrivi
 One serde-serializable struct, the single source of truth:
 
 - `ticks: u64` — monotone tick counter; the calendar is derived from it (no separate stored date to drift).
-- `rng: Pcg32` — hand-rolled PCG-32 (64-bit state, 64-bit stream constant); serializable; the only randomness source.
+- `rng: Pcg32` — hand-rolled PCG-32 (64-bit state, 64-bit stream constant); serializable; the only randomness source. A kitten's profile draws nothing from it: the kittens leaf draws a profile from a PCG-32 local to the draw, seeded by hashing the kitten's name and generation and never stored, so a profile is a fixed function of what the save holds (kittens leaf: Drawing a profile).
 - `resources` — stocks per resource kind (economy leaf defines kinds/caps).
 - `structures` — owned count per structure kind.
 - `kittens` — the roster (kittens leaf defines the entry shape).
