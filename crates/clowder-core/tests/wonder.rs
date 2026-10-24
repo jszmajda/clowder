@@ -968,7 +968,7 @@ fn caravans_resolve_against_standing_success_yields_a_basket_a_nap_still_pays() 
     s.discovered.insert(ColonyId::Owls); // shy, −0.10
     give(&mut s, ResourceId::Pep, 5_000.0);
     give(&mut s, ResourceId::Shinies, 1_500.0);
-    give(&mut s, ResourceId::Mint, 50_000.0);
+    give(&mut s, ResourceId::Mint, 5_000.0);
     s.apply(Command::Trade(ColonyId::Owls, 100)).unwrap();
     assert_eq!(
         s.stock(ResourceId::Pep),
@@ -1026,7 +1026,12 @@ fn the_seven_tradeable_colonies_match_the_design_table() {
             (Shinies, 250.0),
             (Moonstone, 1.0, 0.95),
         ),
-        (ColonyId::Owls, -0.10, (Mint, 500.0), (Curiosity, 80.0, 1.0)),
+        (
+            ColonyId::Owls,
+            -0.10,
+            (Mint, 50.0),
+            (Curiosity, 2500.0, 1.0),
+        ),
     ];
     for (colony, standing, buy, (sell_r, sell_amt, sell_chance)) in table {
         let def = content::colony_def(colony);

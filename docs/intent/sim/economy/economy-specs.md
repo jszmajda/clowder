@@ -65,6 +65,7 @@ Job yields are per effective worker (SIM-KIT: Home kittens holding the job) per 
 
 - [x] **SIM-ECO-033**: When Craft(id) is applied for an unlocked recipe with sufficient inputs, the system shall spend the recipe's inputs (all-or-nothing, epsilon-tolerant) and add 1 × (1 + craft-ratio effects) of the output; recipes are Locked until their granting idea is researched.
 - [x] **SIM-ECO-034**: The system shall define exactly the recipes of the economy design's CRAFT table, and every recipe's inputs shall be producible no later than the idea band in which the recipe unlocks (no dead recipes — property-tested), excepting the expedition/colony faucets (feathers, bells, mint, shinies, unicorns) owed by later waves.
+- [x] **SIM-ECO-047**: The system shall give every crafted good at least one use — a structure's price or converter input, a recipe's input, a refinement's materials, an idea's gate, a rite's or arch upgrade's price, a dream loom's price, a colony's buy-resource, or a sky mission's fuel — so no recipe makes something nothing spends.
 
 ## Depth: Energy (NRG facet)
 

@@ -269,6 +269,22 @@ fn the_site_ladder_is_thirteen_in_order_with_fuels_and_outposts() {
     assert!(fuel_has(cloud, Cometsilk, 500.0) && fuel_has(cloud, Echoes, 100.0));
     let star = content::site_def(SiteId::TheFurthestStar).mission_fuel;
     assert!(fuel_has(star, JarsOfPurrs, 500.0) && fuel_has(star, Echoes, 16000.0));
+
+    // Balloons lift the climbing missions; dreamweave goes to the farthest.
+    for (site, r, n) in [
+        (SiteId::Rooftops, ResourceId::Balloons, 2.0),
+        (SiteId::SunnyHill, ResourceId::Balloons, 5.0),
+        (SiteId::CloudNine, ResourceId::Balloons, 20.0),
+        (SiteId::TheAurora, ResourceId::Dreamweave, 5.0),
+        (SiteId::TheMilkyWay, ResourceId::Dreamweave, 15.0),
+        (SiteId::TheFarShore, ResourceId::Dreamweave, 40.0),
+        (SiteId::TheFurthestStar, ResourceId::Dreamweave, 100.0),
+    ] {
+        assert!(
+            fuel_has(content::site_def(site).mission_fuel, r, n),
+            "{site:?} {r:?}"
+        );
+    }
 }
 
 // =====================================================================

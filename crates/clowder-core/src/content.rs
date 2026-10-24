@@ -491,6 +491,8 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         name: "Herb Garden",
         base_costs: &[(ResourceId::Pebbles, 60.0)],
         ratio: 1.12,
+        // A corner of every garden grows mint, a luxury every kitten uses.
+        productions: &[(ResourceId::Mint, 0.00015)],
         resource_ratios: &[(ResourceId::Catnip, 0.03)],
         gate: StructureGate::Idea(IdeaId::Horticulture),
         ..BLD
@@ -528,8 +530,9 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
     },
     StructureDef {
         name: "Kiln",
+        // No moonstone: the Kiln is where a meadow's own moonstone comes from.
         base_costs: &[
-            (ResourceId::Moonstone, 4.0),
+            (ResourceId::Tiles, 60.0),
             (ResourceId::Dew, 150.0),
             (ResourceId::Brass, 30.0),
         ],
@@ -740,7 +743,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         ratio: 1.25,
         // Amplifies dynamos (COGWORKS_DYNAMO_BOOST); converts capped raws at
         // year close (SIM-ECO-039).
-        energy_prod: 1.0,
+        energy_prod: 3.0,
         mess: 0.5,
         gate: StructureGate::Idea(IdeaId::Cogwheels),
         ..BLD
@@ -3746,10 +3749,10 @@ static COLONIES: [ColonyDef; 8] = [
     ColonyDef {
         name: "Owls",
         start_standing: -0.10,
-        buy: (ResourceId::Mint, 500.0),
+        buy: (ResourceId::Mint, 50.0),
         sells: &[ColonySell {
             resource: ResourceId::Curiosity,
-            amount: 80.0,
+            amount: 2500.0,
             ..SELL
         }],
     },
@@ -3975,12 +3978,20 @@ static SITES: [SiteDef; 13] = [
     },
     SiteDef {
         name: "Rooftops",
-        mission_fuel: &[(ResourceId::Moonmilk, 50.0), (ResourceId::Skymaps, 500.0)],
+        mission_fuel: &[
+            (ResourceId::Moonmilk, 50.0),
+            (ResourceId::Skymaps, 500.0),
+            (ResourceId::Balloons, 2.0),
+        ],
         outpost: StructureId::WeatherVane,
     },
     SiteDef {
         name: "Sunny Hill",
-        mission_fuel: &[(ResourceId::Moonmilk, 150.0), (ResourceId::Skymaps, 2000.0)],
+        mission_fuel: &[
+            (ResourceId::Moonmilk, 150.0),
+            (ResourceId::Skymaps, 2000.0),
+            (ResourceId::Balloons, 5.0),
+        ],
         outpost: StructureId::SolarArray,
     },
     SiteDef {
@@ -4008,12 +4019,20 @@ static SITES: [SiteDef; 13] = [
     },
     SiteDef {
         name: "Cloud Nine",
-        mission_fuel: &[(ResourceId::Cometsilk, 500.0), (ResourceId::Echoes, 100.0)],
+        mission_fuel: &[
+            (ResourceId::Cometsilk, 500.0),
+            (ResourceId::Echoes, 100.0),
+            (ResourceId::Balloons, 20.0),
+        ],
         outpost: StructureId::SkyDock,
     },
     SiteDef {
         name: "The Aurora",
-        mission_fuel: &[(ResourceId::JarsOfPurrs, 5.0), (ResourceId::Echoes, 250.0)],
+        mission_fuel: &[
+            (ResourceId::JarsOfPurrs, 5.0),
+            (ResourceId::Echoes, 250.0),
+            (ResourceId::Dreamweave, 5.0),
+        ],
         outpost: StructureId::AuroraLantern,
     },
     SiteDef {
@@ -4021,6 +4040,7 @@ static SITES: [SiteDef; 13] = [
         mission_fuel: &[
             (ResourceId::JarsOfPurrs, 25.0),
             (ResourceId::Echoes, 1000.0),
+            (ResourceId::Dreamweave, 15.0),
         ],
         outpost: StructureId::StarNursery,
     },
@@ -4029,6 +4049,7 @@ static SITES: [SiteDef; 13] = [
         mission_fuel: &[
             (ResourceId::JarsOfPurrs, 100.0),
             (ResourceId::Echoes, 4000.0),
+            (ResourceId::Dreamweave, 40.0),
         ],
         outpost: StructureId::FarBeacon,
     },
@@ -4037,6 +4058,7 @@ static SITES: [SiteDef; 13] = [
         mission_fuel: &[
             (ResourceId::JarsOfPurrs, 500.0),
             (ResourceId::Echoes, 16000.0),
+            (ResourceId::Dreamweave, 100.0),
         ],
         outpost: StructureId::WishingStar,
     },

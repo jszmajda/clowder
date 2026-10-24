@@ -58,9 +58,9 @@ The full id space (append-only; serialized as an enum-indexed array, so **new id
 | 38 | Schemes | crafted | ∞ | band-3 gate currency |
 | 39 | Cairns | crafted | ∞ | monument material |
 | 40 | Kites | crafted | ∞ | trade & sky capacity |
-| 41 | Balloons | crafted | ∞ | dew logistics |
+| 41 | Balloons | crafted | ∞ | lift for the sky missions that go up high (cosmic leaf) |
 | 42 | Moonmilk | crafted | ∞ | cosmic propellant |
-| 43 | Dreamweave | crafted | ∞ | late-game fabric |
+| 43 | Dreamweave | crafted | ∞ | late-game fabric, carried on the missions to the farthest sites (cosmic leaf) |
 | 44 | Cometsilk | crafted | ∞ | stardust textile |
 | 45 | Cleverness | transient | ∞ | the Yarn Computer's accumulating wit |
 
@@ -80,11 +80,11 @@ Cost of copy k+1 = `ceil(base × ratio^k)` per component. A gated structure reve
 | 5 | Scratching Post | 15 twigs, 5 fluff | 1.15 | +5 happiness pts | ScratchingArts |
 | 6 | Cat Tree | 30 twigs, 10 fluff | 1.15 | houses 3; +10 fluff cap; +75 pep cap | TwigArchitecture |
 | 7 | Window Perch | 40 catnip, 8 twigs | 1.15 | houses 1; +0.001 curiosity/t; +25 pep cap | CozyCarpentry |
-| 8 | Herb Garden | 60 pebbles | 1.12 | catnip production +3%/bld | Horticulture |
+| 8 | Herb Garden | 60 pebbles | 1.12 | catnip production +3%/bld; +0.00015 mint/t (a corner of every garden grows it) | Horticulture |
 | 9 | Couch Mine | 90 twigs | 1.15 | +0.01 pebbles/t; +0.001 shinies/t (what turns up under the couch); pebble production +20%/bld | CouchSpelunking |
 | 10 | Gravel Pit | 80 tiles, 15 brass | 1.15 | pebble production +35%/bld; +0.004 embers/t; mess 0.25 | Excavation |
 | 11 | Hearth | 45 pebbles, 25 twigs | 1.15 | converter −0.05 twigs −0.10 pebbles → +0.02 buttons/t, +0.001 embers/t; +2 happiness pts; mess 0.1 | Emberkeeping |
-| 12 | Kiln | 4 moonstone, 150 dew, 30 brass | 1.15 | converter −0.5 pebbles −0.024 dew → +0.15 buttons/t, +0.0005 moonstone/t; mess 1.0 | CeramicArts |
+| 12 | Kiln | 60 tiles, 150 dew, 30 brass | 1.15 | converter −0.5 pebbles −0.024 dew → +0.15 buttons/t, +0.0005 moonstone/t; mess 1.0 | CeramicArts |
 | 13 | Shed | 2 wands, 3 tiles | 1.15 | caps: twigs+150, pebbles+200, buttons+25, embers+30, moonstone+10, shinies+5 | PackRattery |
 | 14 | Porch | 40 tiles, 60 badges, 4 lattices | 1.15 | caps: catnip+1000, twigs+400, pebbles+500, buttons+80, embers+50, moonstone+25, shinies+12; all Porch caps ×(1+LDR(0.01·kite high-water, 2.25)) — the multiplier ratchets on the most kites ever held, so spending kites never shrinks storage (cozy: no confiscation-by-clamp) | PorchLogistics |
 | 15 | Study Nook | 30 twigs, 45 pebbles, 80 curiosity | 1.15 | curiosity production +20%/bld; +200 curiosity cap | Notetaking |
@@ -99,7 +99,7 @@ Cost of copy k+1 = `ceil(base × ratio^k)` per component. A gated structure reve
 | 24 | Treat Bakery | 4000 pebbles, 150 shinies, 150 badges | 1.15 | converter −0.004 shinies −0.6 pep → feathers ×1.25·mpr, bells ×0.3·mpr where mpr = pep_cap × 0.007/100 | TreatAlchemy |
 | 25 | Tea House | 800 twigs, 600 charm, 4 mint, 300 quills | 1.5 | jamboree ratio +1%/bld; jamboree arrival +0.1%/bld | TeaCeremonies |
 | 26 | Dew Collector | 40 brass, 20 cogs, 20 lattices | 1.15 | +0.02 dew/t; +1200 dew cap | DewHarvest |
-| 27 | Cogworks | 50 brass, 15 cogs | 1.25 | Dynamo boost +15%/bld; energy +1; yearly auto-craft of capped raws (98% rule); mess 0.5 | Cogwheels |
+| 27 | Cogworks | 50 brass, 15 cogs | 1.25 | Dynamo boost +15%/bld; energy +3; yearly auto-craft of capped raws (98% rule); mess 0.5 | Cogwheels |
 | 28 | Dynamo Wheel | 4 cogs, 8 moonsteel, 1 scheme | 1.25 | −0.05 dew/t; global production +2%/active ×(1+0.15·Cogworks) × fuel fraction; energy +5 × fuel fraction; mess 5 (a starved wheel spins down proportionally) | Dynamos |
 | 29 | Sunning Deck | 60 moonstone | 1.15 | energy +2 (winter ×0.75, summer ×1.25) | SolarBasking |
 | 30 | Stream Wheel | 120 moonstone, 25 pavers | 1.15 | energy +5 | Millworks |
@@ -194,6 +194,10 @@ StorageFull rejection when the yield resource is at cap (unchanged rule).
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
+| Energy before the band-3 producers | The Cogworks, the one band-1 producer, gives enough energy that one covers a band-2 consumer or two | Band-2 consumers with only a +1 producer; band-2 consumers that use no energy | Every band-2 energy consumer arrives a band before any other producer, so a +1 Cogworks at a 1.25 price ramp leaves a meadow in deficit for the whole band, with the deficit cutting the global layers it has no other way to restore. Consumers that use no energy until later would remove the trade-off the band introduces energy to teach |
+| The Kiln's price | Tiles, dew, and brass, no moonstone | A little moonstone, bought from a neighbour | The Kiln is the meadow's own moonstone source; pricing it in moonstone leaves a meadow without the neighbour that sells it with no way to build the building that makes it |
+| Mint's supply | A trickle from every Herb Garden, trade with the Rabbits on top | Trade alone | Mint is a luxury every kitten uses up, and a single half-chance trade cannot keep a grown clowder's mint stocked; feathers and bells already have a structure source in the Treat Bakery |
+| Every crafted good has a use (SIM-ECO-047) | Balloons and Dreamweave each fuel sky missions (cosmic leaf) | Crafts kept for flavour with nothing to spend them on | A recipe with no use is labour the player can only waste, and its Tinkerer bindings and trait bonuses with it |
 | Where shinies come from | A steady trickle from every Couch Mine, with pouncing as the active bonus on top | Pouncing alone; a new structure of their own | Shinies price every caravan, every promotion, and the rites, so a supply that only active play brings in makes trading an obligation to keep pouncing and lets a converter drain them while the player is away (Tenet 2). The Couch Mine is already built early and is where lost glinting things would be found; a structure of its own would be one more thing to learn for a currency the player needs from the first trade |
 | Id-space growth | Append-only enums; arrays zero-fill on load | Re-orderable ids; map-keyed stocks | Append-only keeps every old save's indexes valid and serialization canonical |
 | Staged rebuilds | None — separate structures | KG-style deltagrades (pasture→solar farm) | Staging recycles UI slots but resets counts and complicates save/undo semantics; a TUI-era decision, revisit after the shell exists |

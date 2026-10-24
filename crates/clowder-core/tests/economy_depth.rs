@@ -294,7 +294,7 @@ fn structure_table_spot_anchors_across_bands() {
     assert_eq!(
         d.base_costs,
         &[
-            (ResourceId::Moonstone, 4.0),
+            (ResourceId::Tiles, 60.0),
             (ResourceId::Dew, 150.0),
             (ResourceId::Brass, 30.0)
         ]
@@ -897,16 +897,16 @@ fn energy_accounting_sums_active_structures() {
     grant(&mut s, StructureId::SunningDeck, 1); // +2.5
     grant(&mut s, StructureId::StreamWheel, 1); // +5
     grant(&mut s, StructureId::StarBasin, 1); // +10
-    grant(&mut s, StructureId::Cogworks, 1); // +1
+    grant(&mut s, StructureId::Cogworks, 1); // +3
     grant(&mut s, StructureId::WhiskerLab, 2); // −2
     grant(&mut s, StructureId::ToyWorkshop, 1); // −2
     grant(&mut s, StructureId::PrismSpinner, 1); // −2
     grant(&mut s, StructureId::BoxLabyrinth, 1); // −2
     grant(&mut s, StructureId::MemoryChest, 1); // −20
     grant(&mut s, StructureId::YarnComputer, 3); // −10.5
-    assert!((s.energy_production() - 18.5).abs() < 1e-9);
+    assert!((s.energy_production() - 20.5).abs() < 1e-9);
     assert!((s.energy_consumption() - 38.5).abs() < 1e-9);
-    assert!((s.energy_deficit_ratio() - 18.5 / 38.5).abs() < 1e-9);
+    assert!((s.energy_deficit_ratio() - 20.5 / 38.5).abs() < 1e-9);
 }
 
 // @spec SIM-ECO-036, SIM-ENG-021
@@ -1708,4 +1708,118 @@ fn couch_mines_turn_up_shinies() {
         (got - 10.0).abs() < 0.5,
         "ten mines over 1000 ticks turn up about 10 shinies, got {got}"
     );
+}
+
+/// One Cogworks gives the energy a band-2 consumer or two uses, so a meadow
+/// that builds them is not left in deficit for a whole band waiting on the
+/// band-3 producers.
+/// @spec SIM-ECO-028
+#[test]
+fn one_cogworks_powers_the_first_energy_users() {
+    assert_eq!(
+        content::structure_def(StructureId::Cogworks).energy_prod,
+        3.0
+    );
+    let mut s = GameState::new(1202);
+    grant(&mut s, StructureId::Cogworks, 1);
+    grant(&mut s, StructureId::WhiskerLab, 1);
+    grant(&mut s, StructureId::BoxLabyrinth, 1);
+    assert!(s.energy_production() >= s.energy_consumption());
+    assert_eq!(s.energy_deficit_ratio(), 1.0, "no deficit");
+}
+
+/// The Kiln, the meadow's own moonstone source, costs no moonstone, so a
+/// meadow holding none can still build its first.
+/// @spec SIM-ECO-028
+#[test]
+fn the_first_kiln_needs_no_moonstone() {
+    let d = content::structure_def(StructureId::Kiln);
+    assert!(d
+        .base_costs
+        .iter()
+        .all(|(r, _)| *r != ResourceId::Moonstone));
+    let mut s = GameState::new(1203);
+    s.ideas.insert(IdeaId::CeramicArts);
+    give(&mut s, ResourceId::Moonstone, 0.0);
+    for (r, amount) in d.base_costs {
+        give(&mut s, *r, *amount);
+    }
+    s.apply(Command::Build(StructureId::Kiln))
+        .expect("a Kiln with no moonstone held");
+    assert_eq!(s.structures[StructureId::Kiln.ix()], 1);
+}
+
+/// Every Herb Garden grows a little mint.
+/// @spec SIM-ECO-028
+#[test]
+fn herb_gardens_grow_a_little_mint() {
+    let d = content::structure_def(StructureId::HerbGarden);
+    assert!(
+        d.productions.contains(&(ResourceId::Mint, 0.00015)),
+        "{:?}",
+        d.productions
+    );
+    let mut s = GameState::new(1204);
+    s.ideas.insert(IdeaId::Horticulture);
+    grant(&mut s, StructureId::HerbGarden, 20);
+    give(&mut s, ResourceId::Mint, 0.0);
+    run_ticks(&mut s, 1000);
+    assert!(
+        s.stock(ResourceId::Mint) > 1.5,
+        "mint {}",
+        s.stock(ResourceId::Mint)
+    );
+}
+
+/// Every crafted good has somewhere to go: a structure, recipe, refinement,
+/// idea, rite, arch, loom, colony, or sky mission prices it.
+/// @spec SIM-ECO-047
+#[test]
+fn every_crafted_good_has_a_use() {
+    let used = |r: ResourceId| {
+        StructureId::ALL.iter().any(|s| {
+            let d = content::structure_def(*s);
+            d.base_costs.iter().any(|(x, _)| *x == r)
+                || d.converter
+                    .as_ref()
+                    .is_some_and(|c| c.inputs.iter().any(|(x, _)| *x == r))
+        }) || CraftId::ALL
+            .iter()
+            .any(|c| content::craft_def(*c).inputs.iter().any(|(x, _)| *x == r))
+            || RefinementId::ALL.iter().any(|f| {
+                content::refinement_def(*f)
+                    .materials
+                    .iter()
+                    .any(|(x, _)| *x == r)
+            })
+            || IdeaId::ALL
+                .iter()
+                .any(|i| content::idea_def(*i).gate.iter().any(|(x, _)| *x == r))
+            || RiteId::ALL
+                .iter()
+                .any(|t| content::rite_def(*t).cost.iter().any(|(x, _)| *x == r))
+            || ArchId::ALL
+                .iter()
+                .any(|a| content::arch_def(*a).cost.iter().any(|(x, _)| *x == r))
+            || DreamLoomId::ALL.iter().any(|l| {
+                content::dream_loom_def(*l)
+                    .cost
+                    .iter()
+                    .any(|(x, _)| *x == r)
+            })
+            || ColonyId::ALL
+                .iter()
+                .any(|c| content::colony_def(*c).buy.0 == r)
+            || SiteId::ALL.iter().any(|s| {
+                content::site_def(*s)
+                    .mission_fuel
+                    .iter()
+                    .any(|(x, _)| *x == r)
+            })
+    };
+    for r in ResourceId::ALL {
+        if content::tier(r) == content::Tier::Crafted {
+            assert!(used(r), "{r:?} is crafted but nothing uses it");
+        }
+    }
 }

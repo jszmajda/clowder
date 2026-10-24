@@ -33,7 +33,7 @@ Buy → sell [amount @ base-chance, in-season]. Standings warm from their start 
 | 3 | **Hedgehogs** | 0 | feathers ×500 | pebbles 1000 @ 100% (spring +25%); tiles 5 @ 75%, pavers 1 @ 10% |
 | 4 | **Rabbits** | +0.15 | tiles ×50 | embers 350 @ 100%; dew 100 @ 25%; mint 20 @ 50% (spring +25%) |
 | 5 | **Deer** | 0 | shinies ×250 | moonstone 1 @ 95%; stardust 0.1 @ 50% (needs Pen Pal level ≥ 5) |
-| 6 | **Owls** | −0.10 (shy) | mint ×500 | curiosity 80 @ 100% (a scholarly colony) |
+| 6 | **Owls** | −0.10 (shy) | mint ×50 | curiosity 2500 @ 100% (a scholarly colony) |
 | 7 | **Star Whales** | visitor (no Pen Pal) | — | see Star Whale arc |
 
 Foxes' moonstone (the inspiration's ship-scaled titanium): chance `0.15 + 0.0035 × Kites`, amount `(1.5 + 0.03 × Kites) × (1 + fox_standing_bonus)` — Kites (crafted) scale the pre-Kiln moonstone supply, making trade the early metal path (the economy leaf's cross-wave obligation).
@@ -64,6 +64,7 @@ The gentle-giant visitor arc (the inspiration's leviathans, de-fanged): Star Wha
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
+| The Owls' terms | 50 mint for 2500 curiosity | 500 mint for 80 curiosity | The Owls are met only once curiosity storage passes 125000, where 80 curiosity is nothing; and 500 mint is many trades' worth of a luxury every kitten uses up. Their trade should be worth a caravan to the clowder that finally meets them |
 | No hostile colonies | Shy (warms to neutral) instead of hostile (capped at neutral, failure chance) | Keep hostile races | Tenet 1 — the *mechanic* (negative standing = failure chance, warmable) is preserved; only "enemy" becomes "shy" |
 | Kite-scaled moonstone | Foxes' moonstone scales with Kites built | Flat moonstone trade | The inspiration's ship-scaled-titanium loop; makes Kites doubly useful (storage + metal) and gives band 3 its trade-paced supply |
 | Failed trade still costs the caravan | Pep/goods spent on a nap, courtesy gift possible | Full refund on failure | A costless retry removes all standing tension; the courtesy gift keeps it warm |

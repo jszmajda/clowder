@@ -116,7 +116,7 @@ Commands apply only between ticks. Saturating arithmetic on all day counters.
 |---|---|---|
 | Raw materials (capped) | catnip, twigs, fluff, pebbles, buttons, embers, shinies, dew, moonstone, stardust, hushfelt (economy) | full production stack; caps from structures |
 | Transient currencies | pep, curiosity, charm, warmth, skymaps (capped); cleverness (uncapped by design — the Yarn Computer's wit has no ceiling) | exempt from global multipliers (layers 6–8); each earned by its own subsystem |
-| Luxuries (uncapped, draining) | feathers, bells, mint (economy; expeditions/colonies supply) | per-kitten drain; each distinct stocked luxury = +10 happiness points |
+| Luxuries (uncapped, draining) | feathers, bells, mint (economy; structures, expeditions, and colonies supply) | per-kitten drain; each distinct stocked luxury = +10 happiness points |
 | Crafted goods (uncapped) | wands, tiles, badges, brass, cogs, moonsteel, lattices, pavers, quills, stories, anthologies, schemes, cairns, kites, balloons, moonmilk, dreamweave, cometsilk (economy) | made via crafting with craft-ratio bonus; gate currencies for research bands |
 | Mystic chain | unicorns, rainbows, prisms, starshards, echoes, dreamcorns, jars of purrs (mystic) | sink-chain with upgradeable exchange rates and event faucets |
 | Legacy (persist across Moves) | Elder Wisdom, Warm Memories, Passed-Down Wisdom, serenity (prestige/ceremonies) | prestige currencies at different timescales |
