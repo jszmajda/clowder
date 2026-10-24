@@ -23,8 +23,9 @@ fn fnv1a(bytes: impl IntoIterator<Item = u8>) -> u64 {
 /// The profile a kitten named `name`, arriving in `generation`, draws: from a
 /// generator local to the draw, seeded by hashing the name and the
 /// generation, in the fixed order pattern, slot colours, eyes, how many
-/// favourites, their kinds, their entries, pose. The fur and eyes come first,
-/// so how favourites and poses are drawn never moves them.
+/// favourites, their kinds, their entries, pose, and whether it is a surprise.
+/// The fur and eyes come first, so how favourites and poses are drawn never
+/// moves them, and the surprise comes last, so it moves nothing else.
 /// @spec SIM-KIT-032
 pub fn draw_profile(name: &str, generation: u32) -> Profile {
     let seed = fnv1a(name.bytes().chain(generation.to_le_bytes()));
@@ -61,6 +62,22 @@ pub fn draw_profile(name: &str, generation: u32) -> Profile {
         .collect();
 
     let pose = Pose::ALL[rng.index(Pose::ALL.len())];
+
+    // Once in a blue moon, the same pattern in colours no ordinary cat wears.
+    // Drawn last, so it moves no other draw.
+    if rng.index(content::SURPRISE_ODDS) == 0 {
+        let mut surprising: Vec<FurColour> = Vec::new();
+        for _ in 0..colours.len() {
+            let left: Vec<FurColour> = content::SURPRISING_COLOURS
+                .iter()
+                .copied()
+                .filter(|c| !surprising.contains(c))
+                .collect();
+            surprising.push(left[rng.index(left.len())]);
+        }
+        colours = surprising;
+    }
+
     Profile {
         fur: Fur { pattern, colours },
         eyes,

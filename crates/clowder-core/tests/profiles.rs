@@ -152,9 +152,17 @@ fn every_draw_comes_from_its_table() {
             def.slots.len(),
             "{name}: one colour per slot"
         );
+        // A surprise wears surprising colours in every slot (checked in
+        // `once_in_a_blue_moon_a_kitten_is_a_surprise`); every other kitten
+        // takes each slot's colour from that slot's list.
+        let surprise = p
+            .fur
+            .colours
+            .iter()
+            .all(|c| content::SURPRISING_COLOURS.contains(c));
         for (slot, c) in p.fur.colours.iter().enumerate() {
             assert!(
-                def.slots[slot].contains(c),
+                surprise || def.slots[slot].contains(c),
                 "{name}: slot {slot} took {c:?}"
             );
             assert!(
@@ -490,6 +498,72 @@ fn every_fur_colour_has_a_name() {
         .collect();
     assert_eq!(names.len(), FurColour::ALL.len(), "names are distinct");
     assert!(names.iter().all(|n| !n.is_empty()));
+}
+
+/// About one kitten in forty is a surprise: its pattern kept, each slot's
+/// colour a surprising one no earlier slot took. Every other kitten wears only
+/// ordinary colours.
+/// @spec SIM-KIT-032, SIM-KIT-042
+#[test]
+fn once_in_a_blue_moon_a_kitten_is_a_surprise() {
+    let surprising = content::SURPRISING_COLOURS;
+    let mut surprises = 0;
+    let mut draws = 0;
+    for generation in 0..10 {
+        for name in content::NAME_POOL.iter() {
+            let p = draw_profile(name, generation);
+            draws += 1;
+            let odd = p
+                .fur
+                .colours
+                .iter()
+                .filter(|c| surprising.contains(*c))
+                .count();
+            if odd == 0 {
+                continue;
+            }
+            surprises += 1;
+            assert_eq!(
+                odd,
+                p.fur.colours.len(),
+                "{name}: a surprise is a whole one"
+            );
+            let mut distinct = p.fur.colours.clone();
+            distinct.sort();
+            distinct.dedup();
+            assert_eq!(
+                distinct.len(),
+                p.fur.colours.len(),
+                "{name}: no colour twice"
+            );
+            assert_eq!(
+                p.fur.colours.len(),
+                content::fur_pattern_def(p.fur.pattern).slots.len(),
+                "{name}: the pattern keeps its slots"
+            );
+        }
+    }
+    let share = surprises as f64 / draws as f64;
+    assert!(
+        (0.015..=0.035).contains(&share),
+        "{surprises} surprises in {draws} kittens"
+    );
+}
+
+/// At least eight surprising colours, none a colour a slot lists, each named.
+/// @spec SIM-KIT-042
+#[test]
+fn the_surprising_colours_are_their_own() {
+    let surprising = content::SURPRISING_COLOURS;
+    assert!(surprising.len() >= 8);
+    for c in surprising.iter() {
+        for p in FurPattern::ALL {
+            for slot in content::fur_pattern_def(p).slots {
+                assert!(!slot.contains(c), "{c:?} is in a {p:?} slot");
+            }
+        }
+        assert!(!content::fur_colour_name(*c).is_empty());
+    }
 }
 
 // ---------------------------------------------------------------------------

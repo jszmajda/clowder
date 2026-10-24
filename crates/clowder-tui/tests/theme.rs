@@ -675,12 +675,13 @@ fn the_theme_can_produce_sixteen_colours_and_the_paths_between_stops_and_no_othe
 
     // Beside those, only a portrait's fur and eye colours, which depict a
     // kitten and are worn by nothing but its portrait and swatches
-    // (TUI-THEME-027): twelve furs and six eyes, each its own.
+    // (TUI-THEME-027): twenty furs, the surprising eight among them, and six
+    // eyes, each its own.
     let furs: HashSet<(u8, u8, u8)> = FurColour::ALL
         .iter()
         .map(|c| rgb_of(fur::fur_colour(*c), &format!("{c:?} fur")))
         .collect();
-    assert_eq!(furs.len(), 12, "twelve fur colours");
+    assert_eq!(furs.len(), 20, "twenty fur colours");
     let eyes: HashSet<(u8, u8, u8)> = EyeColour::ALL
         .iter()
         .map(|c| rgb_of(fur::eye_colour(*c), &format!("{c:?} eyes")))

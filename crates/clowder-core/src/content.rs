@@ -2785,8 +2785,32 @@ pub fn fur_colour_name(c: FurColour) -> &'static str {
         FurColour::Fawn => "fawn",
         FurColour::Seal => "seal",
         FurColour::Lilac => "lilac",
+        FurColour::Lavender => "lavender",
+        FurColour::Periwinkle => "periwinkle",
+        FurColour::Seafoam => "seafoam",
+        FurColour::Rose => "rose",
+        FurColour::Marigold => "marigold",
+        FurColour::Plum => "plum",
+        FurColour::Teal => "teal",
+        FurColour::Cornflower => "cornflower",
     }
 }
+
+/// The colours a surprising kitten wears, none of them a colour any slot
+/// lists. @spec SIM-KIT-042
+pub static SURPRISING_COLOURS: [FurColour; 8] = [
+    FurColour::Lavender,
+    FurColour::Periwinkle,
+    FurColour::Seafoam,
+    FurColour::Rose,
+    FurColour::Marigold,
+    FurColour::Plum,
+    FurColour::Teal,
+    FurColour::Cornflower,
+];
+
+/// One kitten in this many is a surprise. @spec SIM-KIT-032
+pub const SURPRISE_ODDS: usize = 40;
 
 /// An eye look: each eye's colour, and the words for the look.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

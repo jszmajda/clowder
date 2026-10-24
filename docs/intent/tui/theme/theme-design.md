@@ -177,6 +177,15 @@ Each kitten's profile carries its fur — a pattern and a colour for each of the
 | brown | `#7A5536` | | seal | `#4A3328` |
 | chocolate | `#5E3A26` | | lilac | `#B7A5B4` |
 
+Surprising colours, which about one kitten in forty wears (kittens leaf: Once in a blue moon), are true to their names too:
+
+| Surprising colour | Value | | Surprising colour | Value |
+|---|---|---|---|---|
+| lavender | `#B497D6` | | marigold | `#F2A93B` |
+| periwinkle | `#8E9BEF` | | plum | `#8E4585` |
+| seafoam | `#71D6B0` | | teal | `#2A9D8F` |
+| rose | `#E58FA9` | | cornflower | `#6495ED` |
+
 | Eye colour | Value | | Eye colour | Value |
 |---|---|---|---|---|
 | green | `#6DAF4F` | | amber | `#D6962A` |

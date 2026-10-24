@@ -467,10 +467,19 @@ pub enum FurColour {
     Fawn,
     Seal,
     Lilac,
+    // The surprising colours, worn once in a blue moon.
+    Lavender,
+    Periwinkle,
+    Seafoam,
+    Rose,
+    Marigold,
+    Plum,
+    Teal,
+    Cornflower,
 }
 
 impl FurColour {
-    pub const ALL: [FurColour; 12] = [
+    pub const ALL: [FurColour; 20] = [
         FurColour::Black,
         FurColour::White,
         FurColour::Grey,
@@ -483,6 +492,14 @@ impl FurColour {
         FurColour::Fawn,
         FurColour::Seal,
         FurColour::Lilac,
+        FurColour::Lavender,
+        FurColour::Periwinkle,
+        FurColour::Seafoam,
+        FurColour::Rose,
+        FurColour::Marigold,
+        FurColour::Plum,
+        FurColour::Teal,
+        FurColour::Cornflower,
     ];
 }
 

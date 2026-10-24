@@ -538,6 +538,14 @@ fn the_fur_and_eye_colours_are_the_design_s() {
         (FurColour::Fawn, 0xD4B79A),
         (FurColour::Seal, 0x4A3328),
         (FurColour::Lilac, 0xB7A5B4),
+        (FurColour::Lavender, 0xB497D6),
+        (FurColour::Periwinkle, 0x8E9BEF),
+        (FurColour::Seafoam, 0x71D6B0),
+        (FurColour::Rose, 0xE58FA9),
+        (FurColour::Marigold, 0xF2A93B),
+        (FurColour::Plum, 0x8E4585),
+        (FurColour::Teal, 0x2A9D8F),
+        (FurColour::Cornflower, 0x6495ED),
     ];
     let hex = |v: u32| Color::Rgb((v >> 16) as u8, (v >> 8) as u8, v as u8);
     assert_eq!(fur.len(), FurColour::ALL.len());
