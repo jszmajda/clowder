@@ -7,11 +7,11 @@ prefix: TUI-THEME
 
 ## Context and Design Philosophy
 
-This leaf owns every colour decision in clowder: the palette, what each colour is allowed to mean, the coats the stores wear, the contrast floor, the posture toward light and dark terminals, and the discipline that keeps the game fully playable by someone who cannot distinguish any of it.
+This leaf owns every colour decision in clowder: the palette, what each colour is allowed to mean, the coats the stores wear, the fur a kitten's portrait is painted in, the contrast floor, the posture toward light and dark terminals, and the discipline that keeps the game fully playable by someone who cannot distinguish any of it.
 
 The brief is unusual, and it should drive the design rather than be decorated over. Clowder is not a page someone visits; it is **a pane that sits beside real work for weeks**. The player looks at it for two seconds between compiles. It shares a screen with their editor, their logs, and their shell. A theme that announces itself is a theme that becomes irritating on day three — and irritating-on-day-three is a failure of tenet 1 as surely as anything grim would be.
 
-So colour has exactly two jobs here, and the design keeps them apart. **State** is the job the two-second glance depends on: whether a thing is affordable, whether a store is full, whether something wants the player. **Identity** is the job that makes the pane a clowder rather than a ledger: every resource wears a coat of its own, so the stores have the variety a litter has, and a name reads as the same thing wherever it stands. The glance contract in the navigation leaf — empty chip cluster means nothing needs you — only works if the eye has learned that a state colour *appearing* is information, which is why the two jobs never share a place: state colours sit on marks, coats sit on names, and nothing wears both.
+So colour has exactly two jobs here, and the design keeps them apart. (One fenced picture uses colour for neither: a kitten's portrait is painted in its fur, which depicts the kitten and asks nothing of the reader — Fur, below.) **State** is the job the two-second glance depends on: whether a thing is affordable, whether a store is full, whether something wants the player. **Identity** is the job that makes the pane a clowder rather than a ledger: every resource wears a coat of its own, so the stores have the variety a litter has, and a name reads as the same thing wherever it stands. The glance contract in the navigation leaf — empty chip cluster means nothing needs you — only works if the eye has learned that a state colour *appearing* is information, which is why the two jobs never share a place: state colours sit on marks, coats sit on names, and nothing wears both.
 
 ## Two Jobs for Colour
 
@@ -22,6 +22,8 @@ The load-bearing decision. There are 46 resources, 40 structures, and 59 ideas. 
 **Names wear coats.** A coat is a resource's own colours, fixed for the life of the game, chosen for the name rather than for anything the store is doing, and worn wherever the name is drawn. A coat says nothing the name does not say; it is texture, learned by familiarity, never asked to be read. Because a coat is on every resource name the player sees, the eye files it with the names, and a state colour appearing is still the thing that stands out — the ring is measured clear of every state colour (The ring), so no coat is ever read as one.
 
 This is also what keeps the state palette small enough to be disciplined about contrast and colour-vision safety.
+
+One picture is the exception, and it is fenced: a kitten's **portrait**, in the inspector, is painted in the kitten's own fur (Fur, below). That colour is neither state nor identity. It depicts: it is what the kitten looks like, and it sits on block cells inside the portrait and its swatches, never on a name, a mark, or a word. A kitten's name still wears no colour of its own.
 
 ## The Ground Belongs to the Terminal
 
@@ -38,7 +40,7 @@ Six roles. Every value sits in a mid-luminance band so it clears the contrast fl
 | Role | Value | Carries |
 |---|---|---|
 | *(inherited)* | terminal foreground | All ordinary text — counts, costs, prose, and every name that wears no coat |
-| `dim` | `#7C7873` | Revealed but not actionable, owned and done, flavour events, a list's group-header rules and the inspector's `last time` divider, spent hints |
+| `dim` | `#7C7873` | Revealed but not actionable, owned and done, flavour events, a list's group-header rules and the inspector's `last time` and `about` dividers, a kitten's favourites, spent hints |
 | `ready` | `#3E8E5A` | ● affordable now |
 | `partial` | `#A8802F` | ◐ partially affordable |
 | `attention` | `#C0663A` | Each attention chip whole, the `full` tag on a capped store, a sidebar note's count of capped stores out of view, an armed row's expansion beneath it — and nothing else |
@@ -160,6 +162,49 @@ On the header rule the accent colours the underline alone. The facts and chips a
 
 Autumn's accent sits near `attention` in hue, and it is safe for the same reason the confinement is. The accent is only ever a line — an underline or a column of `│` — always present, always in the same places. `attention` is only ever worn by glyphs and words, and it appears only when something wants the player. The glance reads orange *appearing*; a line that never comes or goes gives it nothing to rule out. The coats keep clear of it another way: they sit only on names, never on a glyph or a tag, and every colour a coat can put on a character is measured clear of `attention` (The ring), so a name in its coat — even one that has just arrived in the ticker — is never read as something wanting the player.
 
+## Fur
+
+Each kitten's profile carries its fur — a pattern and a colour for each of the pattern's slots — and its eyes (kittens leaf: Profiles). The inspector draws the kitten as a small portrait (render leaf: The portrait) and lists the fur's colours as a strip of swatches. This section says what those colours are and where they may go.
+
+**Fur colours are true to life.** A black cat is black and a white cat is white. The palette's mid-luminance band exists so that every colour that carries meaning holds against both grounds; a fur colour carries none — the fur's words say everything it says (Colour Is Always the Second Channel, below) — so the band does not bind it, and a fur held to the band would draw every black cat charcoal and every white one grey. The cost is that a fur close to the terminal's ground nearly disappears against it: a black cat on a dark terminal, a white one on a light terminal. The portrait answers that with its outline, which is drawn in the inherited foreground, so the cat's shape stands against any ground whatever its fur. A swatch has no outline. A swatch the ground swallows still stands directly before its colour's name, so nothing is lost but the block.
+
+| Fur colour | Value | | Fur colour | Value |
+|---|---|---|---|---|
+| black | `#1C1A1A` | | ginger | `#D9822B` |
+| white | `#F4F1EA` | | cream | `#EED9B0` |
+| grey | `#8A8D93` | | cinnamon | `#A0603A` |
+| silver | `#C3C6CC` | | fawn | `#D4B79A` |
+| brown | `#7A5536` | | seal | `#4A3328` |
+| chocolate | `#5E3A26` | | lilac | `#B7A5B4` |
+
+| Eye colour | Value | | Eye colour | Value |
+|---|---|---|---|---|
+| green | `#6DAF4F` | | amber | `#D6962A` |
+| gold | `#E3C04A` | | copper | `#B8642E` |
+| blue | `#5B9BD5` | | hazel | `#9C8A3E` |
+
+**Where fur may go.** Fur colours and eye colours are worn only by the cells of a portrait and by swatches: a portrait's fur cells, its two eye cells, and each swatch's block. Every other character in and around them — the portrait's outline, its nose, the fur's and eyes' words, each swatch's colour name — is drawn in the inherited foreground. No fur or eye colour is ever worn by a name, a mark, a figure, or any word, and no state colour or coat is ever worn by a portrait's cell or a swatch, so the depiction never reads as a state and no state is ever mistaken for a cat.
+
+**How a pattern lays its colours.** The portrait is four rows tall, and its first three rows hold its fifteen fur cells (render leaf: The portrait). Each pattern assigns every fur cell one of its slots, and the cell is painted in the colour that slot took. The masks below name the fur cells by row and by column within the portrait, numbered from zero; a cell not named under a slot takes slot 0.
+
+| Pattern | Slots | Mask |
+|---|---|---|
+| solid | 0 colour | every fur cell slot 0 |
+| tabby | 0 base, 1 stripe | slot 1 on every fur cell in an even column — the stripes run down the face |
+| tuxedo | 0 colour, 1 white | slot 1 on row 2's columns 3, 4, 6, 7 — the white muzzle |
+| bicolour | 0 colour, 1 white | slot 1 on row 1's columns 4, 5, 6 and every fur cell of row 2 — the blaze and the white lower face |
+| tortoiseshell | 0 dark, 1 warm | slot 1 on row 0's column 8, row 1's columns 1, 5, 6, 9, and row 2's columns 2, 7 — the patches |
+| calico | 0 white, 1 warm, 2 dark | slot 1 on row 0's column 2, row 1's columns 1, 2, 6; slot 2 on row 0's column 8, row 1's columns 8, 9, and row 2's column 8 — patches on a white face |
+| colourpoint | 0 body, 1 point | slot 1 on both ears (row 0) and row 2's columns 3, 4, 6, 7 — the dark ears and mask |
+| van | 0 white, 1 colour | slot 1 on both ears (row 0) and row 1's columns 1, 2, 8, 9 — colour on the head only |
+| smoke | 0 top, 1 undercoat | slot 1 on every fur cell of row 2 |
+
+A pattern's masks follow its slots as the kittens leaf orders them, so a slot index means the same thing in both leaves; a test holds every pattern in the core's table to a mask here.
+
+**Eyes.** The left eye cell is painted in the eye look's left colour and the right eye cell in its right colour, so odd eyes show as two colours.
+
+**A swatch** is two cells of the full block `█`, both in one fur colour. The strip lists the fur's colours in slot order, each swatch followed by one blank column and the colour's name.
+
 ## Colour Is Always the Second Channel
 
 Every meaning colour carries is carried by something else first — a glyph, a word, or a fill. This is not an accessibility afterthought bolted onto a finished palette; it is why the state palette could stay this small.
@@ -173,6 +218,7 @@ Every meaning colour carries is carried by something else first — a glyph, a w
 | Milestone | `★` | `milestone` |
 | Flavour vs mechanical | `·` vs `▪` | `dim` vs inherited |
 | Which resource | The name itself | Its coat |
+| A kitten's fur and eyes | The fur's words, the eyes' words, and each swatch's colour name | The portrait's cells and the swatches |
 | Mood | The word itself | *(none)* |
 | Season | The season's name in the header | Chrome accent |
 
@@ -221,6 +267,8 @@ Both rules hold whatever values the palette settles on (Deferred 1). Retuning th
 | A name a sentence spells otherwise | The coat laid across the characters as the sentence spells them | Coat only a spelling that matches the stores' exactly; compute the coat over the stores' spelling and cut it to the word | Sentences say "a twig" and "catnip"; coating only exact spellings leaves most of a blurb's resources plain. Laying the dressing across the word as written keeps each dressing's look on every spelling, where a cut coat would stop a blend partway |
 | What beside the name wears the coat | Nothing: figures, separators, and blanks wear the line's colour | The whole component, figure and name | A column of figures in mixed colours reads as several columns |
 | A shortened name's colours | Each kept character keeps its colour; the ellipsis wears the replaced character's | Recomputed over the drawn text; the ellipsis in `dim` | A store should look like itself at every width, and a dim ellipsis would be a second meaning on the one glyph that already says "cut" |
+| A kitten's portrait | Painted in its true fur and eye colours on block cells, outline in the inherited foreground | No portrait, the fur in words alone; fur colours held to the mid-luminance band; a painted ground behind the portrait | Words alone lose the delight the portrait is for. Held to the band, every black cat draws charcoal and every white one grey, which is not the cat. A painted ground breaks the rule that the ground is the terminal's, and in one polarity or the other it is a patch pasted on the pane. The outline in the inherited foreground keeps the shape on any ground at no cost to the fur |
+| Where fur colour may go | A portrait's cells and swatch blocks only, never a name, mark, figure, or word | A kitten's name in its fur colour | A name in fur colour is a coat on a kitten, a vocabulary nothing matches against (Which identities wear a coat); and fur colours are outside the band, so text in them would fail the contrast floor |
 | Background | Inherit the terminal's | Paint a designed ground; detect and switch | Inheriting is legible in light and dark with no detection, and looks native beside other panes; detection is unreliable under tmux and a wrong guess is worse than none |
 | Palette size | Six roles | A fuller set with per-tier ramps | Every added state colour dilutes the signal that a state colour *is* meaning |
 | Mood rendering | A word, no colour | A five-step colour ramp | The word already says it unambiguously; a ramp adds a channel that fails for some players and says nothing new to the rest |
@@ -247,4 +295,5 @@ Both rules hold whatever values the palette settles on (Deferred 1). Retuning th
 - Parent: `../tui-design.md` (truecolor-only, the thin-shell split)
 - Sibling: `navigation/` owns the glyphs and words this palette sits behind — TUI-NAV-009 (markers), TUI-NAV-019 (mood as a word), TUI-NAV-020 (chips), TUI-NAV-021 (single-width glyphs), TUI-NAV-022 (the non-colour channel requirement)
 - Sibling: `render/` draws the fields a coat is worn in — the sidebar, a list row's cost field, the count prompt's preview, and the inspector's cost lines (Numbers and Names) — and shortens names with the ellipsis a coat follows (TUI-RENDER-014)
-- Consumes: `clowder_core::Season` for the chrome accent; `clowder_core::ResourceId` for the coat table; the core's reading of a blurb as text and resource references (curiosity leaf, SIM-CUR-014) for the resources a description names
+- Sibling: `render/` draws the portrait whose cells this leaf paints (The portrait)
+- Consumes: `clowder_core::Season` for the chrome accent; the profile's fur pattern, fur colours, and eye look (kittens leaf: Profiles) for the portrait; `clowder_core::ResourceId` for the coat table; the core's reading of a blurb as text and resource references (curiosity leaf, SIM-CUR-014) for the resources a description names

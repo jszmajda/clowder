@@ -7,8 +7,8 @@
 
 ## What Colour Means
 
-- [x] **TUI-THEME-003**: The system shall use colour for two things only — state, worn by marks (glyphs, tags, chips, and whole lines), and identity, worn by a resource's name as its coat — so that a structure, idea, job, kitten, or any other named thing takes its colour from its current state and never from which item it is, and a resource's coat never varies with the resource's stock, cap, rate, or any other state.
-- [x] **TUI-THEME-004**: The system shall define exactly six palette roles — dim, ready, partial, attention, milestone, and the inherited foreground — and a ring of exactly seven coat hues, and shall render no colour outside the five state colours, the seven hues, the colours on a blended coat's path between its stops, and the seasonal chrome accent.
+- [ ] **TUI-THEME-003**: The system shall use colour for three things only — state, worn by marks (glyphs, tags, chips, and whole lines); identity, worn by a resource's name as its coat; and depiction, worn by a kitten's portrait and fur swatches alone (TUI-THEME-027) — so that a structure, idea, job, kitten, or any other named thing takes its colour from its current state and never from which item it is, and a resource's coat never varies with the resource's stock, cap, rate, or any other state.
+- [ ] **TUI-THEME-004**: The system shall define exactly six palette roles — dim, ready, partial, attention, milestone, and the inherited foreground — and a ring of exactly seven coat hues, and shall render no colour outside the five state colours, the seven hues, the colours on a blended coat's path between its stops, the seasonal chrome accent, and the fur and eye colours of TUI-THEME-027.
 - [x] **TUI-THEME-005**: The system shall render mood with no colour at all, the mood word being its only channel.
 - [x] **TUI-THEME-006**: The system shall convey focus through the cursor glyph and, where more emphasis is needed, reverse video — never through a palette colour.
 - [x] **TUI-THEME-007**: The system shall render reverse-video emphasis by inverting the terminal's own foreground and background pair rather than a palette colour, so emphasis works in either polarity.
@@ -43,3 +43,10 @@
 - [x] **TUI-THEME-024**: When the ticker's line or a Journal line states a time away's gains or changed stores or what an act brought home, and when a footer note states that a refused command is short of a resource, the system shall draw each resource it names in that resource's coat as TUI-THEME-023 lays one.
 - [x] **TUI-THEME-025**: The system shall draw the ticker's newest entry in the inherited foreground, save a flavor event, which it shall draw in `dim`, laying no faint attribute over either.
 - [x] **TUI-THEME-026**: The system shall draw each of the ticker's lights other than the sky's with its glyph and word in the inherited foreground and its clock in `dim`.
+
+## Fur
+
+- [ ] **TUI-THEME-027**: The system shall paint a kitten's fur and eyes in the fur and eye colours the theme design's Fur tables give, true to life and not held to the mid-luminance band of TUI-THEME-002, and shall let those colours be worn only by a portrait's fur cells and eye cells and by a swatch's block — never by a name, mark, figure, or word — drawing every other character of a portrait and of the swatch strip, the outline, the nose, the fur's and eyes' words, and each colour's name included, in the inherited foreground, and wearing no state colour or coat on any portrait cell or swatch.
+- [ ] **TUI-THEME-028**: The system shall paint each of a portrait's fur cells in the colour its fur's pattern assigns it — the colour taken by the slot the theme design's mask for that pattern names for the cell, slot 0 for every cell the mask does not name — with a mask for every pattern in the core's fur-pattern table.
+- [ ] **TUI-THEME-029**: The system shall paint a portrait's left eye cell in the eye look's left colour and its right eye cell in the look's right colour.
+- [ ] **TUI-THEME-030**: The system shall draw a fur's swatch strip as its colours in slot order, each as a swatch — two cells of `█` in that colour — followed by one blank column and the colour's name.
