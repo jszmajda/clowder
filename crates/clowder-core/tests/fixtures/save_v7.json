@@ -1,0 +1,438 @@
+{
+  "save_version": 7,
+  "saved_at_unix": 1760400000,
+  "owed_ticks": 0,
+  "report_so_far": null,
+  "state": {
+    "ticks": 60,
+    "rng": {
+      "state": 5466178521041158301,
+      "inc": 2885390081777926815
+    },
+    "resources": [
+      95.66500000000002,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "structures": [
+      0,
+      6,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "kittens": [
+      {
+        "name": "Falafel",
+        "job": null,
+        "location": "Home",
+        "arrived_day": 0,
+        "job_seq": null,
+        "away_seq": null,
+        "skills": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 0.0,
+        "rank": 0,
+        "trait_id": "Curious",
+        "tinkering": null
+      },
+      {
+        "name": "Bonbon",
+        "job": null,
+        "location": "Home",
+        "arrived_day": 2,
+        "job_seq": null,
+        "away_seq": null,
+        "skills": [
+          640.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 0.0,
+        "rank": 2,
+        "trait_id": "Curious",
+        "tinkering": null
+      },
+      {
+        "name": "Linden",
+        "job": null,
+        "location": "Home",
+        "arrived_day": 3,
+        "job_seq": null,
+        "away_seq": null,
+        "skills": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 0.0,
+        "rank": 0,
+        "trait_id": "Serene",
+        "tinkering": null
+      },
+      {
+        "name": "Nimbus",
+        "job": null,
+        "location": "Home",
+        "arrived_day": 4,
+        "job_seq": null,
+        "away_seq": null,
+        "skills": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 0.0,
+        "rank": 0,
+        "trait_id": "Crafty",
+        "tinkering": null
+      },
+      {
+        "name": "Cactus",
+        "job": null,
+        "location": "Home",
+        "arrived_day": 5,
+        "job_seq": null,
+        "away_seq": null,
+        "skills": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 0.0,
+        "rank": 0,
+        "trait_id": "Brassy",
+        "tinkering": null
+      },
+      {
+        "name": "Bubbles",
+        "job": null,
+        "location": "Home",
+        "arrived_day": 6,
+        "job_seq": null,
+        "away_seq": null,
+        "skills": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 0.0,
+        "rank": 0,
+        "trait_id": "Bold",
+        "tinkering": null
+      }
+    ],
+    "ideas": [],
+    "pity": 0,
+    "famine_days": 0,
+    "recovery_days": 6,
+    "grumpy": false,
+    "next_seq": 0,
+    "zoomies_until": 0,
+    "speed": 1.0,
+    "roster_high_water": 6,
+    "revealed": [
+      {
+        "Structure": "CatnipPatch"
+      }
+    ],
+    "revealed_resources": [
+      "Catnip"
+    ],
+    "journal": {
+      "recent": [
+        {
+          "tick": 1,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Structure": "CatnipPatch"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 10,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Falafel"
+              }
+            }
+          }
+        },
+        {
+          "tick": 20,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Bonbon"
+              }
+            }
+          }
+        },
+        {
+          "tick": 30,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Linden"
+              }
+            }
+          }
+        },
+        {
+          "tick": 40,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Nimbus"
+              }
+            }
+          }
+        },
+        {
+          "tick": 50,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Cactus"
+              }
+            }
+          }
+        },
+        {
+          "tick": 60,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Bubbles"
+              }
+            }
+          }
+        }
+      ],
+      "kept": []
+    },
+    "kites_high_water": 0.0,
+    "mess": 0.0,
+    "pending_sky": null,
+    "elder": null,
+    "jamboree_until": 0,
+    "refinements": [],
+    "rules": [],
+    "devotion": 0.0,
+    "serenity": 0.0,
+    "peak_devotion": 0.0,
+    "enlightenment_tier": 0,
+    "rites": [],
+    "rite_counts": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "arches_bought": [],
+    "dream_drift": 0.0,
+    "promises": [],
+    "penpal": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "discovered": [],
+    "learned_goods": {},
+    "elder_wisdom": 0.0,
+    "warm_memories": 0.0,
+    "passed_down_wisdom": 0.0,
+    "generation": 1,
+    "traditions": [],
+    "family_album": [
+      {
+        "name": "Falafel",
+        "trait_id": "Crafty",
+        "rank": 0,
+        "generation": 0
+      },
+      {
+        "name": "Juniper",
+        "trait_id": "Brassy",
+        "rank": 1,
+        "generation": 0
+      },
+      {
+        "name": "Toffee",
+        "trait_id": "Alchemical",
+        "rank": 2,
+        "generation": 0
+      }
+    ],
+    "armed_adventure": null,
+    "active_adventure": null,
+    "adventure_completions": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "adventure_rewards": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "adventure_done": false,
+    "tidy_progress": 0,
+    "sites_reached": [],
+    "dream_looms": [],
+    "stirred_dreams": 0.0,
+    "distant_dawn": false,
+    "whale_visit_years": 0,
+    "whale_contentment": 0,
+    "deja_vu_until": 0
+  }
+}
