@@ -808,3 +808,13 @@ fn the_draw_schedule_has_not_moved() {
         );
     }
 }
+
+/// The Forecaster tradition shows the coming season with no idea needed.
+/// @spec SIM-ENG-017
+#[test]
+fn the_forecaster_knows_the_coming_season() {
+    let mut s = GameState::new(1302);
+    assert_eq!(s.season_forecast(), None);
+    s.traditions.insert(TraditionId::Forecaster);
+    assert!(s.season_forecast().is_some());
+}

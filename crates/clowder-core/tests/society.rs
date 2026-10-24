@@ -1934,3 +1934,31 @@ fn availability_agrees_with_acting_under_a_discounted_price() {
         "at least one idea is affordable only through the discount"
     );
 }
+
+/// Under Festival Spirit a jamboree hosted while one runs pays the bill again
+/// and adds its 100 days to the one running; without it, it is refused.
+/// @spec SIM-KIT-025
+#[test]
+fn festival_spirit_stacks_jamborees_end_to_end() {
+    let mut s = GameState::new(1301);
+    s.ideas.insert(IdeaId::TeaCeremonies);
+    let bill = |s: &mut GameState| {
+        give(s, ResourceId::Pep, 800.0);
+        give(s, ResourceId::Charm, 1500.0);
+        give(s, ResourceId::Quills, 40.0);
+    };
+    bill(&mut s);
+    s.apply(Command::HostJamboree).unwrap();
+    let first_end = s.jamboree_until;
+    bill(&mut s);
+    assert_eq!(
+        s.apply(Command::HostJamboree).unwrap_err(),
+        CommandError::Locked
+    );
+
+    s.traditions.insert(TraditionId::FestivalSpirit);
+    s.apply(Command::HostJamboree)
+        .expect("a second jamboree stacks");
+    assert_eq!(s.jamboree_until, first_end + 1000, "100 more days");
+    assert_eq!(s.stock(ResourceId::Charm), 0.0, "the bill is paid again");
+}

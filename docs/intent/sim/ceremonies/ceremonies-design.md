@@ -49,6 +49,8 @@ One-time purchases (`BuyRite`), warmth + shinies priced, unlocked when *devotion
 | 9 | Enlightenment | 7500 warmth, 2000 shinies | 125000 | **enables the Enlightenment tier ladder**; makes rites 0–7 re-buyable (stacking, price ×2.5 each) |
 | 10 | Everwarm Frescoes | 4000 warmth, 1800 shinies, 8000 charm | 200000 | Sun Rooms gain warmth cap = unlimited_dr(frescoes, 1.65) × warm_memories (prestige leaf) |
 
+Each rite carries a **blurb**: a short joke and then its effect in plain words, marking each resource it names as the curiosity leaf's blurbs do (SIM-CUR-014). The shell shows it as what the rite does, so every one says why it is worth having before it is bought (Tenet 3).
+
 ## Enlightenment Tiers
 
 `Enlighten` spends *serenity* (the inspiration's transcendence ladder): reaching tier t has cumulative cost `total_cost(t) = inverse_unlimited_dr(e^t / 10, 0.1)` — brutally exponential — so each Enlighten spends the marginal `total_cost(t) − total_cost(t−1)`. Each tier squares the Reverie conversion (via `(tier+1)²`), raises the Long Sun cap through Sunstone content, and unlocks the Dream Cartography rites (echo-priced, wave 6 seam). Tiers persist across the Move (they're serenity-bought and serenity persists).

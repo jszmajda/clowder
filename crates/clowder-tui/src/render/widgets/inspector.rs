@@ -433,10 +433,10 @@ fn statement(id: ContentId) -> Pieces {
         ContentId::Idea(i) => blurb_statement(content::idea_def(i).blurb),
         ContentId::Refinement(r) => blurb_statement(content::refinement_def(r).blurb),
         ContentId::Rule(r) => blurb_statement(content::rule_def(r).blurb),
-        ContentId::Rite(_)
-        | ContentId::Arch(_)
-        | ContentId::Tradition(_)
-        | ContentId::DreamLoom(_) => Vec::new(),
+        ContentId::Rite(r) => blurb_statement(content::rite_def(r).blurb),
+        ContentId::Arch(a) => blurb_statement(content::arch_def(a).blurb),
+        ContentId::Tradition(t) => blurb_statement(content::tradition_def(t).blurb),
+        ContentId::DreamLoom(l) => blurb_statement(content::dream_loom_def(l).blurb),
     }
 }
 

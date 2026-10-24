@@ -47,7 +47,7 @@
 //!   Napped { years } (a SUMMARY, not a per-tick stream), DreamLoomBought { id },
 //!   DejaVuDay, DistantDawn.
 //! New Effect variants: OutdoorProductionRatio, LongSunCapBonus, DejaVuChance,
-//!   ReverieYield, HeatEfficiency, HeatDissipation, NapYield.
+//!   ReverieYield, HeatEfficiency, HeatDissipation.
 //! Derived queries pinned (all GameState methods): site_reachable(SiteId) ->
 //!   bool, max_nap_length() -> u32, starshard_cost(years: u32) -> f64,
 //!   outdoor_transfer() -> f64 (a state-independent constant fraction, 0 < t < 1).
@@ -1224,4 +1224,30 @@ fn a_cosmic_state_round_trips_byte_identically() {
 
     let again = save_string(&loaded.state, 1000);
     assert_eq!(json, again, "save → load → save is byte-stable");
+}
+
+/// The Lucid Nap brings a little reverie per year napped; the Deep Cushion
+/// makes a nap a little cheaper.
+/// @spec SIM-DREAM-011
+#[test]
+fn lucid_naps_bring_reverie_and_deep_cushions_cheapen_naps() {
+    let mut s = GameState::new(1304);
+    s.ideas.insert(IdeaId::DeepNapTheory);
+    give(&mut s, ResourceId::Starshards, 1e12);
+    let plain_cost = s.starshard_cost(100);
+    s.dream_looms.insert(DreamLoomId::DeepCushion);
+    let cushioned = s.starshard_cost(100);
+    assert!(
+        cushioned < plain_cost && cushioned >= (plain_cost * 0.95).floor(),
+        "about 5% cheaper: {plain_cost} -> {cushioned}"
+    );
+
+    s.dream_looms.insert(DreamLoomId::LucidNap);
+    give(&mut s, ResourceId::Reverie, 0.0);
+    s.apply(Command::DeepNap(10)).unwrap();
+    assert!(
+        (s.stock(ResourceId::Reverie) - 1.0).abs() < 1e-9,
+        "ten years napped bring one reverie, got {}",
+        s.stock(ResourceId::Reverie)
+    );
 }

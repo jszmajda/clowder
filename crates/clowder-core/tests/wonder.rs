@@ -1445,3 +1445,17 @@ fn a_played_wonder_state_round_trips_losslessly() {
     assert_eq!(st.penpal, s.penpal);
     assert_eq!(st.discovered, s.discovered);
 }
+
+/// Prism Sight makes each day's prism descent and rainbow shower 10% likelier.
+/// @spec SIM-MOVE-013
+#[test]
+fn prism_sight_brightens_the_sky_events() {
+    let mut s = GameState::new(1303);
+    grant(&mut s, StructureId::RainbowArch, 3);
+    s.arches_bought.insert(ArchId::PrismArch);
+    let (descent, shower) = (s.prism_descent_chance(), s.rainbow_shower_chance());
+    assert!(descent > 0.0 && shower > 0.0, "fixture: both can happen");
+    s.traditions.insert(TraditionId::PrismSight);
+    assert!((s.prism_descent_chance() - descent * 1.1).abs() < 1e-12);
+    assert!((s.rainbow_shower_chance() - shower * 1.1).abs() < 1e-12);
+}

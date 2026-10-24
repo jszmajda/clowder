@@ -1747,7 +1747,9 @@ impl GameState {
     /// The upcoming season — Some only once the season-forecast idea is researched.
     // @spec SIM-ENG-017
     pub fn season_forecast(&self) -> Option<Season> {
-        if self.ideas.contains(&IdeaId::SeasonalAwareness) {
+        if self.ideas.contains(&IdeaId::SeasonalAwareness)
+            || self.traditions.contains(&TraditionId::Forecaster)
+        {
             let next = (season_index_of_day(self.day()) + 1) % 4;
             Some(Season::ALL[next])
         } else {
@@ -1905,11 +1907,14 @@ impl GameState {
         let ratio = content::STARSHARD_COST_RATIO;
         let base = content::STARSHARD_COST_BASE * (ratio.powf(y) - 1.0) / (ratio - 1.0);
         let heat = 1.0 + content::STARSHARD_HEAT_COUPLING * self.stirred_dreams;
-        let discount = if self.dream_looms.contains(&DreamLoomId::LongSlumber) {
-            1.0 - content::LONG_SLUMBER_COST_DISCOUNT
-        } else {
-            1.0
-        };
+        let mut discount = 1.0;
+        if self.dream_looms.contains(&DreamLoomId::LongSlumber) {
+            discount *= 1.0 - content::LONG_SLUMBER_COST_DISCOUNT;
+        }
+        // @spec SIM-DREAM-011
+        if self.dream_looms.contains(&DreamLoomId::DeepCushion) {
+            discount *= 1.0 - content::DEEP_CUSHION_COST_DISCOUNT;
+        }
         // A whole number of starshards: exact against any (even 1e12) stock, so
         // the spend is precise. @spec SIM-DREAM-001
         (base * heat * discount).ceil()
@@ -2108,6 +2113,26 @@ impl GameState {
     }
 
     /// A jamboree runs while ticks < jamboree_until. @spec SIM-KIT-025
+    /// Each day's chance of a prism descending, brightened by Prism Sight.
+    /// @spec SIM-UNI-006, SIM-MOVE-013
+    pub fn prism_descent_chance(&self) -> f64 {
+        self.effect(crate::effects::Effect::PrismDescentChance) * self.prism_sight()
+    }
+
+    /// Each day's chance of a rainbow shower, brightened by Prism Sight.
+    /// @spec SIM-UNI-005, SIM-MOVE-013
+    pub fn rainbow_shower_chance(&self) -> f64 {
+        self.effect(crate::effects::Effect::RainbowShowerChance) * self.prism_sight()
+    }
+
+    fn prism_sight(&self) -> f64 {
+        if self.traditions.contains(&TraditionId::PrismSight) {
+            content::PRISM_SIGHT_RATIO
+        } else {
+            1.0
+        }
+    }
+
     pub fn jamboree_active(&self) -> bool {
         self.ticks < self.jamboree_until
     }

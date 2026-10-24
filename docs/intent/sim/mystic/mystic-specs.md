@@ -22,3 +22,4 @@
 
 - [x] **SIM-UNI-009**: When MakePromise is applied with a free Promise slot and enough echoes, the system shall spend the echoes and fill a slot; each active Promise draws 0.0005 dreamcorn/day upkeep and contributes its small global effect through the effect-key system.
 - [x] **SIM-UNI-010**: While a Promise's daily dreamcorn upkeep cannot be met, the system shall mark that Promise quiet — suspending its effect while holding its slot — and restore it automatically once dreamcorn upkeep can be paid; no Promise, alicorn-analog, or kitten skill is ever destroyed.
+- [x] **SIM-UNI-012**: The system shall give every Rainbow Arch upgrade a blurb — a short joke, then the upgrade's effect in plain words — marking each resource it names as SIM-CUR-014 marks them.

@@ -49,19 +49,21 @@ The prestige shop (`BuyTradition`), Elder-Wisdom-priced, permanent across Moves 
 | 5 | Memory Chest II | 100 | memory_chest_ratio +3% |
 | 6 | Warm Welcome Home | 5 | new meadows start with +50 catnip and a Cozy Cushion |
 | 7 | Elder Stories | 25 | craft ratio +5%; story crafts +25% |
-| 8 | Golden Ratio | 50 | structure prices −1.6%; build-queue +1 (shell hint) |
+| 8 | Golden Ratio | 50 | structure prices −1.6% |
 | 9 | Grand Proportion | 100 | structure prices −1.8% |
 | 10 | Vitruvian Cat | 250 | structure prices −2% |
 | 11 | Renaissance | 750 | structure prices −2.25% |
 | 12–21 | **Nine Lives I–X** | 500 / 750 / 1250 / 1750 / 2500 / 5000 / 7500 / 15000 / 30000 / 60000 | each +5% to nine_lives_ratio (raises both the slope AND the +200% cap of Elder Wisdom's production, and its storage) — the near-endless Wisdom sink |
-| 22 | Good Neighbours | 5 | +10% trade standing everywhere; unlocks colony traditions |
+| 22 | Good Neighbours | 5 | +10% trade standing everywhere |
 | 23 | Well-Rested | 25 | kitten arrival speed +75% |
 | 24 | Bright-Eyed | 400 | kitten arrival speed +150% |
-| 25 | Festival Spirit | 25 | jamborees may stack (additive) |
+| 25 | Festival Spirit | 25 | a jamboree hosted while one runs adds its 100 days to it (kittens leaf) |
 | 26 | Second Wind | 50 | on a Move, one Traveling Basket kitten keeps its job assignment |
 | 27 | Forecaster | 25 | the season forecast is always available (no idea needed) |
-| 28 | Prism Sight | 125 | prism/rainbow event chances +10% |
+| 28 | Prism Sight | 125 | prism-descent and rainbow-shower chances ×1.1 (mystic leaf) |
 | 29 | Adventurous Spirit | 40 | unlocks the Adventures surface (SIM-ADV) |
+
+Each tradition carries a **blurb**: a short joke and then its effect in plain words, marking each resource it names as the curiosity leaf's blurbs do (SIM-CUR-014). The shell shows it as what the tradition does, so every one says why it is worth having before it is bought (Tenet 3).
 
 ## The Family Album
 

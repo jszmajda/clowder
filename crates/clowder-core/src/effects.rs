@@ -118,9 +118,6 @@ pub enum Effect {
     HeatEfficiency,
     /// +% stirred-dreams dissipation (the Warm Blanket loom). @spec SIM-DREAM-003
     HeatDissipation,
-    /// Per-year nap yield bonus (the Deep Cushion / Lucid Nap looms; dormant —
-    /// naps replay the pure tick path). @spec SIM-DREAM-006
-    NapYield,
 }
 
 /// Diminishing-returns primitive: linear to 75% of `limit`, asymptotic to
@@ -435,9 +432,10 @@ fn arch_effect(arch: ArchId, key: Effect) -> f64 {
 }
 
 /// One Dream Loom upgrade's contribution to one effect key — the dreamtime
-/// design's loom table. Deep Cushion / Lucid Nap drive NapYield (dormant: the
-/// nap replays the pure tick path); Long Slumber's nap-length and cost effects
-/// are derived queries (`max_nap_length`, `starshard_cost`), not keys.
+/// design's loom table. The Deep Cushion's and Long Slumber's cost effects and
+/// Long Slumber's nap length are derived queries (`starshard_cost`,
+/// `max_nap_length`), and the Lucid Nap's reverie lands with the nap
+/// (`deep_nap`), not keys.
 /// @spec SIM-DREAM-006
 fn loom_effect(loom: crate::state::DreamLoomId, key: Effect) -> f64 {
     use crate::state::DreamLoomId as L;
@@ -445,8 +443,6 @@ fn loom_effect(loom: crate::state::DreamLoomId, key: Effect) -> f64 {
         (L::SoftPillow, Effect::HeatEfficiency) => 0.10,
         (L::WarmBlanket, Effect::HeatDissipation) => 0.20,
         (L::DreamCatcher, Effect::DejaVuChance) => 0.25,
-        (L::DeepCushion, Effect::NapYield) => 0.05,
-        (L::LucidNap, Effect::NapYield) => 0.05,
         (L::CozyCave, Effect::HeatEfficiency) => 0.15,
         (L::ReverieNet, Effect::ReverieYield) => 0.50,
         _ => 0.0,

@@ -74,7 +74,7 @@
 ## Initial State & Derived Queries
 
 - [x] **SIM-ENG-016**: When a new game starts, the system shall initialize an empty meadow — zero stocks, no structures, no kittens, no researched ideas, tick 0, game speed 1.0 — with the RNG seeded from a caller-supplied seed.
-- [x] **SIM-ENG-017**: Where the season-forecast idea (SIM-CUR) is researched, the system shall expose the upcoming season as a queryable derived value.
+- [x] **SIM-ENG-017**: Where the season-forecast idea (SIM-CUR) is researched or the Forecaster tradition (SIM-MOVE) is held, the system shall expose the upcoming season as a queryable derived value.
 
 ## Effect System & Shared Mechanics
 

@@ -287,8 +287,10 @@ pub const DREAM_DRIFT_PER_ARCH: f64 = 0.000001; // per tick per Memory Arch
 pub const DREAM_DRIFT_THROTTLE: f64 = 0.25; // while any dreamcorn already dreams
 pub const SKY_ARCH_PRISM_DRIFT: f64 = 0.00002; // per tick, the Sky Arch's steady drift
                                                // @spec SIM-UNI-005
-pub const RAINBOW_SHOWER_AMOUNT: f64 = 5000.0; // a windfall on a shower day
-                                               // @spec SIM-UNI-009, SIM-UNI-010
+pub const RAINBOW_SHOWER_AMOUNT: f64 = 5000.0;
+/// Prism Sight's brightening of the prism and rainbow chances. @spec SIM-MOVE-013
+pub const PRISM_SIGHT_RATIO: f64 = 1.1; // a windfall on a shower day
+                                        // @spec SIM-UNI-009, SIM-UNI-010
 pub const PROMISE_ECHO_COST: f64 = 1.0;
 pub const PROMISE_UPKEEP_DREAMCORN: f64 = 0.0005; // per day, per kept Promise
 pub const PROMISE_GLOBAL_RATIO: f64 = 0.0005; // each kept Promise's global effect
@@ -3392,6 +3394,9 @@ use crate::state::{ArchId, ColonyId, RiteId};
 /// high-water reached its gate. @spec SIM-SUN-005
 pub struct RiteDef {
     pub name: &'static str,
+    /// A short joke and the plain effect, each resource it names marked
+    /// (`blurb_parts`).
+    pub blurb: &'static str,
     pub cost: &'static [(ResourceId, f64)],
     pub devotion_gate: f64,
 }
@@ -3403,56 +3408,67 @@ pub fn rite_def(r: RiteId) -> &'static RiteDef {
 static RITES: [RiteDef; 11] = [
     RiteDef {
         name: "Morning Stretch",
+        blurb: "A long, luxurious stretch toward the light. {warmth|Warmth} production +10%.",
         cost: &[(ResourceId::Warmth, 100.0)],
         devotion_gate: 150.0,
     },
     RiteDef {
         name: "Shared Sunpuddle",
+        blurb: "Room in the puddle for everyone. {curiosity|Curiosity} cap +2% per Sunbeam Altar.",
         cost: &[(ResourceId::Warmth, 250.0), (ResourceId::Shinies, 150.0)],
         devotion_gate: 300.0,
     },
     RiteDef {
         name: "Golden Hour",
+        blurb: "The light goes the colour of honey. {warmth|Warmth} cap ×1.5, and ×0.1 more for each Golden Hour after the first.",
         cost: &[(ResourceId::Warmth, 350.0), (ResourceId::Shinies, 250.0)],
         devotion_gate: 500.0,
     },
     RiteDef {
         name: "Warm Welcome",
+        blurb: "Every cat gets a seat in the sun. +0.4 happiness per Sunbeam Altar.",
         cost: &[(ResourceId::Warmth, 500.0), (ResourceId::Shinies, 250.0)],
         devotion_gate: 750.0,
     },
     RiteDef {
         name: "Stained Sunlight",
+        blurb: "Colour pools on the floor. Sunbeam Altars +0.05 {charm|Charm}/t each.",
         cost: &[(ResourceId::Warmth, 500.0), (ResourceId::Shinies, 250.0)],
         devotion_gate: 750.0,
     },
     RiteDef {
         name: "The Long Sun",
+        blurb: "The afternoon that never quite ends. Turns on the Long Sun, a production bonus that grows with devotion.",
         cost: &[(ResourceId::Warmth, 750.0), (ResourceId::Shinies, 500.0)],
         devotion_gate: 1000.0,
     },
     RiteDef {
         name: "Grand Basking",
+        blurb: "Everyone at once, in the warmest spot. Sunbeam Altars +60 {charm|Charm} cap and +0.1 {charm|Charm}/t each.",
         cost: &[(ResourceId::Warmth, 1250.0), (ResourceId::Shinies, 750.0)],
         devotion_gate: 10000.0,
     },
     RiteDef {
         name: "Sun Wardens' Oath",
+        blurb: "The wardens promise to keep watch. +25 {pep|Pep} cap per Sunbeam Altar.",
         cost: &[(ResourceId::Warmth, 3500.0), (ResourceId::Shinies, 1500.0)],
         devotion_gate: 75000.0,
     },
     RiteDef {
         name: "The Reverie",
+        blurb: "Eyes half closed, thoughts drifting. Opens Sunrise Reverie, which turns devotion into serenity.",
         cost: &[(ResourceId::Warmth, 5000.0), (ResourceId::Shinies, 1800.0)],
         devotion_gate: 100000.0,
     },
     RiteDef {
         name: "Enlightenment",
+        blurb: "Everything is warm and nothing hurts. Opens the Enlightenment tiers, and lets the earlier rites be taken again, each time at a higher price.",
         cost: &[(ResourceId::Warmth, 7500.0), (ResourceId::Shinies, 2000.0)],
         devotion_gate: 125000.0,
     },
     RiteDef {
         name: "Everwarm Frescoes",
+        blurb: "Murals that remember every summer. Every Sun Room gains {warmth|Warmth} cap from Warm Memories, more with each fresco.",
         cost: &[
             (ResourceId::Warmth, 4000.0),
             (ResourceId::Shinies, 1800.0),
@@ -3484,6 +3500,9 @@ pub const RITE_RESTACK_RATIO: f64 = 2.5; // price ×2.5 per additional copy
 /// @spec SIM-UNI-005
 pub struct ArchDef {
     pub name: &'static str,
+    /// A short joke and the plain effect, each resource it names marked
+    /// (`blurb_parts`).
+    pub blurb: &'static str,
     pub cost: &'static [(ResourceId, f64)],
 }
 
@@ -3494,18 +3513,22 @@ pub fn arch_def(a: ArchId) -> &'static ArchDef {
 static ARCHES: [ArchDef; 8] = [
     ArchDef {
         name: "Ribbon Arch",
+        blurb: "Streamers in every colour. {unicorns|Unicorns} production +5%.",
         cost: &[(ResourceId::Rainbows, 500.0)],
     },
     ArchDef {
         name: "Crystal Arch",
+        blurb: "It hums when the light hits it. {unicorns|Unicorns} production +10%; {prism|Prisms} descent chance +0.05% a day.",
         cost: &[(ResourceId::Rainbows, 25000.0), (ResourceId::Prisms, 25.0)],
     },
     ArchDef {
         name: "Prism Arch",
+        blurb: "It throws colour on every wall. {unicorns|Unicorns} production +25%; chance of a shower of {rainbows|Rainbows} +0.05% a day.",
         cost: &[(ResourceId::Rainbows, 50000.0), (ResourceId::Prisms, 50.0)],
     },
     ArchDef {
         name: "Sky Arch",
+        blurb: "Tall enough to tickle the clouds. {unicorns|Unicorns} production +50%; {prisms|Prisms} drift down, +0.00002/t.",
         cost: &[
             (ResourceId::Rainbows, 125000.0),
             (ResourceId::Prisms, 500.0),
@@ -3513,6 +3536,7 @@ static ARCHES: [ArchDef; 8] = [
     },
     ArchDef {
         name: "Dreaming Arch",
+        blurb: "{Unicorns} nap beneath it. {unicorns|Unicorns} production +250%; {starshard|Starshards} refining +5%.",
         cost: &[
             (ResourceId::Shinies, 500.0),
             (ResourceId::Rainbows, 1_000_000.0),
@@ -3521,6 +3545,7 @@ static ARCHES: [ArchDef; 8] = [
     },
     ArchDef {
         name: "Starlit Arch",
+        blurb: "Lit from within, all night long. {unicorns|Unicorns} production +500%; {starshard|Starshards} refining +10%.",
         cost: &[
             (ResourceId::Shinies, 1250.0),
             (ResourceId::Rainbows, 750_000.0),
@@ -3529,6 +3554,7 @@ static ARCHES: [ArchDef; 8] = [
     },
     ArchDef {
         name: "Memory Arch",
+        blurb: "Every parade it has seen, remembered. Rainbow Arches begin to dream {dreamcorns|Dreamcorns}, faster the more are built.",
         cost: &[
             (ResourceId::Stardust, 2500.0),
             (ResourceId::Prisms, 50000.0),
@@ -3536,6 +3562,7 @@ static ARCHES: [ArchDef; 8] = [
     },
     ArchDef {
         name: "Everdream Arch",
+        blurb: "A doorway into the softest dream. {jars of purrs|JarsOfPurrs} cap +2; opens condensing jars.",
         cost: &[
             (ResourceId::Dreamcorns, 100.0),
             (ResourceId::Cairns, 1000.0),
@@ -3780,6 +3807,9 @@ pub const FRUGAL_MEADOW_TWIST: f64 = 0.10;
 /// the effect-key system (see `effects::tradition_effect`). @spec SIM-MOVE-010
 pub struct TraditionDef {
     pub cost_wisdom: f64,
+    /// A short joke and the plain effect, each resource it names marked
+    /// (`blurb_parts`).
+    pub blurb: &'static str,
 }
 
 pub fn tradition_def(t: TraditionId) -> &'static TraditionDef {
@@ -3788,52 +3818,60 @@ pub fn tradition_def(t: TraditionId) -> &'static TraditionDef {
 
 /// The prestige shop table, in TraditionId order. @spec SIM-MOVE-010
 static TRADITIONS: [TraditionDef; 30] = [
-    TraditionDef { cost_wisdom: 5.0 },   // CarefulPacking
-    TraditionDef { cost_wisdom: 5.0 },   // TravelingBasketsI
-    TraditionDef { cost_wisdom: 35.0 },  // TravelingBasketsII
-    TraditionDef { cost_wisdom: 300.0 }, // TravelingBasketsIII
-    TraditionDef { cost_wisdom: 10.0 },  // MemoryChestI
-    TraditionDef { cost_wisdom: 100.0 }, // MemoryChestII
-    TraditionDef { cost_wisdom: 5.0 },   // WarmWelcomeHome
-    TraditionDef { cost_wisdom: 25.0 },  // ElderStories
-    TraditionDef { cost_wisdom: 50.0 },  // GoldenRatio
-    TraditionDef { cost_wisdom: 100.0 }, // GrandProportion
-    TraditionDef { cost_wisdom: 250.0 }, // VitruvianCat
-    TraditionDef { cost_wisdom: 750.0 }, // Renaissance
-    TraditionDef { cost_wisdom: 500.0 }, // NineLivesI
-    TraditionDef { cost_wisdom: 750.0 }, // NineLivesII
+    TraditionDef { cost_wisdom: 5.0, blurb: "Nothing breaks on the way. Every building's price −1%." },   // CarefulPacking
+    TraditionDef { cost_wisdom: 5.0, blurb: "Room for one more. A Move carries 1 more kitten along." },   // TravelingBasketsI
+    TraditionDef { cost_wisdom: 35.0, blurb: "Roomier baskets. A Move carries 2 more kittens along." },  // TravelingBasketsII
+    TraditionDef { cost_wisdom: 300.0, blurb: "Baskets with an upstairs. A Move carries 4 more kittens along." }, // TravelingBasketsIII
+    TraditionDef { cost_wisdom: 10.0, blurb: "A few tins tucked in the luggage. A Move carries 1.5% more of every store." },  // MemoryChestI
+    TraditionDef { cost_wisdom: 100.0, blurb: "The good tins, packed carefully. A Move carries 3% more of every store." }, // MemoryChestII
+    TraditionDef { cost_wisdom: 5.0, blurb: "Someone left the light on. A new meadow starts with 50 {catnip|Catnip} and a Cozy Cushion." },   // WarmWelcomeHome
+    TraditionDef { cost_wisdom: 25.0, blurb: "The old cats remember how. Craft ratio +5%; {quills|Quills}, {stories|Stories}, and {anthologies|Anthologies} craft +25%." },  // ElderStories
+    TraditionDef { cost_wisdom: 50.0, blurb: "Pleasing proportions. Every building's price −1.6%." },  // GoldenRatio
+    TraditionDef { cost_wisdom: 100.0, blurb: "Rooms that feel right. Every building's price −1.8%." }, // GrandProportion
+    TraditionDef { cost_wisdom: 250.0, blurb: "A cat, perfectly in proportion. Every building's price −2%." }, // VitruvianCat
+    TraditionDef { cost_wisdom: 750.0, blurb: "Everything, beautifully, again. Every building's price −2.25%." }, // Renaissance
+    TraditionDef { cost_wisdom: 500.0, blurb: "A second life, and the wisdom of the first. Elder Wisdom's production bonus, and its cap, +5%." }, // NineLivesI
+    TraditionDef { cost_wisdom: 750.0, blurb: "A third life, a little wiser. Elder Wisdom's production bonus, and its cap, +5%." }, // NineLivesII
     TraditionDef {
         cost_wisdom: 1250.0,
+        blurb: "Four lives in, and the naps keep getting better. Elder Wisdom's production bonus, and its cap, +5%.",
     }, // NineLivesIII
     TraditionDef {
         cost_wisdom: 1750.0,
+        blurb: "Five lives: halfway to legend. Elder Wisdom's production bonus, and its cap, +5%.",
     }, // NineLivesIV
     TraditionDef {
         cost_wisdom: 2500.0,
+        blurb: "Six lives, and the stories are long now. Elder Wisdom's production bonus, and its cap, +5%.",
     }, // NineLivesV
     TraditionDef {
         cost_wisdom: 5000.0,
+        blurb: "Seven lives, and nothing surprises them. Elder Wisdom's production bonus, and its cap, +5%.",
     }, // NineLivesVI
     TraditionDef {
         cost_wisdom: 7500.0,
+        blurb: "Eight lives, and they still chase string. Elder Wisdom's production bonus, and its cap, +5%.",
     }, // NineLivesVII
     TraditionDef {
         cost_wisdom: 15000.0,
+        blurb: "Nine lives? Who's counting. Elder Wisdom's production bonus, and its cap, +5%.",
     }, // NineLivesVIII
     TraditionDef {
         cost_wisdom: 30000.0,
+        blurb: "More lives than any cat should have. Elder Wisdom's production bonus, and its cap, +5%.",
     }, // NineLivesIX
     TraditionDef {
         cost_wisdom: 60000.0,
+        blurb: "Lives beyond counting, every one of them cozy. Elder Wisdom's production bonus, and its cap, +5%.",
     }, // NineLivesX
-    TraditionDef { cost_wisdom: 5.0 },   // GoodNeighbours
-    TraditionDef { cost_wisdom: 25.0 },  // WellRested
-    TraditionDef { cost_wisdom: 400.0 }, // BrightEyed
-    TraditionDef { cost_wisdom: 25.0 },  // FestivalSpirit
-    TraditionDef { cost_wisdom: 50.0 },  // SecondWind
-    TraditionDef { cost_wisdom: 25.0 },  // Forecaster
-    TraditionDef { cost_wisdom: 125.0 }, // PrismSight
-    TraditionDef { cost_wisdom: 40.0 },  // AdventurousSpirit
+    TraditionDef { cost_wisdom: 5.0, blurb: "A wave over every fence. Standing with every neighbour +10%." },   // GoodNeighbours
+    TraditionDef { cost_wisdom: 25.0, blurb: "A good night's sleep, all round. Kittens arrive 75% more often." },  // WellRested
+    TraditionDef { cost_wisdom: 400.0, blurb: "Word gets around. Kittens arrive 150% more often." }, // BrightEyed
+    TraditionDef { cost_wisdom: 25.0, blurb: "Why stop? A jamboree hosted while one runs adds its 100 days to the party." },  // FestivalSpirit
+    TraditionDef { cost_wisdom: 50.0, blurb: "Some cats bring their work home. On a Move, one carried kitten keeps its job." },  // SecondWind
+    TraditionDef { cost_wisdom: 25.0, blurb: "Whiskers that twitch before the weather turns. The coming season is always shown, no idea needed." },  // Forecaster
+    TraditionDef { cost_wisdom: 125.0, blurb: "Eyes for sparkle. Prism descents and showers of {rainbows|Rainbows} are 10% likelier." }, // PrismSight
+    TraditionDef { cost_wisdom: 40.0, blurb: "What's past the fence? Opens Adventures." },  // AdventurousSpirit
 ];
 
 // ---- Wave 5: adventures (SIM-ADV) ----
@@ -3932,6 +3970,10 @@ pub const WHALE_ECHOES_PER_CARAVAN: f64 = 5.0;
 pub const NAP_BASE_MAX_YEARS: u32 = 100;
 pub const LONG_SLUMBER_MAX_YEARS: u32 = 400;
 pub const LONG_SLUMBER_COST_DISCOUNT: f64 = 0.10;
+/// The Deep Cushion's cut to a nap's starshard cost. @spec SIM-DREAM-011
+pub const DEEP_CUSHION_COST_DISCOUNT: f64 = 0.05;
+/// The Lucid Nap's reverie per year napped. @spec SIM-DREAM-011
+pub const LUCID_NAP_REVERIE_PER_YEAR: f64 = 0.1;
 pub const STARSHARD_COST_BASE: f64 = 5.0;
 pub const STARSHARD_COST_RATIO: f64 = 1.08;
 pub const STARSHARD_HEAT_COUPLING: f64 = 0.01; // × stirred_dreams, raising nap cost
@@ -4068,6 +4110,9 @@ static SITES: [SiteDef; 13] = [
 /// effect-key system (see `effects::loom_effect`). @spec SIM-DREAM-006
 pub struct DreamLoomDef {
     pub name: &'static str,
+    /// A short joke and the plain effect, each resource it names marked
+    /// (`blurb_parts`).
+    pub blurb: &'static str,
     pub cost: &'static [(ResourceId, f64)],
 }
 
@@ -4078,38 +4123,47 @@ pub fn dream_loom_def(l: DreamLoomId) -> &'static DreamLoomDef {
 static DREAM_LOOMS: [DreamLoomDef; 9] = [
     DreamLoomDef {
         name: "Soft Pillow",
+        blurb: "Sink right in. Naps stir dreams 10% less.",
         cost: &[(ResourceId::Reverie, 5.0)],
     },
     DreamLoomDef {
         name: "Warm Blanket",
+        blurb: "Tucked in tight. Stirred dreams settle 20% faster.",
         cost: &[(ResourceId::Reverie, 15.0)],
     },
     DreamLoomDef {
         name: "Dream Catcher",
+        blurb: "Catches the good ones. Déjà-vu days come 25% more often.",
         cost: &[(ResourceId::Reverie, 40.0)],
     },
     DreamLoomDef {
         name: "Deep Cushion",
+        blurb: "The softest seat in the house. Naps cost 5% fewer {starshards|Starshards}.",
         cost: &[(ResourceId::Reverie, 100.0)],
     },
     DreamLoomDef {
         name: "Lucid Nap",
+        blurb: "Awake inside the dream. Each nap brings 0.1 {reverie|Reverie} per year napped.",
         cost: &[(ResourceId::Reverie, 250.0)],
     },
     DreamLoomDef {
         name: "Cozy Cave",
+        blurb: "Dark, quiet, warm. Naps stir dreams 15% less.",
         cost: &[(ResourceId::Reverie, 500.0)],
     },
     DreamLoomDef {
         name: "Long Slumber",
+        blurb: "The longest nap there is. Naps may run 400 years longer and cost 10% fewer {starshards|Starshards}.",
         cost: &[(ResourceId::Reverie, 1000.0)],
     },
     DreamLoomDef {
         name: "Reverie Net",
+        blurb: "Gathers every drifting thought. Déjà-vu days bring 50% more {reverie|Reverie}.",
         cost: &[(ResourceId::Reverie, 2500.0)],
     },
     DreamLoomDef {
         name: "The Distant Dawn",
+        blurb: "A warm sunrise after the longest night. At year 40000 the Distant Dawn rises: Passed-Down Wisdom's caps ×4, for good.",
         cost: &[
             (ResourceId::Reverie, 10000.0),
             (ResourceId::JarsOfPurrs, 100.0),

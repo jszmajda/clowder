@@ -19,3 +19,4 @@
 ## Enlightenment
 
 - [x] **SIM-SUN-008**: When Enlighten is applied with enough serenity for the next tier, the system shall spend the marginal cost total_cost(t) − total_cost(t−1) (where total_cost(t) = inverse_unlimited_dr(e^t / 10, 0.1)) and increment the enlightenment tier, raising the Long Sun cap and the Reverie conversion square; otherwise it rejects with InsufficientResources.
+- [x] **SIM-SUN-009**: The system shall give every Sunbeam Rite a blurb — a short joke, then the rite's effect in plain words — marking each resource it names as SIM-CUR-014 marks them.

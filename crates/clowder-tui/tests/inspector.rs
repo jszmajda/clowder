@@ -2363,17 +2363,17 @@ fn a_blurb_kinds_statement_is_its_blurb_and_nothing_restated_beside_it() {
     assert!(seen > 20, "fixture: many blurb rows are listed ({seen})");
 }
 
-/// A rite's, an arch's, a tradition's, and a dream loom's definitions carry
-/// nothing past name, price, and gate, so their rows have no statement — and no
-/// stand-in sentence for one. Wording-free: a line the row shows both when the
-/// item is already the player's and when it is open to take is neither the
+/// A rite's, an arch's, a tradition's, and a dream loom's definitions carry a
+/// blurb past name, price, and gate, so their rows state the blurb and nothing
+/// standing in for anything else. Wording-free: a line the row shows both when
+/// the item is already the player's and when it is open to take is neither the
 /// next cost (stated only when open) nor the reason (stated only when held), so
-/// beyond the name no such line may exist. A rite counts its copies; the
-/// others, held once, count nothing. Quantified over every item of the four
-/// kinds.
+/// beyond the name such a line may only be the blurb's. A rite counts its
+/// copies; the others, held once, count nothing. Quantified over every item of
+/// the four kinds.
 /// @spec TUI-NAV-018
 #[test]
-fn rows_whose_definition_states_nothing_carry_no_statement_and_no_stand_in() {
+fn rows_of_blurbed_kinds_state_their_blurb_and_no_stand_in() {
     let mut checked = 0;
     let cover = |state: &mut GameState, id: ContentId| {
         for (r, need) in state.cost_of_next(id, 1) {
@@ -2438,10 +2438,18 @@ fn rows_whose_definition_states_nothing_carry_no_statement_and_no_stand_in() {
         let b = pane_text(&open, &view, WIDE, TALL);
         let la = lines_of(&a);
         let lb = lines_of(&b);
+        let blurb = clowder_core::content::blurb_text(match id {
+            ContentId::Rite(r) => clowder_core::content::rite_def(r).blurb,
+            ContentId::Arch(a) => clowder_core::content::arch_def(a).blurb,
+            ContentId::Tradition(t) => clowder_core::content::tradition_def(t).blurb,
+            ContentId::DreamLoom(l) => clowder_core::content::dream_loom_def(l).blurb,
+            _ => unreachable!(),
+        });
         let common: Vec<&String> = la
             .iter()
             .skip(1)
             .filter(|l| lb.iter().skip(1).any(|m| m == *l))
+            .filter(|l| !blurb.contains(l.as_str()))
             .collect();
         assert!(
             common.is_empty(),
@@ -2450,6 +2458,7 @@ fn rows_whose_definition_states_nothing_carry_no_statement_and_no_stand_in() {
         );
 
         let mut allowed = name_numbers(&held, &key);
+        allowed.extend(numbers(&blurb));
         if counts.is_some() {
             allowed.insert("1".to_string());
         }
@@ -2465,6 +2474,45 @@ fn rows_whose_definition_states_nothing_carry_no_statement_and_no_stand_in() {
     assert!(
         checked > 20,
         "fixture: every rite, arch, tradition, and loom ({checked})"
+    );
+}
+
+/// A rite, an arch upgrade, a tradition, or a dream loom states its blurb as
+/// what it does, as an idea does, so every purchasable item says why it might
+/// be worth having.
+/// @spec TUI-NAV-018
+#[test]
+fn every_purchasable_item_states_its_blurb() {
+    let state = world(true);
+    let mut checked = 0;
+    for (section, row) in every_row(&state) {
+        let blurb = match row.key {
+            RowKey::Content(ContentId::Rite(r), _) => clowder_core::content::rite_def(r).blurb,
+            RowKey::Content(ContentId::Arch(a), _) => clowder_core::content::arch_def(a).blurb,
+            RowKey::Content(ContentId::Tradition(t), _) => {
+                clowder_core::content::tradition_def(t).blurb
+            }
+            RowKey::Content(ContentId::DreamLoom(l), _) => {
+                clowder_core::content::dream_loom_def(l).blurb
+            }
+            _ => continue,
+        };
+        let shown = pane_text(&state, &looking_at(section, row.key.clone()), WIDE, TALL);
+        let words: String = shown.split_whitespace().collect::<Vec<_>>().join(" ");
+        let want: String = clowder_core::content::blurb_text(blurb)
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(
+            words.contains(&want),
+            "{:?} does not state {want:?}. It read:\n{shown}",
+            row.key
+        );
+        checked += 1;
+    }
+    assert!(
+        checked > 40,
+        "fixture: the rites, arches, traditions, and looms ({checked})"
     );
 }
 
@@ -2672,11 +2720,14 @@ fn no_next_cost_is_stated_for_what_is_yours_on_a_tinker_row_or_where_the_price_n
         "fixture: open to take"
     );
     let shown = pane_text(&open, &looking_at(Section::Legacy, key), WIDE, TALL);
+    let blurb = clowder_core::content::blurb_text(clowder_core::content::tradition_def(t).blurb);
+    let beyond_name: Vec<String> = lines_of(&shown).into_iter().skip(1).collect();
     assert_eq!(
-        lines_of(&shown).len(),
-        1,
+        beyond_name.join(" "),
+        blurb,
         "the core's price names no component, so no next cost is stated — not even a heading or a \
-         \"costs nothing\", which would be false for a price outside the vocabulary. It read:\n{shown}"
+         \"costs nothing\", which would be false for a price outside the vocabulary; only the \
+         tradition's blurb stands beneath its name. It read:\n{shown}"
     );
 }
 

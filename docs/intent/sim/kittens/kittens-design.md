@@ -141,7 +141,7 @@ Each trait has a name the player reads it by and a blurb stating its effect plai
 
 ## Jamborees
 
-Jamborees unlock in band 1 but their charm bill (1500) is deliberately a band-2 project — the idea researches early and the ambition teases (the silhouette philosophy, applied to a command). `HostJamboree` spends 800 pep + 1500 charm + 40 quills and sets a 100-day (one game year) jamboree: +30 happiness points × (1 + jamboree-ratio effects), arrival chance × (2 + jamboree-arrival effects), luxury drain ×1.2 (celebrations consume). One jamboree at a time (no stacking until the relevant Tradition); hosting while one runs is rejected with Locked (the shell's hint should read "already celebrating"). Ends silently; the shell may celebrate.
+Jamborees unlock in band 1 but their charm bill (1500) is deliberately a band-2 project — the idea researches early and the ambition teases (the silhouette philosophy, applied to a command). `HostJamboree` spends 800 pep + 1500 charm + 40 quills and sets a 100-day (one game year) jamboree: +30 happiness points × (1 + jamboree-ratio effects), arrival chance × (2 + jamboree-arrival effects), luxury drain ×1.2 (celebrations consume). One jamboree at a time; hosting while one runs is rejected with Locked (the shell's hint should read "already celebrating") — except under the Festival Spirit tradition (prestige leaf), where hosting while one runs pays the bill again and adds its 100 days to the jamboree running, so the festivities stack end to end. Ends silently; the shell may celebrate.
 
 ## Happiness (Mood)
 

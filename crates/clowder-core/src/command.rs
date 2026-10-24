@@ -507,8 +507,11 @@ impl GameState {
     /// celebrating" is Locked), all-or-nothing bill, 100 days of festivity.
     // @spec SIM-KIT-025
     fn host_jamboree(&mut self) -> Result<Vec<Event>, CommandError> {
+        // Festival Spirit lets a jamboree be hosted while one runs: its 100
+        // days add to the one running. @spec SIM-KIT-025
+        let stacks = self.traditions.contains(&TraditionId::FestivalSpirit);
         if !self.ideas.contains(&IdeaId::TeaCeremonies)
-            || self.jamboree_active()
+            || (self.jamboree_active() && !stacks)
             || self.active_adventure == Some(AdventureId::QuietRetreat)
         {
             return Err(CommandError::Locked);
@@ -518,7 +521,7 @@ impl GameState {
             (ResourceId::Charm, content::JAMBOREE_CHARM),
             (ResourceId::Quills, content::JAMBOREE_QUILLS),
         ])?;
-        self.jamboree_until = self.ticks + content::JAMBOREE_TICKS;
+        self.jamboree_until = self.ticks.max(self.jamboree_until) + content::JAMBOREE_TICKS;
         Ok(vec![Event::JamboreeStarted {
             until_tick: self.jamboree_until,
         }])
@@ -1335,6 +1338,15 @@ impl GameState {
             for event in self.tick_replay() {
                 crate::save::fold_event(&mut report, event);
             }
+        }
+        // The Lucid Nap: a little reverie for every year napped, counted in
+        // the nap's report. @spec SIM-DREAM-011
+        if self
+            .dream_looms
+            .contains(&crate::state::DreamLoomId::LucidNap)
+        {
+            self.resources[ResourceId::Reverie.ix()] +=
+                content::LUCID_NAP_REVERIE_PER_YEAR * years as f64;
         }
         for r in ResourceId::ALL {
             report.resource_deltas[r.ix()] = self.resources[r.ix()] - before[r.ix()];

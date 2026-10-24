@@ -34,12 +34,14 @@ Reverie-priced upgrades (`BuyDreamLoom`, ~9) that make napping deeper and cooler
 | 0 | Soft Pillow | 5 | heat efficiency +10% (naps stir less) |
 | 1 | Warm Blanket | 15 | stirred-dreams dissipation +20% |
 | 2 | Dream Catcher | 40 | déjà-vu day chance +25% |
-| 3 | Deep Cushion | 100 | per-year nap yield +5% |
-| 4 | Lucid Nap | 250 | naps also advance reverie a little |
+| 3 | Deep Cushion | 100 | a nap's starshard cost −5% |
+| 4 | Lucid Nap | 250 | each nap brings 0.1 reverie per year napped |
 | 5 | Cozy Cave | 500 | heat efficiency +15% |
 | 6 | Long Slumber | 1000 | max nap length +; starshard cost −10% |
 | 7 | Reverie Net | 2500 | déjà-vu days yield +50% reverie |
 | 8 | The Distant Dawn | 10000 reverie, 100 Jars | unlocks the Distant Dawn era (below) |
+
+Each loom upgrade carries a **blurb**: a short joke and then its effect in plain words, marking each resource it names as the curiosity leaf's blurbs do (SIM-CUR-014). The shell shows it as what the loom upgrade does, so every one says why it is worth having before it is bought (Tenet 3).
 
 ## The Distant Dawn
 
@@ -55,6 +57,7 @@ At the far end of time (the inspiration's Dark Future at year 40000, here the **
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
+| What the Deep Cushion does | Shaves a nap's starshard cost | A per-year nap yield bonus | A nap replays the real tick and nothing else (HLD: one simulation), so a yield bonus on top would be shadow math that makes a nap richer than the same time awake; a cheaper nap is the same comfort without it |
 | Naps replay real `tick()` | Fast-forward the same simulation + per-year yields | Closed-form skip | One simulation, no shadow math (the offline-catch-up principle applied to voluntary skips) |
 | Heat as a cadence brake | Stirred dreams raise nap cost, dissipate passively | Hard nap cooldown; no brake | The inspiration's heat mechanic — a soft, self-clearing brake beats a hard timer and never blocks the player permanently |
 | Reverie only in déjà-vu days | Uncanny-day-gated currency | Passive reverie | Gives naps a second reward loop and makes déjà-vu days a delight rather than an interruption |

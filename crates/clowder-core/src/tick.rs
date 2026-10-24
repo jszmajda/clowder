@@ -908,12 +908,12 @@ impl GameState {
         // the arch-free hot path free of effect scans.
         // @spec SIM-UNI-006, SIM-UNI-005
         if self.structures[StructureId::RainbowArch.ix()] > 0 || !self.arches_bought.is_empty() {
-            let descent = self.effect(crate::effects::Effect::PrismDescentChance);
+            let descent = self.prism_descent_chance();
             if descent > 0.0 && self.rng.chance(descent) {
                 self.resources[ResourceId::Prisms.ix()] += 1.0;
                 events.push(Event::PrismDescended);
             }
-            let shower = self.effect(crate::effects::Effect::RainbowShowerChance);
+            let shower = self.rainbow_shower_chance();
             if shower > 0.0 && self.rng.chance(shower) {
                 self.resources[ResourceId::Rainbows.ix()] += content::RAINBOW_SHOWER_AMOUNT;
             }
