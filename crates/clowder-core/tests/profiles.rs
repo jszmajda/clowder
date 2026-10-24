@@ -35,15 +35,15 @@ fn bare(name: &str, arrived_day: u64) -> Kitten {
     }
 }
 
-fn favourite_tables() -> [(&'static str, &'static [&'static str]); 6] {
-    [
-        ("food", &content::FAVOURITE_FOODS),
-        ("toy", &content::FAVOURITE_TOYS),
-        ("nap", &content::FAVOURITE_NAPS),
-        ("show", &content::FAVOURITE_SHOWS),
-        ("pastime", &content::FAVOURITE_PASTIMES),
-        ("quirk", &content::FAVOURITE_QUIRKS),
-    ]
+/// Every favourite kind's label and entries.
+fn favourite_tables() -> Vec<(&'static str, &'static [&'static str])> {
+    FavouriteKind::ALL
+        .iter()
+        .map(|k| {
+            let def = content::favourite_kind_def(*k);
+            (def.label, def.entries)
+        })
+        .collect()
 }
 
 /// Whether `phrase` holds `name` as a whole word or a run of whole words,
@@ -142,6 +142,8 @@ fn the_state_rng_plays_no_part_in_a_profile() {
 #[test]
 fn every_draw_comes_from_its_table() {
     let mut patterns = BTreeSet::new();
+    let (mut counts, mut all_kinds, mut poses) =
+        (BTreeSet::new(), BTreeSet::new(), BTreeSet::new());
     for (i, name) in content::NAME_POOL.iter().enumerate() {
         let p = draw_profile(name, (i % 5) as u32);
         let def = content::fur_pattern_def(p.fur.pattern);
@@ -160,16 +162,70 @@ fn every_draw_comes_from_its_table() {
                 "{name}: slot {slot} repeats an earlier slot's {c:?}"
             );
         }
-        let fields = [&p.food, &p.toy, &p.nap, &p.show, &p.pastime, &p.quirk];
-        for ((label, table), got) in favourite_tables().iter().zip(fields) {
-            assert!(table.contains(&got.as_str()), "{name}: {label} {got:?}");
+        // Four to six favourites, each of its own kind, in kind order, each
+        // from its kind's table.
+        assert!(
+            (4..=6).contains(&p.favourites.len()),
+            "{name}: {}",
+            p.favourites.len()
+        );
+        let kinds: Vec<FavouriteKind> = p.favourites.iter().map(|f| f.kind).collect();
+        let mut ordered = kinds.clone();
+        ordered.sort();
+        ordered.dedup();
+        assert_eq!(kinds, ordered, "{name}: distinct kinds, in kind order");
+        for f in &p.favourites {
+            let def = content::favourite_kind_def(f.kind);
+            assert!(
+                def.entries.contains(&f.entry.as_str()),
+                "{name}: {:?} {:?}",
+                f.kind,
+                f.entry
+            );
         }
         patterns.insert(p.fur.pattern);
+        counts.insert(p.favourites.len());
+        all_kinds.extend(kinds);
+        poses.insert(p.pose);
     }
     assert_eq!(
         patterns.len(),
         FurPattern::ALL.len(),
         "every pattern turns up"
+    );
+    assert_eq!(
+        counts.len(),
+        3,
+        "four, five, and six favourites all turn up"
+    );
+    assert_eq!(
+        all_kinds.len(),
+        FavouriteKind::ALL.len(),
+        "every kind turns up"
+    );
+    assert_eq!(poses.len(), Pose::ALL.len(), "every pose turns up");
+}
+
+/// Kittens differ in which kinds of favourites they have, not only in what
+/// they are.
+/// @spec SIM-KIT-032
+#[test]
+fn kittens_are_known_for_different_things() {
+    let sets: BTreeSet<Vec<FavouriteKind>> = content::NAME_POOL
+        .iter()
+        .take(60)
+        .map(|n| {
+            draw_profile(n, 0)
+                .favourites
+                .iter()
+                .map(|f| f.kind)
+                .collect()
+        })
+        .collect();
+    assert!(
+        sets.len() >= 50,
+        "sixty kittens, {} sets of kinds",
+        sets.len()
     );
 }
 
@@ -344,12 +400,23 @@ fn every_eye_look_names_both_eyes() {
     assert!(odd >= 1, "some kitten has odd eyes");
 }
 
-/// Six tables of at least 24 short, printable, distinct entries.
+/// At least twelve kinds, each with a short label of its own and at least
+/// sixteen short, printable, distinct entries.
 /// @spec SIM-KIT-037
 #[test]
 fn the_favourite_tables_are_full_and_tidy() {
-    for (label, table) in favourite_tables() {
-        assert!(table.len() >= 24, "{label}: {} entries", table.len());
+    let tables = favourite_tables();
+    assert!(tables.len() >= 12, "{} kinds", tables.len());
+    let labels: BTreeSet<&str> = tables.iter().map(|(l, _)| *l).collect();
+    assert_eq!(labels.len(), tables.len(), "every kind has its own label");
+    for (label, table) in tables {
+        let n = label.chars().count();
+        assert!((1..=20).contains(&n), "{label:?} is {n} characters");
+        assert!(
+            label.chars().all(|c| c.is_ascii_graphic() || c == ' '),
+            "{label:?}"
+        );
+        assert!(table.len() >= 16, "{label}: {} entries", table.len());
         let mut seen = BTreeSet::new();
         for e in table {
             let n = e.chars().count();
@@ -370,6 +437,12 @@ fn the_favourite_tables_are_full_and_tidy() {
 fn no_favourite_names_a_thing_in_the_game() {
     let vocabulary = game_vocabulary();
     for (label, table) in favourite_tables() {
+        for name in &vocabulary {
+            assert!(
+                !contains_words(label, name),
+                "the label {label:?} names {name:?}"
+            );
+        }
         for e in table {
             for name in &vocabulary {
                 assert!(
@@ -629,7 +702,7 @@ const V7_FIXTURE: &str = include_str!("fixtures/save_v7.json");
 /// @spec SAVE-027
 #[test]
 fn profiles_are_saved() {
-    const { assert!(SAVE_VERSION >= 8, "a version step carries them") };
+    const { assert!(SAVE_VERSION >= 9, "a version step carries them") };
     let mut s = GameState::new(12);
     adopt(&mut s, 3);
     s.family_album.push(ArchivedKitten {
@@ -768,4 +841,98 @@ fn a_hand_edited_save_missing_a_profile_gets_one() {
         back.kittens[1].profile,
         Some(draw_profile(&s.kittens[1].name, s.generation))
     );
+}
+
+const V8_FIXTURE: &str = include_str!("fixtures/save_v8.json");
+
+/// A v8 save's kittens and memorials keep the fur and eyes they stored and
+/// gain favourites of varied kinds and a pose, as their names and
+/// generations draw them.
+/// @spec SAVE-029
+#[test]
+fn a_v8_save_keeps_its_kittens_fur_and_eyes() {
+    assert!(V8_FIXTURE.contains("\"save_version\": 8"));
+    let before: serde_json::Value = serde_json::from_str(V8_FIXTURE).unwrap();
+    let s = load_string(V8_FIXTURE, 1_760_500_000).unwrap().state;
+    let stored =
+        |list: &str, i: usize, field: &str| before["state"][list][i]["profile"][field].clone();
+    for (i, k) in s.kittens.iter().enumerate() {
+        let p = k.profile.as_ref().expect("a profile");
+        assert_eq!(
+            serde_json::to_value(&p.fur).unwrap(),
+            stored("kittens", i, "fur"),
+            "{}",
+            k.name
+        );
+        assert_eq!(
+            serde_json::to_value(p.eyes).unwrap(),
+            stored("kittens", i, "eyes"),
+            "{}",
+            k.name
+        );
+        assert!((4..=6).contains(&p.favourites.len()), "{}", k.name);
+    }
+    for (i, a) in s.family_album.iter().enumerate() {
+        let p = a.profile.as_ref().expect("a profile");
+        assert_eq!(
+            serde_json::to_value(&p.fur).unwrap(),
+            stored("family_album", i, "fur")
+        );
+        assert_eq!(
+            Some(p),
+            Some(&Profile {
+                fur: p.fur.clone(),
+                eyes: p.eyes,
+                ..draw_profile(&a.name, a.generation)
+            }),
+            "memorial {}: favourites and pose as its draw gives them",
+            a.name
+        );
+    }
+}
+
+/// Migrating a v8 save changes nothing but its profiles' favourites and
+/// poses.
+/// @spec SAVE-029, SAVE-013
+#[test]
+fn a_v8_save_migrates_with_everything_else_exact() {
+    let before: serde_json::Value = serde_json::from_str(V8_FIXTURE).unwrap();
+    let at = before["saved_at_unix"].as_u64().unwrap();
+    let sd = begin_load(V8_FIXTURE, at)
+        .expect("a v8 save loads")
+        .set_down();
+    let resaved: serde_json::Value = serde_json::from_str(&save_string_carrying(
+        &sd.state,
+        at,
+        sd.owed_ticks,
+        Some(&sd.report_so_far),
+    ))
+    .unwrap();
+    assert_eq!(resaved["save_version"], SAVE_VERSION);
+    let (was, now) = (
+        before["state"].as_object().unwrap(),
+        resaved["state"].as_object().unwrap(),
+    );
+    assert_eq!(
+        was.keys().collect::<Vec<_>>(),
+        now.keys().collect::<Vec<_>>()
+    );
+    for (key, old) in was {
+        if key == "kittens" || key == "family_album" {
+            let (old, new) = (old.as_array().unwrap(), now[key].as_array().unwrap());
+            assert_eq!(old.len(), new.len(), "{key}");
+            for (o, n) in old.iter().zip(new) {
+                let (mut o, mut n) = (
+                    o.as_object().unwrap().clone(),
+                    n.as_object().unwrap().clone(),
+                );
+                let (op, np) = (o.remove("profile").unwrap(), n.remove("profile").unwrap());
+                assert_eq!(o, n, "{key}: everything but the profile is kept");
+                assert_eq!(op["fur"], np["fur"], "{key}: the fur is kept");
+                assert_eq!(op["eyes"], np["eyes"], "{key}: the eyes are kept");
+            }
+        } else {
+            assert_eq!(old, &now[key], "migrating a v8 save changed `{key}`");
+        }
+    }
 }

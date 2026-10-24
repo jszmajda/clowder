@@ -185,23 +185,23 @@ Each kitten's profile carries its fur — a pattern and a colour for each of the
 
 **Where fur may go.** Fur colours and eye colours are worn only by the cells of a portrait and by swatches: a portrait's fur cells, its two eye cells, and each swatch's block. Every other character in and around them — the portrait's outline, its nose, the fur's and eyes' words, each swatch's colour name — is drawn in the inherited foreground. No fur or eye colour is ever worn by a name, a mark, a figure, or any word, and no state colour or coat is ever worn by a portrait's cell or a swatch, so the depiction never reads as a state and no state is ever mistaken for a cat.
 
-**How a pattern lays its colours.** The portrait is four rows tall, and its first three rows hold its fifteen fur cells (render leaf: The portrait). Each pattern assigns every fur cell one of its slots, and the cell is painted in the colour that slot took. The masks below name the fur cells by row and by column within the portrait, numbered from zero; a cell not named under a slot takes slot 0.
+**How a pattern lays its colours.** Each pattern assigns every fur cell of the portrait one of its slots, and the cell is painted in the colour that slot took. A pattern's rule is stated by where a cell sits on the cat — its part (top, back, chest, under, paw, tail), its patch (A, B, or neither), and its column — as the render leaf labels every fur cell of every pose (render leaf: The portrait), so one rule paints a pattern in any pose. A cell the rule does not name takes slot 0.
 
-| Pattern | Slots | Mask |
+| Pattern | Slots | Rule |
 |---|---|---|
 | solid | 0 colour | every fur cell slot 0 |
-| tabby | 0 base, 1 stripe | slot 1 on every fur cell in an even column — the stripes run down the face |
-| tuxedo | 0 colour, 1 white | slot 1 on row 2's columns 3, 4, 6, 7 — the white muzzle |
-| bicolour | 0 colour, 1 white | slot 1 on row 1's columns 4, 5, 6 and every fur cell of row 2 — the blaze and the white lower face |
-| tortoiseshell | 0 dark, 1 warm | slot 1 on row 0's column 8, row 1's columns 1, 5, 6, 9, and row 2's columns 2, 7 — the patches |
-| calico | 0 white, 1 warm, 2 dark | slot 1 on row 0's column 2, row 1's columns 1, 2, 6; slot 2 on row 0's column 8, row 1's columns 8, 9, and row 2's column 8 — patches on a white face |
-| colourpoint | 0 body, 1 point | slot 1 on both ears (row 0) and row 2's columns 3, 4, 6, 7 — the dark ears and mask |
-| van | 0 white, 1 colour | slot 1 on both ears (row 0) and row 1's columns 1, 2, 8, 9 — colour on the head only |
-| smoke | 0 top, 1 undercoat | slot 1 on every fur cell of row 2 |
+| tabby | 0 base, 1 stripe | slot 1 on every fur cell in an even column — the stripes run across the body |
+| tuxedo | 0 colour, 1 white | slot 1 on chest and paw cells — the white bib and socks |
+| bicolour | 0 colour, 1 white | slot 1 on chest, under, and paw cells — the white front and belly |
+| tortoiseshell | 0 dark, 1 warm | slot 1 on patch A — the warm patches |
+| calico | 0 white, 1 warm, 2 dark | slot 1 on patch A, slot 2 on patch B — patches on white |
+| colourpoint | 0 body, 1 point | slot 1 on paw and tail cells — the dark points |
+| van | 0 white, 1 colour | slot 1 on top and tail cells — colour near the head and on the tail |
+| smoke | 0 top, 1 undercoat | slot 1 on under cells — the pale undercoat showing beneath |
 
-A pattern's masks follow its slots as the kittens leaf orders them, so a slot index means the same thing in both leaves; a test holds every pattern in the core's table to a mask here.
+A pattern's rule follows its slots as the kittens leaf orders them, so a slot index means the same thing in both leaves; a test holds every pattern in the core's table to a rule here.
 
-**Eyes.** The left eye cell is painted in the eye look's left colour and the right eye cell in its right colour, so odd eyes show as two colours.
+**Eyes.** Where the pose shows its kitten's eyes, the left eye cell is painted in the eye look's left colour and the right eye cell in its right colour, so odd eyes show as two colours. A napping kitten's closed eyes are outline, and its eyes are told in words alone.
 
 **A swatch** is two cells of the full block `█`, both in one fur colour. The strip lists the fur's colours in slot order, each swatch followed by one blank column and the colour's name.
 

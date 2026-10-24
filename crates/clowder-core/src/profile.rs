@@ -7,7 +7,7 @@
 
 use crate::content;
 use crate::rng::Pcg32;
-use crate::state::{EyeLook, Fur, FurColour, FurPattern, Profile};
+use crate::state::{EyeLook, Favourite, FavouriteKind, Fur, FurColour, FurPattern, Pose, Profile};
 
 /// 64-bit FNV-1a. Hand-rolled because the standard hasher's output may change
 /// between Rust releases, and a profile drawn on load must match the one an
@@ -22,7 +22,9 @@ fn fnv1a(bytes: impl IntoIterator<Item = u8>) -> u64 {
 
 /// The profile a kitten named `name`, arriving in `generation`, draws: from a
 /// generator local to the draw, seeded by hashing the name and the
-/// generation, in the fixed order pattern, slot colours, eyes, favourites.
+/// generation, in the fixed order pattern, slot colours, eyes, how many
+/// favourites, their kinds, their entries, pose. The fur and eyes come first,
+/// so how favourites and poses are drawn never moves them.
 /// @spec SIM-KIT-032
 pub fn draw_profile(name: &str, generation: u32) -> Profile {
     let seed = fnv1a(name.bytes().chain(generation.to_le_bytes()));
@@ -39,16 +41,31 @@ pub fn draw_profile(name: &str, generation: u32) -> Profile {
         colours.push(left[rng.index(left.len())]);
     }
     let eyes = EyeLook::ALL[rng.index(EyeLook::ALL.len())];
-    let mut pick = |table: &[&str]| table[rng.index(table.len())].to_string();
+
+    // Four to six kinds, none twice, then held in kind order.
+    let count = 4 + rng.index(3);
+    let mut left: Vec<FavouriteKind> = FavouriteKind::ALL.to_vec();
+    let mut kinds: Vec<FavouriteKind> = (0..count)
+        .map(|_| left.remove(rng.index(left.len())))
+        .collect();
+    kinds.sort();
+    let favourites = kinds
+        .into_iter()
+        .map(|kind| {
+            let entries = content::favourite_kind_def(kind).entries;
+            Favourite {
+                kind,
+                entry: entries[rng.index(entries.len())].to_string(),
+            }
+        })
+        .collect();
+
+    let pose = Pose::ALL[rng.index(Pose::ALL.len())];
     Profile {
         fur: Fur { pattern, colours },
         eyes,
-        food: pick(&content::FAVOURITE_FOODS),
-        toy: pick(&content::FAVOURITE_TOYS),
-        nap: pick(&content::FAVOURITE_NAPS),
-        show: pick(&content::FAVOURITE_SHOWS),
-        pastime: pick(&content::FAVOURITE_PASTIMES),
-        quirk: pick(&content::FAVOURITE_QUIRKS),
+        favourites,
+        pose,
     }
 }
 

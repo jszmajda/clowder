@@ -18,9 +18,10 @@ use std::path::{Path, PathBuf};
 /// save itself (SAVE-024). v7 adds what each colony has shown the clowder
 /// (SAVE-026), arriving empty. v8 adds each kitten's and each memorial's
 /// profile (SAVE-027), drawn on migration from each one's name and generation
-/// (SAVE-028).
-/// @spec SAVE-013, SAVE-014, SAVE-021, SAVE-023, SAVE-026, SAVE-027
-pub const SAVE_VERSION: u32 = 8;
+/// (SAVE-028). v9 gives profiles favourites of varied kinds and a pose; a v8
+/// profile keeps its fur and eyes and draws the rest (SAVE-029).
+/// @spec SAVE-013, SAVE-014, SAVE-021, SAVE-023, SAVE-026, SAVE-027, SAVE-029
+pub const SAVE_VERSION: u32 = 9;
 /// The shortest absence worth reporting. Public for the same reason the cap
 /// is: a caller deciding whether to surface a report must use this value, not
 /// a copy of it. @spec SAVE-015
@@ -340,7 +341,7 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
     // Version-check on the loose parse first: a newer save may contain
     // variants this binary can't deserialize, and that must read as TooNew,
     // not Corrupt.
-    let value: serde_json::Value = serde_json::from_str(s).map_err(|e| LoadError::Corrupt {
+    let mut value: serde_json::Value = serde_json::from_str(s).map_err(|e| LoadError::Corrupt {
         detail: e.to_string(),
     })?;
     let found = value
@@ -352,6 +353,13 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
     if found > SAVE_VERSION {
         return Err(LoadError::TooNew { found });
     }
+    // v8 -> v9: a v8 profile is set aside before the state is read, its fur
+    // and eyes kept to be given back once the rest is drawn. @spec SAVE-029
+    let kept_looks = if found == 8 {
+        set_aside_v8_profiles(&mut value)
+    } else {
+        KeptLooks::default()
+    };
     let file: SaveFile = serde_json::from_value(value).map_err(|e| LoadError::Corrupt {
         detail: e.to_string(),
     })?;
@@ -461,6 +469,7 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
     // Every kitten and memorial holds a profile: a save from before profiles
     // (v7 and older) draws them all, and a hand-edited one draws any it lacks.
     give_missing_profiles(&mut state);
+    kept_looks.give_back(&mut state);
 
     // v5 -> v6: the revealed-resource set arrives filled by the engine's own
     // reveal rule, applied once to the state as normalized and before any
@@ -491,6 +500,68 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
         this_truncated: truncated,
         partial: OfflineReport::default(),
     })
+}
+
+/// The fur and eyes of each v8 profile set aside, by roster and album
+/// position.
+#[derive(Default)]
+struct KeptLooks {
+    kittens: Vec<Option<(crate::state::Fur, crate::state::EyeLook)>>,
+    album: Vec<Option<(crate::state::Fur, crate::state::EyeLook)>>,
+}
+
+impl KeptLooks {
+    /// Each kitten and memorial keeps the fur and eyes its v8 profile held.
+    fn give_back(self, state: &mut GameState) {
+        let profiles = state
+            .kittens
+            .iter_mut()
+            .map(|k| &mut k.profile)
+            .zip(self.kittens)
+            .chain(
+                state
+                    .family_album
+                    .iter_mut()
+                    .map(|a| &mut a.profile)
+                    .zip(self.album),
+            );
+        for (profile, kept) in profiles {
+            if let (Some(p), Some((fur, eyes))) = (profile.as_mut(), kept) {
+                p.fur = fur;
+                p.eyes = eyes;
+            }
+        }
+    }
+}
+
+/// Take every profile out of a v8 save's kittens and memorials — a v8
+/// profile holds six favourites of fixed kinds and no pose, which this
+/// version cannot read — keeping each one's fur and eyes. A profile whose fur
+/// or eyes do not read is set aside whole, and draws them as a missing
+/// profile does. @spec SAVE-029
+fn set_aside_v8_profiles(value: &mut serde_json::Value) -> KeptLooks {
+    let mut take = |list: &str| -> Vec<Option<(crate::state::Fur, crate::state::EyeLook)>> {
+        let Some(entries) = value
+            .get_mut("state")
+            .and_then(|s| s.get_mut(list))
+            .and_then(|l| l.as_array_mut())
+        else {
+            return Vec::new();
+        };
+        entries
+            .iter_mut()
+            .map(|entry| {
+                let profile = entry.as_object_mut()?.remove("profile")?;
+                let fur = serde_json::from_value(profile.get("fur")?.clone()).ok()?;
+                let eyes = serde_json::from_value(profile.get("eyes")?.clone()).ok()?;
+                Some((fur, eyes))
+            })
+            .collect()
+    };
+    KeptLooks {
+        kittens: take("kittens"),
+        album: take("family_album"),
+    }
 }
 
 /// Give every memorial, in album order, and then every rostered kitten, in

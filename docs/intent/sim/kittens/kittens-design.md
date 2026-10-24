@@ -53,17 +53,18 @@ Every kitten has a **profile**: what it looks like and what it loves. A profile 
 pub struct Profile {
     pub fur: Fur,         // a pattern and the colours its slots took, in slot order
     pub eyes: EyeLook,    // one entry of the eye-look table
-    pub food: String,     // favourite food
-    pub toy: String,      // favourite toy
-    pub nap: String,      // favourite place to nap
-    pub show: String,     // favourite thing to watch
-    pub pastime: String,  // what it loves to do
-    pub quirk: String,    // a little habit all its own
+    pub favourites: Vec<Favourite>, // four to six, each of a different kind, in kind order
+    pub pose: Pose,       // how its portrait draws it: sitting up, napping, or a loaf
 }
 
 pub struct Fur {
     pub pattern: FurPattern,
     pub colours: Vec<FurColour>, // one per slot of the pattern
+}
+
+pub struct Favourite {
+    pub kind: FavouriteKind, // which kind of favourite: a food, a secret talent, …
+    pub entry: String,       // what it is, as the kind's table words it
 }
 ```
 
@@ -73,7 +74,7 @@ pub struct Fur {
 
 **Eyes.** The eye-look table lists every look a kitten's eyes can have. Each look names the colour of the left eye and of the right, and carries its words (`green eyes`). A look whose two eyes differ is an ordinary entry, so it is exactly as rare as its share of the table.
 
-**Favourites.** Six tables, one for each favourite (food, toy, nap, show, pastime, quirk), each of at least 24 entries. An entry is a short phrase written to follow its label on the profile: printable ASCII, at most 40 characters, distinct in its table ignoring case. No entry names anything in the game: not as a whole word, nor as a run of whole words, ignoring case, does it contain the name of a resource (as the stores spell it, or that spelling with its last word made singular), structure, job, idea, craft, refinement, house rule, rite, arch, tradition, dream loom, colony, site, adventure, season, or kitten trait — the vocabulary the name pool is also kept apart from. A favourite that named something in the game would read as a reason to make or buy it, and a profile gives no such reason (Tenet 3).
+**Favourites.** A kitten's favourites are the little things that make it itself, and what makes one kitten unlike another is as much *which* things it is known for as what they are: one is known for its favourite food and the thing it is secretly afraid of, another for its signature move and the smell it loves. So favourites come in **kinds**, and each kitten has its own handful of kinds. The favourite-kind table lists at least twelve kinds. Each kind has a label, the words that introduce it on the profile (`Favourite food`, `Secret talent`), and a table of at least sixteen entries. A label is printable ASCII of at most 20 characters; an entry is a short phrase written to follow its label: printable ASCII, at most 40 characters, distinct in its table ignoring case. Kinds are typed ids, append-only like every content id. No label or entry names anything in the game: not as a whole word, nor as a run of whole words, ignoring case, does it contain the name of a resource (as the stores spell it, or that spelling with its last word made singular), structure, job, idea, craft, refinement, house rule, rite, arch, tradition, dream loom, colony, site, adventure, season, or kitten trait — the vocabulary the name pool is also kept apart from. A favourite that named something in the game would read as a reason to make or buy it, and a profile gives no such reason (Tenet 3).
 
 ### Drawing a profile
 
@@ -82,15 +83,22 @@ A kitten's profile is drawn once, when it arrives, and stored on the kitten. It 
 1. the pattern;
 2. each slot's colour, in slot order, drawn over only those of the slot's colours that no earlier slot took, so two slots never share a colour (a slot left with no colour to take is impossible in the table, and a content test holds it so);
 3. the eye look;
-4. the six favourites, in the order of the struct above.
+4. how many favourites it has: four, five, or six;
+5. that many kinds, each drawn over the kinds not yet drawn, so no kind is drawn twice; the kinds are then held in kind-table order, the order the profile states them in;
+6. an entry for each of those kinds, in kind-table order, from the kind's table;
+7. the pose.
 
-Each draw is uniform over its table, in content-table order.
+Each draw is uniform over its table, in content-table order. The fur and the eyes come first, so a change to how favourites or poses are drawn leaves every kitten's fur and eyes as they were.
+
+**Poses.** The pose is how the kitten's portrait draws it — sitting up, napping, or lying in a loaf (render leaf: The portrait) — so a page of kittens reads as a room of cats doing their own things rather than a row of identical pictures. It is a profile field like any other: drawn once, kept for life, read by no rule of the simulation.
 
 Taking nothing from the state RNG keeps its fixed draw schedule (SIM-ENG-018) exactly as it was, so every random outcome in a meadow is the one it would have been without profiles. Keying the draw on what the save holds means a profile can be drawn again from any save, which is how a save written before profiles existed gives its kittens theirs (persistence leaf). Names are unique within a generation (§ Names), so no two kittens drawn in one generation share a seed, and namesakes in different generations draw different profiles.
 
 ### Kept for life
 
-A profile is stored, never re-derived: what a kitten looks like and what it loves is part of who it is, kept for the same reason its name is. A favourite is kept as its words, so the favourite tables can grow, shrink, or be reworded between versions without changing any kitten. A pattern, a fur colour, and an eye look are kept as ids, append-only like every content id, so their tables can grow without changing any kitten either; rewording a colour's name changes how a fur is said, never what it is. A profile never changes once drawn — not when the kitten wanders off or comes home, not when it is promoted or made the Elder. A kitten carried in a Traveling Basket brings its profile into the new meadow, and the Family Album's memorial of every kitten keeps the profile it had (prestige leaf), so the album remembers what each kitten looked like and loved.
+A profile is stored, never re-derived: what a kitten looks like and what it loves is part of who it is, kept for the same reason its name is. A favourite is kept as its words, so the favourite tables can grow, shrink, or be reworded between versions without changing any kitten. A pattern, a fur colour, an eye look, a favourite's kind, and a pose are kept as ids, append-only like every content id, so their tables can grow without changing any kitten either; rewording a colour's name changes how a fur is said, never what it is. A profile never changes once drawn — not when the kitten wanders off or comes home, not when it is promoted or made the Elder. A kitten carried in a Traveling Basket brings its profile into the new meadow, and the Family Album's memorial of every kitten keeps the profile it had (prestige leaf), so the album remembers what each kitten looked like and loved.
+
+One save format predates kinds and poses: format v8 held six favourites of the same six kinds on every kitten, and no pose. A profile from that format keeps its fur and eyes on load and has its favourites and pose drawn as an arrival draws them (persistence leaf), so a clowder from that format looks as it did and gains the variety every later kitten has.
 
 ## Kitten Facts
 
@@ -180,6 +188,9 @@ The wander threshold (3 days ≈ 7.5 real seconds per day of famine at live spee
 | How a favourite reads | A phrase from a table, kept clear of every name in the game | Phrases free to name game things ("loves catnip") | A favourite naming a store or a structure reads as a reason to make or buy it, and no such reason exists (Tenet 3) |
 | How fur is chosen | Patterns with slots, each slot drawing from the colours a real cat could have there | Any colours in any combination | Free combinations draw kittens no cat looks like, and a profile is most charming when the player can picture the cat |
 | The trait None, read by the player | Easygoing | None | "Temperament: None" says nothing about a cat, and the trait list already says some cats simply are |
+| Which favourites a kitten has | Four to six kinds, drawn from a table of kinds | The same fixed set of kinds on every kitten; every kind on every kitten | The same kinds on every kitten makes every profile read as one form filled in many times; what a kitten is known for is part of its character. Every kind on every kitten is a profile too long to read at a glance or to fit a short pane |
+| How a portrait draws a kitten | One of three poses, drawn once and kept | A single pose for every kitten; a face alone | A face filled solid with fur and two small eyes reads as a mask rather than a cat. One pose for all makes a roster of identical pictures; a few poses make each kitten look like it is getting on with its day |
+| Profiles saved before kinds and poses (format v8) | Favourites and pose drawn on load, fur and eyes kept | Kept as they were, given a pose alone | Kept as they were, every kitten of such a save would carry the same six kinds — the sameness the kinds exist to end — for as long as that clowder lives, while the kittens arriving after it vary. Keeping the fur and eyes keeps the part the player knows a kitten by at a glance exactly as it was |
 
 ## Open Questions & Future Decisions
 

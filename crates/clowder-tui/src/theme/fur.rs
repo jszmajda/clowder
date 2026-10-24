@@ -38,43 +38,54 @@ pub fn eye_colour(c: EyeColour) -> Color {
     Color::Rgb(r, g, b)
 }
 
-/// The slot whose colour a pattern paints the portrait's fur cell at `row`,
-/// `col` in — the theme design's mask, slot 0 wherever it names none.
+/// Where on the cat a portrait's fur cell sits, as the render leaf labels
+/// every fur cell of every pose.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FurPart {
+    /// The shoulders, or the back nearest the head.
+    Top,
+    Back,
+    Chest,
+    /// The belly and lower body.
+    Under,
+    Paw,
+    Tail,
+}
+
+/// The two sets of cells a patched coat's second and third colours fall on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Patch {
+    A,
+    B,
+}
+
+/// The slot whose colour a pattern paints a fur cell in, by the cell's part,
+/// its patch, and its column — the theme design's rule, slot 0 wherever it
+/// names none, so one rule paints a pattern in every pose.
 /// @spec TUI-THEME-028
-pub fn fur_slot(pattern: FurPattern, row: usize, col: usize) -> usize {
-    let at = |cells: &[(usize, usize)]| cells.contains(&(row, col));
-    let muzzle = row == 2 && [3, 4, 6, 7].contains(&col);
+pub fn fur_slot(pattern: FurPattern, part: FurPart, patch: Option<Patch>, col: usize) -> usize {
+    use FurPart::*;
+    let on = |yes: bool| usize::from(yes);
     match pattern {
         FurPattern::Solid => 0,
-        // The stripes run down the face.
-        FurPattern::Tabby => usize::from(col % 2 == 0),
-        FurPattern::Tuxedo => usize::from(muzzle),
-        // The blaze and the white lower face.
-        FurPattern::Bicolour => usize::from((row == 1 && [4, 5, 6].contains(&col)) || row == 2),
-        FurPattern::Tortoiseshell => usize::from(at(&[
-            (0, 8),
-            (1, 1),
-            (1, 5),
-            (1, 6),
-            (1, 9),
-            (2, 2),
-            (2, 7),
-        ])),
-        // Warm and dark patches on a white face.
-        FurPattern::Calico => {
-            if at(&[(0, 2), (1, 1), (1, 2), (1, 6)]) {
-                1
-            } else if at(&[(0, 8), (1, 8), (1, 9), (2, 8)]) {
-                2
-            } else {
-                0
-            }
-        }
-        // The dark ears and mask.
-        FurPattern::Colourpoint => usize::from(row == 0 || muzzle),
-        // Colour on the head only.
-        FurPattern::Van => usize::from(row == 0 || (row == 1 && [1, 2, 8, 9].contains(&col))),
-        // A pale undercoat showing on the lower face.
-        FurPattern::Smoke => usize::from(row == 2),
+        // The stripes run across the body.
+        FurPattern::Tabby => on(col % 2 == 0),
+        // The white bib and socks.
+        FurPattern::Tuxedo => on(matches!(part, Chest | Paw)),
+        // The white front and belly.
+        FurPattern::Bicolour => on(matches!(part, Chest | Under | Paw)),
+        FurPattern::Tortoiseshell => on(patch == Some(Patch::A)),
+        // Warm and dark patches on white.
+        FurPattern::Calico => match patch {
+            Some(Patch::A) => 1,
+            Some(Patch::B) => 2,
+            None => 0,
+        },
+        // The dark points.
+        FurPattern::Colourpoint => on(matches!(part, Paw | Tail)),
+        // Colour near the head and on the tail.
+        FurPattern::Van => on(matches!(part, Top | Tail)),
+        // The pale undercoat showing beneath.
+        FurPattern::Smoke => on(part == Under),
     }
 }

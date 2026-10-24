@@ -4,9 +4,9 @@
 
 use crate::effects::Effect;
 use crate::state::{
-    AdventureId, CraftId, DreamLoomId, EyeColour, EyeLook, FurColour, FurPattern, IdeaId, JobId,
-    KittenTrait, RefinementId, ResourceId, RuleId, Season, SiteId, StructureGate, StructureId,
-    TraditionId,
+    AdventureId, CraftId, DreamLoomId, EyeColour, EyeLook, FavouriteKind, FurColour, FurPattern,
+    IdeaId, JobId, KittenTrait, RefinementId, ResourceId, RuleId, Season, SiteId, StructureGate,
+    StructureId, TraditionId,
 };
 use crate::state::{IDEA_COUNT, REFINEMENT_COUNT, RESOURCE_COUNT, STRUCTURE_COUNT};
 
@@ -2831,8 +2831,15 @@ pub fn eye_look_def(l: EyeLook) -> &'static EyeLookDef {
     &EYE_LOOKS[l as usize]
 }
 
-/// The favourite foods. @spec SIM-KIT-037, SIM-KIT-038
-pub static FAVOURITE_FOODS: [&str; 32] = [
+/// A favourite kind: the label that introduces it on a profile, and its
+/// entries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FavouriteKindDef {
+    pub label: &'static str,
+    pub entries: &'static [&'static str],
+}
+
+static FOODS: [&str; 32] = [
     "tuna, but only on Tuesdays",
     "the crust off a slice of toast",
     "a single cold green pea",
@@ -2867,8 +2874,7 @@ pub static FAVOURITE_FOODS: [&str; 32] = [
     "broth, warmed, in a saucer",
 ];
 
-/// The favourite toys. @spec SIM-KIT-037, SIM-KIT-038
-pub static FAVOURITE_TOYS: [&str; 29] = [
+static TOYS: [&str; 29] = [
     "a crinkly paper bag",
     "the cap from a milk jug",
     "a hair tie, stolen nightly",
@@ -2900,8 +2906,7 @@ pub static FAVOURITE_TOYS: [&str; 29] = [
     "the pull cord of a lamp",
 ];
 
-/// The favourite places to nap. @spec SIM-KIT-037, SIM-KIT-038
-pub static FAVOURITE_NAPS: [&str; 28] = [
+static NAP_SPOTS: [&str; 28] = [
     "the top of the fridge",
     "a laundry basket, fresh from the dryer",
     "the exact middle of the bed",
@@ -2932,8 +2937,7 @@ pub static FAVOURITE_NAPS: [&str; 28] = [
     "a box by the heater",
 ];
 
-/// The favourite things to watch. @spec SIM-KIT-037, SIM-KIT-038
-pub static FAVOURITE_SHOWS: [&str; 28] = [
+static SHOWS: [&str; 28] = [
     "rain racing down the window",
     "the washing machine's spin",
     "pigeons on the wire",
@@ -2964,8 +2968,7 @@ pub static FAVOURITE_SHOWS: [&str; 28] = [
     "the goldfish next door",
 ];
 
-/// What a kitten loves to do. @spec SIM-KIT-037, SIM-KIT-038
-pub static FAVOURITE_PASTIMES: [&str; 28] = [
+static PASTIMES: [&str; 28] = [
     "sitting in boxes",
     "knocking things off shelves",
     "chirping at birds",
@@ -2996,8 +2999,7 @@ pub static FAVOURITE_PASTIMES: [&str; 28] = [
     "lying in the sun",
 ];
 
-/// A little habit all its own. @spec SIM-KIT-037, SIM-KIT-038
-pub static FAVOURITE_QUIRKS: [&str; 28] = [
+static QUIRKS: [&str; 28] = [
     "sneezes when happy",
     "sleeps with its tongue out",
     "only drinks from a glass",
@@ -3027,6 +3029,232 @@ pub static FAVOURITE_QUIRKS: [&str; 28] = [
     "drools when petted",
     "sleeps with one eye open",
 ];
+
+static SECRET_TALENTS: [&str; 18] = [
+    "opening the treat cupboard",
+    "turning off the alarm clock",
+    "fitting through any gap",
+    "knowing when you'll be home",
+    "herding the other kittens",
+    "stealing socks undetected",
+    "purring loud enough to rattle glasses",
+    "sleeping through thunder",
+    "finding the one warm spot",
+    "opening doors by leaping on handles",
+    "hearing a can open three rooms away",
+    "walking along very thin railings",
+    "sitting perfectly still for an hour",
+    "untying shoelaces",
+    "climbing down, eventually",
+    "telling the time by dinner",
+    "fetching hair ties, on command",
+    "looking innocent",
+];
+
+static FEARS: [&str; 18] = [
+    "the vacuum cleaner",
+    "cucumbers left on the floor",
+    "its own reflection, some days",
+    "the doorbell",
+    "plastic bags that move by themselves",
+    "the hairdryer",
+    "anything that pops",
+    "the sound of tinfoil",
+    "sneezes, especially its own",
+    "the bath, obviously",
+    "hats",
+    "the blender",
+    "umbrellas opening indoors",
+    "the dark under the stairs",
+    "thunder, a little",
+    "the neighbour's very large dog",
+    "being picked up the wrong way",
+    "absolutely nothing, it claims",
+];
+
+static DAYDREAMS: [&str; 17] = [
+    "an endless roll of toilet paper",
+    "a bird that just sits there",
+    "a box big enough for everyone",
+    "a sunny windowsill, forever",
+    "a fish the size of a sofa",
+    "being taller than the fridge",
+    "a lap that never stands up",
+    "flying, like the pigeons",
+    "a room full of crinkly bags",
+    "a bowl that refills itself",
+    "catching the moon in the pond",
+    "a hammock in the sun",
+    "the last slice of ham, all to itself",
+    "a castle made of cushions",
+    "chasing a leaf that never lands",
+    "tummy rubs with no trap",
+    "a nap that lasts all week",
+];
+
+static SAYINGS: [&str; 16] = [
+    "mrrp?",
+    "a small squeak, like a hinge",
+    "nothing, but very loudly",
+    "mew, then thinks better of it",
+    "mrow, with feeling",
+    "brrrt!",
+    "a long complaint about dinner",
+    "meow, only when you're on the phone",
+    "eek",
+    "chirrup?",
+    "a polite little mip",
+    "one meow per stair",
+    "wow, apparently",
+    "the same thing as you, but later",
+    "hello, every single morning",
+    "mmm-rrrah",
+];
+
+static COLLECTIONS: [&str; 17] = [
+    "bottle caps",
+    "hair ties from all over the house",
+    "leaves, brought in one at a time",
+    "single socks",
+    "pen lids",
+    "crumpled receipts",
+    "bits of string",
+    "things that roll under the sofa",
+    "shoelaces, detached",
+    "ribbons from presents",
+    "one earring of every pair",
+    "crayons",
+    "twist ties from the bread bags",
+    "acorns from the garden",
+    "corks",
+    "paper clips",
+    "anything that glints",
+];
+
+static PET_PEEVES: [&str; 16] = [
+    "a closed door, any door",
+    "an empty patch in the food bowl",
+    "being looked at while eating",
+    "wet paws",
+    "the alarm clock",
+    "when you move during a nap",
+    "a bath, or the idea of one",
+    "cold floors in the morning",
+    "being ignored for a phone",
+    "a new brand of litter",
+    "hiccups",
+    "the lid on the fish tank",
+    "someone else in its chair",
+    "the bottom of the bowl showing",
+    "rain, personally",
+    "sudden music",
+];
+
+static SMELLS: [&str; 17] = [
+    "fresh laundry",
+    "your shoes, unfortunately",
+    "rain on hot stones",
+    "toast",
+    "cut grass",
+    "the inside of a paper bag",
+    "lavender in the garden",
+    "the cardboard of a new delivery",
+    "warm radiators",
+    "pine needles",
+    "old books",
+    "a freshly opened tin",
+    "your pillow",
+    "the dog next door, from a distance",
+    "wet earth after a storm",
+    "coffee, from across the room",
+    "oranges, which it hates loving",
+];
+
+static SIGNATURE_MOVES: [&str; 17] = [
+    "the slow blink",
+    "the loaf",
+    "the sudden sprint",
+    "the flop and roll",
+    "the headbutt",
+    "the paw on your cheek",
+    "the tail flick of disapproval",
+    "the full-body stretch",
+    "the shoulder perch",
+    "the silent stare",
+    "the bread-making knead",
+    "the doorway sit",
+    "the one-paw wave",
+    "the sideways hop",
+    "the tummy trap",
+    "the yawn and squeak",
+    "the knock-it-off-the-table",
+];
+
+/// Every favourite kind, in `FavouriteKind` order: its label and its
+/// entries. @spec SIM-KIT-037, SIM-KIT-038
+static FAVOURITE_KINDS: [FavouriteKindDef; 14] = [
+    FavouriteKindDef {
+        label: "Favourite food",
+        entries: &FOODS,
+    },
+    FavouriteKindDef {
+        label: "Favourite toy",
+        entries: &TOYS,
+    },
+    FavouriteKindDef {
+        label: "Best nap spot",
+        entries: &NAP_SPOTS,
+    },
+    FavouriteKindDef {
+        label: "Loves watching",
+        entries: &SHOWS,
+    },
+    FavouriteKindDef {
+        label: "Pastime",
+        entries: &PASTIMES,
+    },
+    FavouriteKindDef {
+        label: "Quirk",
+        entries: &QUIRKS,
+    },
+    FavouriteKindDef {
+        label: "Secret talent",
+        entries: &SECRET_TALENTS,
+    },
+    FavouriteKindDef {
+        label: "Afraid of",
+        entries: &FEARS,
+    },
+    FavouriteKindDef {
+        label: "Daydreams about",
+        entries: &DAYDREAMS,
+    },
+    FavouriteKindDef {
+        label: "Often says",
+        entries: &SAYINGS,
+    },
+    FavouriteKindDef {
+        label: "Collects",
+        entries: &COLLECTIONS,
+    },
+    FavouriteKindDef {
+        label: "Pet peeve",
+        entries: &PET_PEEVES,
+    },
+    FavouriteKindDef {
+        label: "Favourite smell",
+        entries: &SMELLS,
+    },
+    FavouriteKindDef {
+        label: "Signature move",
+        entries: &SIGNATURE_MOVES,
+    },
+];
+
+/// A kind's definition. @spec SIM-KIT-037, SIM-KIT-038
+pub fn favourite_kind_def(k: FavouriteKind) -> &'static FavouriteKindDef {
+    &FAVOURITE_KINDS[k as usize]
+}
 
 /// A trait as the player reads it: its name and its blurb.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

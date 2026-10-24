@@ -1169,17 +1169,9 @@ fn about_lines(state: &GameState, ix: usize, width: usize) -> Vec<Line<'static>>
 
     // The favourites, each a flavour line under the Journal's ·, in dim.
     // @spec TUI-NAV-166
-    if let Some(p) = profile {
-        for (label, entry) in [
-            ("Favourite food", &p.food),
-            ("Favourite toy", &p.toy),
-            ("Best nap spot", &p.nap),
-            ("Loves watching", &p.show),
-            ("Pastime", &p.pastime),
-            ("Quirk", &p.quirk),
-        ] {
-            out.push(Line::styled(format!("\u{b7} {label}: {entry}"), dim));
-        }
+    for f in profile.map_or(&[][..], |p| &p.favourites[..]) {
+        let label = clowder_core::content::favourite_kind_def(f.kind).label;
+        out.push(Line::styled(format!("\u{b7} {label}: {}", f.entry), dim));
     }
     out
 }

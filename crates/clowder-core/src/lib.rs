@@ -34,7 +34,7 @@ pub use save::{
 };
 pub use state::{
     AdventureId, ArchId, ArchivedKitten, Availability, ColonyId, ContentId, CraftId, DreamLoomId,
-    EyeColour, EyeLook, Fur, FurColour, FurPattern, GameState, IdeaId, JobId, Kitten, KittenTrait,
-    Location, MoodTier, Profile, Promise, RefinementId, ResourceId, RiteId, RuleId, Season, SiteId,
-    StructureGate, StructureId, TraditionId,
+    EyeColour, EyeLook, Favourite, FavouriteKind, Fur, FurColour, FurPattern, GameState, IdeaId,
+    JobId, Kitten, KittenTrait, Location, MoodTier, Pose, Profile, Promise, RefinementId,
+    ResourceId, RiteId, RuleId, Season, SiteId, StructureGate, StructureId, TraditionId,
 };

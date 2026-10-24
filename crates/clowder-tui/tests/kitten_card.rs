@@ -1,13 +1,13 @@
-//! A kitten's `about` card: its portrait painted in its own fur, the facts
-//! the core holds about it, and its favourites.
+//! A kitten's `about` card: its portrait in its own pose, painted in its own
+//! fur, the facts the core holds about it, and its favourites.
 //!
 //! @spec TUI-NAV-164, TUI-NAV-165, TUI-NAV-166, TUI-RENDER-029,
 //! TUI-THEME-027, TUI-THEME-028, TUI-THEME-029, TUI-THEME-030
 
 use clowder_core::content;
 use clowder_core::{
-    fur_words, EyeColour, EyeLook, Fur, FurColour, FurPattern, GameState, JobId, Kitten,
-    KittenTrait, Location, Profile, Season,
+    fur_words, EyeColour, EyeLook, Favourite, FavouriteKind, Fur, FurColour, FurPattern, GameState,
+    JobId, Kitten, KittenTrait, Location, Pose, Profile, Season,
 };
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
@@ -22,62 +22,132 @@ use clowder_tui::theme::Role;
 
 const H: u16 = 48;
 
-/// The portrait, as the render design draws it.
-const ART: [&str; 4] = [
-    " /\u{2588}\\___/\u{2588}\\ ",
-    "(\u{2588}\u{2588}o\u{2588}\u{2588}\u{2588}o\u{2588}\u{2588})",
-    "=\\\u{2588}\u{2588}\u{2588}^\u{2588}\u{2588}\u{2588}/=",
-    "  \\_____/  ",
-];
+/// A part of the cat a fur cell sits on, as the render design labels it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Part {
+    Top,
+    Back,
+    Chest,
+    Under,
+    Paw,
+    Tail,
+}
 
-/// The fifteen fur cells, by row and column within the portrait.
-const FUR_CELLS: [(usize, usize); 15] = [
-    (0, 2),
-    (0, 8),
-    (1, 1),
-    (1, 2),
-    (1, 4),
-    (1, 5),
-    (1, 6),
-    (1, 8),
-    (1, 9),
-    (2, 2),
-    (2, 3),
-    (2, 4),
-    (2, 6),
-    (2, 7),
-    (2, 8),
-];
+/// A pose's drawing, its eye cells, and every fur cell's part and patch, as
+/// the render design has them.
+struct Drawing {
+    art: &'static [&'static str],
+    eyes: Option<[(usize, usize); 2]>,
+    /// (row, column, part, patch) — patch 1 for A, 2 for B, 0 for neither.
+    fur: &'static [(usize, usize, Part, u8)],
+}
 
-/// The theme design's masks: the slot a pattern gives a fur cell.
-fn mask(p: FurPattern, r: usize, c: usize) -> usize {
-    let at = |cells: &[(usize, usize)]| cells.contains(&(r, c));
+fn drawing(pose: Pose) -> Drawing {
+    use Part::*;
+    match pose {
+        Pose::Sitting => Drawing {
+            art: &[
+                "   /\\_/\\",
+                "  ( o.o )",
+                "   > ^ <",
+                "  /\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\\  __",
+                " (_\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}_)\u{2588}\u{2588}/",
+            ],
+            eyes: Some([(1, 4), (1, 6)]),
+            fur: &[
+                (3, 3, Top, 1),
+                (3, 7, Top, 2),
+                (3, 4, Back, 1),
+                (3, 6, Back, 0),
+                (3, 5, Chest, 0),
+                (4, 5, Chest, 0),
+                (4, 4, Under, 1),
+                (4, 6, Under, 2),
+                (4, 3, Paw, 0),
+                (4, 7, Paw, 2),
+                (4, 10, Tail, 1),
+                (4, 11, Tail, 2),
+            ],
+        },
+        Pose::Napping => Drawing {
+            art: &[
+                "         /\\_/\\",
+                "   _____( -.- )",
+                "  /\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}  \\",
+                " (_\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}_)",
+            ],
+            eyes: None,
+            fur: &[
+                (2, 9, Top, 2),
+                (2, 10, Top, 2),
+                (2, 11, Top, 0),
+                (2, 4, Back, 1),
+                (2, 5, Back, 1),
+                (2, 6, Back, 1),
+                (2, 7, Back, 0),
+                (2, 8, Back, 0),
+                (3, 10, Chest, 2),
+                (3, 11, Chest, 0),
+                (3, 4, Under, 0),
+                (3, 5, Under, 1),
+                (3, 6, Under, 0),
+                (3, 7, Under, 0),
+                (3, 8, Under, 0),
+                (3, 9, Under, 2),
+                (3, 12, Paw, 1),
+                (3, 13, Paw, 0),
+                (2, 3, Tail, 0),
+                (3, 3, Tail, 2),
+            ],
+        },
+        Pose::Loaf => Drawing {
+            art: &[
+                "      /\\_/\\",
+                "  ___( o.o )",
+                " /\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\\",
+                "(_\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}\u{2588}_)",
+            ],
+            eyes: Some([(1, 7), (1, 9)]),
+            fur: &[
+                (2, 8, Top, 0),
+                (2, 9, Top, 1),
+                (2, 10, Top, 0),
+                (2, 11, Top, 2),
+                (2, 3, Back, 1),
+                (2, 4, Back, 1),
+                (2, 5, Back, 0),
+                (2, 6, Back, 2),
+                (2, 7, Back, 2),
+                (3, 8, Chest, 0),
+                (3, 9, Chest, 0),
+                (3, 3, Under, 1),
+                (3, 4, Under, 0),
+                (3, 5, Under, 0),
+                (3, 6, Under, 2),
+                (3, 7, Under, 2),
+                (3, 10, Paw, 0),
+                (3, 11, Paw, 1),
+                (2, 2, Tail, 0),
+                (3, 2, Tail, 0),
+            ],
+        },
+    }
+}
+
+/// The theme design's rules: the slot a pattern gives a fur cell.
+fn rule(p: FurPattern, col: usize, part: Part, patch: u8) -> usize {
+    use Part::*;
+    let on = |yes: bool| usize::from(yes);
     match p {
         FurPattern::Solid => 0,
-        FurPattern::Tabby => usize::from(c % 2 == 0),
-        FurPattern::Tuxedo => usize::from(r == 2 && [3, 4, 6, 7].contains(&c)),
-        FurPattern::Bicolour => usize::from((r == 1 && [4, 5, 6].contains(&c)) || r == 2),
-        FurPattern::Tortoiseshell => usize::from(at(&[
-            (0, 8),
-            (1, 1),
-            (1, 5),
-            (1, 6),
-            (1, 9),
-            (2, 2),
-            (2, 7),
-        ])),
-        FurPattern::Calico => {
-            if at(&[(0, 2), (1, 1), (1, 2), (1, 6)]) {
-                1
-            } else if at(&[(0, 8), (1, 8), (1, 9), (2, 8)]) {
-                2
-            } else {
-                0
-            }
-        }
-        FurPattern::Colourpoint => usize::from(r == 0 || (r == 2 && [3, 4, 6, 7].contains(&c))),
-        FurPattern::Van => usize::from(r == 0 || (r == 1 && [1, 2, 8, 9].contains(&c))),
-        FurPattern::Smoke => usize::from(r == 2),
+        FurPattern::Tabby => on(col % 2 == 0),
+        FurPattern::Tuxedo => on(matches!(part, Chest | Paw)),
+        FurPattern::Bicolour => on(matches!(part, Chest | Under | Paw)),
+        FurPattern::Tortoiseshell => on(patch == 1),
+        FurPattern::Calico => usize::from(patch),
+        FurPattern::Colourpoint => on(matches!(part, Paw | Tail)),
+        FurPattern::Van => on(matches!(part, Top | Tail)),
+        FurPattern::Smoke => on(part == Under),
     }
 }
 
@@ -93,16 +163,25 @@ fn fur_of(p: FurPattern) -> Fur {
     }
 }
 
-fn profile(fur: Fur, eyes: EyeLook) -> Profile {
+const FAVOURITES: [(FavouriteKind, &str); 4] = [
+    (FavouriteKind::Food, "warm toast crusts"),
+    (FavouriteKind::Toy, "a crinkly paper bag"),
+    (FavouriteKind::SecretTalent, "opening the cupboard"),
+    (FavouriteKind::SignatureMove, "the slow blink"),
+];
+
+fn profile(fur: Fur, eyes: EyeLook, pose: Pose) -> Profile {
     Profile {
         fur,
         eyes,
-        food: "warm toast crusts".into(),
-        toy: "a crinkly paper bag".into(),
-        nap: "the top of the fridge".into(),
-        show: "rain on the window".into(),
-        pastime: "sitting in boxes".into(),
-        quirk: "sneezes when happy".into(),
+        favourites: FAVOURITES
+            .iter()
+            .map(|(kind, entry)| Favourite {
+                kind: *kind,
+                entry: entry.to_string(),
+            })
+            .collect(),
+        pose,
     }
 }
 
@@ -184,7 +263,11 @@ fn dim() -> Color {
 fn the_card_stands_beneath_the_row_in_its_order() {
     let s = meadow(kitten(
         "Pip",
-        Some(profile(fur_of(FurPattern::Tabby), EyeLook::Green)),
+        Some(profile(
+            fur_of(FurPattern::Tabby),
+            EyeLook::Green,
+            Pose::Sitting,
+        )),
     ));
     let buf = card(&s, 80);
     let lines = text(&buf);
@@ -196,7 +279,7 @@ fn the_card_stands_beneath_the_row_in_its_order() {
         lines[..about].iter().any(|l| l.starts_with("Pip")),
         "the name above it"
     );
-    let portrait = row_of(&lines, ART[0].trim_end());
+    let portrait = row_of(&lines, drawing(Pose::Sitting).art[0]);
     let temperament = row_of(&lines, "\u{25aa} Temperament: ");
     let food = row_of(&lines, "\u{b7} Favourite food: ");
     assert!(about < portrait && portrait < temperament && temperament < food);
@@ -228,7 +311,11 @@ fn a_kitten_without_a_profile_still_has_its_facts() {
 fn the_facts_read_as_the_core_reports_them() {
     let mut k = kitten(
         "Pip",
-        Some(profile(fur_of(FurPattern::Solid), EyeLook::Gold)),
+        Some(profile(
+            fur_of(FurPattern::Solid),
+            EyeLook::Gold,
+            Pose::Loaf,
+        )),
     );
     let job = JobId::ALL[1];
     k.skills[job as usize] = 640.0;
@@ -307,29 +394,33 @@ fn the_facts_have_their_plain_cases() {
 // TUI-NAV-166 — the favourites
 // ---------------------------------------------------------------------------
 
-/// Six lines, each its label and the entry exactly as held, every cell dim.
+/// One line for each favourite the profile holds, in its order, each its
+/// kind's label and the entry exactly as held, every cell dim.
 /// @spec TUI-NAV-166
 #[test]
 fn the_favourites_follow_the_facts_in_dim() {
-    let p = profile(fur_of(FurPattern::Calico), EyeLook::Blue);
+    let p = profile(fur_of(FurPattern::Calico), EyeLook::Blue, Pose::Napping);
     let s = meadow(kitten("Pip", Some(p.clone())));
     let buf = card(&s, 120);
     let lines = text(&buf);
-    let first = row_of(&lines, "\u{b7} Favourite food: ");
-    let want = [
-        format!("\u{b7} Favourite food: {}", p.food),
-        format!("\u{b7} Favourite toy: {}", p.toy),
-        format!("\u{b7} Best nap spot: {}", p.nap),
-        format!("\u{b7} Loves watching: {}", p.show),
-        format!("\u{b7} Pastime: {}", p.pastime),
-        format!("\u{b7} Quirk: {}", p.quirk),
-    ];
-    for (i, w) in want.iter().enumerate() {
-        assert_eq!(&lines[first + i], w);
+    let first = row_of(&lines, "\u{b7} ");
+    for (i, f) in p.favourites.iter().enumerate() {
+        let w = format!(
+            "\u{b7} {}: {}",
+            content::favourite_kind_def(f.kind).label,
+            f.entry
+        );
+        assert_eq!(lines[first + i], w);
         for x in 0..w.chars().count() {
             assert_eq!(fg(&buf, x, first + i), dim(), "{w:?} column {x}");
         }
     }
+    assert!(
+        lines[first + p.favourites.len()..]
+            .iter()
+            .all(|l| l.is_empty()),
+        "nothing after the favourites"
+    );
     let since = row_of(&lines, "\u{25aa} With the clowder since ");
     assert!(since < first, "facts come before favourites");
 }
@@ -338,63 +429,68 @@ fn the_favourites_follow_the_facts_in_dim() {
 // TUI-RENDER-029 — the portrait and its words
 // ---------------------------------------------------------------------------
 
-/// The four rows whole from the left edge, the words beside the face where
+/// Every pose's rows whole from the left edge, the words beside the cat where
 /// they fit, and the strip beneath.
 /// @spec TUI-RENDER-029, TUI-THEME-030
 #[test]
-fn the_portrait_stands_whole_with_its_words_beside_it() {
+fn every_pose_stands_whole_with_its_words_beside_it() {
     let fur = fur_of(FurPattern::Tabby);
-    let s = meadow(kitten("Pip", Some(profile(fur.clone(), EyeLook::Green))));
-    let lines = text(&card(&s, 80));
-    let top = row_of(&lines, ART[0].trim_end());
-    let words = fur_words(&fur);
-    let eyes = content::eye_look_def(EyeLook::Green).words;
-    assert_eq!(lines[top], ART[0].trim_end());
-    assert_eq!(lines[top + 1], format!("{}   {words}", ART[1]));
-    assert_eq!(lines[top + 2], format!("{}   {eyes}", ART[2]));
-    assert_eq!(lines[top + 3], ART[3].trim_end());
-    let strip: Vec<String> = fur
-        .colours
-        .iter()
-        .map(|c| format!("\u{2588}\u{2588} {}", content::fur_colour_name(*c)))
-        .collect();
-    assert_eq!(lines[top + 4], strip.join("  "));
+    for pose in Pose::ALL {
+        let d = drawing(pose);
+        let s = meadow(kitten(
+            "Pip",
+            Some(profile(fur.clone(), EyeLook::Green, pose)),
+        ));
+        let lines = text(&card(&s, 80));
+        let top = row_of(&lines, d.art[0]);
+        let widest = d.art.iter().map(|r| r.chars().count()).max().unwrap();
+        let words = fur_words(&fur);
+        let eyes = content::eye_look_def(EyeLook::Green).words;
+        for (r, row) in d.art.iter().enumerate() {
+            let want = match r {
+                1 => format!("{row:<widest$}   {words}"),
+                2 => format!("{row:<widest$}   {eyes}"),
+                _ => row.to_string(),
+            };
+            assert_eq!(lines[top + r], want, "{pose:?} row {r}");
+        }
+        let strip: Vec<String> = fur
+            .colours
+            .iter()
+            .map(|c| format!("\u{2588}\u{2588} {}", content::fur_colour_name(*c)))
+            .collect();
+        assert_eq!(lines[top + d.art.len()], strip.join("  "), "{pose:?}");
+    }
 }
 
-/// Where the words would not fit beside the face whole, they stand beneath
+/// Where the words would not fit beside the cat whole, they stand beneath
 /// it, and a strip too long for one line breaks between items.
 /// @spec TUI-RENDER-029, TUI-THEME-030
 #[test]
 fn a_narrow_card_puts_the_words_beneath_and_breaks_the_strip_between_items() {
     let fur = fur_of(FurPattern::Calico);
+    let d = drawing(Pose::Napping);
     let s = meadow(kitten(
         "Pip",
-        Some(profile(fur.clone(), EyeLook::OddBlueCopper)),
+        Some(profile(fur.clone(), EyeLook::OddBlueCopper, Pose::Napping)),
     ));
     let lines = text(&card(&s, 22));
-    let top = row_of(&lines, ART[0].trim_end());
-    for (i, row) in ART.iter().enumerate() {
-        assert_eq!(
-            lines[top + i],
-            row.trim_end(),
-            "row {i} whole, nothing beside it"
-        );
+    let top = row_of(&lines, d.art[0]);
+    for (i, row) in d.art.iter().enumerate() {
+        assert_eq!(lines[top + i], *row, "row {i} whole, nothing beside it");
     }
+    let below = top + d.art.len();
     let words = fur_words(&fur);
-    assert_eq!(
-        lines[top + 4],
-        words,
-        "the fur's words beneath the portrait"
-    );
-    let strip_at = top
-        + 5
-        + lines[top + 5..]
+    assert_eq!(lines[below], words, "the fur's words beneath the portrait");
+    let strip_at = below
+        + 1
+        + lines[below + 1..]
             .iter()
             .position(|l| l.starts_with('\u{2588}'))
             .expect("a strip");
     let eyes = content::eye_look_def(EyeLook::OddBlueCopper).words;
     assert_eq!(
-        lines[top + 5..strip_at].join(" "),
+        lines[below + 1..strip_at].join(" "),
         eyes,
         "the eyes' words beneath the fur's, wrapped as any line"
     );
@@ -462,42 +558,59 @@ fn the_fur_and_eye_colours_are_the_design_s() {
     }
 }
 
-/// Every pattern paints each fur cell in its mask's slot's colour, the eyes
-/// in the look's two colours, and everything else in the portrait — outline,
-/// nose, words — in the inherited foreground.
+/// Every pattern, in every pose, paints each fur cell in its rule's slot's
+/// colour, the eyes (where the pose shows them) in the look's two colours,
+/// and everything else in the portrait — outline, words — in the inherited
+/// foreground.
 /// @spec TUI-THEME-027, TUI-THEME-028, TUI-THEME-029
 #[test]
-fn every_pattern_paints_its_mask() {
-    for p in FurPattern::ALL {
-        let fur = fur_of(p);
-        let s = meadow(kitten(
-            "Pip",
-            Some(profile(fur.clone(), EyeLook::OddBlueCopper)),
-        ));
-        let buf = card(&s, 80);
-        let lines = text(&buf);
-        let top = row_of(&lines, ART[0].trim_end());
-        for (r, row) in ART.iter().enumerate() {
-            for (c, ch) in row.chars().enumerate() {
-                let got = fg(&buf, c, top + r);
-                let want = if FUR_CELLS.contains(&(r, c)) {
-                    fur_colour(fur.colours[mask(p, r, c)])
-                } else if (r, c) == (1, 3) {
-                    eye_colour(content::eye_look_def(EyeLook::OddBlueCopper).left)
-                } else if (r, c) == (1, 7) {
-                    eye_colour(content::eye_look_def(EyeLook::OddBlueCopper).right)
-                } else {
-                    Color::Reset
-                };
-                assert_eq!(got, want, "{p:?} row {r} column {c} ({ch:?})");
-            }
-            // The words beside the face wear no fur.
-            for x in 11..80 {
-                assert_eq!(
-                    fg(&buf, x, top + r),
-                    Color::Reset,
-                    "{p:?} row {r} column {x}"
-                );
+fn every_pattern_paints_its_rule_in_every_pose() {
+    let look = content::eye_look_def(EyeLook::OddBlueCopper);
+    for pose in Pose::ALL {
+        let d = drawing(pose);
+        let fur_cells = d
+            .art
+            .iter()
+            .map(|r| r.matches('\u{2588}').count())
+            .sum::<usize>();
+        assert_eq!(
+            d.fur.len(),
+            fur_cells,
+            "{pose:?}: every fur cell is labelled"
+        );
+        for p in FurPattern::ALL {
+            let fur = fur_of(p);
+            let s = meadow(kitten(
+                "Pip",
+                Some(profile(fur.clone(), EyeLook::OddBlueCopper, pose)),
+            ));
+            let buf = card(&s, 80);
+            let lines = text(&buf);
+            let top = row_of(&lines, d.art[0]);
+            let widest = d.art.iter().map(|r| r.chars().count()).max().unwrap();
+            for (r, row) in d.art.iter().enumerate() {
+                for (c, ch) in row.chars().enumerate() {
+                    let got = fg(&buf, c, top + r);
+                    let want = if let Some(&(_, col, part, patch)) =
+                        d.fur.iter().find(|f| (f.0, f.1) == (r, c))
+                    {
+                        fur_colour(fur.colours[rule(p, col, part, patch)])
+                    } else if d.eyes.is_some_and(|e| e[0] == (r, c)) {
+                        eye_colour(look.left)
+                    } else if d.eyes.is_some_and(|e| e[1] == (r, c)) {
+                        eye_colour(look.right)
+                    } else {
+                        Color::Reset
+                    };
+                    assert_eq!(got, want, "{pose:?} {p:?} row {r} column {c} ({ch:?})");
+                }
+                for x in widest..80 {
+                    assert_eq!(
+                        fg(&buf, x, top + r),
+                        Color::Reset,
+                        "{pose:?} {p:?} row {r} column {x}"
+                    );
+                }
             }
         }
     }
@@ -508,7 +621,10 @@ fn every_pattern_paints_its_mask() {
 #[test]
 fn a_swatch_wears_its_colour_and_its_name_does_not() {
     let fur = fur_of(FurPattern::Calico);
-    let s = meadow(kitten("Pip", Some(profile(fur.clone(), EyeLook::Green))));
+    let s = meadow(kitten(
+        "Pip",
+        Some(profile(fur.clone(), EyeLook::Green, Pose::Sitting)),
+    ));
     let buf = card(&s, 80);
     let lines = text(&buf);
     let strip = row_of(&lines, "\u{2588}\u{2588} ");

@@ -543,18 +543,72 @@ pub struct Fur {
     pub colours: Vec<FurColour>,
 }
 
+/// The kinds of favourite a kitten can be known for. Ids are append-only.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum FavouriteKind {
+    Food,
+    Toy,
+    NapSpot,
+    Show,
+    Pastime,
+    Quirk,
+    SecretTalent,
+    AfraidOf,
+    Daydream,
+    OftenSays,
+    Collects,
+    PetPeeve,
+    Smell,
+    SignatureMove,
+}
+
+impl FavouriteKind {
+    pub const ALL: [FavouriteKind; 14] = [
+        FavouriteKind::Food,
+        FavouriteKind::Toy,
+        FavouriteKind::NapSpot,
+        FavouriteKind::Show,
+        FavouriteKind::Pastime,
+        FavouriteKind::Quirk,
+        FavouriteKind::SecretTalent,
+        FavouriteKind::AfraidOf,
+        FavouriteKind::Daydream,
+        FavouriteKind::OftenSays,
+        FavouriteKind::Collects,
+        FavouriteKind::PetPeeve,
+        FavouriteKind::Smell,
+        FavouriteKind::SignatureMove,
+    ];
+}
+
+/// One thing a kitten is known for: its kind, and what it is.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Favourite {
+    pub kind: FavouriteKind,
+    pub entry: String,
+}
+
+/// How a kitten's portrait draws it. Ids are append-only.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum Pose {
+    Sitting,
+    Napping,
+    Loaf,
+}
+
+impl Pose {
+    pub const ALL: [Pose; 3] = [Pose::Sitting, Pose::Napping, Pose::Loaf];
+}
+
 /// What a kitten looks like and what it loves. Drawn once at arrival and kept
 /// for life; no rule of the simulation reads it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Profile {
     pub fur: Fur,
     pub eyes: EyeLook,
-    pub food: String,
-    pub toy: String,
-    pub nap: String,
-    pub show: String,
-    pub pastime: String,
-    pub quirk: String,
+    /// Four to six, each of its own kind, in kind order.
+    pub favourites: Vec<Favourite>,
+    pub pose: Pose,
 }
 
 /// The banded idea tree, ids append-only: 0–8 are the founding nine, 9–17

@@ -125,27 +125,70 @@ A figure that is not finite has no digits to state, and is said in words instead
 
 ## The Portrait
 
-A kitten's `about` card in the inspector opens with its portrait (navigation leaf: Who the kitten is): the kitten drawn small, four rows by eleven columns, in single-width characters only.
+A kitten's `about` card in the inspector opens with its portrait (navigation leaf: Who the kitten is): the kitten drawn small, in single-width characters only, in the pose its profile holds (kittens leaf: Poses) — sitting up, napping, or lying in a loaf. Each pose is a fixed drawing.
+
+Sitting up, five rows:
 
 ```
- /█\___/█\
-(██o███o██)
-=\███^███/=
-  \_____/
+   /\_/\
+  ( o.o )
+   > ^ <
+  /█████\  __
+ (_█████_)██/
 ```
 
-Rows and columns are numbered from zero, from the portrait's top-left cell. Each cell has one of four roles:
+Napping, four rows:
 
-- **Fur** — the fifteen `█` cells, two in row 0 (the ears, columns 2 and 8), seven in row 1, and six in row 2. The theme leaf's masks name them by row and column and paint each in one of the fur's colours (theme leaf: Fur).
-- **Eye** — the two `o` cells of row 1, the left eye at column 3 and the right at column 7, painted in the eye look's colours.
-- **Nose** — the `^` at row 2, column 5.
-- **Outline** — every other non-blank cell: the ears' edges, the face's sides and chin, the whiskers.
+```
+         /\_/\
+   _____( -.- )
+  /█████████  \
+ (_███████████_)
+```
 
-The nose and the outline are drawn in the inherited foreground, so the shape of the cat stands against any ground whatever its fur. Blank cells stay blank: the portrait paints nothing around the cat.
+Loaf, four rows:
 
-**Drawn whole.** Each of the portrait's rows is drawn whole from the inspector's left edge, never wrapped, shortened, or trimmed of its leading blanks, since a row moved by a column is a different and broken picture. The inspector is never narrower than its minimum, which is wider than the portrait.
+```
+      /\_/\
+  ___( o.o )
+ /██████████\
+(_██████████_)
+```
 
-**Its words.** The fur's words and the eyes' words stand beside the face, three blank columns to the right of the portrait, the fur's on row 1 and the eyes' on row 2 — wherever the inspector's width holds the portrait, the three columns, and the longer of the two whole. Where it does not, they stand beneath the portrait instead, the fur's line and then the eyes', and wrap as any inspector line does. Which way they stand follows from the width and the two lengths alone.
+Rows and columns are numbered from zero, from each drawing's top-left cell. Each cell has one of three roles:
+
+- **Fur** — the `█` cells, painted in the fur's colours (theme leaf: Fur).
+- **Eye** — the two `o` cells of a pose whose kitten is awake, the left eye first: sitting up, row 1 columns 4 and 6; the loaf, row 1 columns 7 and 9. The napping kitten's eyes are closed, so its pose has no eye cells, and its eyes are told in words alone.
+- **Outline** — every other non-blank cell, the nose and the whiskers included.
+
+The outline is drawn in the inherited foreground, so the shape of the cat stands against any ground whatever its fur. Blank cells stay blank: the portrait paints nothing around the cat. The head is outline and the body is fur, so a cat's face is always the familiar one and its colouring shows on the body, where a pattern has room to read.
+
+**Where each fur cell is on the cat.** A pattern lays its colours by where a cell sits on the body, not by its position in one particular drawing, so the theme leaf states each pattern's mask once for every pose. Each fur cell is one of six parts — **top** (the shoulders or the back nearest the head), **back**, **chest**, **under** (the belly and lower body), **paw**, **tail** — and some cells also belong to **patch A** or **patch B**, the two sets a patched coat's second and third colours fall on:
+
+| Pose | Fur cell (row: columns) | Part | Patch A | Patch B |
+|---|---|---|---|---|
+| Sitting up | 3: 3, 7 | top | 3: 3 | 3: 7 |
+| | 3: 4, 6 | back | 3: 4 | |
+| | 3: 5 and 4: 5 | chest | | |
+| | 4: 4, 6 | under | 4: 4 | 4: 6 |
+| | 4: 3, 7 | paw | | 4: 7 |
+| | 4: 10, 11 | tail | 4: 10 | 4: 11 |
+| Napping | 2: 9–11 | top | | 2: 9, 10 |
+| | 2: 4–8 | back | 2: 4, 5, 6 | |
+| | 3: 10, 11 | chest | | 3: 10 |
+| | 3: 4–9 | under | 3: 5 | 3: 9 |
+| | 3: 12, 13 | paw | 3: 12 | |
+| | 2: 3 and 3: 3 | tail | | 3: 3 |
+| Loaf | 2: 8–11 | top | 2: 9 | 2: 11 |
+| | 2: 3–7 | back | 2: 3, 4 | 2: 6, 7 |
+| | 3: 8, 9 | chest | | |
+| | 3: 3–7 | under | 3: 3 | 3: 6, 7 |
+| | 3: 10, 11 | paw | 3: 11 | |
+| | 2: 2 and 3: 2 | tail | | |
+
+**Drawn whole.** Each of the portrait's rows is drawn whole from the inspector's left edge, never wrapped, shortened, or trimmed of its leading blanks, since a row moved by a column is a different and broken picture. The inspector is never narrower than its minimum, which is wider than every pose.
+
+**Its words.** The fur's words and the eyes' words stand beside the cat, three blank columns to the right of the pose's widest row, the fur's on row 1 and the eyes' on row 2 — wherever the inspector's width holds the pose, the three columns, and the longer of the two whole. Where it does not, they stand beneath the portrait instead, the fur's line and then the eyes', and wrap as any inspector line does. Which way they stand follows from the width, the pose, and the two lengths alone.
 
 **The strip.** Beneath the portrait, and beneath its words where they stand beneath it, the swatch strip (theme leaf: a swatch) lists the fur's colours, each swatch with its colour's name, items two blank columns apart. It breaks onto a further line only between items, never parting a swatch from its name, each further line beginning at the inspector's left edge.
 
@@ -192,8 +235,8 @@ Whether frames run at a fixed cadence or only when something changed is deferred
 | Sidebar overflow | A window onto the stores in the stores group's order, moved only by the player (navigation leaf: Scrolling the sidebar); every store in it whole; a note at the head and the foot counting the stores out of view on that side, and how many of them wear `full` | A fixed glance choosing the stores wearing `full` first, with one `+N more` note; clipping at the sidebar's foot; the stores wearing `full` drawn at the top | A fixed glance keeps every store past its lines out of the sidebar for good once a meadow holds more stores than it has lines, and its full-first choice moves stores in and out of the glance as they fill and spend. The window moves only when the player moves it, so a glance finds each store where it last stood. The notes' full count keeps what the full-first choice was for: a capped store out of view still says it wants notice. A clipped foot drops stores with no mark that any are missing, and can cut a store between its lines; stores wearing `full` drawn at the top would jump lines as they fill and spend |
 | A resource's name in a price | Spelled as its stores row spells it | A lower-cased word of its own | Two spellings of one resource read as two resources, and the stores row is where the player reads that resource's stock, cap, and rate |
 | Truncation | Explicit ellipsis, full text in the inspector | Hard cut; scrolling text; shrinking to fit | A hard cut hides that anything was lost; motion in a glanceable pane is exactly what the design is avoiding |
-| The portrait's art | A fixed four-by-eleven face of ASCII outline, `█` fur cells, and two eye cells | A larger full-body portrait; art varying by pattern; braille or half-block pixel art | A face is what reads as a particular cat at this size, and four rows leave the facts beneath it in view on a short pane. One shape for every kitten lets the fur, which is what differs, be what the eye compares. Braille and half-blocks need a painted ground to show colour on both halves of a cell, and the ground is the terminal's |
-| Where the portrait's words go | Beside the face where they fit whole, otherwise beneath | Always beneath; always beside, wrapping | Beside is the card the portrait was designed for, and it saves two rows; words wrapped beside an eleven-column picture break into fragments, so a pane too narrow takes them beneath instead |
+| The portrait's art | Three whole-cat poses — sitting up, napping, a loaf — each an outline head over a body of `█` fur cells | A face filled solid with fur; one pose for every kitten; braille or half-block pixel art | A face filled with fur and two small eyes reads as a mask rather than a cat. The familiar outline face keeps every cat friendly-looking on any ground, and the body gives a pattern room to show. Three poses make a roster look like a room of cats each getting on with its day. Braille and half-blocks need a painted ground to show colour on both halves of a cell, and the ground is the terminal's |
+| Where the portrait's words go | Beside the cat where they fit whole, otherwise beneath | Always beneath; always beside, wrapping | Beside is the card the portrait was designed for, and it saves two rows; words wrapped beside a narrow picture break into fragments, so a pane too narrow takes them beneath instead |
 
 ## Open Questions & Future Decisions
 
