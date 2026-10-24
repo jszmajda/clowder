@@ -4,8 +4,9 @@
 
 use crate::effects::Effect;
 use crate::state::{
-    AdventureId, CraftId, DreamLoomId, IdeaId, JobId, RefinementId, ResourceId, RuleId, Season,
-    SiteId, StructureGate, StructureId, TraditionId,
+    AdventureId, CraftId, DreamLoomId, EyeColour, EyeLook, FurColour, FurPattern, IdeaId, JobId,
+    KittenTrait, RefinementId, ResourceId, RuleId, Season, SiteId, StructureGate, StructureId,
+    TraditionId,
 };
 use crate::state::{IDEA_COUNT, REFINEMENT_COUNT, RESOURCE_COUNT, STRUCTURE_COUNT};
 
@@ -2690,6 +2691,390 @@ pub static NAME_POOL: [&str; 401] = [
     "Countess Crumb",
     "Baron Snoozly",
 ];
+
+// ---- Profiles ----
+
+/// A fur pattern: its words, marking with `{k}` where slot k's colour name
+/// goes, and its slots, each listing the colours it may take — only colours a
+/// real cat could wear there.
+/// @spec SIM-KIT-035
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FurPatternDef {
+    pub words: &'static str,
+    pub slots: &'static [&'static [FurColour]],
+}
+
+/// Each pattern, in `FurPattern` order. @spec SIM-KIT-035
+static FUR_PATTERNS: [FurPatternDef; 9] = {
+    use FurColour::*;
+    [
+        // Solid
+        FurPatternDef {
+            words: "solid {0}",
+            slots: &[&[
+                Black, White, Grey, Cream, Ginger, Brown, Chocolate, Lilac, Cinnamon, Fawn,
+            ]],
+        },
+        // Tabby: a base and its stripes.
+        FurPatternDef {
+            words: "{0} tabby",
+            slots: &[
+                &[Brown, Silver, Ginger, Cream, Grey],
+                &[Black, Chocolate, Cinnamon, Ginger, Grey],
+            ],
+        },
+        // Tuxedo: a dark coat and a white muzzle.
+        FurPatternDef {
+            words: "{0} tuxedo",
+            slots: &[&[Black, Grey, Chocolate], &[White]],
+        },
+        // Bicolour: a colour and a white blaze and chin.
+        FurPatternDef {
+            words: "{0} and white",
+            slots: &[&[Black, Grey, Ginger, Cream, Chocolate, Lilac], &[White]],
+        },
+        // Tortoiseshell: a dark colour patched with a warm one.
+        FurPatternDef {
+            words: "tortoiseshell",
+            slots: &[&[Black, Chocolate, Grey, Lilac], &[Ginger, Cream]],
+        },
+        // Calico: white, patched warm and dark.
+        FurPatternDef {
+            words: "calico",
+            slots: &[&[White], &[Ginger, Cream], &[Black, Grey]],
+        },
+        // Colourpoint: a pale body with dark points.
+        FurPatternDef {
+            words: "{1} point",
+            slots: &[&[Cream, White, Fawn], &[Seal, Grey, Chocolate, Lilac, Ginger]],
+        },
+        // Van: white, with colour on the head.
+        FurPatternDef {
+            words: "{1} and white van",
+            slots: &[&[White], &[Ginger, Black, Cream, Grey]],
+        },
+        // Smoke: dark tips over a pale undercoat.
+        FurPatternDef {
+            words: "{0} smoke",
+            slots: &[&[Black, Grey, Chocolate], &[Silver, White]],
+        },
+    ]
+};
+
+/// A pattern's definition. @spec SIM-KIT-035
+pub fn fur_pattern_def(p: FurPattern) -> &'static FurPatternDef {
+    &FUR_PATTERNS[p as usize]
+}
+
+/// A fur colour's name, as a fur's words say it. @spec SIM-KIT-039
+pub fn fur_colour_name(c: FurColour) -> &'static str {
+    match c {
+        FurColour::Black => "black",
+        FurColour::White => "white",
+        FurColour::Grey => "grey",
+        FurColour::Silver => "silver",
+        FurColour::Brown => "brown",
+        FurColour::Chocolate => "chocolate",
+        FurColour::Ginger => "ginger",
+        FurColour::Cream => "cream",
+        FurColour::Cinnamon => "cinnamon",
+        FurColour::Fawn => "fawn",
+        FurColour::Seal => "seal",
+        FurColour::Lilac => "lilac",
+    }
+}
+
+/// An eye look: each eye's colour, and the words for the look.
+/// @spec SIM-KIT-036
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EyeLookDef {
+    pub left: EyeColour,
+    pub right: EyeColour,
+    pub words: &'static str,
+}
+
+/// An eye look whose two eyes are one colour.
+const fn both(c: EyeColour, words: &'static str) -> EyeLookDef {
+    EyeLookDef {
+        left: c,
+        right: c,
+        words,
+    }
+}
+
+/// Each look, in `EyeLook` order. @spec SIM-KIT-036
+static EYE_LOOKS: [EyeLookDef; 8] = {
+    use EyeColour::*;
+    [
+        both(Green, "green eyes"),
+        both(Gold, "golden eyes"),
+        both(Blue, "blue eyes"),
+        both(Amber, "amber eyes"),
+        both(Copper, "copper eyes"),
+        both(Hazel, "hazel eyes"),
+        EyeLookDef {
+            left: Blue,
+            right: Copper,
+            words: "odd eyes, blue and copper",
+        },
+        EyeLookDef {
+            left: Blue,
+            right: Green,
+            words: "odd eyes, blue and green",
+        },
+    ]
+};
+
+/// A look's definition. @spec SIM-KIT-036
+pub fn eye_look_def(l: EyeLook) -> &'static EyeLookDef {
+    &EYE_LOOKS[l as usize]
+}
+
+/// The favourite foods. @spec SIM-KIT-037, SIM-KIT-038
+pub static FAVOURITE_FOODS: [&str; 32] = [
+    "tuna, but only on Tuesdays",
+    "the crust off a slice of toast",
+    "a single cold green pea",
+    "whatever you are eating right now",
+    "warm milk foam from the top of a cup",
+    "sardines, eaten with great ceremony",
+    "the last bite of a pancake",
+    "chicken, shredded very small",
+    "a lick of butter, stolen",
+    "salmon skin, crispy",
+    "plain yogurt off a spoon",
+    "melon, for reasons unknown",
+    "cheese rind left on a plate",
+    "scrambled egg, a little cold",
+    "the gravy and not the meat",
+    "olives, sniffed but never eaten",
+    "shrimp tails from the bin",
+    "a pinch of roast turkey",
+    "cantaloupe, inexplicably",
+    "dry kibble, one at a time",
+    "the water from the tuna tin",
+    "a crumb of blueberry muffin",
+    "corn kernels batted off the table",
+    "pumpkin mash",
+    "mackerel by the window",
+    "a strand of spaghetti, slurped",
+    "cream cheese on a fingertip",
+    "ham, offered by a soft touch",
+    "the bacon nobody was watching",
+    "rotisserie chicken skin",
+    "a nibble of cucumber, bravely",
+    "broth, warmed, in a saucer",
+];
+
+/// The favourite toys. @spec SIM-KIT-037, SIM-KIT-038
+pub static FAVOURITE_TOYS: [&str; 29] = [
+    "a crinkly paper bag",
+    "the cap from a milk jug",
+    "a hair tie, stolen nightly",
+    "a sock with no partner",
+    "a cork from a long-ago party",
+    "a crumpled receipt",
+    "a ping-pong ball",
+    "a toy mouse with one ear",
+    "the drawstring of a hoodie",
+    "a shoelace, still in its shoe",
+    "an ice cube skating on the floor",
+    "a rubber band",
+    "a bottle cap under the fridge",
+    "the end of a measuring tape",
+    "the ribbon off a birthday present",
+    "a pom-pom the size of a grape",
+    "a crinkle ball",
+    "a wine cork, much loved",
+    "a pencil, pushed off the desk",
+    "the tassel on a curtain",
+    "a paper straw wrapper",
+    "a sprig of dried lavender",
+    "a balled-up piece of foil",
+    "the corner of a rug",
+    "a houseplant's lowest leaf",
+    "a dangling earring",
+    "a stick from the garden",
+    "a bit of string, any bit",
+    "the pull cord of a lamp",
+];
+
+/// The favourite places to nap. @spec SIM-KIT-037, SIM-KIT-038
+pub static FAVOURITE_NAPS: [&str; 28] = [
+    "the top of the fridge",
+    "a laundry basket, fresh from the dryer",
+    "the exact middle of the bed",
+    "a patch of light on the rug",
+    "on the keyboard, mid-sentence",
+    "a shoebox one size too small",
+    "the bathroom sink",
+    "behind the curtains",
+    "on a pile of fresh towels",
+    "the bottom stair",
+    "a radiator shelf",
+    "on top of the warm router",
+    "in an open suitcase",
+    "on whoever is reading",
+    "the bookshelf, between two novels",
+    "a flowerpot with no flower",
+    "the back of the sofa",
+    "under the duvet, toes out",
+    "the windowsill above the sink",
+    "in a paper bag by the door",
+    "the passenger seat",
+    "a drawer left open an inch",
+    "on a freshly folded sweater",
+    "the doormat, for the draughts",
+    "the warm spot where you just sat",
+    "on top of the piano",
+    "inside the bathtub, dry",
+    "a box by the heater",
+];
+
+/// The favourite things to watch. @spec SIM-KIT-037, SIM-KIT-038
+pub static FAVOURITE_SHOWS: [&str; 28] = [
+    "rain racing down the window",
+    "the washing machine's spin",
+    "pigeons on the wire",
+    "a fly that cannot be caught",
+    "the fish tank, very closely",
+    "snow falling past the lamp",
+    "the dripping kitchen tap",
+    "squirrels holding a meeting",
+    "you, while you sleep",
+    "the ceiling fan going round",
+    "soap bubbles drifting by",
+    "the neighbour's dog, through a gap",
+    "leaves skittering down the path",
+    "a spider building its web",
+    "the toaster, waiting for it",
+    "cooking shows, from the counter",
+    "moths around the lamp",
+    "the screensaver",
+    "a candle flame, from far away",
+    "the post arriving",
+    "nature films about birds",
+    "the bathwater running",
+    "the robot vacuum, with suspicion",
+    "clouds sliding over the roof",
+    "the shadow of a passing bird",
+    "the cursor on your screen",
+    "fireflies at dusk",
+    "the goldfish next door",
+];
+
+/// What a kitten loves to do. @spec SIM-KIT-037, SIM-KIT-038
+pub static FAVOURITE_PASTIMES: [&str; 28] = [
+    "sitting in boxes",
+    "knocking things off shelves",
+    "chirping at birds",
+    "kneading the blankets",
+    "chasing its own tail",
+    "hiding under the bed",
+    "sprinting about at three in the morning",
+    "loafing",
+    "sitting on important papers",
+    "grooming a friend",
+    "carrying socks around the house",
+    "climbing the curtains",
+    "batting at dangling things",
+    "following you to the bathroom",
+    "drinking from the tap",
+    "staring into empty corners",
+    "making biscuits on laps",
+    "rolling in the dust",
+    "stealing your seat",
+    "pretending not to care",
+    "playing fetch, rarely",
+    "talking back",
+    "headbutting chins",
+    "supervising dinner",
+    "sitting in the sink",
+    "squeezing into small places",
+    "tucking its paws under",
+    "lying in the sun",
+];
+
+/// A little habit all its own. @spec SIM-KIT-037, SIM-KIT-038
+pub static FAVOURITE_QUIRKS: [&str; 28] = [
+    "sneezes when happy",
+    "sleeps with its tongue out",
+    "only drinks from a glass",
+    "trills instead of meowing",
+    "sits like a little loaf",
+    "has one crooked whisker",
+    "blinks slowly at strangers",
+    "carries its food to another room",
+    "tucks its nose under its tail",
+    "chatters at the window",
+    "sleeps on its back, belly up",
+    "is wary of the fridge humming",
+    "taps you twice for attention",
+    "walks across the piano at night",
+    "has one white toe",
+    "purrs in its sleep",
+    "headbutts doorframes",
+    "comes running at the sound of a zip",
+    "kicks its water bowl first",
+    "always lands on its feet, smugly",
+    "sits in any square on the floor",
+    "stares at walls, knowingly",
+    "naps in a perfect circle",
+    "yawns very loudly",
+    "has a meow like a squeaky hinge",
+    "pats the water before drinking",
+    "drools when petted",
+    "sleeps with one eye open",
+];
+
+/// A trait as the player reads it: its name and its blurb. @spec SIM-KIT-040
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TraitDef {
+    pub name: &'static str,
+    pub blurb: &'static str,
+}
+
+/// Each trait's name and blurb, in `KittenTrait` order. The figures match
+/// the Elder trait effects exactly (a content test holds them). @spec SIM-KIT-040
+static TRAITS: [TraitDef; 8] = [
+    TraitDef {
+        name: "Easygoing",
+        blurb: "As Elder: nothing changes. Some cats simply are.",
+    },
+    TraitDef {
+        name: "Crafty",
+        blurb: "As Elder: every craft +5%.",
+    },
+    TraitDef {
+        name: "Brassy",
+        blurb: "As Elder: {badges|Badges}, {brass|Brass}, {cogs|Cogs}, and {moonsteel|Moonsteel} craft +10%.",
+    },
+    TraitDef {
+        name: "Alchemical",
+        blurb: "As Elder: {pavers|Pavers}, {moonmilk|Moonmilk}, {dreamweave|Dreamweave}, and {cometsilk|Cometsilk} craft +7.5%.",
+    },
+    TraitDef {
+        name: "Charming",
+        blurb: "As Elder: trade ratio +3%.",
+    },
+    TraitDef {
+        name: "Bold",
+        blurb: "As Elder: pounce ratio +0.5.",
+    },
+    TraitDef {
+        name: "Curious",
+        blurb: "As Elder: ideas cost 5% less {curiosity|Curiosity}.",
+    },
+    TraitDef {
+        name: "Serene",
+        blurb: "As Elder: rites cost 9% less.",
+    },
+];
+
+/// A trait's definition. @spec SIM-KIT-040
+pub fn trait_def(t: KittenTrait) -> &'static TraitDef {
+    &TRAITS[t as usize]
+}
 
 // ---- Flavor templates ----
 

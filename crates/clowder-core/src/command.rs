@@ -1063,6 +1063,7 @@ impl GameState {
                 trait_id: k.trait_id,
                 rank: k.rank,
                 generation: gen,
+                profile: k.profile.clone(),
             });
         }
 
@@ -1087,6 +1088,7 @@ impl GameState {
                     rank: k.rank,
                     trait_id: k.trait_id,
                     tinkering: None,
+                    profile: k.profile,
                 }
             })
             .collect();

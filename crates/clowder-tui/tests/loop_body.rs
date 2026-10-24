@@ -618,6 +618,7 @@ fn roster_kitten(name: &str) -> clowder_core::Kitten {
         rank: 0,
         trait_id: clowder_core::KittenTrait::None,
         tinkering: None,
+        profile: None,
     }
 }
 

@@ -283,6 +283,9 @@ impl GameState {
                 // @spec SIM-KIT-023, SIM-ENG-018
                 let trait_id = crate::state::KittenTrait::ALL
                     [self.rng.index(crate::state::KittenTrait::ALL.len())];
+                // The profile takes no state-RNG draw: it is read off the
+                // name and generation. @spec SIM-KIT-031
+                let profile = crate::profile::draw_profile(&name, self.generation);
                 self.kittens.push(crate::state::Kitten {
                     name: name.clone(),
                     job: None,
@@ -295,6 +298,7 @@ impl GameState {
                     rank: 0,
                     trait_id,
                     tinkering: None,
+                    profile: Some(profile),
                 });
                 self.pity = 0;
                 events.push(Event::KittenArrived { name });

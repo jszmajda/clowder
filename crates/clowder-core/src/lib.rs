@@ -10,6 +10,7 @@ mod effects;
 mod events;
 mod gating;
 mod journal;
+mod profile;
 mod query;
 mod rng;
 mod save;
@@ -20,7 +21,8 @@ pub use command::{Command, CommandError};
 pub use effects::{limited_dr, unlimited_dr, Effect};
 pub use events::{Event, EventClass};
 pub use journal::{Journal, JournalEntry, JournalItem};
-pub use query::{Act, Bench, FlowSource, LockReason, Offers, Source, Timer};
+pub use profile::{draw_profile, fur_words};
+pub use query::{Act, Arrival, BestAt, Bench, FlowSource, KittenFacts, LockReason, Offers, Source, Timer};
 pub use rng::Pcg32;
 pub use save::{
     begin_load, default_save_path, load_string, read_save, save_string, save_string_carrying,
@@ -30,6 +32,7 @@ pub use save::{
 };
 pub use state::{
     AdventureId, ArchId, ArchivedKitten, Availability, ColonyId, ContentId, CraftId, DreamLoomId,
-    GameState, IdeaId, JobId, Kitten, KittenTrait, Location, MoodTier, Promise, RefinementId,
+    EyeColour, EyeLook, Fur, FurColour, FurPattern, GameState, IdeaId, JobId, Kitten, KittenTrait,
+    Location, MoodTier, Profile, Promise, RefinementId,
     ResourceId, RiteId, RuleId, Season, SiteId, StructureGate, StructureId, TraditionId,
 };

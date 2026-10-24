@@ -2155,6 +2155,7 @@ fn kitten_named(name: &str, location: clowder_core::Location) -> clowder_core::K
         rank: 0,
         trait_id: clowder_core::KittenTrait::None,
         tinkering: None,
+        profile: None,
     }
 }
 

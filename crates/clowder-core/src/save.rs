@@ -16,9 +16,11 @@ use std::path::{Path, PathBuf};
 /// recorded.
 /// v6 adds the revealed-resource set (SAVE-023), filled on migration from the
 /// save itself (SAVE-024). v7 adds what each colony has shown the clowder
-/// (SAVE-026), arriving empty.
-/// @spec SAVE-013, SAVE-014, SAVE-021, SAVE-023, SAVE-026
-pub const SAVE_VERSION: u32 = 7;
+/// (SAVE-026), arriving empty. v8 adds each kitten's and each memorial's
+/// profile (SAVE-027), drawn on migration from each one's name and generation
+/// (SAVE-028).
+/// @spec SAVE-013, SAVE-014, SAVE-021, SAVE-023, SAVE-026, SAVE-027
+pub const SAVE_VERSION: u32 = 8;
 /// The shortest absence worth reporting. Public for the same reason the cap
 /// is: a caller deciding whether to surface a report must use this value, not
 /// a copy of it. @spec SAVE-015
@@ -456,6 +458,10 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
         goods.retain(|g| offered.iter().any(|(o, _)| o == g));
     }
 
+    // Every kitten and memorial holds a profile: a save from before profiles
+    // (v7 and older) draws them all, and a hand-edited one draws any it lacks.
+    give_missing_profiles(&mut state);
+
     // v5 -> v6: the revealed-resource set arrives filled by the engine's own
     // reveal rule, applied once to the state as normalized and before any
     // catch-up tick. @spec SAVE-024
@@ -485,6 +491,47 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
         this_truncated: truncated,
         partial: OfflineReport::default(),
     })
+}
+
+/// Give every memorial, in album order, and then every rostered kitten, in
+/// roster order, that holds no profile the one its name and generation draw —
+/// save that one named as a memorial of the generation just before its own
+/// takes that memorial's profile, since a Move memorializes each kitten in
+/// every generation it lived through and carries some along. Nothing else
+/// changes, and the state RNG is untouched. @spec SAVE-028
+fn give_missing_profiles(state: &mut GameState) {
+    fn remembered(
+        album: &[crate::state::ArchivedKitten],
+        name: &str,
+        generation: u32,
+    ) -> Option<crate::state::Profile> {
+        let before = generation.checked_sub(1)?;
+        album
+            .iter()
+            .find(|a| a.generation == before && a.name == name)
+            .and_then(|a| a.profile.clone())
+    }
+    for i in 0..state.family_album.len() {
+        if state.family_album[i].profile.is_some() {
+            continue;
+        }
+        let (name, generation) = (
+            state.family_album[i].name.clone(),
+            state.family_album[i].generation,
+        );
+        let profile = remembered(&state.family_album[..i], &name, generation)
+            .unwrap_or_else(|| crate::profile::draw_profile(&name, generation));
+        state.family_album[i].profile = Some(profile);
+    }
+    let generation = state.generation;
+    for k in &mut state.kittens {
+        if k.profile.is_none() {
+            k.profile = Some(
+                remembered(&state.family_album, &k.name, generation)
+                    .unwrap_or_else(|| crate::profile::draw_profile(&k.name, generation)),
+            );
+        }
+    }
 }
 
 /// Parse a save and replay its whole catch-up at once through

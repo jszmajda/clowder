@@ -9,7 +9,8 @@
 use std::collections::BTreeMap;
 
 use crate::state::{
-    ArchId, CraftId, GameState, JobId, Location, ResourceId, StructureId, RESOURCE_COUNT,
+    ArchId, CraftId, GameState, JobId, KittenTrait, Location, ResourceId, Season, StructureId,
+    RESOURCE_COUNT,
 };
 
 /// What a stock move is made for: the one thing a flow is credited to.
@@ -210,6 +211,35 @@ pub struct Offers {
     pub tells_by_name: bool,
 }
 
+/// What the simulation holds about a kitten that bears on play and no other
+/// surface states. @spec SIM-KIT-041
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KittenFacts {
+    pub trait_id: KittenTrait,
+    pub rank: u8,
+    /// The job it knows best, or None while it has no skill above zero.
+    pub best_at: Option<BestAt>,
+    pub arrival: Arrival,
+}
+
+/// The job a kitten holds the most skill in, and the yield bonus that
+/// skill's tier gives it there, as a fraction (0.025 for +2.5%).
+/// @spec SIM-KIT-041
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BestAt {
+    pub job: JobId,
+    pub bonus: f64,
+}
+
+/// When a kitten joined the clowder. @spec SIM-KIT-041
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Arrival {
+    /// It arrived on this day, in this season of this year.
+    Day { day: u64, season: Season, year: u64 },
+    /// A Move carried it along from the old meadow.
+    CarriedAlong,
+}
+
 /// The tinkerers' bench: the meadow's seats, who holds them, and who waits
 /// for one. @spec SIM-ENG-073
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -225,6 +255,43 @@ pub struct Bench {
 }
 
 impl GameState {
+    /// The facts about the kitten at roster position `ix`, or None where no
+    /// kitten stands there. @spec SIM-KIT-041
+    pub fn kitten_facts(&self, ix: usize) -> Option<KittenFacts> {
+        let k = self.kittens.get(ix)?;
+        // The bonus is the one production applies, the master tier scaled as
+        // production scales it. @spec SIM-KIT-020
+        let master_mult = 1.0 + self.effect(crate::effects::Effect::MasterSkillMultiplier);
+        // The most skill, ties to the earliest job; none while all are zero.
+        let best_at = JobId::ALL
+            .iter()
+            .fold(None::<JobId>, |best, &j| match best {
+                Some(b) if k.skills[b as usize] >= k.skills[j as usize] => Some(b),
+                _ if k.skills[j as usize] > 0.0 => Some(j),
+                _ => best,
+            })
+            .map(|job| BestAt {
+                job,
+                bonus: crate::content::skill_tier_bonus_scaled(k.skills[job as usize], master_mult),
+            });
+        // No arrival check runs before the first day close, so day 0 is a
+        // Move's carried kitten (SIM-MOVE-002).
+        let arrival = match k.arrived_day {
+            0 => Arrival::CarriedAlong,
+            day => Arrival::Day {
+                day,
+                season: crate::state::season_of_day(day),
+                year: day / crate::content::DAYS_PER_YEAR,
+            },
+        };
+        Some(KittenFacts {
+            trait_id: k.trait_id,
+            rank: k.rank,
+            best_at,
+            arrival,
+        })
+    }
+
     /// Every source that can raise `r` during a meadow's play, in the fixed
     /// listing order, each with whether the player knows it yet.
     ///

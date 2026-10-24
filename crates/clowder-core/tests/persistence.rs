@@ -384,6 +384,23 @@ fn v2_fixture() -> String {
     })
 }
 
+/// A migrated save's kittens and memorials with their profiles set aside —
+/// the one thing each gains from a save written before profiles (SAVE-028) —
+/// after checking every one has gained one; any other field as it is.
+fn profiles_set_aside(key: &str, now: &serde_json::Value) -> serde_json::Value {
+    let mut now = now.clone();
+    if key == "kittens" || key == "family_album" {
+        for entry in now.as_array_mut().into_iter().flatten() {
+            let profile = entry.as_object_mut().and_then(|o| o.remove("profile"));
+            assert!(
+                profile.is_some_and(|p| !p.is_null()),
+                "every entry of `{key}` gains a profile"
+            );
+        }
+    }
+    now
+}
+
 /// Numeric-aware JSON equality. A hand-written fixture may spell a float
 /// `0` where the serializer spells it `0.0`; that is the same meadow, and a
 /// migration-fidelity test should not fail on the spelling. Integers still
@@ -668,7 +685,7 @@ fn a_v2_save_migrates_to_an_empty_journal_with_its_meadow_otherwise_exact() {
             .get(key)
             .unwrap_or_else(|| panic!("migration dropped the v2 field `{key}`"));
         assert!(
-            json_eq(was, now),
+            json_eq(was, &profiles_set_aside(key, now)),
             "`{key}` changed across migration: {was} -> {now}"
         );
     }
@@ -973,7 +990,7 @@ fn a_v3_save_migrates_owing_nothing_with_its_meadow_otherwise_exact() {
     for (key, was) in before["state"].as_object().unwrap() {
         let now = &resaved["state"][key];
         assert!(
-            json_eq(was, now),
+            json_eq(was, &profiles_set_aside(key, now)),
             "migrating a v3 save changed `{key}`: {was} became {now}"
         );
     }
@@ -1666,7 +1683,7 @@ fn a_v4_save_migrates_carrying_no_report_so_far() {
     for (key, was) in before["state"].as_object().unwrap() {
         let now = &resaved["state"][key];
         assert!(
-            json_eq(was, now),
+            json_eq(was, &profiles_set_aside(key, now)),
             "migrating a v4 save changed `{key}`: {was} became {now}"
         );
     }
@@ -2183,7 +2200,7 @@ fn a_v5_save_migrates_with_everything_else_exact() {
     for (key, was) in before["state"].as_object().unwrap() {
         let now = &resaved["state"][key];
         assert!(
-            json_eq(was, now),
+            json_eq(was, &profiles_set_aside(key, now)),
             "migrating a v5 save changed `{key}`: {was} became {now}"
         );
     }

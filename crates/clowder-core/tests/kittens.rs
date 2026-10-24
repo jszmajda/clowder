@@ -70,6 +70,7 @@ fn away_kitten(name: &str) -> Kitten {
         rank: 0,
         trait_id: KittenTrait::None,
         tinkering: None,
+        profile: None,
     }
 }
 
@@ -122,90 +123,10 @@ fn the_name_pool_is_large_short_capitalised_and_free_of_look_alikes() {
     }
 }
 
-/// An identifier spelled as words: a space before each capital after the
-/// first.
-fn spaced(tag: &str) -> String {
-    let mut out = String::new();
-    for (i, c) in tag.chars().enumerate() {
-        if i > 0 && c.is_uppercase() {
-            out.push(' ');
-        }
-        out.push(c);
-    }
-    out
-}
-
-/// A spelling with its last word made singular: a final "ies" read as "y",
-/// otherwise a final "s" dropped.
-fn singular(name: &str) -> String {
-    if let Some(stem) = name.strip_suffix("ies") {
-        format!("{stem}y")
-    } else if let Some(stem) = name.strip_suffix('s') {
-        stem.to_string()
-    } else {
-        name.to_string()
-    }
-}
-
 // @spec SIM-KIT-029
 #[test]
 fn no_kitten_name_is_the_name_of_any_other_thing() {
-    let mut others: Vec<String> = Vec::new();
-    for r in ResourceId::ALL {
-        let name = spaced(&format!("{r:?}"));
-        others.push(singular(&name));
-        others.push(name);
-    }
-    let debug = |v: &dyn std::fmt::Debug| spaced(&format!("{v:?}"));
-    for s in StructureId::ALL {
-        others.push(content::structure_def(s).name.to_string());
-    }
-    for j in JobId::ALL {
-        others.push(content::job_def(j).name.to_string());
-    }
-    for i in IdeaId::ALL {
-        others.push(content::idea_def(i).name.to_string());
-    }
-    for c in CraftId::ALL {
-        others.push(content::craft_def(c).name.to_string());
-    }
-    for r in RefinementId::ALL {
-        others.push(content::refinement_def(r).name.to_string());
-    }
-    for r in RuleId::ALL {
-        others.push(content::rule_def(r).name.to_string());
-    }
-    for r in RiteId::ALL {
-        others.push(content::rite_def(r).name.to_string());
-    }
-    for a in ArchId::ALL {
-        others.push(content::arch_def(a).name.to_string());
-    }
-    for t in TraditionId::ALL {
-        others.push(debug(&t));
-    }
-    for l in DreamLoomId::ALL {
-        others.push(content::dream_loom_def(l).name.to_string());
-    }
-    for c in ColonyId::ALL {
-        others.push(content::colony_def(c).name.to_string());
-        others.push(debug(&c));
-    }
-    for s in SiteId::ALL {
-        others.push(content::site_def(s).name.to_string());
-        others.push(debug(&s));
-    }
-    for a in AdventureId::ALL {
-        others.push(debug(&a));
-    }
-    for s in Season::ALL {
-        others.push(debug(&s));
-    }
-    for t in KittenTrait::ALL {
-        others.push(debug(&t));
-    }
-    let others: std::collections::BTreeSet<String> =
-        others.iter().map(|o| o.to_lowercase()).collect();
+    let others: std::collections::BTreeSet<String> = game_vocabulary().into_iter().collect();
     for name in content::NAME_POOL.iter() {
         assert!(
             !others.contains(&name.to_lowercase()),

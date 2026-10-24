@@ -87,6 +87,7 @@ fn kitten(name: &str, job: Option<JobId>) -> Kitten {
         rank: 0,
         trait_id: KittenTrait::None,
         tinkering: None,
+        profile: None,
     }
 }
 

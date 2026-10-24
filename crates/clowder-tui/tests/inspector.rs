@@ -396,6 +396,7 @@ fn plain_kitten() -> Kitten {
         rank: 0,
         trait_id: KittenTrait::None,
         tinkering: None,
+        profile: None,
     }
 }
 

@@ -423,6 +423,141 @@ impl KittenTrait {
     ];
 }
 
+/// The patterns a kitten's fur can take. Ids are append-only: a saved fur
+/// names its pattern. @spec SIM-KIT-035
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum FurPattern {
+    Solid,
+    Tabby,
+    Tuxedo,
+    Bicolour,
+    Tortoiseshell,
+    Calico,
+    Colourpoint,
+    Van,
+    Smoke,
+}
+
+impl FurPattern {
+    pub const ALL: [FurPattern; 9] = [
+        FurPattern::Solid,
+        FurPattern::Tabby,
+        FurPattern::Tuxedo,
+        FurPattern::Bicolour,
+        FurPattern::Tortoiseshell,
+        FurPattern::Calico,
+        FurPattern::Colourpoint,
+        FurPattern::Van,
+        FurPattern::Smoke,
+    ];
+}
+
+/// The colours a fur pattern's slots can take. Ids are append-only.
+/// @spec SIM-KIT-035
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum FurColour {
+    Black,
+    White,
+    Grey,
+    Silver,
+    Brown,
+    Chocolate,
+    Ginger,
+    Cream,
+    Cinnamon,
+    Fawn,
+    Seal,
+    Lilac,
+}
+
+impl FurColour {
+    pub const ALL: [FurColour; 12] = [
+        FurColour::Black,
+        FurColour::White,
+        FurColour::Grey,
+        FurColour::Silver,
+        FurColour::Brown,
+        FurColour::Chocolate,
+        FurColour::Ginger,
+        FurColour::Cream,
+        FurColour::Cinnamon,
+        FurColour::Fawn,
+        FurColour::Seal,
+        FurColour::Lilac,
+    ];
+}
+
+/// The colour of one eye. @spec SIM-KIT-036
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum EyeColour {
+    Green,
+    Gold,
+    Blue,
+    Amber,
+    Copper,
+    Hazel,
+}
+
+impl EyeColour {
+    pub const ALL: [EyeColour; 6] = [
+        EyeColour::Green,
+        EyeColour::Gold,
+        EyeColour::Blue,
+        EyeColour::Amber,
+        EyeColour::Copper,
+        EyeColour::Hazel,
+    ];
+}
+
+/// The looks a kitten's eyes can have — each naming both eyes' colours in the
+/// content table. Ids are append-only. @spec SIM-KIT-036
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum EyeLook {
+    Green,
+    Gold,
+    Blue,
+    Amber,
+    Copper,
+    Hazel,
+    OddBlueCopper,
+    OddBlueGreen,
+}
+
+impl EyeLook {
+    pub const ALL: [EyeLook; 8] = [
+        EyeLook::Green,
+        EyeLook::Gold,
+        EyeLook::Blue,
+        EyeLook::Amber,
+        EyeLook::Copper,
+        EyeLook::Hazel,
+        EyeLook::OddBlueCopper,
+        EyeLook::OddBlueGreen,
+    ];
+}
+
+/// A kitten's fur: a pattern and the colour each of its slots took, in slot
+/// order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Fur {
+    pub pattern: FurPattern,
+    pub colours: Vec<FurColour>,
+}
+
+/// What a kitten looks like and what it loves. Drawn once at arrival and kept
+/// for life; no rule of the simulation reads it. @spec SIM-KIT-033
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Profile {
+    pub fur: Fur,
+    pub eyes: EyeLook,
+    pub food: String,
+    pub toy: String,
+    pub nap: String,
+    pub show: String,
+    pub pastime: String,
+    pub quirk: String,
+}
+
 /// The banded idea tree, ids append-only: 0–8 are the founding nine, 9–17
 /// finish band 0, 18–27 band 1, 28–35 band 2, 36–43 band 3, 44–55 band 4,
 /// and 56 (Pouncing Practice) is a band-0 idea appended late — ids never
@@ -876,6 +1011,10 @@ pub struct ArchivedKitten {
     pub rank: u8,
     #[serde(default)]
     pub generation: u32,
+    /// The kitten's profile as it was when the Move archived it; a save from
+    /// before profiles has none until load gives it one. @spec SIM-MOVE-001
+    #[serde(default)]
+    pub profile: Option<Profile>,
 }
 
 /// A Promise to the Night Court: fills a slot, draws gentle dreamcorn upkeep,
@@ -987,6 +1126,11 @@ pub struct Kitten {
     /// The recipe this Tinkerer is bound to, if any. @spec SIM-ECO-043
     #[serde(default)]
     pub tinkering: Option<CraftId>,
+    /// What it looks like and loves, drawn at arrival and kept for life. Only
+    /// a save from before profiles holds none, and load gives it one.
+    /// @spec SIM-KIT-031, SIM-KIT-034
+    #[serde(default)]
+    pub profile: Option<Profile>,
 }
 
 /// Deserialize a counter wide and clamp — hand-edited saves get physics, not

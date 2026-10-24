@@ -197,6 +197,7 @@ fn kitten(i: usize) -> Kitten {
         rank: 0,
         trait_id: KittenTrait::None,
         tinkering: None,
+        profile: None,
     }
 }
 

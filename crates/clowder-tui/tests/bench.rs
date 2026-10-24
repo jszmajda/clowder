@@ -52,6 +52,7 @@ fn kitten(name: &str, job: Option<JobId>, bound: Option<CraftId>, away: bool) ->
         rank: 0,
         trait_id: KittenTrait::None,
         tinkering: bound,
+        profile: None,
     }
 }
 
