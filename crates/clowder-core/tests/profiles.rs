@@ -95,11 +95,17 @@ fn the_draw_is_a_fixed_function_of_name_and_generation() {
         .iter()
         .map(|n| format!("{:?}", draw_profile(n, 0)))
         .collect();
-    assert!(by_name.len() >= 39, "forty names draw forty profiles, near enough");
+    assert!(
+        by_name.len() >= 39,
+        "forty names draw forty profiles, near enough"
+    );
     let by_generation: BTreeSet<String> = (0..20)
         .map(|g| format!("{:?}", draw_profile("Biscuit", g)))
         .collect();
-    assert!(by_generation.len() >= 19, "namesakes in other generations differ");
+    assert!(
+        by_generation.len() >= 19,
+        "namesakes in other generations differ"
+    );
 }
 
 /// The state RNG plays no part: two meadows with different seeds that admit a
@@ -139,9 +145,16 @@ fn every_draw_comes_from_its_table() {
     for (i, name) in content::NAME_POOL.iter().enumerate() {
         let p = draw_profile(name, (i % 5) as u32);
         let def = content::fur_pattern_def(p.fur.pattern);
-        assert_eq!(p.fur.colours.len(), def.slots.len(), "{name}: one colour per slot");
+        assert_eq!(
+            p.fur.colours.len(),
+            def.slots.len(),
+            "{name}: one colour per slot"
+        );
         for (slot, c) in p.fur.colours.iter().enumerate() {
-            assert!(def.slots[slot].contains(c), "{name}: slot {slot} took {c:?}");
+            assert!(
+                def.slots[slot].contains(c),
+                "{name}: slot {slot} took {c:?}"
+            );
             assert!(
                 !p.fur.colours[..slot].contains(c),
                 "{name}: slot {slot} repeats an earlier slot's {c:?}"
@@ -153,7 +166,11 @@ fn every_draw_comes_from_its_table() {
         }
         patterns.insert(p.fur.pattern);
     }
-    assert_eq!(patterns.len(), FurPattern::ALL.len(), "every pattern turns up");
+    assert_eq!(
+        patterns.len(),
+        FurPattern::ALL.len(),
+        "every pattern turns up"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +225,9 @@ fn a_profile_survives_everything_a_kitten_does() {
     give(&mut s, ResourceId::Catnip, 0.0);
     run_days(&mut s, 8);
     assert!(
-        s.kittens.iter().any(|k| k.location == Location::NeighborsYard),
+        s.kittens
+            .iter()
+            .any(|k| k.location == Location::NeighborsYard),
         "fixture: someone wandered"
     );
     give(&mut s, ResourceId::Catnip, 500.0);
@@ -256,11 +275,16 @@ fn a_move_keeps_every_profile() {
     s.traditions.insert(TraditionId::TravelingBasketsI);
     let profiles: Vec<Option<Profile>> = s.kittens.iter().map(|k| k.profile.clone()).collect();
     s.apply(Command::GreatMeadowMove).expect("a Move");
-    let archived: Vec<Option<Profile>> =
-        s.family_album.iter().map(|a| a.profile.clone()).collect();
-    assert_eq!(archived, profiles, "each memorial keeps its kitten's profile");
+    let archived: Vec<Option<Profile>> = s.family_album.iter().map(|a| a.profile.clone()).collect();
+    assert_eq!(
+        archived, profiles,
+        "each memorial keeps its kitten's profile"
+    );
     assert_eq!(s.kittens.len(), 1, "fixture: one basket");
-    assert_eq!(s.kittens[0].profile, profiles[0], "the carried kitten keeps its own");
+    assert_eq!(
+        s.kittens[0].profile, profiles[0],
+        "the carried kitten keeps its own"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -287,8 +311,11 @@ fn every_pattern_can_always_fill_its_slots() {
             assert!(!list.is_empty(), "{p:?} slot {slot}");
             let mut next = Vec::new();
             for taken in &prefixes {
-                let left: Vec<FurColour> =
-                    list.iter().copied().filter(|c| !taken.contains(c)).collect();
+                let left: Vec<FurColour> = list
+                    .iter()
+                    .copied()
+                    .filter(|c| !taken.contains(c))
+                    .collect();
                 assert!(!left.is_empty(), "{p:?} slot {slot} after {taken:?}");
                 for c in left {
                     let mut t = taken.clone();
@@ -384,7 +411,10 @@ fn a_fur_reads_as_its_pattern_words_filled_in() {
 /// @spec SIM-KIT-039
 #[test]
 fn every_fur_colour_has_a_name() {
-    let names: BTreeSet<&str> = FurColour::ALL.iter().map(|c| content::fur_colour_name(*c)).collect();
+    let names: BTreeSet<&str> = FurColour::ALL
+        .iter()
+        .map(|c| content::fur_colour_name(*c))
+        .collect();
     assert_eq!(names.len(), FurColour::ALL.len(), "names are distinct");
     assert!(names.iter().all(|n| !n.is_empty()));
 }
@@ -437,7 +467,11 @@ fn every_trait_has_a_name_and_an_as_elder_blurb() {
             format!("{t:?}")
         };
         assert_eq!(def.name, want);
-        assert!(def.blurb.starts_with("As Elder: "), "{t:?}: {:?}", def.blurb);
+        assert!(
+            def.blurb.starts_with("As Elder: "),
+            "{t:?}: {:?}",
+            def.blurb
+        );
         let marks = def.blurb.matches('{').count();
         let resources = blurb_parts(def.blurb)
             .iter()
@@ -454,8 +488,16 @@ fn every_trait_has_a_name_and_an_as_elder_blurb() {
 fn every_trait_blurb_states_its_effect_exactly() {
     let cases: [(KittenTrait, Effect, f64); 7] = [
         (KittenTrait::Crafty, Effect::CraftRatio, 100.0),
-        (KittenTrait::Brassy, Effect::CraftRatioFor(CraftId::Badges), 100.0),
-        (KittenTrait::Alchemical, Effect::CraftRatioFor(CraftId::Pavers), 100.0),
+        (
+            KittenTrait::Brassy,
+            Effect::CraftRatioFor(CraftId::Badges),
+            100.0,
+        ),
+        (
+            KittenTrait::Alchemical,
+            Effect::CraftRatioFor(CraftId::Pavers),
+            100.0,
+        ),
         (KittenTrait::Charming, Effect::TradeRatio, 100.0),
         (KittenTrait::Bold, Effect::PounceRatio, 1.0),
         (KittenTrait::Curious, Effect::IdeaCostRatio, 100.0),
@@ -473,7 +515,10 @@ fn every_trait_blurb_states_its_effect_exactly() {
         );
     }
     let calm = content::blurb_text(content::trait_def(KittenTrait::None).blurb);
-    assert!(figures(&calm).is_empty(), "Easygoing states no figure: {calm:?}");
+    assert!(
+        figures(&calm).is_empty(),
+        "Easygoing states no figure: {calm:?}"
+    );
 
     for t in [KittenTrait::Brassy, KittenTrait::Alchemical] {
         let s = led_by(t);
@@ -540,7 +585,11 @@ fn facts_report_the_job_it_knows_best() {
         assert!((best.bonus - bonus).abs() < 1e-12, "{xp}: {}", best.bonus);
     }
     s.kittens[0].skills[first as usize] = 9000.0;
-    assert_eq!(s.kitten_facts(0).unwrap().best_at.unwrap().job, first, "ties go first");
+    assert_eq!(
+        s.kitten_facts(0).unwrap().best_at.unwrap().job,
+        first,
+        "ties go first"
+    );
 }
 
 /// Since: the day, season, and year it arrived — or carried along, for a
@@ -612,8 +661,11 @@ fn a_v7_save_draws_its_kittens_profiles() {
             a.name
         );
     }
-    let remembered: Vec<&ArchivedKitten> =
-        s.family_album.iter().filter(|a| a.generation == 0).collect();
+    let remembered: Vec<&ArchivedKitten> = s
+        .family_album
+        .iter()
+        .filter(|a| a.generation == 0)
+        .collect();
     let mut carried = 0;
     for k in &s.kittens {
         let want = match remembered.iter().find(|a| a.name == k.name) {
@@ -660,7 +712,9 @@ fn a_kitten_carried_twice_looks_the_same_on_every_page() {
 fn a_v7_save_migrates_with_everything_else_exact() {
     let before: serde_json::Value = serde_json::from_str(V7_FIXTURE).unwrap();
     let at = before["saved_at_unix"].as_u64().unwrap();
-    let sd = begin_load(V7_FIXTURE, at).expect("a v7 save loads").set_down();
+    let sd = begin_load(V7_FIXTURE, at)
+        .expect("a v7 save loads")
+        .set_down();
     let resaved: serde_json::Value = serde_json::from_str(&save_string_carrying(
         &sd.state,
         at,
@@ -684,7 +738,10 @@ fn a_v7_save_migrates_with_everything_else_exact() {
             assert_eq!(old.len(), new.len(), "{key}");
             for (o, n) in old.iter().zip(new) {
                 let mut n = n.as_object().unwrap().clone();
-                assert!(n.remove("profile").is_some_and(|p| !p.is_null()), "{key}: {o}");
+                assert!(
+                    n.remove("profile").is_some_and(|p| !p.is_null()),
+                    "{key}: {o}"
+                );
                 assert_eq!(o.as_object().unwrap(), &n, "{key}");
             }
         } else {

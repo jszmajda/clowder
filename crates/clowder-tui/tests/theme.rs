@@ -55,14 +55,15 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::sync::Mutex;
 
-use clowder_core::{ResourceId, Season};
+use clowder_core::{EyeColour, FurColour, ResourceId, Season};
 use ratatui::backend::TestBackend;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::Paragraph;
 use ratatui::Terminal;
 
 use theme::{
-    blend, coat, coat_colours, seasonal_accent, truecolor_advertised, Coat, Dressing, Hue, Role,
+    blend, coat, coat_colours, fur, seasonal_accent, truecolor_advertised, Coat, Dressing, Hue,
+    Role,
 };
 
 // ---------------------------------------------------------------------------
@@ -671,6 +672,20 @@ fn the_theme_can_produce_sixteen_colours_and_the_paths_between_stops_and_no_othe
         None,
         "the sixth role is the absence of a colour, not a seventeenth value"
     );
+
+    // Beside those, only a portrait's fur and eye colours, which depict a
+    // kitten and are worn by nothing but its portrait and swatches
+    // (TUI-THEME-027): twelve furs and six eyes, each its own.
+    let furs: HashSet<(u8, u8, u8)> = FurColour::ALL
+        .iter()
+        .map(|c| rgb_of(fur::fur_colour(*c), &format!("{c:?} fur")))
+        .collect();
+    assert_eq!(furs.len(), 12, "twelve fur colours");
+    let eyes: HashSet<(u8, u8, u8)> = EyeColour::ALL
+        .iter()
+        .map(|c| rgb_of(fur::eye_colour(*c), &format!("{c:?} eyes")))
+        .collect();
+    assert_eq!(eyes.len(), 6, "six eye colours");
 
     // Every colour a solid or patched coat puts on a character is a stop, and
     // every colour a blended coat puts on one lies on the path between two

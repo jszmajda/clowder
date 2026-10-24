@@ -90,7 +90,7 @@ Taking nothing from the state RNG keeps its fixed draw schedule (SIM-ENG-018) ex
 
 ### Kept for life
 
-A profile is stored, never re-derived. The tables can grow, shrink, or be reworded between versions without changing any kitten: what a kitten looks like and what it loves is part of who it is, kept for the same reason its name is. A profile never changes once drawn — not when the kitten wanders off or comes home, not when it is promoted or made the Elder. A kitten carried in a Traveling Basket brings its profile into the new meadow, and the Family Album's memorial of every kitten keeps the profile it had (prestige leaf), so the album remembers what each kitten looked like and loved.
+A profile is stored, never re-derived: what a kitten looks like and what it loves is part of who it is, kept for the same reason its name is. A favourite is kept as its words, so the favourite tables can grow, shrink, or be reworded between versions without changing any kitten. A pattern, a fur colour, and an eye look are kept as ids, append-only like every content id, so their tables can grow without changing any kitten either; rewording a colour's name changes how a fur is said, never what it is. A profile never changes once drawn — not when the kitten wanders off or comes home, not when it is promoted or made the Elder. A kitten carried in a Traveling Basket brings its profile into the new meadow, and the Family Album's memorial of every kitten keeps the profile it had (prestige leaf), so the album remembers what each kitten looked like and loved.
 
 ## Kitten Facts
 

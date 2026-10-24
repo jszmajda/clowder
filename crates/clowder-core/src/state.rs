@@ -424,7 +424,7 @@ impl KittenTrait {
 }
 
 /// The patterns a kitten's fur can take. Ids are append-only: a saved fur
-/// names its pattern. @spec SIM-KIT-035
+/// names its pattern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum FurPattern {
     Solid,
@@ -453,7 +453,6 @@ impl FurPattern {
 }
 
 /// The colours a fur pattern's slots can take. Ids are append-only.
-/// @spec SIM-KIT-035
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum FurColour {
     Black,
@@ -487,7 +486,7 @@ impl FurColour {
     ];
 }
 
-/// The colour of one eye. @spec SIM-KIT-036
+/// The colour of one eye.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum EyeColour {
     Green,
@@ -510,7 +509,7 @@ impl EyeColour {
 }
 
 /// The looks a kitten's eyes can have — each naming both eyes' colours in the
-/// content table. Ids are append-only. @spec SIM-KIT-036
+/// content table. Ids are append-only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum EyeLook {
     Green,
@@ -545,7 +544,7 @@ pub struct Fur {
 }
 
 /// What a kitten looks like and what it loves. Drawn once at arrival and kept
-/// for life; no rule of the simulation reads it. @spec SIM-KIT-033
+/// for life; no rule of the simulation reads it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Profile {
     pub fur: Fur,

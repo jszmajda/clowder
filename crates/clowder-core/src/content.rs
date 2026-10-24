@@ -2697,7 +2697,6 @@ pub static NAME_POOL: [&str; 401] = [
 /// A fur pattern: its words, marking with `{k}` where slot k's colour name
 /// goes, and its slots, each listing the colours it may take — only colours a
 /// real cat could wear there.
-/// @spec SIM-KIT-035
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FurPatternDef {
     pub words: &'static str,
@@ -2746,7 +2745,10 @@ static FUR_PATTERNS: [FurPatternDef; 9] = {
         // Colourpoint: a pale body with dark points.
         FurPatternDef {
             words: "{1} point",
-            slots: &[&[Cream, White, Fawn], &[Seal, Grey, Chocolate, Lilac, Ginger]],
+            slots: &[
+                &[Cream, White, Fawn],
+                &[Seal, Grey, Chocolate, Lilac, Ginger],
+            ],
         },
         // Van: white, with colour on the head.
         FurPatternDef {
@@ -2785,7 +2787,6 @@ pub fn fur_colour_name(c: FurColour) -> &'static str {
 }
 
 /// An eye look: each eye's colour, and the words for the look.
-/// @spec SIM-KIT-036
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EyeLookDef {
     pub left: EyeColour,
@@ -3027,7 +3028,7 @@ pub static FAVOURITE_QUIRKS: [&str; 28] = [
     "sleeps with one eye open",
 ];
 
-/// A trait as the player reads it: its name and its blurb. @spec SIM-KIT-040
+/// A trait as the player reads it: its name and its blurb.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TraitDef {
     pub name: &'static str,

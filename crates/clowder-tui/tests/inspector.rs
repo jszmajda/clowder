@@ -1038,6 +1038,7 @@ fn the_inspector_states_the_elders_mark_beneath_the_name_on_the_elders_row_alone
             // With no Elder: the name, and nothing else. A kitten's row has
             // no definition, no count, and no cost to state.
             let (_, plain) = list_and_inspector_in_frame(&base, &view, w, TALL);
+            let plain = above_the_card(plain);
             assert!(
                 plain.join(" ") == *name || plain.concat() == *name,
                 "fixture: {whr} with the core holding no Elder, the inspector states the kitten's \
@@ -1055,6 +1056,7 @@ fn the_inspector_states_the_elders_mark_beneath_the_name_on_the_elders_row_alone
             let mut elsewhere = base.clone();
             elsewhere.elder = Some(other);
             let (_, shown) = list_and_inspector_in_frame(&elsewhere, &view, w, TALL);
+            let shown = above_the_card(shown);
             assert_eq!(
                 shown, plain,
                 "{whr} with kitten {other} the Elder: this kitten is not the Elder, so the \
@@ -1066,6 +1068,7 @@ fn the_inspector_states_the_elders_mark_beneath_the_name_on_the_elders_row_alone
             let mut own = base.clone();
             own.elder = Some(k);
             let (list, shown) = list_and_inspector_in_frame(&own, &view, w, TALL);
+            let shown = above_the_card(shown);
             let mut expected = plain.clone();
             expected.push(ELDER_MARK.to_string());
             assert_eq!(
@@ -1699,6 +1702,16 @@ fn numbers_outside_waits(text: &str) -> BTreeSet<String> {
 }
 
 /// The non-blank lines of a drawing, trimmed, in order.
+/// What the inspector states above a kitten's `about` card, which stands
+/// beneath everything else on a kitten's row (TUI-NAV-164) and has claims of
+/// its own (`kitten_card.rs`); every line, on any other row.
+fn above_the_card(lines: Vec<String>) -> Vec<String> {
+    lines
+        .into_iter()
+        .take_while(|l| !l.trim_start().starts_with("\u{2500}\u{2500} about"))
+        .collect()
+}
+
 fn lines_of(text: &str) -> Vec<String> {
     text.lines()
         .map(|l| l.trim().to_string())
@@ -2457,7 +2470,8 @@ fn rows_whose_definition_states_nothing_carry_no_statement_and_no_stand_in() {
 
 /// A row whose action has no content definition — a fixed action, a kitten's
 /// rows, a site, an adventure, a pen pal — has nothing to state beyond its name
-/// (the tinkerers' bench, which states the seats, is swept in `bench.rs`):
+/// (the tinkerers' bench, which states the seats, is swept in `bench.rs`, and
+/// the `about` card beneath a kitten's row in `kitten_card.rs`):
 /// no statement, no stand-in, no price, no reason — save, on a row the list
 /// draws with a label in its name's place, that label (TUI-NAV-091). (Pounce
 /// and Trade rows state the core's one-unit price instead, TUI-NAV-073.)
@@ -2483,7 +2497,7 @@ fn a_row_with_no_definition_states_only_its_name() {
                 }
             }
             let shown = pane_text(&state, &looking_at(section, row.key.clone()), WIDE, TALL);
-            let lines = lines_of(&shown);
+            let lines = above_the_card(lines_of(&shown));
             let label = is_later_row(&state, section, &row.key)
                 .then(|| later_row_label(&row.key).expect("fixture: a later row has a label"));
             assert_eq!(

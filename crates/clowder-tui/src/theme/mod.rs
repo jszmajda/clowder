@@ -6,7 +6,11 @@
 //! coat, fixed for the life of the game and chosen to suit the name; a coat
 //! says nothing the name does not. Every meaning colour carries is carried
 //! first by a glyph, a word, or a fill — turn all colour off and the game is
-//! still completely playable. @spec TUI-THEME-003, TUI-THEME-010
+//! still completely playable. One fenced picture is neither: a kitten's
+//! portrait is painted in its own fur, which depicts and means nothing
+//! (`fur`). @spec TUI-THEME-003, TUI-THEME-010
+
+pub mod fur;
 
 use clowder_core::{ResourceId, Season};
 use ratatui::style::Color;

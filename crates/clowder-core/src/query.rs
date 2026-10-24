@@ -212,7 +212,7 @@ pub struct Offers {
 }
 
 /// What the simulation holds about a kitten that bears on play and no other
-/// surface states. @spec SIM-KIT-041
+/// surface states.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct KittenFacts {
     pub trait_id: KittenTrait,
@@ -224,14 +224,13 @@ pub struct KittenFacts {
 
 /// The job a kitten holds the most skill in, and the yield bonus that
 /// skill's tier gives it there, as a fraction (0.025 for +2.5%).
-/// @spec SIM-KIT-041
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BestAt {
     pub job: JobId,
     pub bonus: f64,
 }
 
-/// When a kitten joined the clowder. @spec SIM-KIT-041
+/// When a kitten joined the clowder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Arrival {
     /// It arrived on this day, in this season of this year.

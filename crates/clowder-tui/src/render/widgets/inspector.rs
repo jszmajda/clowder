@@ -15,10 +15,11 @@
 
 use clowder_core::content::{self, TICKS_PER_SECOND};
 use clowder_core::{
-    Command, ContentId, Event, FlowSource, GameState, JournalItem, LockReason, ResourceId,
+    Arrival, Command, ContentId, Event, FlowSource, GameState, JournalItem, LockReason, ResourceId,
 };
 use ratatui::{
     layout::Rect,
+    style::Style,
     text::Line,
     widgets::{Paragraph, Wrap},
     Frame,
@@ -1100,8 +1101,87 @@ fn draw_body(
             _ => line_from_pieces(&l, ratatui::style::Style::default(), true, usize::MAX),
         })
         .collect();
+    let mut out = out;
+    if let RowKey::Kitten(ix, _) = key {
+        out.extend(about_lines(state, *ix, area.width as usize));
+    }
     let para = Paragraph::new(out).wrap(Wrap { trim: true });
     f.render_widget(para, area);
+}
+
+/// A kitten's `about` card, beneath everything else its row states: a dim
+/// divider, its portrait, the facts the core reports about it, and its
+/// favourites — every word the core's. A kitten the core holds no profile for
+/// states its facts alone. @spec TUI-NAV-164, TUI-NAV-165, TUI-NAV-166
+fn about_lines(state: &GameState, ix: usize, width: usize) -> Vec<Line<'static>> {
+    let Some(facts) = state.kitten_facts(ix) else {
+        return Vec::new();
+    };
+    let dim = crate::render::style_for(Role::Dim);
+    let mut out = vec![
+        Line::raw(""),
+        Line::styled(fmt::group_header_line("about", width), dim),
+    ];
+    let profile = state.kittens[ix].profile.as_ref();
+    if let Some(p) = profile {
+        out.extend(crate::render::portrait::portrait_lines(p, width));
+    }
+
+    // The facts, each a mechanical line under the Journal's ▪.
+    // @spec TUI-NAV-165
+    let def = clowder_core::content::trait_def(facts.trait_id);
+    let mut temperament = vec![Piece::plain(format!(
+        "\u{25aa} Temperament: {}. ",
+        def.name
+    ))];
+    temperament.extend(crate::render::marked_pieces(def.blurb));
+    let best = match facts.best_at {
+        Some(b) if b.bonus > 0.0 => format!(
+            "\u{25aa} Best at: {} (+{}% from skill)",
+            clowder_core::content::job_def(b.job).name,
+            fmt::exact(b.bonus * 100.0)
+        ),
+        Some(b) => format!(
+            "\u{25aa} Best at: {}",
+            clowder_core::content::job_def(b.job).name
+        ),
+        None => "\u{25aa} Best at: nothing yet".to_string(),
+    };
+    let since = match facts.arrival {
+        Arrival::Day { day, season, year } => {
+            format!("\u{25aa} With the clowder since {season:?} Day {day} Year {year}")
+        }
+        Arrival::CarriedAlong => "\u{25aa} Came along from the old meadow".to_string(),
+    };
+    for pieces in [
+        temperament,
+        vec![Piece::plain(format!("\u{25aa} Rank {}", facts.rank))],
+        vec![Piece::plain(best)],
+        vec![Piece::plain(since)],
+    ] {
+        out.push(line_from_pieces(
+            &pieces,
+            Style::default(),
+            true,
+            usize::MAX,
+        ));
+    }
+
+    // The favourites, each a flavour line under the Journal's ·, in dim.
+    // @spec TUI-NAV-166
+    if let Some(p) = profile {
+        for (label, entry) in [
+            ("Favourite food", &p.food),
+            ("Favourite toy", &p.toy),
+            ("Best nap spot", &p.nap),
+            ("Loves watching", &p.show),
+            ("Pastime", &p.pastime),
+            ("Quirk", &p.quirk),
+        ] {
+            out.push(Line::styled(format!("\u{b7} {label}: {entry}"), dim));
+        }
+    }
+    out
 }
 
 /// Flavour name, plain mechanical statement, exact next cost with have/need
