@@ -459,7 +459,22 @@ fn every_pose_stands_whole_with_its_words_beside_it() {
             .iter()
             .map(|c| format!("\u{2588}\u{2588} {}", content::fur_colour_name(*c)))
             .collect();
-        assert_eq!(lines[top + d.art.len()], strip.join("  "), "{pose:?}");
+        let below = top + d.art.len();
+        assert_eq!(
+            lines[below], "",
+            "{pose:?}: a blank line between the cat and its colours"
+        );
+        assert_eq!(lines[below + 1], strip.join("  "), "{pose:?}");
+        assert_eq!(
+            lines[below + 2],
+            "",
+            "{pose:?}: a blank line after the colours"
+        );
+        assert!(
+            lines[below + 3].starts_with("\u{25aa} Temperament: "),
+            "{pose:?}: then the facts, {:?}",
+            lines[below + 3]
+        );
     }
 }
 
@@ -490,10 +505,11 @@ fn a_narrow_card_puts_the_words_beneath_and_breaks_the_strip_between_items() {
             .expect("a strip");
     let eyes = content::eye_look_def(EyeLook::OddBlueCopper).words;
     assert_eq!(
-        lines[below + 1..strip_at].join(" "),
+        lines[below + 1..strip_at - 1].join(" "),
         eyes,
         "the eyes' words beneath the fur's, wrapped as any line"
     );
+    assert_eq!(lines[strip_at - 1], "", "a blank line before the colours");
     let items: Vec<String> = fur
         .colours
         .iter()
@@ -514,6 +530,11 @@ fn a_narrow_card_puts_the_words_beneath_and_breaks_the_strip_between_items() {
     assert!(
         strip.len() >= 2,
         "fixture: the strip needs more than one line"
+    );
+    assert_eq!(
+        lines[strip_at + strip.len()],
+        "",
+        "a blank line after the colours"
     );
 }
 

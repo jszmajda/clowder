@@ -190,7 +190,7 @@ The outline is drawn in the inherited foreground, so the shape of the cat stands
 
 **Its words.** The fur's words and the eyes' words stand beside the cat, three blank columns to the right of the pose's widest row, the fur's on row 1 and the eyes' on row 2 — wherever the inspector's width holds the pose, the three columns, and the longer of the two whole. Where it does not, they stand beneath the portrait instead, the fur's line and then the eyes', and wrap as any inspector line does. Which way they stand follows from the width, the pose, and the two lengths alone.
 
-**The strip.** Beneath the portrait, and beneath its words where they stand beneath it, the swatch strip (theme leaf: a swatch) lists the fur's colours, each swatch with its colour's name, items two blank columns apart. It breaks onto a further line only between items, never parting a swatch from its name, each further line beginning at the inspector's left edge.
+**The strip.** Beneath the portrait, and beneath its words where they stand beneath it, one blank line apart from them, the swatch strip (theme leaf: a swatch) lists the fur's colours, each swatch with its colour's name, items two blank columns apart. It breaks onto a further line only between items, never parting a swatch from its name, each further line beginning at the inspector's left edge. One blank line follows the strip, so the picture, its colours, and the facts beneath read as three things rather than one block.
 
 ## The Frame Budget
 

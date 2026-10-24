@@ -181,8 +181,10 @@ pub(crate) fn portrait_lines(profile: &Profile, width: usize) -> Vec<Line<'stati
         out.push(Line::raw(eyes.words.to_string()));
     }
 
-    // The strip: each colour's swatch and name, items two blanks apart.
-    // @spec TUI-THEME-030
+    // The strip: each colour's swatch and name, items two blanks apart, a
+    // blank line either side so the cat, its colours, and the facts read as
+    // three things. @spec TUI-THEME-030, TUI-RENDER-029
+    out.push(Line::raw(""));
     let mut strip: Vec<Span<'static>> = Vec::new();
     for (i, c) in profile.fur.colours.iter().enumerate() {
         if i > 0 {
@@ -198,5 +200,6 @@ pub(crate) fn portrait_lines(profile: &Profile, width: usize) -> Vec<Line<'stati
         )));
     }
     out.push(Line::from(strip));
+    out.push(Line::raw(""));
     out
 }
