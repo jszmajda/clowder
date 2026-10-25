@@ -230,6 +230,23 @@ pub struct BestAt {
     pub bonus: f64,
 }
 
+/// A colony's correspondence as a frontend shows it. @spec SIM-TRADE-013
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PenPalReport {
+    pub level: u32,
+    /// The charm the next letter costs.
+    pub price: f64,
+    /// The colony's standing now.
+    pub standing: f64,
+    /// The part of that standing the letters have added.
+    pub warmth: f64,
+    /// How much one more letter would raise the standing; zero once it can't.
+    pub next_warmth: f64,
+    /// The lowest level above this one at which a good the colony sells
+    /// opens, if any.
+    pub opens_at: Option<u32>,
+}
+
 /// The meadow's mess as a frontend states it. @spec SIM-ECO-049
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MessReport {
@@ -270,6 +287,35 @@ pub struct Bench {
 }
 
 impl GameState {
+    /// What a discovered tradeable colony's pen pals have done and what the
+    /// next letter would do, read through the standing rule itself; nothing
+    /// for the Star Whales or a colony not yet found. @spec SIM-TRADE-013
+    pub fn pen_pal(&self, colony: crate::state::ColonyId) -> Option<PenPalReport> {
+        use crate::content;
+        if colony == crate::state::ColonyId::StarWhales || !self.discovered.contains(&colony) {
+            return None;
+        }
+        let level = self.penpal[colony.ix()];
+        let standing_at = |l: u32| {
+            let mut probe = self.clone();
+            probe.penpal[colony.ix()] = l;
+            probe.standing(colony)
+        };
+        let standing = self.standing(colony);
+        Some(PenPalReport {
+            level,
+            price: content::PENPAL_BASE_CHARM * content::PENPAL_CHARM_RATIO.powi(level as i32),
+            standing,
+            warmth: standing - standing_at(0),
+            next_warmth: standing_at(level + 1) - standing,
+            opens_at: content::colony_goods(colony)
+                .into_iter()
+                .map(|(_, min)| min)
+                .filter(|min| *min > level)
+                .min(),
+        })
+    }
+
     /// Each built structure that makes or uses energy, in structure order,
     /// with its signed share at current state: what its copies make, as
     /// production counts it, or minus what they use, as consumption counts it

@@ -1459,3 +1459,50 @@ fn prism_sight_brightens_the_sky_events() {
     assert!((s.prism_descent_chance() - descent * 1.1).abs() < 1e-12);
     assert!((s.rainbow_shower_chance() - shower * 1.1).abs() < 1e-12);
 }
+
+/// A colony's correspondence as a frontend shows it: level, the next letter's
+/// price, standing and the letters' part of it, what one more letter adds,
+/// and the next level at which a good opens.
+/// @spec SIM-TRADE-013
+#[test]
+fn the_pen_pal_query_says_what_letters_have_done() {
+    let mut s = GameState::new(1501);
+    s.ideas.insert(IdeaId::PenPalNetworks);
+    assert!(s.pen_pal(ColonyId::Deer).is_none(), "undiscovered");
+    s.discovered.insert(ColonyId::Deer);
+    s.discovered.insert(ColonyId::Foxes);
+    s.discovered.insert(ColonyId::StarWhales);
+    assert!(
+        s.pen_pal(ColonyId::StarWhales).is_none(),
+        "whales take no letters"
+    );
+
+    let deer = s.pen_pal(ColonyId::Deer).unwrap();
+    assert_eq!(deer.level, 0);
+    assert!((deer.price - 100.0).abs() < 1e-9);
+    assert_eq!(deer.warmth, 0.0);
+    assert!((deer.next_warmth - 0.01).abs() < 1e-12);
+    assert_eq!(deer.opens_at, Some(content::DEER_STARDUST_MIN_PENPAL));
+
+    s.penpal[ColonyId::Deer.ix()] = 3;
+    let deer = s.pen_pal(ColonyId::Deer).unwrap();
+    assert!((deer.price - 100.0 * 1.15f64.powi(3)).abs() < 1e-9);
+    assert!((deer.warmth - 0.03).abs() < 1e-12);
+    assert!((deer.standing - s.standing(ColonyId::Deer)).abs() < 1e-12);
+    s.penpal[ColonyId::Deer.ix()] = content::DEER_STARDUST_MIN_PENPAL;
+    assert_eq!(
+        s.pen_pal(ColonyId::Deer).unwrap().opens_at,
+        None,
+        "nothing left to open"
+    );
+
+    // Capped warmth: another letter adds nothing.
+    s.penpal[ColonyId::Deer.ix()] = 80;
+    assert_eq!(s.pen_pal(ColonyId::Deer).unwrap().next_warmth, 0.0);
+
+    // A shy colony warms only to neutral.
+    s.penpal[ColonyId::Foxes.ix()] = 20;
+    let foxes = s.pen_pal(ColonyId::Foxes).unwrap();
+    assert_eq!(foxes.standing, 0.0);
+    assert_eq!(foxes.next_warmth, 0.0, "already neutral");
+}

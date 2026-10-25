@@ -318,6 +318,8 @@ fn stated_count(state: &GameState, row: &Row) -> Option<u64> {
 fn stated_cost(state: &GameState, row: &Row) -> Option<Vec<(ResourceId, f64)>> {
     let cost = match (&row.key, &row.kind) {
         (RowKey::Content(_, "tinker"), _) => return None,
+        // A letter's price is the core's Pen Pal query's. @spec TUI-NAV-171
+        (RowKey::Colony(c, "penpal"), _) => vec![(ResourceId::Charm, state.pen_pal(*c)?.price)],
         (RowKey::Content(id, _), _) => {
             if state.lock_reason(*id) == Some(LockReason::AlreadyYours) {
                 return None;

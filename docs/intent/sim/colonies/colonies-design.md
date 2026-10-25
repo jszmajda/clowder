@@ -50,7 +50,9 @@ What a colony offers, in full, is its sell basket in the table's order, then Fox
 
 ## Pen Pals
 
-`SendPenPal(colony)` establishes/deepens a correspondence (the inspiration's embassies), charm-priced at `base × 1.15^level`. Each level: +1% success chance on non-guaranteed sells (soft cap +75%), and raises the minimum-level goods a colony will part with. Star Whales take no Pen Pals.
+`SendPenPal(colony)` establishes or deepens a correspondence (the inspiration's embassies), charm-priced at `base × 1.15^level`. Each level warms the colony's standing by 0.01, the warmth letters add soft-capped at 0.75 in all, so a shy colony naps through fewer caravans and a warm one sends more bonus trips (Standing, above). A colony keeps some goods for closer friends, each opening at the Pen Pal level its sell row names. Star Whales take no Pen Pals.
+
+The core reports a colony's correspondence as a frontend needs to show it, so a letter's effect is never invisible: the level; the next letter's charm price; the colony's standing now and the part of it the letters have added; how much one more letter would warm it, which is nothing once the warmth is capped or a shy colony has warmed all the way to neutral; and the next level at which a good it keeps for closer friends opens, if any (SIM-TRADE-013).
 
 ## Scout Picnics
 
@@ -64,6 +66,7 @@ The gentle-giant visitor arc (the inspiration's leviathans, de-fanged): Star Wha
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
+| What a Pen Pal level does | Warms the colony's standing by 0.01, the letters' warmth soft-capped at 0.75 | Also raising the chance of each non-guaranteed good by 1% a level | Standing already carries every caravan's odds — fewer naps from a shy colony, more bonus trips from a warm one — so one knob gives pen pals a felt effect on every trade; a second per-good chance would double-count the same friendship |
 | The Owls' terms | 50 mint for 2500 curiosity | 500 mint for 80 curiosity | The Owls are met only once curiosity storage passes 125000, where 80 curiosity is nothing; and 500 mint is many trades' worth of a luxury every kitten uses up. Their trade should be worth a caravan to the clowder that finally meets them |
 | No hostile colonies | Shy (warms to neutral) instead of hostile (capped at neutral, failure chance) | Keep hostile races | Tenet 1 — the *mechanic* (negative standing = failure chance, warmable) is preserved; only "enemy" becomes "shy" |
 | Kite-scaled moonstone | Foxes' moonstone scales with Kites built | Flat moonstone trade | The inspiration's ship-scaled-titanium loop; makes Kites doubly useful (storage + metal) and gives band 3 its trade-paced supply |

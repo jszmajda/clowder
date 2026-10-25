@@ -1068,6 +1068,15 @@ fn draw_body(
                 lines.push(crate::render::count_prompt_preview_pieces(
                     state, &row, &p.digits,
                 ));
+            } else if let RowKey::Colony(c, "penpal") = &row.key {
+                // The next letter's price, then what the letters have done.
+                // @spec TUI-NAV-171, TUI-NAV-172
+                if let Some(report) = state.pen_pal(*c) {
+                    lines.push(Vec::new());
+                    lines.extend(unit_cost_lines(state, &[(ResourceId::Charm, report.price)]));
+                    lines.push(Vec::new());
+                    lines.extend(pen_pal_lines(*c, &report));
+                }
             } else if let RowKind::Act { command, .. } = &row.kind {
                 if let Some(unit) = state.unit_price(command) {
                     lines.push(Vec::new());
@@ -1117,6 +1126,46 @@ fn draw_body(
     }
     let para = Paragraph::new(out).wrap(Wrap { trim: true });
     f.render_widget(para, area);
+}
+
+/// What a neighbour's pen pals have done and what another letter would do,
+/// from the core's Pen Pal query: the level, the standing in words with the
+/// letters' part, what that standing does to a caravan, the next letter's
+/// warmth, and the level at which something more opens. @spec TUI-NAV-172
+fn pen_pal_lines(c: clowder_core::ColonyId, r: &clowder_core::PenPalReport) -> Vec<Pieces> {
+    let name = content::colony_def(c).name;
+    let pct = |v: f64| (v * 100.0).round() as i64;
+    let mut out = vec![plain(format!("Pen pals: {}.", r.level))];
+    let mut standing = if pct(r.standing) > 0 {
+        format!("The {name} are warm to you: +{}%.", pct(r.standing))
+    } else if pct(r.standing) < 0 {
+        format!("The {name} are shy of you: \u{2212}{}%.", -pct(r.standing))
+    } else {
+        format!("The {name} are neutral towards you.")
+    };
+    if pct(r.warmth) > 0 {
+        standing.push_str(&format!(" Your letters added +{}%.", pct(r.warmth)));
+    }
+    out.push(plain(standing));
+    let odds = pct(r.standing.abs().min(1.0));
+    out.push(plain(if pct(r.standing) > 0 {
+        format!("About {odds}% of caravans come home with a bonus.")
+    } else if pct(r.standing) < 0 {
+        format!("About {odds}% of caravans find them napping.")
+    } else {
+        "Caravans trade at the usual odds.".to_string()
+    }));
+    out.push(plain(if pct(r.next_warmth) > 0 {
+        format!("Another letter warms them by {}%.", pct(r.next_warmth))
+    } else {
+        "Letters can't warm them any further.".to_string()
+    }));
+    if let Some(level) = r.opens_at {
+        out.push(plain(format!(
+            "At pen pal level {level}, they'll trade something more."
+        )));
+    }
+    out
 }
 
 /// The Energy readout: the totals, every structure's share under what it

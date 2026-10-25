@@ -1590,6 +1590,10 @@ fn stated_cost(state: &GameState, row: &Row) -> Option<Vec<(ResourceId, f64)>> {
             }
             state.cost_of_next(*id, 1)
         }
+        // A pen-pal row's next letter (TUI-NAV-171).
+        (RowKey::Colony(c, "penpal"), _) => {
+            vec![(ResourceId::Charm, state.pen_pal(*c)?.price)]
+        }
         (_, RowKind::Act { command, .. }) => state.unit_price(command)?,
         _ => return None,
     };

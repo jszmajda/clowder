@@ -2,6 +2,12 @@
 
 What changed in each release of Clowder, written so it spoils nothing: what changed for the player, never what the new things are called, what they cost, or what they do in numbers. Clowder is meant to be discovered by playing it.
 
+## [Unreleased]
+
+### Fixed
+
+- **Pen pals show what they do.** A neighbour's pen pal row now states the next letter's price, and its inspector says how many letters you've sent, how warm the neighbour is towards you and what that does to your caravans, what another letter would add, and when a closer friendship opens something more. The ticker names the neighbour and the level when a letter goes out.
+
 ## [1.2.0] — 2026-10-24
 
 ### New

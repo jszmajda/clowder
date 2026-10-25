@@ -17,9 +17,10 @@
 ## Standing & Pen Pals
 
 - [x] **SIM-TRADE-005**: The system shall compute a colony's standing as its start value plus its Pen Pal contribution plus any dedicated per-colony standing effects (the Charming Elder and Gift Stands raise trade ratio, a separate knob); a shy colony (negative standing) shall only ever warm toward neutral and never become an enemy.
-- [x] **SIM-TRADE-006**: When SendPenPal(colony) is applied with charm base × 1.15^level affordable, the system shall spend the charm and raise the colony's Pen Pal level, adding +1% non-guaranteed success chance per level (soft-capped at +75%) and raising its minimum-level goods; Star Whales accept no Pen Pals.
+- [x] **SIM-TRADE-006**: When SendPenPal(colony) is applied with charm base × 1.15^level affordable, the system shall spend the charm and raise the colony's Pen Pal level, which warms its standing by 0.01 per level (the warmth letters add soft-capped at 0.75) and opens the goods it keeps for that level; Star Whales accept no Pen Pals.
 
 ## Discovery
 
 - [x] **SIM-TRADE-007**: When ScoutPicnic is applied after the trade surface (Gift Economy idea) opens and with 1000 pep, the system shall discover the next colony by deterministic prerequisite priority (Foxes need charm ≥ 1500; Deer need ≥ 1 Kite; Owls need ≥ 100 Kites and curiosity cap > 125000; else a random first-tier colony), finding nobody half the time and refunding 950 pep on such a quiet day — the chance is named here because every other number in this spec is.
 - [x] **SIM-TRADE-008**: The system shall discover the first colony free when the trade surface opens, and never undiscover a colony.
+- [x] **SIM-TRADE-013**: The system shall expose, for a discovered tradeable colony, a read-only Pen Pal query reporting its Pen Pal level; the charm price of the next letter (SIM-TRADE-006); its standing now (SIM-TRADE-005); the part of that standing its letters add; how much one more letter would raise its standing, zero where the letters' warmth is at its cap or a shy colony stands at neutral; and the lowest Pen Pal level above the current one at which a good it sells opens, or none — reporting nothing for the Star Whales or an undiscovered colony.

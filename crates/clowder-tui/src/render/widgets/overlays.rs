@@ -167,6 +167,11 @@ fn event_words(event: &Event) -> String {
         E::ElderAppointed { name } => format!("{name} is the Elder now"),
         E::KittenPromoted { name, .. } => format!("{name} was promoted"),
         E::ColonyDiscovered { .. } => "a new neighbour found".into(),
+        // @spec TUI-NAV-173
+        E::PenPalSent { colony, level } => format!(
+            "a letter to the {} \u{2014} pen pals, level {level}",
+            clowder_core::content::colony_def(*colony).name
+        ),
         E::MeadowMoved { generation } => format!("the clowder moved on — generation {generation}"),
         E::DistantDawn => "a distant dawn".into(),
         // Everything else says its kind without unpacking its payload: better a
