@@ -157,6 +157,21 @@ fn the_mess_row_is_listed_with_anything_messy() {
     assert_eq!(row.kind, RowKind::Display);
 }
 
+/// A structure that tidies mess lists the Mess row too, even in a clean
+/// meadow with nothing else messy built.
+/// @spec TUI-NAV-167
+#[test]
+fn the_mess_row_is_listed_with_anything_tidying() {
+    let mut s = GameState::new(44);
+    s.structures[StructureId::BroomCupboard.ix()] = 1;
+    assert!(
+        structure_def(StructureId::BroomCupboard).mess < 0.0,
+        "fixture"
+    );
+    assert_eq!(s.mess, 0.0, "fixture");
+    assert!(keys(&s).contains(&RowKey::Mess));
+}
+
 // ---------------------------------------------------------------------------
 // TUI-NAV-168, TUI-THEME-015, TUI-RENDER-030 — what the rows read
 // ---------------------------------------------------------------------------

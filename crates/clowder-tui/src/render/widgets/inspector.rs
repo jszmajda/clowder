@@ -347,10 +347,17 @@ fn structure_statement(s: clowder_core::StructureId) -> Pieces {
             ]);
         }
     }
-    if d.mess != 0.0 {
+    // A negative mess field tidies; it is stated as what it tidies.
+    // @spec TUI-NAV-177
+    if d.mess > 0.0 {
         parts.push(plain(format!(
             "Makes {} mess per second.",
             per_second(d.mess)
+        )));
+    } else if d.mess < 0.0 {
+        parts.push(plain(format!(
+            "Tidies {} mess per second.",
+            per_second(-d.mess)
         )));
     }
     if d.energy_prod != 0.0 {

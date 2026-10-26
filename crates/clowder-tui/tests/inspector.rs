@@ -2071,6 +2071,42 @@ fn a_structures_statement_is_every_field_its_definition_sets_and_nothing_else() 
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
+/// A structure whose definition tidies mess says so as an amount tidied, never
+/// as a negative amount made; one that makes mess says it makes it. Quantified
+/// over every structure whose definition carries a mess field.
+/// @spec TUI-NAV-177
+#[test]
+fn a_structures_mess_is_stated_as_made_or_tidied_by_its_sign() {
+    let mut checked = (0, 0);
+    for s in StructureId::ALL {
+        let mess = tables::structure_def(s).mess;
+        if mess == 0.0 {
+            continue;
+        }
+        let (_, shown) = structure_pane(s);
+        let flat = shown.split_whitespace().collect::<Vec<_>>().join(" ");
+        let amount = per_second(mess.abs());
+        if mess < 0.0 {
+            checked.1 += 1;
+            assert!(
+                flat.contains(&format!("Tidies {amount} mess per second.")),
+                "{s:?} read:\n{shown}"
+            );
+            assert!(!flat.contains("Makes -"), "{s:?} read:\n{shown}");
+        } else {
+            checked.0 += 1;
+            assert!(
+                flat.contains(&format!("Makes {amount} mess per second.")),
+                "{s:?} read:\n{shown}"
+            );
+        }
+    }
+    assert!(
+        checked.0 > 0 && checked.1 > 0,
+        "fixture: the tables define structures that make and that tidy mess"
+    );
+}
+
 /// The qualifiers that shape a structure's productions — seasonal, scaled by
 /// the energy surplus, routed through the outdoor channel — are stated exactly
 /// where the definition sets them. Wording-free: some word must appear on every
