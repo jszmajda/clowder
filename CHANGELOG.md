@@ -2,7 +2,7 @@
 
 What changed in each release of Clowder, written so it spoils nothing: what changed for the player, never what the new things are called, what they cost, or what they do in numbers. Clowder is meant to be discovered by playing it.
 
-## [Unreleased]
+## [1.3.1] — 2026-10-26
 
 ### Changed
 
