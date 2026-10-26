@@ -525,3 +525,87 @@ fn the_ticker_celebrates_by_name() {
         "{line}"
     );
 }
+
+/// Colour does the reading: an earned achievement's line in `milestone`, its
+/// words in the inherited foreground with each named resource in its coat and
+/// when it was earned in `dim`; a locked one's name inherited and its mark and
+/// hint in `dim`; and blank lines part the earned, the locked, and the
+/// secrets.
+/// @spec TUI-NAV-175
+#[test]
+fn colour_and_space_make_the_scrapbook_easy_to_read() {
+    use ratatui::style::Color;
+    let mut s = quiet();
+    s.achievements
+        .insert(AchievementId::FollowedHome, earned(40));
+    let t = scrapbook(s.clone(), &[], 160, 90);
+    let rows = screen(&t);
+    let buf = t.backend().buffer();
+    let fg = |x: usize, y: usize| buf[(x as u16, y as u16)].fg;
+    let col = |row: &str, needle: &str| {
+        let b = row
+            .find(needle)
+            .unwrap_or_else(|| panic!("{needle:?} not in {row:?}"));
+        row[..b].chars().count()
+    };
+    let milestone = Role::Milestone.color().unwrap();
+    let dim = Role::Dim.color().unwrap();
+
+    let def = achievement_def(AchievementId::FollowedHome);
+    let y = rows
+        .iter()
+        .position(|r| r.trim_start().starts_with(&format!("★ {}", def.name)))
+        .unwrap();
+    for needle in ["★", def.name, "new"] {
+        assert_eq!(fg(col(&rows[y], needle), y), milestone, "{needle:?}");
+    }
+    let words = &rows[y + 1];
+    let first = words.trim_start().chars().next().unwrap().to_string();
+    assert_eq!(
+        fg(col(words, &first), y + 1),
+        Color::Reset,
+        "the words read plainly"
+    );
+    let coated = content::blurb_parts(def.words)
+        .into_iter()
+        .find_map(|p| match p {
+            content::BlurbPart::Resource(_, t) => Some(t),
+            content::BlurbPart::Text(_) => None,
+        })
+        .expect("fixture: these words name a resource");
+    let at = fg(col(words, coated), y + 1);
+    assert!(
+        at != Color::Reset && at != dim,
+        "{coated:?} wears its coat: {at:?}"
+    );
+    assert_eq!(fg(col(words, "Gen 0"), y + 1), dim, "when, in dim");
+    assert_eq!(fg(col(words, "—"), y + 1), dim, "the dash with it");
+
+    assert!(
+        rows[y + 2].trim().is_empty(),
+        "a blank line after the earned"
+    );
+    let locked = AchievementId::ALL
+        .into_iter()
+        .find(|id| !s.achievements.contains_key(id) && !achievement_def(*id).secret)
+        .map(achievement_def)
+        .unwrap();
+    let ly = y + 3;
+    assert!(rows[ly].contains(locked.name), "{}", rows[ly]);
+    assert_eq!(fg(col(&rows[ly], "○"), ly), dim);
+    assert_eq!(
+        fg(col(&rows[ly], locked.name), ly),
+        Color::Reset,
+        "the name reads plainly"
+    );
+    assert_eq!(fg(col(&rows[ly], locked.hint), ly), dim, "the hint recedes");
+
+    let sy = rows
+        .iter()
+        .position(|r| r.contains("still to find"))
+        .unwrap();
+    assert!(
+        rows[sy - 1].trim().is_empty(),
+        "a blank line before the secrets"
+    );
+}

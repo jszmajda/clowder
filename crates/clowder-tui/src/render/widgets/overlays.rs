@@ -619,50 +619,59 @@ fn achievement_lines(state: &GameState, view: &ViewState, width: usize) -> Vec<L
         Line::raw(format!("Achievements — {earned} of {} earned", list.len())),
         Line::raw(String::new()),
     ];
+    let plain = Style::default();
+    // What the clowder has done, in violet; its words plain, each resource in
+    // its coat; when, receding.
     for (id, def, when) in &list {
         let Some(when) = when else { continue };
         let mut name = vec![Piece::plain(format!("\u{2605} {}", def.name))];
         if view.achievements_new.contains(id) {
             name.push(Piece::plain(" new"));
         }
-        lines.extend(wrapped(&name, None, 0, width, Style::default(), true));
-        let mut words = crate::render::marked_pieces(def.words);
-        words.push(Piece::plain(" \u{2014}"));
-        let earned_on = Piece::plain(format!(
-            "Gen {}, {}",
-            when.generation,
-            super::chrome::date_words(when.day)
-        ));
         lines.extend(wrapped(
-            &words,
-            Some(earned_on),
-            2,
-            width,
-            Style::default(),
-            true,
-        ));
-    }
-    for (_, def, when) in &list {
-        if when.is_some() || def.secret {
-            continue;
-        }
-        let locked = [Piece::plain(format!(
-            "\u{25cb} {} \u{2014} {}",
-            def.name, def.hint
-        ))];
-        lines.extend(wrapped(
-            &locked,
+            &name,
             None,
             0,
             width,
-            style_for(Role::Dim),
+            style_for(Role::Milestone),
             false,
         ));
+        let mut words = crate::render::marked_pieces(def.words);
+        words.push(Piece::role(" \u{2014}", Role::Dim));
+        let earned_on = Piece::role(
+            format!(
+                "Gen {}, {}",
+                when.generation,
+                super::chrome::date_words(when.day)
+            ),
+            Role::Dim,
+        );
+        lines.extend(wrapped(&words, Some(earned_on), 2, width, plain, true));
+    }
+    // What there is to look forward to: the name plain, the mark and the hint
+    // receding.
+    let mut locked = list
+        .iter()
+        .filter(|(_, def, when)| when.is_none() && !def.secret)
+        .peekable();
+    if earned > 0 && locked.peek().is_some() {
+        lines.push(Line::raw(String::new()));
+    }
+    for (_, def, _) in locked {
+        let pieces = [
+            Piece::role("\u{25cb}", Role::Dim),
+            Piece::plain(format!(" {}", def.name)),
+            Piece::role(format!(" \u{2014} {}", def.hint), Role::Dim),
+        ];
+        lines.extend(wrapped(&pieces, None, 0, width, plain, true));
     }
     let secrets = list
         .iter()
         .filter(|(_, def, when)| def.secret && when.is_none())
         .count();
+    if secrets > 0 && lines.len() > 2 {
+        lines.push(Line::raw(String::new()));
+    }
     match secrets {
         0 => {}
         1 => lines.push(Line::raw("\u{2026}and 1 secret still to find.")),

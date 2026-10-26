@@ -40,11 +40,11 @@ Six roles. Every value sits in a mid-luminance band so it clears the contrast fl
 | Role | Value | Carries |
 |---|---|---|
 | *(inherited)* | terminal foreground | All ordinary text — counts, costs, prose, and every name that wears no coat |
-| `dim` | `#7C7873` | Revealed but not actionable, owned and done, flavour events, a list's group-header rules and the inspector's `last time` and `about` dividers, a kitten's favourites, spent hints |
+| `dim` | `#7C7873` | Revealed but not actionable, owned and done, flavour events, a list's group-header rules and the inspector's `last time` and `about` dividers, a kitten's favourites, spent hints, and in the scrapbook a locked achievement's mark and hint and when an earned one was earned |
 | `ready` | `#3E8E5A` | ● affordable now |
 | `partial` | `#A8802F` | ◐ partially affordable |
 | `attention` | `#C0663A` | Each attention chip whole, the `full` tag on a capped store, a sidebar note's count of capped stores out of view, an armed row's expansion beneath it — and nothing else |
-| `milestone` | `#7E6BA8` | ★ milestones and newly revealed content |
+| `milestone` | `#7E6BA8` | ★ milestones and newly revealed content, an earned achievement's name line in the scrapbook among them |
 
 Mood takes no colour at all. The navigation leaf already renders it as a word (TUI-NAV-019), and a word is unambiguous, translatable to a screen reader, and immune to every failure mode a five-step colour ramp has. Where a channel is already carrying meaning well, adding colour is noise.
 

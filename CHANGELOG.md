@@ -2,6 +2,12 @@
 
 What changed in each release of Clowder, written so it spoils nothing: what changed for the player, never what the new things are called, what they cost, or what they do in numbers. Clowder is meant to be discovered by playing it.
 
+## [Unreleased]
+
+### Changed
+
+- **The achievements scrapbook is easier to read.** What you've earned stands out in colour, the names still to find read plainly with their hints quieter beside them, and a little space parts the earned from the rest.
+
 ## [1.3.0] — 2026-10-26
 
 ### New
