@@ -345,8 +345,9 @@ impl GameState {
         use crate::content;
         let level = self.mess_level();
         let mut probe = self.clone();
-        let (accrual, _) = probe.resource_phases(&mut None);
-        let per_tick = accrual - content::MESS_DISSIPATION * self.mess;
+        let (change, _) = probe.resource_phases(&mut None);
+        // How far the next tick moves it, stopping at zero.
+        let per_tick = self.next_mess(change) - self.mess;
         MessReport {
             amount: self.mess,
             level: (level >= 0).then_some(level as u32),

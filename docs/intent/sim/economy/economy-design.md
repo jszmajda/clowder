@@ -112,8 +112,10 @@ Cost of copy k+1 = `ceil(base × ratio^k)` per component. A gated structure reve
 | 37 | Unicorn Meadow | 2 unicorns | 1.75 | +0.001 unicorns/t (mystic leaf multiplies) | UnicornLore |
 | 38 | Rainbow Arch | 5000 rainbows, 25 cairns | 1.15 | count is the Parade exchange rate; hosts Arch upgrades; +0.02%/day prism-descent chance each (mystic leaf consumes); first copy granted free with the Parade Routes idea | ParadeRoutes |
 | 39 | Sunstone | 8 moonstone, 50 cairns, 1 echo | 1.15 | Long Sun cap +0.05 per enlightenment tier each (ceremonies leaf consumes); energy −1 | LongSunMasonry |
+| 53 | Broom Cupboard | 30 wands, 10 brass | 1.15 | mess −1 (tidies) | — |
+| 54 | Clockwork Broom | 30 cogs, 12 moonsteel | 1.15 | mess −5 (tidies); energy −2 | — |
 
-No staged rebuilds in this pass: every structure is its own entry (see Decisions). Structures 38–39 are cross-leaf: they live in this table (the economy owns the StructureId space, costs, and ramps) but their effects are defined and consumed by the mystic and ceremonies leaves respectively — the same split as the Sunbeam Altar hosting Rites. Structures 40–52 are the cosmic outposts (Lookout Post … Wishing Star): they too live in the StructureId space, but they are gated on their *site being reached* (a cosmic-leaf state, not an idea), their production flows through the cosmic **outdoor** channel (diluted global/wisdom/Long-Sun transfer), and their effects are owned by the cosmic leaf. Their build costs escalate off cosmic materials (moonmilk, cometsilk, hushfelt, Jars) per the cosmic design.
+No staged rebuilds in this pass: every structure is its own entry (see Decisions). The table steps from 39 to 53 because ids 40–52 are the cosmic outposts described below. The tidying structures 53–54 carry no gate (see MESS). Structures 38–39 are cross-leaf: they live in this table (the economy owns the StructureId space, costs, and ramps) but their effects are defined and consumed by the mystic and ceremonies leaves respectively — the same split as the Sunbeam Altar hosting Rites. Structures 40–52 are the cosmic outposts (Lookout Post … Wishing Star): they too live in the StructureId space, but they are gated on their *site being reached* (a cosmic-leaf state, not an idea), their production flows through the cosmic **outdoor** channel (diluted global/wisdom/Long-Sun transfer), and their effects are owned by the cosmic leaf. Their build costs escalate off cosmic materials (moonmilk, cometsilk, hushfelt, Jars) per the cosmic design.
 
 ## CRAFT — Crafting
 
@@ -157,9 +159,21 @@ The core reports the meadow's energy structure by structure: for each built stru
 
 ## MESS — Mess
 
-Dirty structures add mess/tick (see table); tidy effects subtract; dissipation is 1e-4 × mess per tick (analytic equilibrium = net_accrual / 1e-4). Mess level = floor(log10(mess / 1e4)) when mess ≥ 1e4, else none. Level effects (all slowdowns): L0+: catnip growth ×0.8 per level step, floored at ×0.25; L1+: arrival chance ×0.75; L2+: −5 happiness points per level above 1. Tidying (Toy Workshop rota refinement, later content) flips signs. Mess never destroys anything.
+A structure's mess per copy is its BLD-table mess plus the tidy effects that name it. Where that sum is positive, each built copy makes that much mess per tick; where it is negative, each copy tidies that much away. A converter makes or tidies in proportion to its throughput (its throttle fraction). The tick's **mess accrual** is all the mess made; its **tidying** is all the mess tidied away. The two stay separate sums, because a rule that scales one must not scale the other: a twist that makes mess accrue faster (adventures leaf) scales the accrual and leaves the tidying as it is (SIM-ECO-050).
 
-The core reports mess as a frontend needs to state it: the amount, its level (or none), how fast it is changing per game second at current state — accrual less dissipation, as the next tick would move it — and what the level is slowing: the catnip-growth multiplier, the arrival multiplier, and the happiness points it costs (SIM-ECO-049).
+Each tick, mess changes by accrual − tidying − dissipation, where dissipation is 1e-4 × mess, and it never falls below zero: a meadow cannot be tidier than clean, and tidying banks nothing against mess made later. With no tidying, mess settles where accrual equals dissipation (mess = accrual / 1e-4). Mess level = floor(log10(mess / 1e4)) when mess ≥ 1e4, else none. Level effects (all slowdowns): L0+: catnip growth ×0.8 per level step, floored at ×0.25; L1+: arrival chance ×0.75; L2+: −5 happiness points per level above 1. Mess never destroys anything.
+
+Tidying comes from three sources, each at the scale of the mess it meets:
+
+- The **Broom Cupboard** (−1 per copy) is built from wands and brass. Brass is also what the first serious mess-makers, the Gravel Pit and the Cogworks, are built from, so tidying turns up when they do.
+- The **Tidy-Up Rota** refinement (curiosity leaf) turns each Toy Workshop's 2 into −2.
+- The **Clockwork Broom** (−5 per copy, energy −2) is built from cogs and moonsteel, so it turns up with the Dynamo Wheel, the meadow's biggest mess-maker, and runs on the energy the wheel supplies.
+
+The two tidying structures carry no gate. Each reveals when the meadow holds 30% of its price, as any ungated structure does, so a way back from mess opens as soon as the meadow holds what builds it.
+
+Tidying can always outpace mess-making: at 20 copies of every structure, with every tidy effect in the content tables applied, the meadow tidies more per tick than it makes (SIM-ECO-051). The figures are 160 tidied (Broom Cupboards 20, rota'd Toy Workshops 40, Clockwork Brooms 100) against 137 made (Hearths 2, Gravel Pits 5, Kilns 20, Cogworks 10, Dynamo Wheels 100).
+
+The core reports mess as a frontend needs to state it: the amount, its level (or none), how fast it is changing per game second at current state, and what the level is slowing: the catnip-growth multiplier, the arrival multiplier, and the happiness points it costs (SIM-ECO-049). The rate is how far the next tick would move the mess: accrual less tidying and dissipation, stopping at zero. A clean meadow that tidies more than it makes is holding steady, not falling.
 
 ## Jobs (extended roster)
 
@@ -194,6 +208,7 @@ StorageFull rejection when the yield resource is at cap (unchanged rule).
 - Global-layer exemption: a Dynamo Wheel never changes pep/charm/warmth/curiosity/skymap/luxury/mystic income.
 - Pounce-vs-bakery: with fewer than 10 Pouncers, an unthrottled Treat Bakery out-drinks pep income — the shinies input throttles it first in practice; the tension is intended (see Decisions).
 - Energy floor: no deficit can push layers 6–8 below ×0.25.
+- Mess is reversible: at 20 copies of everything, tidying outpaces mess-making (SIM-ECO-051; MESS has the figures).
 
 ## Decisions & Alternatives
 
@@ -213,6 +228,10 @@ StorageFull rejection when the yield resource is at cap (unchanged rule).
 | Global-source self-boost | A structure's own raw output is exempt from the global ratio it contributes | Let it amplify its own faucet | Avoids a self-referential loop and keeps the Star Basin's stardust legible; the boost still applies from every other global source |
 | Where tinkerer seats come from | A per-copy field of the structure definition, summed over the meadow's structures | The bind's rule counting the one structure that seats tinkerers | The definition is what the inspector states, so a field is a seat the player reads on the structure's own row; a rule naming a structure is stated nowhere a player looks, and a second seat-giver would mean changing the rule |
 | When the Tinkerer commands exist | While the Tinkerer job is unlocked | Always, the command refusing until a Tinkerer stands free | An always-open gate lists a tinkerer count row under every recipe from the meadow's first craft, long before any kitten can take the job, every one of them an act no press can take |
+| Where tidying comes from | Two tidying structures, one at the scale of band 1's industry and one at the Dynamo Wheel's, beside the Tidy-Up Rota | (a) Refinements alone; (b) a tidying job; (c) a single tidying structure | A refinement is bought once and cannot grow with the industry it answers. A job spends kittens and tidies at the mood's mercy, turning mess into a tax on the clowder. A single structure priced for band 1 cannot keep up with Dynamo Wheels within a sensible copy count; priced for band 3, it leaves band 1's mess with no answer |
+| Tidying structures' gates | None: each reveals when the meadow holds 30% of its price | An idea gate on each | Mess is a slowdown the meadow makes for itself, and its remedy should open as soon as the meadow holds what builds it, not after a research detour. The price materials already pace it, since brass and moonsteel each arrive with an idea |
+| Mess below zero | Floored at zero; tidying banks nothing | Let mess run negative as credit | Negative mess means nothing on screen, and a banked credit would let one burst of building prepay a future industry, removing the trade-off between making and tidying |
+| Accrual and tidying | Kept as two sums, the mess made and the mess tidied away | One net change per tick | A rule that makes mess accrue faster would, applied to a net figure, also make a tidy meadow tidy faster: the opposite of what it is for |
 | Treat Bakery pep draw vs pounce budget | Contention by design (the inspiration's mint pattern) | Pep-reserve floor; auto-toggling | Choosing between passive luxury income and active expedition bursts is a real decision; structure on/off toggling is an integration-wave obligation that will hand the player the lever |
 
 ## Open Questions & Future Decisions

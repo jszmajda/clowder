@@ -9,7 +9,7 @@ fn new_game_is_an_empty_meadow() {
     let s = GameState::new(7);
     assert_eq!(s.ticks, 0);
     assert_eq!(s.resources, [0.0; 46]);
-    assert_eq!(s.structures, [0; 53]);
+    assert_eq!(s.structures, [0; 55]);
     assert!(s.kittens.is_empty());
     assert!(s.ideas.is_empty());
     assert_eq!((s.pity, s.famine_days, s.recovery_days), (0, 0, 0));

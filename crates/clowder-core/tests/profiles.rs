@@ -895,7 +895,7 @@ fn a_v7_save_migrates_with_everything_else_exact() {
                 assert_eq!(o.as_object().unwrap(), &n, "{key}");
             }
         } else {
-            assert_eq!(old, &now[key], "migrating a v7 save changed `{key}`");
+            assert!(kept(old, &now[key]), "migrating a v7 save changed `{key}`");
         }
     }
 }
@@ -1010,7 +1010,7 @@ fn a_v8_save_migrates_with_everything_else_exact() {
                 assert_eq!(op["eyes"], np["eyes"], "{key}: the eyes are kept");
             }
         } else {
-            assert_eq!(old, &now[key], "migrating a v8 save changed `{key}`");
+            assert!(kept(old, &now[key]), "migrating a v8 save changed `{key}`");
         }
     }
 }

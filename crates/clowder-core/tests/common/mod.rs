@@ -237,6 +237,31 @@ pub fn game_vocabulary() -> Vec<String> {
     others.iter().map(|o| o.to_lowercase()).collect()
 }
 
+/// Whether a migrated save's `now` keeps the `was` its fixture held: equal as
+/// numbers wherever both are numbers, save that an id-indexed array may have
+/// grown since the fixture was written by a tail of zeros — ids only ever
+/// append, and a load zero-fills the ids a save predates.
+pub fn kept(was: &serde_json::Value, now: &serde_json::Value) -> bool {
+    use serde_json::Value as V;
+    match (was, now) {
+        (V::Number(x), V::Number(y)) => {
+            if let (Some(i), Some(j)) = (x.as_i64(), y.as_i64()) {
+                return i == j;
+            }
+            x.as_f64() == y.as_f64()
+        }
+        (V::Array(x), V::Array(y)) => {
+            y.len() >= x.len()
+                && x.iter().zip(y).all(|(p, q)| kept(p, q))
+                && y[x.len()..].iter().all(|v| v.as_f64() == Some(0.0))
+        }
+        (V::Object(x), V::Object(y)) => {
+            x.len() == y.len() && x.iter().all(|(k, v)| y.get(k).is_some_and(|w| kept(v, w)))
+        }
+        _ => was == now,
+    }
+}
+
 /// Take the achievement record out of a migrated save's state, checking it
 /// arrived empty (SAVE-030), so a test of an earlier migration step reads only
 /// what that step changed.

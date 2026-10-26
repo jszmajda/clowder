@@ -1,5 +1,5 @@
 //! Depth Wave 6 tests: the frontier segments — cosmic (SIM-SKY) and dreamtime
-//! (SIM-DREAM) — plus the wave-6 seams in economy (SIM-ECO-028 → 53 structures,
+//! (SIM-DREAM) — plus the wave-6 seams in economy (SIM-ECO-028 outposts,
 //! the Site gate; SIM-ECO-024 outpost exemption), the engine (SIM-ENG-021
 //! outdoor carve-out), colonies (SIM-TRADE-001 whale routing), and prestige
 //! (SIM-MOVE-004 cosmic/dreamtime legacies; SIM-MOVE-009 the Distant Dawn cap).
@@ -1129,20 +1129,20 @@ fn a_move_keeps_the_cosmic_dreamtime_legacies_and_resets_the_rest() {
 }
 
 // =====================================================================
-// SIM-ECO-028 / SIM-ECO-024 — 53 structures; the outposts are Site-gated & exempt
+// SIM-ECO-028 / SIM-ECO-024 — the outposts are Site-gated & exempt
 // =====================================================================
 
 // @spec SIM-ECO-028, SIM-ECO-024
 #[test]
-fn the_structure_table_is_fifty_three_with_site_gated_outposts() {
+fn the_structure_table_holds_site_gated_outposts() {
     assert_eq!(
         StructureId::ALL.len(),
-        53,
-        "40 meadow structures + 13 cosmic outposts"
+        55,
+        "40 meadow structures + 13 cosmic outposts + 2 tidying structures"
     );
     assert_eq!(
         GameState::new(552).structures,
-        [0u32; 53],
+        [0u32; 55],
         "a new meadow across the widened array"
     );
 
@@ -1152,6 +1152,15 @@ fn the_structure_table_is_fifty_three_with_site_gated_outposts() {
         assert!(
             matches!(content::structure_def(st).gate, StructureGate::Site(_)),
             "{st:?} is Site-gated, not Idea/Always"
+        );
+    }
+    // The tidying structures after them are ungated.
+    for i in 53..55 {
+        let st = StructureId::ALL[i];
+        assert_eq!(
+            content::structure_def(st).gate,
+            StructureGate::Always,
+            "{st:?}"
         );
     }
     // Non-outpost gates are unchanged (Always / Idea).

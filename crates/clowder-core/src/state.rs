@@ -169,9 +169,12 @@ pub enum StructureId {
     StarNursery,
     FarBeacon,
     WishingStar,
+    // ---- Tidying structures (ids 53..=54), ungated ----
+    BroomCupboard,
+    ClockworkBroom,
 }
 
-pub const STRUCTURE_COUNT: usize = 53;
+pub const STRUCTURE_COUNT: usize = 55;
 
 impl StructureId {
     pub const ALL: [StructureId; STRUCTURE_COUNT] = [
@@ -228,6 +231,8 @@ impl StructureId {
         StructureId::StarNursery,
         StructureId::FarBeacon,
         StructureId::WishingStar,
+        StructureId::BroomCupboard,
+        StructureId::ClockworkBroom,
     ];
     pub fn ix(self) -> usize {
         self as usize

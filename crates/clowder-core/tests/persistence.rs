@@ -685,7 +685,7 @@ fn a_v2_save_migrates_to_an_empty_journal_with_its_meadow_otherwise_exact() {
             .get(key)
             .unwrap_or_else(|| panic!("migration dropped the v2 field `{key}`"));
         assert!(
-            json_eq(was, &profiles_set_aside(key, now)),
+            kept(was, &profiles_set_aside(key, now)),
             "`{key}` changed across migration: {was} -> {now}"
         );
     }
@@ -990,7 +990,7 @@ fn a_v3_save_migrates_owing_nothing_with_its_meadow_otherwise_exact() {
     for (key, was) in before["state"].as_object().unwrap() {
         let now = &resaved["state"][key];
         assert!(
-            json_eq(was, &profiles_set_aside(key, now)),
+            kept(was, &profiles_set_aside(key, now)),
             "migrating a v3 save changed `{key}`: {was} became {now}"
         );
     }
@@ -1683,7 +1683,7 @@ fn a_v4_save_migrates_carrying_no_report_so_far() {
     for (key, was) in before["state"].as_object().unwrap() {
         let now = &resaved["state"][key];
         assert!(
-            json_eq(was, &profiles_set_aside(key, now)),
+            kept(was, &profiles_set_aside(key, now)),
             "migrating a v4 save changed `{key}`: {was} became {now}"
         );
     }
@@ -2201,7 +2201,7 @@ fn a_v5_save_migrates_with_everything_else_exact() {
     for (key, was) in before["state"].as_object().unwrap() {
         let now = &resaved["state"][key];
         assert!(
-            json_eq(was, &profiles_set_aside(key, now)),
+            kept(was, &profiles_set_aside(key, now)),
             "migrating a v5 save changed `{key}`: {was} became {now}"
         );
     }

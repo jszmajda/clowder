@@ -407,9 +407,10 @@ fn a_v6_save_migrates_with_everything_else_exact() {
     take_empty_record(&mut resaved);
     assert_eq!(resaved["save_version"], SAVE_VERSION);
     for (key, was) in before["state"].as_object().unwrap() {
-        assert_eq!(
-            was, &resaved["state"][key],
-            "migrating a v6 save changed `{key}`"
+        let now = &resaved["state"][key];
+        assert!(
+            kept(was, now),
+            "migrating a v6 save changed `{key}`: {was} became {now}"
         );
     }
     let added: Vec<&String> = resaved["state"]

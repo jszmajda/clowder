@@ -403,9 +403,10 @@ fn a_v9_save_migrates_with_an_empty_record() {
     ))
     .unwrap();
     for (key, old) in before["state"].as_object().unwrap() {
-        assert_eq!(
-            old, &resaved["state"][key],
-            "migrating a v9 save changed `{key}`"
+        let now = &resaved["state"][key];
+        assert!(
+            kept(old, now),
+            "migrating a v9 save changed `{key}`: {old} became {now}"
         );
     }
     let added: Vec<&String> = resaved["state"]

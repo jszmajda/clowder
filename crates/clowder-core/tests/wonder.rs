@@ -1287,12 +1287,12 @@ fn the_global_layer_now_reaches_structure_raw_production() {
 #[test]
 fn the_structure_table_is_forty_with_the_two_cross_leaf_arches() {
     use ResourceId::{Cairns, Echoes, Moonstone, Rainbows};
-    assert_eq!(StructureId::ALL.len(), 53, "40 structures, append-only");
+    assert_eq!(StructureId::ALL.len(), 55, "append-only");
     assert_eq!(StructureId::RainbowArch.ix(), 38);
     assert_eq!(StructureId::Sunstone.ix(), 39);
     let s = GameState::new(358);
     assert_eq!(
-        s.structures, [0u32; 53],
+        s.structures, [0u32; 55],
         "a new meadow across the widened array"
     );
 
@@ -1398,8 +1398,8 @@ fn v1_saves_still_load_with_wave_4_fields_defaulted() {
     assert_eq!(st.ticks, 45, "the old meadow is preserved exactly");
     assert_eq!(
         st.structures.len(),
-        53,
-        "structures zero-filled forward to 53"
+        StructureId::ALL.len(),
+        "structures zero-filled forward to every structure"
     );
     assert_eq!(st.structures[StructureId::CatnipPatch.ix()], 1);
     // Every wave-4 field gets its new-game default.

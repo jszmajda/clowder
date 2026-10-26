@@ -227,14 +227,37 @@ fn new_structures_extend_caps_including_multi_resource_extenders() {
 fn structure_table_spot_anchors_across_bands() {
     assert_eq!(
         StructureId::ALL.len(),
-        53,
+        55,
         "exactly the BLD table, no staged rebuilds"
     );
-    assert_eq!(GameState::new(107).structures, [0u32; 53]);
+    assert_eq!(GameState::new(107).structures, [0u32; 55]);
     assert_eq!(StructureId::CatnipPatch.ix(), 0);
     assert_eq!(StructureId::WindowPerch.ix(), 7);
     assert_eq!(StructureId::Porch.ix(), 14);
     assert_eq!(StructureId::UnicornMeadow.ix(), 37);
+
+    // The tidying structures: ungated, revealed by their price.
+    assert_eq!(StructureId::BroomCupboard.ix(), 53);
+    let d = content::structure_def(StructureId::BroomCupboard);
+    assert_eq!(
+        d.base_costs,
+        &[(ResourceId::Wands, 30.0), (ResourceId::Brass, 10.0)]
+    );
+    assert_eq!(d.ratio, 1.15);
+    assert_eq!(d.mess, -1.0);
+    assert_eq!(d.energy_cons, 0.0);
+    assert_eq!(d.gate, StructureGate::Always);
+
+    assert_eq!(StructureId::ClockworkBroom.ix(), 54);
+    let d = content::structure_def(StructureId::ClockworkBroom);
+    assert_eq!(
+        d.base_costs,
+        &[(ResourceId::Cogs, 30.0), (ResourceId::Moonsteel, 12.0)]
+    );
+    assert_eq!(d.ratio, 1.15);
+    assert_eq!(d.mess, -5.0);
+    assert_eq!(d.energy_cons, 2.0);
+    assert_eq!(d.gate, StructureGate::Always);
 
     // Band 0.
     let d = content::structure_def(StructureId::HerbGarden);
@@ -1114,6 +1137,154 @@ fn mess_levels_slow_catnip_arrivals_and_cheer_but_never_confiscate() {
     run_ticks(&mut s, 1);
     assert_eq!(s.stock(ResourceId::Twigs), 10.0);
     assert_eq!(s.stock(ResourceId::Catnip), 20.0);
+}
+
+/// A meadow mid-season with `mess` held and the given structures built.
+fn messy_meadow(seed: u64, mess: f64, built: &[(StructureId, u32)]) -> GameState {
+    let mut s = GameState::new(seed);
+    s.ticks = 3;
+    s.mess = mess;
+    for &(st, n) in built {
+        grant(&mut s, st, n);
+    }
+    s
+}
+
+// @spec SIM-ECO-050, SIM-ECO-037
+#[test]
+fn tidying_structures_take_mess_away_beside_what_others_make() {
+    // 4 Gravel Pits make 1.0; 2 Broom Cupboards tidy 2.0; dissipation 5.0.
+    let mut s = messy_meadow(
+        1404,
+        50_000.0,
+        &[(StructureId::GravelPit, 4), (StructureId::BroomCupboard, 2)],
+    );
+    run_ticks(&mut s, 1);
+    assert!(
+        (s.mess - (50_000.0 + 1.0 - 2.0 - 5.0)).abs() < 1e-9,
+        "made less tidied less dissipated: {}",
+        s.mess
+    );
+
+    // A Clockwork Broom tidies 5 a tick, and uses 2 energy doing it.
+    let mut s = messy_meadow(1405, 50_000.0, &[(StructureId::ClockworkBroom, 1)]);
+    assert!((s.energy_consumption() - 2.0).abs() < 1e-9);
+    run_ticks(&mut s, 1);
+    assert!(
+        (s.mess - (50_000.0 - 5.0 - 5.0)).abs() < 1e-9,
+        "tidied and dissipated: {}",
+        s.mess
+    );
+}
+
+// @spec SIM-ECO-050, SIM-ADV-002
+#[test]
+fn a_faster_mess_twist_scales_what_is_made_and_never_the_tidying() {
+    // 4 Gravel Pits make 1.0; one Toy Workshop under the Tidy-Up Rota tidies
+    // 2.0 — the rota turns it from a maker into a tidier.
+    let calm = || {
+        let mut s = messy_meadow(
+            1406,
+            50_000.0,
+            &[(StructureId::GravelPit, 4), (StructureId::ToyWorkshop, 1)],
+        );
+        s.refinements.insert(RefinementId::TidyUpRota);
+        s
+    };
+    let mut plain = calm();
+    run_ticks(&mut plain, 1);
+    assert!(
+        (plain.mess - (50_000.0 + 1.0 - 2.0 - 5.0)).abs() < 1e-9,
+        "no twist: {}",
+        plain.mess
+    );
+
+    // Tidy Meadow doubles the 1.0 made; the 2.0 tidied stays 2.0.
+    let mut twisted = calm();
+    twisted.active_adventure = Some(AdventureId::TidyMeadow);
+    run_ticks(&mut twisted, 1);
+    assert!(
+        (twisted.mess - (50_000.0 + 2.0 - 2.0 - 5.0)).abs() < 1e-9,
+        "the twist leaves tidying alone: {}",
+        twisted.mess
+    );
+}
+
+// @spec SIM-ECO-037
+#[test]
+fn mess_stops_at_zero_and_tidying_banks_nothing() {
+    // Two Broom Cupboards tidy far more than a little mess.
+    let mut s = messy_meadow(1407, 0.5, &[(StructureId::BroomCupboard, 2)]);
+    run_ticks(&mut s, 200);
+    assert_eq!(s.mess, 0.0, "a clean meadow is as tidy as it gets");
+
+    // Swap the cupboards for makers: mess rises from zero on the next tick,
+    // with no tidying held over to spend first.
+    s.structures[StructureId::BroomCupboard.ix()] = 0;
+    grant(&mut s, StructureId::GravelPit, 4);
+    run_ticks(&mut s, 1);
+    assert!(
+        (s.mess - 1.0).abs() < 1e-9,
+        "one tick of making, nothing banked: {}",
+        s.mess
+    );
+}
+
+/// @spec SIM-ECO-049
+#[test]
+fn the_mess_rate_is_how_far_the_next_tick_moves_it() {
+    // Clean and out-tidying everything: holding steady, not falling.
+    let s = messy_meadow(1408, 0.0, &[(StructureId::BroomCupboard, 2)]);
+    assert_eq!(s.mess_report().rate, 0.0, "nothing to tidy at zero");
+
+    // A little left: the next tick clears it and stops at zero, so the rate
+    // is that remainder per tick, at 4 ticks a second.
+    let s = messy_meadow(1409, 1.0, &[(StructureId::BroomCupboard, 2)]);
+    assert!(
+        (s.mess_report().rate + 4.0).abs() < 1e-9,
+        "{}",
+        s.mess_report().rate
+    );
+
+    // Plenty left: made less tidied less dissipated, per second.
+    let s = messy_meadow(
+        1410,
+        50_000.0,
+        &[(StructureId::GravelPit, 4), (StructureId::BroomCupboard, 2)],
+    );
+    assert!(
+        (s.mess_report().rate - (1.0 - 2.0 - 5.0) * 4.0).abs() < 1e-9,
+        "{}",
+        s.mess_report().rate
+    );
+}
+
+// @spec SIM-ECO-051
+#[test]
+fn tidying_can_always_outpace_mess_making() {
+    // Every source of an effect held at once, so every tidy effect the content
+    // tables carry is applied.
+    let mut s = GameState::new(1411);
+    s.ideas = IdeaId::ALL.into_iter().collect();
+    s.refinements = RefinementId::ALL.into_iter().collect();
+    s.rules = RuleId::ALL.into_iter().collect();
+    s.rites = RiteId::ALL.into_iter().collect();
+    s.arches_bought = ArchId::ALL.into_iter().collect();
+    s.traditions = TraditionId::ALL.into_iter().collect();
+    s.dream_looms = DreamLoomId::ALL.into_iter().collect();
+    let (mut made, mut tidied) = (0.0, 0.0);
+    for st in StructureId::ALL {
+        let per_copy = content::structure_def(st).mess + s.effect(Effect::StructureMessDelta(st));
+        if per_copy > 0.0 {
+            made += 20.0 * per_copy;
+        } else {
+            tidied -= 20.0 * per_copy;
+        }
+    }
+    assert!(
+        tidied > made,
+        "at 20 copies of everything, {tidied} tidied against {made} made"
+    );
 }
 
 // =====================================================================

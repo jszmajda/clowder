@@ -23,7 +23,8 @@ impl GameState {
     }
 
     /// Every phase of a tick that moves a resource stock, in pipeline order,
-    /// returning the mess accrued and whether consumption fell short.
+    /// returning the tick's mess change (accrual less tidying) and whether
+    /// consumption fell short.
     ///
     /// This exists so there is exactly **one** definition of what a tick does
     /// to stocks. `tick_replay` runs it to advance the game and `net_rates`
@@ -41,7 +42,7 @@ impl GameState {
     // @spec SIM-ENG-063, SIM-ENG-064, SIM-ENG-065
     pub(crate) fn resource_phases(&mut self, ledger: &mut Option<&mut FlowLedger>) -> (f64, bool) {
         // ---- Phase 2: production (structures, jobs, converters) ----
-        let mess_accrual = self.produce(ledger);
+        let mess_change = self.produce(ledger);
         // ---- Phase 2b: dreaming (mystic drift, per tick) ----
         // Only Arch upgrades drive drift, so the arch-free hot path skips it.
         // @spec SIM-UNI-007, SIM-UNI-008
@@ -51,7 +52,7 @@ impl GameState {
         // ---- Phase 3: consumption (food, then luxury drain) ----
         // @spec SIM-ECO-020, SIM-ECO-021
         let shortfall = self.consume(ledger);
-        (mess_accrual, shortfall)
+        (mess_change, shortfall)
     }
 
     /// Raise the roster high-water if the clowder has grown. A ratchet: what
@@ -96,13 +97,12 @@ impl GameState {
 
         // ---- Phases 2, 2b, 3: everything that moves a stock ----
         self.ratchet_roster();
-        let (mess_accrual, shortfall) = self.resource_phases(&mut None);
+        let (mess_change, shortfall) = self.resource_phases(&mut None);
 
         // ---- Phase 4: mood, famine flag & mess recompute ----
         // @spec SIM-KIT-013
         self.grumpy = shortfall;
-        // @spec SIM-ECO-037
-        self.mess = (self.mess + mess_accrual - content::MESS_DISSIPATION * self.mess).max(0.0);
+        self.mess = self.next_mess(mess_change);
         // Stirred dreams cool passively each tick (a nap-cadence brake, never a
         // loss), flooring at zero; free when the dream-space is already cool.
         // @spec SIM-DREAM-003
@@ -420,7 +420,7 @@ impl GameState {
     /// layers (base, per-source ratio, season); jobs additionally take mood,
     /// zoomies, and — material tier only — the global layers, dimmed by any
     /// energy deficit; mess multiplies catnip growth last. Returns the tick's
-    /// mess accrual (applied in phase 4).
+    /// mess accrual less its tidying (applied in phase 4).
     // @spec SIM-ENG-021, SIM-ECO-023, SIM-ECO-025, SIM-ECO-032, SIM-ECO-036
     pub(crate) fn produce(&mut self, ledger: &mut Option<&mut FlowLedger>) -> f64 {
         // A déjà-vu day pauses production entirely — a strange half-remembered
@@ -466,7 +466,8 @@ impl GameState {
         let outdoor_raw_mult = 1.0 + (combined_layers - 1.0) * deficit * self.outdoor_transfer();
         let mut outdoor_ratio: Option<f64> = None;
         // Adventure twists on production: Nap Time halves job (kitten) output;
-        // Tidy Meadow raises mess accrual. Both 1.0 with no active adventure.
+        // Tidy Meadow raises mess accrual, never the tidying. Both 1.0 with no
+        // active adventure.
         // @spec SIM-ADV-002
         let job_twist = if self.active_adventure == Some(AdventureId::NapTime) {
             0.5
@@ -664,9 +665,16 @@ impl GameState {
         }
 
         // ---- Converters (throttled), then Tinkerers, accruing mess ----
-        let mess = self.run_converters(ledger);
+        let (made, tidied) = self.run_converters(ledger);
         self.run_tinkerers(ledger);
-        mess * tidy_mult
+        made * tidy_mult - tidied
+    }
+
+    /// The mess after a tick whose accrual less tidying is `change`: less the
+    /// tick's dissipation, never below zero, so tidying banks nothing.
+    // @spec SIM-ECO-037
+    pub(crate) fn next_mess(&self, change: f64) -> f64 {
+        (self.mess + change - content::MESS_DISSIPATION * self.mess).max(0.0)
     }
 
     /// Bound Home Tinkerers craft their recipes in the background, in roster
@@ -715,23 +723,30 @@ impl GameState {
     }
 
     /// Run every converter through the engine throttle and total the tick's
-    /// mess: converters dirty in proportion to their throughput, everything
-    /// else per active copy.
-    // @spec SIM-ECO-029, SIM-ECO-037
-    fn run_converters(&mut self, ledger: &mut Option<&mut FlowLedger>) -> f64 {
-        let mut mess_accrual = 0.0;
+    /// mess, as the mess made and the mess tidied away: converters make or
+    /// tidy in proportion to their throughput, everything else per copy.
+    // @spec SIM-ECO-029, SIM-ECO-050
+    fn run_converters(&mut self, ledger: &mut Option<&mut FlowLedger>) -> (f64, f64) {
+        let (mut made, mut tidied) = (0.0, 0.0);
+        let mut tally = |per_copy: f64, copies: f64| {
+            if per_copy > 0.0 {
+                made += per_copy * copies;
+            } else {
+                tidied -= per_copy * copies;
+            }
+        };
         for s in StructureId::ALL {
             let count = self.structures[s.ix()];
             if count == 0 {
                 continue;
             }
             let def = content::structure_def(s);
-            // Tidy effects flip a structure's mess sign (the Tidy-Up Rota).
-            // @spec SIM-ECO-037, SIM-CUR-010
+            // Tidy effects can flip a structure from making mess to tidying
+            // it (the Tidy-Up Rota). @spec SIM-ECO-050, SIM-CUR-010
             let per_copy_mess =
                 def.mess + self.effect(crate::effects::Effect::StructureMessDelta(s));
             let Some(converter) = def.converter else {
-                mess_accrual += per_copy_mess * count as f64;
+                tally(per_copy_mess, count as f64);
                 continue;
             };
             let demands: Vec<(ResourceId, f64)> = converter
@@ -740,7 +755,7 @@ impl GameState {
                 .map(|(r, d)| (*r, d * count as f64))
                 .collect();
             let fraction = self.throttle_fraction(&demands);
-            mess_accrual += per_copy_mess * count as f64 * fraction;
+            tally(per_copy_mess, count as f64 * fraction);
             if fraction <= 0.0 {
                 continue; // a starved converter idles quietly
             }
@@ -779,7 +794,7 @@ impl GameState {
                 credit(ledger, src, ResourceId::Bells, bells);
             }
         }
-        mess_accrual
+        (made, tidied)
     }
 
     /// Pooled consumption; returns whether this tick was a shortfall. Food

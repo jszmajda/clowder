@@ -2,6 +2,16 @@
 
 What changed in each release of Clowder, written so it spoils nothing: what changed for the player, never what the new things are called, what they cost, or what they do in numbers. Clowder is meant to be discovered by playing it.
 
+## [Unreleased]
+
+### New
+
+- **Mess can be tidied as the meadow grows.** Mess no longer has to be waited out: there are ways to clear it both when it first turns up and once industry really gets going.
+
+### Fixed
+
+- **The mess readout stops at zero.** With nothing left to tidy, it now says mess is holding steady instead of still falling.
+
 ## [1.3.1] — 2026-10-26
 
 ### Changed

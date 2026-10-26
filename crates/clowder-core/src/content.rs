@@ -1025,6 +1025,21 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         outdoor_ratio: 2.0,
         ..BLD
     },
+    // ---- Tidying structures: ungated, each revealed by its price, sized so
+    // tidying can always outpace mess-making. @spec SIM-ECO-051 ----
+    StructureDef {
+        name: "Broom Cupboard",
+        base_costs: &[(ResourceId::Wands, 30.0), (ResourceId::Brass, 10.0)],
+        mess: -1.0,
+        ..BLD
+    },
+    StructureDef {
+        name: "Clockwork Broom",
+        base_costs: &[(ResourceId::Cogs, 30.0), (ResourceId::Moonsteel, 12.0)],
+        mess: -5.0,
+        energy_cons: 2.0,
+        ..BLD
+    },
 ];
 
 // ---- Jobs ----
