@@ -4,9 +4,9 @@
 
 use crate::effects::Effect;
 use crate::state::{
-    AdventureId, CraftId, DreamLoomId, EyeColour, EyeLook, FavouriteKind, FurColour, FurPattern,
-    IdeaId, JobId, KittenTrait, RefinementId, ResourceId, RuleId, Season, SiteId, StructureGate,
-    StructureId, TraditionId,
+    AchievementId, AdventureId, CraftId, DreamLoomId, EyeColour, EyeLook, FavouriteKind, FurColour,
+    FurPattern, IdeaId, JobId, KittenTrait, RefinementId, ResourceId, RuleId, Season, SiteId,
+    StructureGate, StructureId, TraditionId,
 };
 use crate::state::{IDEA_COUNT, REFINEMENT_COUNT, RESOURCE_COUNT, STRUCTURE_COUNT};
 
@@ -3334,6 +3334,397 @@ static TRAITS: [TraitDef; 8] = [
 /// A trait's definition. @spec SIM-KIT-040
 pub fn trait_def(t: KittenTrait) -> &'static TraitDef {
     &TRAITS[t as usize]
+}
+
+// ---- Achievements ----
+
+/// An achievement as the player reads it: what it is called, the nudge shown
+/// while it is locked, what happened once it is earned, and whether it stays
+/// hidden until then. Words mark the resources they name as blurbs do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AchievementDef {
+    pub name: &'static str,
+    pub hint: &'static str,
+    pub words: &'static str,
+    pub secret: bool,
+}
+
+/// Every achievement, in `AchievementId` order. @spec SIM-ACH-001
+static ACHIEVEMENTS: [AchievementDef; 61] = [
+    AchievementDef {
+        name: "A Face at the Door",
+        hint: "Leave the light on. Someone's bound to wander by.",
+        words: "The first kitten came in out of the weather and decided to stay.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "A Proper Clowder",
+        hint: "One kitten is a pet. A few more is a household.",
+        words: "Ten kittens! That's officially a clowder.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Wall-to-Wall Whiskers",
+        hint: "Room for a few more? There's always room for a few more.",
+        words: "Fifty kittens. Every sunbeam has a tenant.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Too Many to Name (Almost)",
+        hint: "Keep going. The names will hold out. Probably.",
+        words: "A hundred kittens, and every one of them still answers to their name. Sometimes.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Full House",
+        hint: "Every bed, every basket, every lap.",
+        words: "Every bed in the house is taken, and two of them are taken twice.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Once in a Blue Moon",
+        hint: "Some kittens aren't like the others.",
+        words:
+            "A kitten arrived wearing a colour no ordinary cat comes in. Nobody's asking questions.",
+        secret: true,
+    },
+    AchievementDef {
+        name: "Odd One Out",
+        hint: "Look them in the eyes. Both of them.",
+        words: "A kitten with odd eyes: one of each, and twice the charm.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Strike a Pose",
+        hint: "Every kitten has a favourite way to sit. Find them all.",
+        words: "Every pose there is, somewhere in the clowder.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "A Coat of Many Colours",
+        hint: "Stripes, patches, socks, and more. Pat them all.",
+        words: "A kitten in every pattern a coat can come in.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Snack Buddies",
+        hint: "Two kittens, one plate.",
+        words: "Two kittens love the very same food. They've agreed to share. Mostly.",
+        secret: true,
+    },
+    AchievementDef {
+        name: "Matching Outfits",
+        hint: "Did you two plan this?",
+        words:
+            "Two kittens turned up in exactly the same coat. It's a little awkward for everyone.",
+        secret: true,
+    },
+    AchievementDef {
+        name: "Seconds, Please",
+        hint: "When every name is taken, borrow one.",
+        words: "The names ran out, so a kitten got a numeral after theirs. Very regal.",
+        secret: true,
+    },
+    AchievementDef {
+        name: "Wise Whiskers",
+        hint: "Every clowder needs someone to look up to.",
+        words: "An Elder keeps watch over the clowder now, mostly with their eyes closed.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Moving Up",
+        hint: "Hard work deserves a little recognition.",
+        words: "A kitten's first promotion. They've been insufferable about it ever since.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Senior Purrsonnel",
+        hint: "Climb a little higher. Then higher still.",
+        words: "A kitten has risen to the fifth rank, and been given a very important cushion.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Paws of Experience",
+        hint: "Practice makes purrfect. Lots and lots of practice.",
+        words: "A kitten knows their work so well they can do it asleep, and sometimes do.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Everyone's on Break",
+        hint: "Sometimes the best work is no work at all.",
+        words: "Ten kittens at home and not one of them working. Bliss.",
+        secret: true,
+    },
+    AchievementDef {
+        name: "Visiting the Neighbours",
+        hint: "The grass is always greener on the other side of the fence.",
+        words: "A kitten slipped off to see what the neighbours were having for dinner.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Home Again",
+        hint: "Everyone comes home eventually.",
+        words: "A wanderer came home, smelling faintly of someone else's dinner.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Pure Bliss",
+        hint: "Happy kittens, happier kittens, happiest kittens.",
+        words: "The whole clowder is blissful. You can hear the purring from the road.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Hangry",
+        hint: "Not every day is a good day.",
+        words: "The clowder is grumpy. Someone knocked a cup off the table, on purpose.",
+        secret: true,
+    },
+    AchievementDef {
+        name: "The Zoomies!",
+        hint: "Three in the morning is a perfectly good time to run laps.",
+        words: "The zoomies! Everybody's running and nobody knows why.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Party Animals",
+        hint: "What this place needs is a party.",
+        words: "A jamboree! Streamers, snacks, and a conga line of tails.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Home Improvement",
+        hint: "A meadow is nice. A meadow with things in it is nicer.",
+        words: "The first thing built in the meadow. It's lopsided, and it's perfect.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Sprawl",
+        hint: "Build. Then build some more.",
+        words: "A hundred buildings dot the meadow. It's practically a village.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Kitten Metropolis",
+        hint: "Go big. Bigger than that.",
+        words: "Five hundred buildings. There's talk of electing a mayor.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Handmade",
+        hint: "Some things are better made by paw.",
+        words: "Something lovingly crafted by kitten paws. Only slightly chewed.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Busy Paws",
+        hint: "Idle paws find projects of their own.",
+        words: "A kitten has taken up a craft of their own, and will not be told how to do it.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "What a Mess",
+        hint: "A lived-in meadow is a happy meadow. Up to a point.",
+        words: "The meadow is officially a mess. Nobody admits to anything.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Lights Flicker",
+        hint: "Everything wants plugging in at once.",
+        words:
+            "The meadow is using more energy than it makes. Someone left the yarn ball spinning.",
+        secret: true,
+    },
+    AchievementDef {
+        name: "Humming Along",
+        hint: "Keep the lights on and the wheels turning.",
+        words: "Plenty of energy, and some to spare. The whole meadow hums.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "A Bright Idea",
+        hint: "Curiosity never hurt a cat.",
+        words: "The clowder's first idea. They're very proud of it.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Well Read",
+        hint: "One idea leads to another, and another.",
+        words: "Twenty ideas! The library is mostly cushions, but still.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Know-It-All",
+        hint: "Learn everything. Then nap about it.",
+        words: "Every idea there is. The clowder is now unbearable at parties.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Refined Tastes",
+        hint: "Little improvements add up.",
+        words: "Ten refinements. Everything's just that bit nicer around here.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "House Rules",
+        hint: "Every household has its rules.",
+        words: "A house rule, adopted. It will be followed whenever convenient.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Pounce!",
+        hint: "Wiggle, wiggle, wiggle... go!",
+        words: "A pounce came home with treasures in its mouth.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "The Great Hunt (for String)",
+        hint: "Strength in numbers, out in the long grass.",
+        words: "Fifty squads out at once. Not a piece of string in the meadow is safe.",
+        secret: true,
+    },
+    AchievementDef {
+        name: "Followed Home",
+        hint: "Something magical might follow you home.",
+        words: "A {unicorn|Unicorns} followed a kitten home. Can we keep it?",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Open for Business",
+        hint: "The neighbours have things. You have things.",
+        words: "The first trade came home. Everyone's a merchant now.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Shh, They're Sleeping",
+        hint: "Knock quietly. Some neighbours sleep in.",
+        words: "A caravan arrived to find the neighbours napping, and tiptoed home again.",
+        secret: true,
+    },
+    AchievementDef {
+        name: "Dear Neighbour",
+        hint: "Write to someone. They might write back.",
+        words: "A neighbour has a pen pal now. The letters are mostly paw prints.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Best Friends Forever",
+        hint: "Keep writing. Friendship takes time.",
+        words: "Ten letters to the same neighbour. You're practically family.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Know the Neighbourhood",
+        hint: "Somebody lives past every hedge.",
+        words: "Every neighbour found. The clowder knows everyone on the block.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Sunbather",
+        hint: "Find a warm spot and stay there.",
+        words: "The first sunbeam rite. Warm, golden, and very, very sleepy.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Enlightened",
+        hint: "Bask long enough and you might see something.",
+        words: "The clowder reached enlightenment. It looked a lot like a nap.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Glitter Parade",
+        hint: "Some days call for glitter.",
+        words: "A parade! Rainbows everywhere, and glitter in places glitter shouldn't be.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Sweet Dreams",
+        hint: "Dream a little dream.",
+        words: "A {dreamcorn|Dreamcorns} wandered out of a dream and into the meadow.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Bottled Contentment",
+        hint: "Some feelings are worth keeping.",
+        words: "Contentment, bottled. A {jar of purrs|JarsOfPurrs} hums on the shelf.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Over the Fence",
+        hint: "There's a whole world past the garden wall.",
+        words: "The clowder reached somewhere new, over the fence and beyond.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Wish Upon a Star",
+        hint: "Go as far as far goes.",
+        words: "The furthest place there is. Everyone made a wish while they were there.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Whale Watching",
+        hint: "Keep an eye on the sky.",
+        words: "A Star Whale is visiting. Everyone's trying very hard not to stare.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "A Very Long Nap",
+        hint: "Sometimes a short nap isn't enough.",
+        words: "The clowder woke from a nap that lasted years. Nobody's in a hurry to get up.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Good Morning",
+        hint: "Every long night ends.",
+        words: "The Distant Dawn has risen. Good morning, everyone.",
+        secret: true,
+    },
+    AchievementDef {
+        name: "Moving Day",
+        hint: "Every meadow is a beginning.",
+        words: "The clowder moved to a new meadow. The boxes were the best part.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Family Tree",
+        hint: "Generations of whiskers.",
+        words: "Five generations of the clowder. The family tree is mostly cats sitting in it.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Remembered",
+        hint: "Nobody's forgotten.",
+        words: "A hundred kittens remembered in the Family Album.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Off on an Adventure",
+        hint: "Pack a snack. Go somewhere new.",
+        words: "An adventure is under way! Somebody packed far too many snacks.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "The Old Ways",
+        hint: "Some things are worth passing down.",
+        words: "A tradition, kept. The kittens of tomorrow will thank you with a slow blink.",
+        secret: false,
+    },
+    AchievementDef {
+        name: "A Whole Year",
+        hint: "Spring, summer, autumn, winter, and round again.",
+        words: "A whole year in the meadow. Happy anniversary!",
+        secret: false,
+    },
+    AchievementDef {
+        name: "Old Meadow",
+        hint: "Stick around. A long, long time.",
+        words: "A hundred years in the meadow. The oldest tree has a kitten-shaped dent.",
+        secret: true,
+    },
+];
+
+/// An achievement's definition. @spec SIM-ACH-001
+pub fn achievement_def(a: AchievementId) -> &'static AchievementDef {
+    &ACHIEVEMENTS[a as usize]
 }
 
 // ---- Flavor templates ----

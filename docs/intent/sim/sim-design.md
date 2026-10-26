@@ -107,6 +107,7 @@ Prices grow exponentially (`base × ratio^owned`, ceil per component); caps grow
 4. **Mood & flags** — happiness recompute; Grumpy flag; **mess recompute**.
 5. **Random events** — zoomies expiry/start, flavor, **windfalls, sky events (observable), unicorn rifts, prism descents, colony arrivals** — all at day boundaries in a fixed draw schedule.
 6. **Clamp** — trim stocks to caps.
+7. **Achievements** — state conditions at a day close, moment conditions against the tick's events; also after every applied command. Reads the meadow, changes nothing but the record (achievements leaf).
 
 Commands apply only between ticks. Saturating arithmetic on all day counters.
 
@@ -138,6 +139,7 @@ Commands apply only between ticks. Saturating arithmetic on all day counters.
 | `adventures/` | `SIM-ADV` | Opt-in variant runs with LDR-capped permanent rewards |
 | `cosmic/` | `SIM-SKY` | Expedition sites beyond the meadow, missions, site structures, outdoor production channel, skymap economy |
 | `dreamtime/` | `SIM-DREAM` | Starshard skips, stirred dreams & dissipation, Dream Loom, the Deep Nap, déjà-vu days & reverie, the Distant Dawn |
+| `achievements/` | `SIM-ACH` | The achievement table, noticing when one is earned, and the record of what was earned and when — pure delight, read by no rule |
 | `persistence` (sibling segment, not under sim) | `SAVE` | Format v2, migrations (v1→v2), catch-up × speed, Family Album persistence |
 
 Cross-leaf contract style is unchanged: leaves expose pure per-phase functions and effect-key contributions; the engine sequences; nobody reaches into another leaf's state.

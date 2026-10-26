@@ -707,17 +707,19 @@ fn unread_reports_are_pinned_at_the_journals_top_newest_first() {
     let mut a = app(l.state.clone(), opened(&l), "pinned");
     let mut t = term(160, 40);
     nap(&mut a, &mut t, 1);
-    let nap_report = match &a
+    // The newest report kept; waking may also have earned an achievement,
+    // kept after it.
+    let nap_report = a
         .state
         .journal
         .kept
-        .last()
-        .expect("the nap was retained")
-        .item
-    {
-        JournalItem::Away(r) => r.clone(),
-        other => panic!("fixture: the last kept entry is the nap's report, not {other:?}"),
-    };
+        .iter()
+        .rev()
+        .find_map(|e| match &e.item {
+            JournalItem::Away(r) => Some(r.clone()),
+            _ => None,
+        })
+        .expect("the nap was retained");
     a.state = with_neighbours(a.state.clone());
 
     keys(&mut a, &mut t, &[press_char('e')]);

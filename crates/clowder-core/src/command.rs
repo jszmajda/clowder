@@ -124,11 +124,19 @@ impl GameState {
     // @spec SIM-ENG-005
     // @spec SIM-ENG-028
     pub fn apply(&mut self, cmd: Command) -> Result<Vec<Event>, CommandError> {
-        let events = self.apply_inner(cmd)?;
+        let pace_only = matches!(cmd, Command::SetSpeed(_));
+        let mut events = self.apply_inner(cmd)?;
         // An applied command leaves every holding and every stated price
         // recorded; a refused one returned above and revealed nothing.
         // @spec SIM-ENG-050, SIM-ENG-054
         self.record_reveals();
+        // A command that tells of nothing happening is no occasion to look —
+        // appointing the Elder who already sits must change nothing — and
+        // speed is the pace the meadow is watched at, never something that
+        // happens in it. @spec SIM-ACH-002, SIM-ENG-024, SIM-ENG-058
+        if !pace_only && !events.is_empty() {
+            self.check_achievements(crate::achievements::Look::Command, &mut events);
+        }
         let tick = self.ticks;
         for event in &events {
             self.journal.record(tick, event);

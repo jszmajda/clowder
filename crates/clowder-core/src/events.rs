@@ -1,6 +1,6 @@
 use crate::state::{
-    AdventureId, ArchId, ColonyId, ContentId, DreamLoomId, IdeaId, JobId, MoodTier, RefinementId,
-    ResourceId, RiteId, RuleId, Season, SiteId, StructureId, TraditionId,
+    AchievementId, AdventureId, ArchId, ColonyId, ContentId, DreamLoomId, IdeaId, JobId, MoodTier,
+    RefinementId, ResourceId, RiteId, RuleId, Season, SiteId, StructureId, TraditionId,
 };
 use serde::{Deserialize, Serialize};
 
@@ -206,6 +206,11 @@ pub enum Event {
     },
     DejaVuDay,
     DistantDawn,
+    // ---- Achievements (SIM-ACH) ----
+    /// An achievement was earned. @spec SIM-ACH-002
+    AchievementEarned {
+        id: AchievementId,
+    },
 }
 
 impl Event {
@@ -283,7 +288,9 @@ impl Event {
             | Event::SiteReached { .. }
             | Event::WhaleSummoned
             | Event::DreamLoomBought { .. }
-            | Event::DistantDawn => EventClass::Milestone,
+            | Event::DistantDawn
+            // Each is earned once, so bounded by the table. @spec SIM-ACH-002
+            | Event::AchievementEarned { .. } => EventClass::Milestone,
 
             // Decided above, on its count.
             Event::StructureBuilt { .. } => unreachable!("handled before the match"),

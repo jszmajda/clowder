@@ -423,6 +423,146 @@ impl KittenTrait {
     ];
 }
 
+/// Every achievement, in table order. Ids are append-only: the record names
+/// them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum AchievementId {
+    AFaceAtTheDoor,
+    AProperClowder,
+    WallToWallWhiskers,
+    TooManyToName,
+    FullHouse,
+    OnceInABlueMoon,
+    OddOneOut,
+    StrikeAPose,
+    ACoatOfManyColours,
+    SnackBuddies,
+    MatchingOutfits,
+    SecondsPlease,
+    WiseWhiskers,
+    MovingUp,
+    SeniorPurrsonnel,
+    PawsOfExperience,
+    EveryonesOnBreak,
+    VisitingTheNeighbours,
+    HomeAgain,
+    PureBliss,
+    Hangry,
+    TheZoomies,
+    PartyAnimals,
+    HomeImprovement,
+    Sprawl,
+    KittenMetropolis,
+    Handmade,
+    BusyPaws,
+    WhatAMess,
+    LightsFlicker,
+    HummingAlong,
+    ABrightIdea,
+    WellRead,
+    KnowItAll,
+    RefinedTastes,
+    HouseRules,
+    Pounce,
+    TheGreatHunt,
+    FollowedHome,
+    OpenForBusiness,
+    ShhTheyreSleeping,
+    DearNeighbour,
+    BestFriendsForever,
+    KnowTheNeighbourhood,
+    Sunbather,
+    Enlightened,
+    GlitterParade,
+    SweetDreams,
+    BottledContentment,
+    OverTheFence,
+    WishUponAStar,
+    WhaleWatching,
+    AVeryLongNap,
+    GoodMorning,
+    MovingDay,
+    FamilyTree,
+    Remembered,
+    OffOnAnAdventure,
+    TheOldWays,
+    AWholeYear,
+    OldMeadow,
+}
+
+impl AchievementId {
+    pub const ALL: [AchievementId; 61] = [
+        AchievementId::AFaceAtTheDoor,
+        AchievementId::AProperClowder,
+        AchievementId::WallToWallWhiskers,
+        AchievementId::TooManyToName,
+        AchievementId::FullHouse,
+        AchievementId::OnceInABlueMoon,
+        AchievementId::OddOneOut,
+        AchievementId::StrikeAPose,
+        AchievementId::ACoatOfManyColours,
+        AchievementId::SnackBuddies,
+        AchievementId::MatchingOutfits,
+        AchievementId::SecondsPlease,
+        AchievementId::WiseWhiskers,
+        AchievementId::MovingUp,
+        AchievementId::SeniorPurrsonnel,
+        AchievementId::PawsOfExperience,
+        AchievementId::EveryonesOnBreak,
+        AchievementId::VisitingTheNeighbours,
+        AchievementId::HomeAgain,
+        AchievementId::PureBliss,
+        AchievementId::Hangry,
+        AchievementId::TheZoomies,
+        AchievementId::PartyAnimals,
+        AchievementId::HomeImprovement,
+        AchievementId::Sprawl,
+        AchievementId::KittenMetropolis,
+        AchievementId::Handmade,
+        AchievementId::BusyPaws,
+        AchievementId::WhatAMess,
+        AchievementId::LightsFlicker,
+        AchievementId::HummingAlong,
+        AchievementId::ABrightIdea,
+        AchievementId::WellRead,
+        AchievementId::KnowItAll,
+        AchievementId::RefinedTastes,
+        AchievementId::HouseRules,
+        AchievementId::Pounce,
+        AchievementId::TheGreatHunt,
+        AchievementId::FollowedHome,
+        AchievementId::OpenForBusiness,
+        AchievementId::ShhTheyreSleeping,
+        AchievementId::DearNeighbour,
+        AchievementId::BestFriendsForever,
+        AchievementId::KnowTheNeighbourhood,
+        AchievementId::Sunbather,
+        AchievementId::Enlightened,
+        AchievementId::GlitterParade,
+        AchievementId::SweetDreams,
+        AchievementId::BottledContentment,
+        AchievementId::OverTheFence,
+        AchievementId::WishUponAStar,
+        AchievementId::WhaleWatching,
+        AchievementId::AVeryLongNap,
+        AchievementId::GoodMorning,
+        AchievementId::MovingDay,
+        AchievementId::FamilyTree,
+        AchievementId::Remembered,
+        AchievementId::OffOnAnAdventure,
+        AchievementId::TheOldWays,
+        AchievementId::AWholeYear,
+        AchievementId::OldMeadow,
+    ];
+}
+
+/// When an achievement was earned: the generation, and the meadow's day.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Earned {
+    pub generation: u32,
+    pub day: u64,
+}
+
 /// The patterns a kitten's fur can take. Ids are append-only: a saved fur
 /// names its pattern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -1394,6 +1534,10 @@ pub struct GameState {
     /// generation, never deleted. @spec SIM-MOVE-001
     #[serde(default)]
     pub family_album: Vec<ArchivedKitten>,
+    /// Every achievement earned, with when; kept across every Move.
+    /// @spec SIM-ACH-002
+    #[serde(default)]
+    pub achievements: BTreeMap<AchievementId, Earned>,
     // ---- Wave 5: adventures (SIM-ADV) ----
     /// The Adventure armed for the next Move. @spec SIM-ADV-001
     #[serde(default)]
@@ -1518,6 +1662,7 @@ impl GameState {
             generation: 0,
             traditions: BTreeSet::new(),
             family_album: Vec::new(),
+            achievements: BTreeMap::new(),
             armed_adventure: None,
             active_adventure: None,
             adventure_completions: [0; 7],
@@ -2436,7 +2581,8 @@ pub(crate) fn season_index_of_day(day: u64) -> usize {
     ((day / content::DAYS_PER_SEASON) % 4) as usize
 }
 
-pub(crate) fn season_of_day(day: u64) -> Season {
+/// The season a day of the meadow falls in.
+pub fn season_of_day(day: u64) -> Season {
     Season::ALL[season_index_of_day(day)]
 }
 
@@ -2515,6 +2661,7 @@ mod move_classification {
             passed_down_wisdom: _,
             generation: _,
             traditions: _,
+            achievements: _,
             family_album: _,
             armed_adventure: _,
             active_adventure: _,

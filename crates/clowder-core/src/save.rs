@@ -1,6 +1,7 @@
 use crate::events::Event;
-use crate::state::{GameState, ResourceId};
+use crate::state::{AchievementId, GameState, ResourceId};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -19,9 +20,11 @@ use std::path::{Path, PathBuf};
 /// (SAVE-026), arriving empty. v8 adds each kitten's and each memorial's
 /// profile (SAVE-027), drawn on migration from each one's name and generation
 /// (SAVE-028). v9 gives profiles favourites of varied kinds and a pose; a v8
-/// profile keeps its fur and eyes and draws the rest (SAVE-029).
-/// @spec SAVE-013, SAVE-014, SAVE-021, SAVE-023, SAVE-026, SAVE-027, SAVE-029
-pub const SAVE_VERSION: u32 = 9;
+/// profile keeps its fur and eyes and draws the rest (SAVE-029). v10 adds the
+/// achievement record (SAVE-030), arriving empty; the meadow's state checks
+/// credit what it has already done as it plays.
+/// @spec SAVE-013, SAVE-014, SAVE-021, SAVE-023, SAVE-026, SAVE-027, SAVE-029, SAVE-030
+pub const SAVE_VERSION: u32 = 10;
 /// The shortest absence worth reporting. Public for the same reason the cap
 /// is: a caller deciding whether to surface a report must use this value, not
 /// a copy of it. @spec SAVE-015
@@ -211,6 +214,9 @@ pub struct CatchUp {
     /// Folded from the ticks this catch-up itself has replayed so far: names
     /// and seasons only, since resource deltas are recomputed from `before`.
     partial: OfflineReport,
+    /// The achievements the record held as loaded, before any tick replayed.
+    /// @spec SAVE-030
+    earned_at_load: BTreeSet<AchievementId>,
 }
 
 /// What advancing a catch-up produced: still owing ticks, or finished.
@@ -264,6 +270,13 @@ impl CatchUp {
     /// Ticks not yet replayed. @spec SAVE-018
     pub fn remaining_ticks(&self) -> u64 {
         self.remaining_ticks
+    }
+
+    /// The achievements the record held as the save was loaded, before any
+    /// tick of this catch-up replayed — so a frontend can tell what the
+    /// absence earned. @spec SAVE-030
+    pub fn earned_at_load(&self) -> &BTreeSet<AchievementId> {
+        &self.earned_at_load
     }
 
     /// The save's own game speed — the rate the shell banks real time passing
@@ -490,6 +503,7 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
     let ticks_to_replay =
         ((elapsed * TICKS_PER_SECOND) as f64 * state.speed).round() as u64 + file.owed_ticks;
     let before = state.resources;
+    let earned_at_load = state.achievements.keys().copied().collect();
     Ok(CatchUp {
         state,
         total_ticks: ticks_to_replay,
@@ -499,6 +513,7 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
         this_elapsed_seconds: elapsed,
         this_truncated: truncated,
         partial: OfflineReport::default(),
+        earned_at_load,
     })
 }
 

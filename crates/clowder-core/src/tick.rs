@@ -207,6 +207,14 @@ impl GameState {
             self.record_price_of(id);
         }
 
+        // ---- Phase 7: achievements, against the meadow and this tick's events ----
+        self.check_achievements(
+            crate::achievements::Look::Tick {
+                day_closed: day > prev_day,
+            },
+            &mut events,
+        );
+
         events
     }
 

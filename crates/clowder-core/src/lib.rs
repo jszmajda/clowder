@@ -4,6 +4,7 @@
 //! game *is* lives here. No terminal, no clocks, no threads — wall-clock time
 //! enters only through the persistence API's caller-supplied timestamps.
 
+mod achievements;
 mod command;
 pub mod content;
 mod effects;
@@ -33,9 +34,11 @@ pub use save::{
     LoadError, LoadedGame, OfflineReport, SetDown, CATCHUP_CAP_SECONDS,
     MIN_REPORTABLE_ABSENCE_SECONDS, SAVE_VERSION,
 };
+pub use state::season_of_day;
 pub use state::{
-    AdventureId, ArchId, ArchivedKitten, Availability, ColonyId, ContentId, CraftId, DreamLoomId,
-    EyeColour, EyeLook, Favourite, FavouriteKind, Fur, FurColour, FurPattern, GameState, IdeaId,
-    JobId, Kitten, KittenTrait, Location, MoodTier, Pose, Profile, Promise, RefinementId,
-    ResourceId, RiteId, RuleId, Season, SiteId, StructureGate, StructureId, TraditionId,
+    AchievementId, AdventureId, ArchId, ArchivedKitten, Availability, ColonyId, ContentId, CraftId,
+    DreamLoomId, Earned, EyeColour, EyeLook, Favourite, FavouriteKind, Fur, FurColour, FurPattern,
+    GameState, IdeaId, JobId, Kitten, KittenTrait, Location, MoodTier, Pose, Profile, Promise,
+    RefinementId, ResourceId, RiteId, RuleId, Season, SiteId, StructureGate, StructureId,
+    TraditionId,
 };

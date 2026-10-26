@@ -397,13 +397,14 @@ fn a_v6_save_migrates_with_everything_else_exact() {
     let sd = begin_load(V6_FIXTURE, at)
         .expect("a v6 save loads")
         .set_down();
-    let resaved: serde_json::Value = serde_json::from_str(&save_string_carrying(
+    let mut resaved: serde_json::Value = serde_json::from_str(&save_string_carrying(
         &sd.state,
         at,
         sd.owed_ticks,
         Some(&sd.report_so_far),
     ))
     .unwrap();
+    take_empty_record(&mut resaved);
     assert_eq!(resaved["save_version"], SAVE_VERSION);
     for (key, was) in before["state"].as_object().unwrap() {
         assert_eq!(

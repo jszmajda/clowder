@@ -155,6 +155,9 @@ fn vocabulary() -> Vec<Event> {
         },
         Event::DejaVuDay,
         Event::DistantDawn,
+        Event::AchievementEarned {
+            id: AchievementId::AFaceAtTheDoor,
+        },
     ]
 }
 
@@ -213,6 +216,7 @@ fn variant_name(e: &Event) -> &'static str {
         Event::DreamLoomBought { .. } => "DreamLoomBought",
         Event::DejaVuDay => "DejaVuDay",
         Event::DistantDawn => "DistantDawn",
+        Event::AchievementEarned { .. } => "AchievementEarned",
     }
 }
 
@@ -713,6 +717,9 @@ fn a_replay_inside_a_command_does_not_stream_into_the_journal() {
     let mut s = GameState::new(2_841);
     s.ideas.insert(IdeaId::DeepNapTheory);
     give(&mut s, ResourceId::Starshards, 1e12);
+    // Waking earns achievements on their own account, each once; this test
+    // measures what the replay itself writes.
+    all_earned(&mut s);
     let before = happened(&s.journal).len();
 
     let years = 10u32;
@@ -840,8 +847,9 @@ fn nothing_that_recurs_on_a_timer_is_a_milestone() {
 }
 
 /// The consequence, end to end: a long unattended stretch leaves the rolling
-/// window at its capacity and the retained side untouched. Nothing that merely
-/// passes the time is worth keeping forever.
+/// window at its capacity and the retained side holding nothing but the
+/// achievements the stretch earned, each once — bounded by their table.
+/// Nothing that merely passes the time recurs into the permanent record.
 /// @spec SIM-ENG-042, SIM-ENG-029
 #[test]
 fn time_alone_never_grows_the_retained_side_of_the_journal() {
@@ -855,13 +863,20 @@ fn time_alone_never_grows_the_retained_side_of_the_journal() {
         "the rolling window overran its capacity at {} entries",
         s.journal.recent.len()
     );
-    assert_eq!(
-        s.journal.kept.len(),
-        0,
-        "twenty thousand days of nobody doing anything left {} permanent entries; only \
-         things the player did or reached should ever be retained",
-        s.journal.kept.len()
-    );
+    let mut earned = BTreeSet::new();
+    for entry in &s.journal.kept {
+        match &entry.item {
+            JournalItem::Happened(Event::AchievementEarned { id }) => assert!(
+                earned.insert(*id),
+                "{id:?} was retained twice; an achievement is earned once"
+            ),
+            other => panic!(
+                "twenty thousand days of nobody doing anything retained {other:?}; only \
+                 things the player did or reached, and each achievement once, should ever \
+                 be retained"
+            ),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -890,6 +905,9 @@ fn appointing_meadow(seed: u64) -> GameState {
         "fixture: a kitten is at work"
     );
     assert_eq!(s.elder, None, "fixture: nobody has been appointed yet");
+    // A first appointment earns an achievement on its own account; these
+    // tests measure what the appointment itself writes.
+    all_earned(&mut s);
     s
 }
 

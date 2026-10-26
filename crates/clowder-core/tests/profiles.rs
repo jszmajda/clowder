@@ -242,7 +242,8 @@ fn kittens_are_known_for_different_things() {
 // ---------------------------------------------------------------------------
 
 /// Two meadows that differ only in their kittens' profiles stay identical,
-/// profiles aside, through a long run of ticks and commands.
+/// profiles aside — and the achievements they earned, which read profiles and
+/// are read by nothing — through a long run of ticks and commands.
 /// @spec SIM-KIT-033
 #[test]
 fn no_rule_reads_a_profile() {
@@ -264,12 +265,13 @@ fn no_rule_reads_a_profile() {
         run_days(s, 150);
     }
     let strip = |s: &GameState| {
-        let mut s = s.clone();
+        let mut s = without_achievements(s);
         for k in &mut s.kittens {
             k.profile = None;
         }
         save_string(&s, 1_000)
     };
+    assert_eq!(a.rng, b.rng, "the same draws");
     assert_eq!(strip(&a), strip(&b));
 }
 
@@ -862,13 +864,14 @@ fn a_v7_save_migrates_with_everything_else_exact() {
     let sd = begin_load(V7_FIXTURE, at)
         .expect("a v7 save loads")
         .set_down();
-    let resaved: serde_json::Value = serde_json::from_str(&save_string_carrying(
+    let mut resaved: serde_json::Value = serde_json::from_str(&save_string_carrying(
         &sd.state,
         at,
         sd.owed_ticks,
         Some(&sd.report_so_far),
     ))
     .unwrap();
+    take_empty_record(&mut resaved);
     assert_eq!(resaved["save_version"], SAVE_VERSION);
     let (was, now) = (
         before["state"].as_object().unwrap(),
@@ -975,13 +978,14 @@ fn a_v8_save_migrates_with_everything_else_exact() {
     let sd = begin_load(V8_FIXTURE, at)
         .expect("a v8 save loads")
         .set_down();
-    let resaved: serde_json::Value = serde_json::from_str(&save_string_carrying(
+    let mut resaved: serde_json::Value = serde_json::from_str(&save_string_carrying(
         &sd.state,
         at,
         sd.owed_ticks,
         Some(&sd.report_so_far),
     ))
     .unwrap();
+    take_empty_record(&mut resaved);
     assert_eq!(resaved["save_version"], SAVE_VERSION);
     let (was, now) = (
         before["state"].as_object().unwrap(),

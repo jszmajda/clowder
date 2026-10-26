@@ -23,7 +23,7 @@ use clowder_tui::nav::ViewState;
 use clowder_tui::runtime::clock::Reading;
 use clowder_tui::runtime::{App, TickAccumulator};
 
-use clowder_core::GameState;
+use clowder_core::{AchievementId, Earned, GameState};
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use std::path::PathBuf;
@@ -776,6 +776,17 @@ fn small_roster() -> GameState {
     state.kittens = ROSTER_NAMES.iter().map(|n| roster_kitten(n)).collect();
     state.roster_high_water = state.kittens.len();
     state.elder = None;
+    // A first appointment earns an achievement on its own account; these
+    // tests measure what an appointment itself writes and says.
+    for id in AchievementId::ALL {
+        state.achievements.insert(
+            id,
+            Earned {
+                generation: 0,
+                day: 0,
+            },
+        );
+    }
     state
 }
 

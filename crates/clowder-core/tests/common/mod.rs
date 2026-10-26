@@ -236,3 +236,45 @@ pub fn game_vocabulary() -> Vec<String> {
     }
     others.iter().map(|o| o.to_lowercase()).collect()
 }
+
+/// Take the achievement record out of a migrated save's state, checking it
+/// arrived empty (SAVE-030), so a test of an earlier migration step reads only
+/// what that step changed.
+pub fn take_empty_record(resaved: &mut serde_json::Value) {
+    let record = resaved["state"]
+        .as_object_mut()
+        .expect("a save holds its state")
+        .remove("achievements");
+    assert!(
+        record.is_some_and(|r| r.as_object().is_some_and(|m| m.is_empty())),
+        "a migrated save's achievement record arrives empty (SAVE-030)"
+    );
+}
+
+/// The meadow with its achievements set aside: the record cleared, and the
+/// journal without the entries earning wrote — milestones, so all in the kept
+/// list (SIM-ACH-002).
+pub fn without_achievements(s: &GameState) -> GameState {
+    let mut s = s.clone();
+    s.achievements.clear();
+    s.journal.kept.retain(|e| {
+        !matches!(
+            e.item,
+            JournalItem::Happened(Event::AchievementEarned { .. })
+        )
+    });
+    s
+}
+
+/// Mark every achievement earned, for a test that measures what something
+/// else writes to the events or the journal: each achievement is earned once,
+/// on its own account (SIM-ACH-002), and would otherwise ride along.
+pub fn all_earned(s: &mut GameState) {
+    let when = Earned {
+        generation: s.generation,
+        day: s.day(),
+    };
+    for id in AchievementId::ALL {
+        s.achievements.insert(id, when);
+    }
+}

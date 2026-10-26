@@ -21,7 +21,7 @@ The leaf owns the Move itself, the three legacy currencies and their formulas, t
 2. **Archive the generation.** Every current kitten is copied into the Family Album as a slim memorial — its name, trait, rank, profile (kittens leaf: Profiles), and the current (pre-increment) generation number — archived, never deleted. The kittens themselves become "Elders of the old meadow" in the Album's telling. (Skills are not memorialized; they travel only in the Baskets.)
 3. **Pack the Traveling Baskets.** Up to `basket_capacity` kittens (a Tradition-raised count, default 0 → raised by the Traveling Baskets tradition) are carried into the new meadow, keeping their names, traits, ranks, skills, and profiles.
 4. **Fill the Memory Chest.** `memory_chest_ratio` (Tradition-raised, default 0) of each resource stock travels along.
-5. **Move in.** The meadow resets to a fresh `GameState` — zero structures, the carried kittens (Traveling Baskets) placed Home, Memory-Chest resources, generation + 1 — *except* the persistent legacy state (Elder Wisdom, Warm Memories, Passed-Down Wisdom, serenity + enlightenment tier from ceremonies, purchased Traditions, and the Family Album), which carry over untouched.
+5. **Move in.** The meadow resets to a fresh `GameState` — zero structures, the carried kittens (Traveling Baskets) placed Home, Memory-Chest resources, generation + 1 — *except* the persistent legacy state (Elder Wisdom, Warm Memories, Passed-Down Wisdom, serenity + enlightenment tier from ceremonies, purchased Traditions, the Family Album, and the achievement record), which carry over untouched.
 
 A Move never reduces any legacy currency and never empties the Family Album. It is the one reset in the game, and it takes nothing the player is attached to.
 

@@ -2180,13 +2180,14 @@ fn a_v5_save_migrates_with_everything_else_exact() {
         "the owed count survives migration"
     );
     let sd = c.set_down();
-    let resaved: serde_json::Value = serde_json::from_str(&save_string_carrying(
+    let mut resaved: serde_json::Value = serde_json::from_str(&save_string_carrying(
         &sd.state,
         at,
         sd.owed_ticks,
         Some(&sd.report_so_far),
     ))
     .unwrap();
+    take_empty_record(&mut resaved);
 
     assert_eq!(
         resaved["save_version"], SAVE_VERSION,
