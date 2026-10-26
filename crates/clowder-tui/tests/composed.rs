@@ -1150,7 +1150,7 @@ fn the_help_overlay_packs_the_legend_before_the_key_map() {
         overlay: Some(Overlay::Help),
         ..looking_at(&state, near_row())
     };
-    let d = cold(&state, &view, 100, 30);
+    let d = cold(&state, &view, 100, 31);
     let lines = region_lines(&d.buffer, d.buffer.area);
     let line_of = |needle: &str| lines.iter().find(|l| l.contains(needle)).unwrap();
     for needle in &HELP_ENTRIES[..KEY_ENTRY_COUNT] {
@@ -1161,7 +1161,7 @@ fn the_help_overlay_packs_the_legend_before_the_key_map() {
             .count();
         assert_eq!(
             others, 0,
-            "at 100x30 the key map is packed although the legend alone would fit: {line:?}"
+            "at 100x31 the key map is packed although the legend alone would fit: {line:?}"
         );
     }
     let packed = HELP_ENTRIES[KEY_ENTRY_COUNT + SCREEN_ENTRIES.len()..]
@@ -1175,7 +1175,7 @@ fn the_help_overlay_packs_the_legend_before_the_key_map() {
         });
     assert!(
         packed,
-        "at 100x30 the legend should be packed for the overlay to fit:\n{}",
+        "at 100x31 the legend should be packed for the overlay to fit:\n{}",
         lines.join("\n")
     );
 }
@@ -1186,7 +1186,7 @@ fn shows_cursor_entry(line: &str) -> bool {
 }
 
 /// How many of `HELP_ENTRIES` come from the key map, which lists them first.
-const KEY_ENTRY_COUNT: usize = 17;
+const KEY_ENTRY_COUNT: usize = 18;
 
 /// The screens' keys among `HELP_ENTRIES`.
 const SCREEN_ENTRIES: &[&str] = &[
@@ -1212,6 +1212,7 @@ const HELP_ENTRIES: &[&str] = &[
     "Increment / decrement a count row",
     "Find-anything palette",
     "Journal: full scrollback",
+    "Achievements: what the clowder",
     "Observe the sky",
     "Game speed down / up",
     "This help overlay",
@@ -1905,6 +1906,7 @@ fn no_divider_cuts_through_a_full_screen_overlay() {
     let state = far_along();
     let overlays_open = [
         ("the Journal", Overlay::Journal { anchor: 0 }),
+        ("the scrapbook", Overlay::Achievements { anchor: 0 }),
         ("help", Overlay::Help),
         (
             "the palette",
@@ -1934,6 +1936,13 @@ fn no_divider_cuts_through_a_full_screen_overlay() {
                                 overlays::journal(f, r, &state, &view)
                             })
                         }
+                        Overlay::Achievements { .. } => assert_some_region_is(
+                            &d,
+                            size,
+                            what,
+                            "overlays::achievements",
+                            |f, r| overlays::achievements(f, r, &state, &view),
+                        ),
                         Overlay::Help => {
                             assert_some_region_is(&d, size, what, "overlays::help", |f, r| {
                                 overlays::help(f, r)

@@ -158,10 +158,13 @@ fn state_bytes(s: &GameState) -> String {
 }
 
 /// The view a load that never needed the screen opens with: the opening
-/// taken against the caught-up state, then the load's report queued.
-fn opened_view(loaded: &LoadedGame) -> ViewState {
+/// taken against the caught-up state, the achievements the save held before
+/// its catch-up as those already seen (TUI-NAV-174), then the load's report
+/// queued.
+fn opened_view(loaded: &LoadedGame, json: &str, now: u64) -> ViewState {
     let mut view = ViewState::default();
     nav::opening(&mut view, &loaded.state);
+    view.achievements_seen = catch_up(json, now).earned_at_load().clone();
     nav::queue_load_report(&mut view, loaded);
     view
 }
@@ -730,7 +733,7 @@ fn the_frame_that_finishes_opens_the_game_against_the_one_call_state() {
         );
         assert_eq!(
             view_of(&app.view),
-            view_of(&opened_view(&one_call)),
+            view_of(&opened_view(&one_call, &json, now)),
             "away {away}s, bound {bound}: the opening taken and the report queued against it"
         );
         assert_eq!(
@@ -1120,13 +1123,13 @@ fn every_other_key_is_discarded_while_waking_and_none_is_held_for_the_game() {
     );
     assert_eq!(
         view_of(&app.view),
-        view_of(&opened_view(&one_call)),
+        view_of(&opened_view(&one_call, &json, now)),
         "no key moved the view"
     );
 
     let mut reference = App {
         state: one_call.state.clone(),
-        view: opened_view(&one_call),
+        view: opened_view(&one_call, &json, now),
         clock: TickAccumulator::default(),
         save_path: scratch("discard-reference"),
         last_save: Instant::now(),
@@ -1237,13 +1240,13 @@ fn every_mouse_event_is_discarded_while_waking_and_none_is_held_for_the_game() {
     );
     assert_eq!(
         view_of(&app.view),
-        view_of(&opened_view(&one_call)),
+        view_of(&opened_view(&one_call, &json, now)),
         "no mouse event moved the view"
     );
 
     let mut reference = App {
         state: one_call.state.clone(),
-        view: opened_view(&one_call),
+        view: opened_view(&one_call, &json, now),
         clock: TickAccumulator::default(),
         save_path: scratch("mouse-discard-reference"),
         last_save: Instant::now(),

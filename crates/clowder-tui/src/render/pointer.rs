@@ -104,7 +104,8 @@ impl PointerRecord {
             .map(|(_, s)| *s)
     }
 
-    /// Whether this cell is in the Journal's region.
+    /// Whether this cell is in the Journal's region — or the Achievements
+    /// overlay's, which the frame records in the same place.
     pub fn journal_at(&self, x: u16, y: u16) -> bool {
         self.journal.as_ref().is_some_and(|(r, _)| within(r, x, y))
     }

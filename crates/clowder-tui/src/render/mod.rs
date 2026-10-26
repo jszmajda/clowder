@@ -1277,6 +1277,15 @@ pub fn frame_recorded(
                 widgets::overlays::journal_max_scroll(state, view, body_rect.height),
             );
         }
+        // The scrapbook scrolls as the Journal does, so the frame records its
+        // region and reach in the same place. @spec TUI-NAV-174
+        Some(Overlay::Achievements { .. }) => {
+            widgets::overlays::achievements(f, body_rect, state, view);
+            record.record_journal(
+                body_rect,
+                widgets::overlays::achievements_max_scroll(state, view, body_rect),
+            );
+        }
         Some(Overlay::Help) => widgets::overlays::help(f, body_rect),
         Some(Overlay::Palette { .. }) => widgets::overlays::palette(f, body_rect, state, view),
         // @spec TUI-RENDER-016

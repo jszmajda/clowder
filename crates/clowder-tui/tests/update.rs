@@ -1286,7 +1286,7 @@ fn the_cursor_does_not_move_on_action() {
 /// live mnemonics is an unbound key. `n` is reserved here too, though not a
 /// mnemonic (TUI-NAV-046): it is the row-bound key TUI-NAV-094 states, whose
 /// own tests cover it in full.
-const GLOBAL_PRINTABLES: &str = "hjklixeoqnX0123456789[]+=-/<>? ";
+const GLOBAL_PRINTABLES: &str = "hjklixeaoqnX0123456789[]+=-/<>? ";
 
 /// The Meadow's fixed mnemonics, in their rows' list order.
 const FIXED_MNEMONICS: [(char, &str); 3] =

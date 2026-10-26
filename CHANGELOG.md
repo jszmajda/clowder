@@ -2,6 +2,16 @@
 
 What changed in each release of Clowder, written so it spoils nothing: what changed for the player, never what the new things are called, what they cost, or what they do in numbers. Clowder is meant to be discovered by playing it.
 
+## [Unreleased]
+
+### New
+
+- **Achievements.** Press `a` for the clowder's scrapbook: dozens of things worth remembering, from big milestones to small, silly kitten moments. Most show a playful hint while you're still on your way to them; some stay secret until you stumble onto them. They're just for fun and change nothing in play. The ticker celebrates each one as it's earned, and a chip in the top bar tells you when there's something new to look at, including anything earned while you were away.
+
+### Saves
+
+- The save format moves to version 10. An older save upgrades with nothing earned yet, and whatever your meadow has already done is credited as it plays on. A save written by this version can't be opened by an older one.
+
 ## [1.2.1] — 2026-10-24
 
 ### Fixed

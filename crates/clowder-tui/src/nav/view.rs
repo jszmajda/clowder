@@ -2,9 +2,10 @@
 //! mirrors a value the core holds — if the shell needs a number the core
 //! computes, it asks. @spec TUI-NAV-008, TUI-NAV-015, TUI-NAV-030
 
+use std::collections::BTreeSet;
 use std::time::Instant;
 
-use clowder_core::{Command, ResourceId};
+use clowder_core::{AchievementId, Command, ResourceId};
 
 use super::rows::RowKey;
 use super::section::Section;
@@ -19,6 +20,11 @@ pub enum Overlay {
         anchor: usize,
     },
     Help,
+    /// The clowder's scrapbook of achievements. Holds its own scroll anchor,
+    /// as the Journal does. @spec TUI-NAV-174
+    Achievements {
+        anchor: usize,
+    },
     /// Find-anything over revealed content, narrowing by substring as
     /// characters arrive. @spec TUI-NAV-038
     Palette {
@@ -132,4 +138,14 @@ pub struct ViewState {
     /// The first store the sidebar is scrolled to, by identity, or `None` for
     /// the top. Every sitting begins at the top, and nothing of it is saved.
     pub sidebar_top: Option<ResourceId>,
+    /// The achievements the player has been shown: the record as the game was
+    /// loaded, before any catch-up replayed, and every one the Achievements
+    /// overlay has drawn since. What the core reports earned beyond it is what
+    /// `✦N earned` counts. Nothing of it is saved, so a restart begins it
+    /// again from the record. @spec TUI-NAV-174, TUI-NAV-020
+    pub achievements_seen: BTreeSet<AchievementId>,
+    /// The achievements the open overlay marks ` new`: those unseen when it
+    /// opened, and those earned while it stands open. Cleared when it closes.
+    /// @spec TUI-NAV-175
+    pub achievements_new: BTreeSet<AchievementId>,
 }

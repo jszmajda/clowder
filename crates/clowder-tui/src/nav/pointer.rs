@@ -61,14 +61,24 @@ pub fn sidebar_key(action: &Action, view: &mut ViewState, record: Option<&Pointe
     true
 }
 
-/// The open Journal's own scrolling by key: `↓`/`j` and `↑`/`k` one line, as a
-/// wheel step moves it, `[` to its top and `]` to its foot, never past where
-/// the last frame drew its last line — so the keys reach every line the wheel
-/// does. True where the Journal is open and `action` is one of those keys,
-/// whether or not it moved; such a key ends no arming and leaves the banner
-/// showing. @spec TUI-NAV-134
+/// The scroll anchor of the open overlay that scrolls — the Journal, or the
+/// Achievements overlay, which scrolls as the Journal does (TUI-NAV-174).
+fn scroll_anchor(view: &mut ViewState) -> Option<&mut usize> {
+    match &mut view.overlay {
+        Some(Overlay::Journal { anchor }) | Some(Overlay::Achievements { anchor }) => Some(anchor),
+        _ => None,
+    }
+}
+
+/// The open Journal's own scrolling by key — and the Achievements overlay's,
+/// by the same keys: `↓`/`j` and `↑`/`k` one line, as a wheel step moves it,
+/// `[` to its top and `]` to its foot, never past where the last frame drew
+/// its last line — so the keys reach every line the wheel does. True where
+/// either is open and `action` is one of those keys, whether or not it
+/// moved; such a key ends no arming and leaves the banner showing.
+/// @spec TUI-NAV-134, TUI-NAV-174
 pub fn journal_key(action: &Action, view: &mut ViewState, record: Option<&PointerRecord>) -> bool {
-    let Some(Overlay::Journal { anchor }) = view.overlay else {
+    let Some(&mut anchor) = scroll_anchor(view) else {
         return false;
     };
     let max = record
@@ -81,7 +91,9 @@ pub fn journal_key(action: &Action, view: &mut ViewState, record: Option<&Pointe
         Action::GroupNext => max,
         _ => return false,
     };
-    view.overlay = Some(Overlay::Journal { anchor: next });
+    if let Some(anchor) = scroll_anchor(view) {
+        *anchor = next;
+    }
     true
 }
 
@@ -113,17 +125,17 @@ pub fn pointer_event(
     let (x, y) = (event.column, event.row);
 
     match &view.overlay {
-        // The Journal scrolls under the wheel over it; it takes no press.
-        Some(Overlay::Journal { anchor }) => {
+        // The Journal scrolls under the wheel over it, and the Achievements
+        // overlay as it does; neither takes a press. @spec TUI-NAV-174
+        Some(Overlay::Journal { .. }) | Some(Overlay::Achievements { .. }) => {
             if let Some(step) = step.filter(|_| record.journal_at(x, y)) {
                 let max = record.journal_max_scroll().unwrap_or(0);
-                let next = if step > 0 {
-                    (anchor + 1).min(max)
-                } else {
-                    anchor.saturating_sub(1)
-                };
-                if next != *anchor {
-                    view.overlay = Some(Overlay::Journal { anchor: next });
+                if let Some(anchor) = scroll_anchor(view) {
+                    *anchor = if step > 0 {
+                        (*anchor + 1).min(max)
+                    } else {
+                        anchor.saturating_sub(1)
+                    };
                 }
             }
             return Outcome::Handled;

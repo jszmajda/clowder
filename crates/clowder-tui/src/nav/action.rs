@@ -26,6 +26,9 @@ pub enum Action {
     Decrement,
     OpenPalette,
     OpenJournal,
+    /// Open the Achievements overlay, or close it where it is open.
+    /// @spec TUI-NAV-174
+    Achievements,
     OpenHelp,
     ObserveSky,
     SpeedUp,

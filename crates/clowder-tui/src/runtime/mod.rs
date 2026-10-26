@@ -738,6 +738,9 @@ impl App {
         // And a row can return to a focused, emptied section the same way —
         // the cursor lands on it without waiting for a key. @spec TUI-NAV-085
         crate::nav::relist_focus(&mut self.view, &self.state);
+        // And an achievement earned beneath the open scrapbook is seen as it
+        // is drawn. @spec TUI-NAV-174
+        crate::nav::show_achievements(&mut self.view, &self.state);
 
         // ---- 4. autosave ----------------------------------------------------
         // @spec TUI-RUN-026, TUI-RUN-028

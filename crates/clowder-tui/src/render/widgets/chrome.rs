@@ -96,18 +96,29 @@ fn sky_live(state: &GameState) -> bool {
         .any(|(t, _)| *t == clowder_core::Timer::SkyEvent)
 }
 
-/// The five attention opportunities, in the fixed order idle, sky, new,
-/// away, energy, each live or not. Shared by the counted and uncounted chip
-/// clusters so the two never drift on which chips are live. The energy chip
-/// is live exactly while the core reports the meadow using more energy than
-/// it makes. @spec TUI-NAV-020
-fn live_opportunities(state: &GameState, view: &ViewState) -> [bool; 5] {
+/// Achievements the core reports earned that the player has not been shown —
+/// what `✦N earned` counts. @spec TUI-NAV-020, TUI-NAV-174
+fn earned_unseen_count(state: &GameState, view: &ViewState) -> usize {
+    state
+        .achievements
+        .keys()
+        .filter(|id| !view.achievements_seen.contains(id))
+        .count()
+}
+
+/// The six attention opportunities, in the fixed order idle, sky, new,
+/// away, energy, earned, each live or not. Shared by the counted and
+/// uncounted chip clusters so the two never drift on which chips are live.
+/// The energy chip is live exactly while the core reports the meadow using
+/// more energy than it makes. @spec TUI-NAV-020
+fn live_opportunities(state: &GameState, view: &ViewState) -> [bool; 6] {
     [
         idle_here_count(state) > 0,
         sky_live(state),
         new_content_count(state, view) > 0,
         view.reports.iter().any(|r| !r.dismissed),
         state.energy_consumption() > state.energy_production(),
+        earned_unseen_count(state, view) > 0,
     ]
 }
 
@@ -122,6 +133,7 @@ fn chip_labels(state: &GameState, view: &ViewState, with_counts: bool) -> Vec<St
     let live = live_opportunities(state, view);
     let idle = idle_here_count(state);
     let new = new_content_count(state, view);
+    let earned = earned_unseen_count(state, view);
     let labels = if with_counts {
         [
             format!("◦{idle} idle"),
@@ -129,6 +141,7 @@ fn chip_labels(state: &GameState, view: &ViewState, with_counts: bool) -> Vec<St
             format!("★{new} new"),
             "~away".to_string(),
             "↯energy".to_string(),
+            format!("✦{earned} earned"),
         ]
     } else {
         [
@@ -137,6 +150,7 @@ fn chip_labels(state: &GameState, view: &ViewState, with_counts: bool) -> Vec<St
             "★new".to_string(),
             "~away".to_string(),
             "↯energy".to_string(),
+            "✦earned".to_string(),
         ]
     };
     labels
@@ -147,16 +161,21 @@ fn chip_labels(state: &GameState, view: &ViewState, with_counts: bool) -> Vec<St
         .collect()
 }
 
+/// A day of the meadow in the header's full date words: its season, the
+/// day, and the year. @spec TUI-NAV-086, TUI-NAV-175
+pub(crate) fn date_words(day: u64) -> String {
+    format!(
+        "{:?} Day {day} Year {}",
+        clowder_core::season_of_day(day),
+        day / clowder_core::content::DAYS_PER_YEAR
+    )
+}
+
 /// The five glance facts in full wording, joined `·`. @spec TUI-NAV-086
 fn full_facts(state: &GameState) -> Vec<String> {
     vec![
         format!("Gen {}", state.generation),
-        format!(
-            "{:?} Day {} Year {}",
-            state.season(),
-            state.day(),
-            state.year()
-        ),
+        date_words(state.day()),
         format!("{} kittens", state.kittens.len()),
         mood_word(state.mood_tier()).to_string(),
         format!("×{}", state.speed),
@@ -599,7 +618,7 @@ fn focused_row(state: &GameState, view: &ViewState) -> Option<Row> {
 pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState, stores_hidden: bool) {
     const HELP: &str = "? help";
 
-    // A full-screen overlay (Journal or help) holds the keyboard too, the
+    // A full-screen overlay (the Journal, the scrapbook, or help) holds the keyboard too, the
     // same as a field does — the armed row's keys beneath it are not what
     // the next Enter reaches while it is open. @spec TUI-NAV-077
     let armed_and_live = view.overlay.is_none()

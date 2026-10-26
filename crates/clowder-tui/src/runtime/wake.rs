@@ -6,11 +6,12 @@
 //! headless in tests exactly as play does. @spec TUI-RUN-033..039,
 //! TUI-NAV-102, TUI-NAV-103
 
+use std::collections::BTreeSet;
 use std::io;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use clowder_core::{Advance, CatchUp};
+use clowder_core::{AchievementId, Advance, CatchUp};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::backend::Backend;
 use ratatui::layout::Rect;
@@ -40,6 +41,10 @@ pub enum Wake {
 /// A load's catch-up in progress behind the waking screen.
 pub struct Waking {
     catch_up: CatchUp,
+    /// What the record held as the save was loaded, taken before any tick
+    /// replayed: what the game opens believing the player has seen.
+    /// @spec TUI-NAV-174
+    seen_at_load: BTreeSet<AchievementId>,
     pub clock: TickAccumulator,
     pub save_path: PathBuf,
     pub last_save: Instant,
@@ -90,6 +95,7 @@ impl Wake {
         bound: u64,
     ) -> Result<Wake, Box<Refused>> {
         let waking = Waking {
+            seen_at_load: catch_up.earned_at_load().clone(),
             catch_up,
             clock: TickAccumulator::default(),
             save_path,
@@ -189,6 +195,9 @@ impl Waking {
                 let mut view = nav::ViewState::default();
                 // @spec TUI-NAV-024
                 nav::opening(&mut view, &loaded.state);
+                // What the absence earned is new to the returning player.
+                // @spec TUI-NAV-174
+                view.achievements_seen = self.seen_at_load;
                 // @spec TUI-NAV-027
                 nav::queue_load_report(&mut view, &loaded);
                 Ok(Wake::Awake(App {

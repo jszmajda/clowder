@@ -52,7 +52,7 @@ pub fn resolve(key: KeyEvent, view: &ViewState) -> Action {
         };
     }
 
-    // A full-screen overlay (Journal or help) takes the cursor, section and
+    // A full-screen overlay (the Journal, the scrapbook, or help) takes the cursor, section and
     // action keys for its own navigation; the speed keys, q, Ctrl-C and Esc
     // stay live (Esc and Ctrl-C are already handled above).
     // @spec TUI-NAV-052
@@ -65,6 +65,10 @@ pub fn resolve(key: KeyEvent, view: &ViewState) -> Action {
             KeyCode::Up | KeyCode::Char('k') => Action::CursorUp,
             KeyCode::Char('[') => Action::GroupPrev,
             KeyCode::Char(']') => Action::GroupNext,
+            // `a` closes the overlay it opens, and no other. @spec TUI-NAV-174
+            KeyCode::Char('a') if matches!(view.overlay, Some(Overlay::Achievements { .. })) => {
+                Action::Achievements
+            }
             _ => Action::Ignored,
         };
     }
@@ -103,6 +107,8 @@ pub fn resolve(key: KeyEvent, view: &ViewState) -> Action {
         KeyCode::Backspace => Action::Decrement,
         KeyCode::Char('/') => Action::OpenPalette,
         KeyCode::Char('e') => Action::OpenJournal,
+        // @spec TUI-NAV-174
+        KeyCode::Char('a') => Action::Achievements,
         KeyCode::Char('o') => Action::ObserveSky,
         KeyCode::Char('<') => Action::SpeedDown,
         KeyCode::Char('>') => Action::SpeedUp,

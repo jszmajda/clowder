@@ -14,7 +14,7 @@ use ratatui::{layout::Rect, Frame};
 
 use crate::nav::rows::RowKey;
 use crate::nav::{Overlay, ViewState};
-use crate::render::{fmt, line_from_pieces, Piece};
+use crate::render::{fmt, line_from_pieces, style_for, Piece};
 use crate::theme::Role;
 
 /// The mark a line opens with, and the class it belongs to. Prominence is the
@@ -174,6 +174,11 @@ fn event_words(event: &Event) -> String {
         ),
         E::MeadowMoved { generation } => format!("the clowder moved on — generation {generation}"),
         E::DistantDawn => "a distant dawn".into(),
+        // @spec TUI-NAV-176
+        E::AchievementEarned { id } => format!(
+            "achievement: {}",
+            clowder_core::content::achievement_def(*id).name
+        ),
         // Everything else says its kind without unpacking its payload: better a
         // plain noun than a struct dump, and better than inventing prose for
         // occurrences whose wording nobody has settled.
@@ -582,6 +587,149 @@ fn away_report_lines(report: &OfflineReport) -> Vec<Line<'static>> {
     lines
 }
 
+/// The clowder's scrapbook: what it has earned, what it hasn't yet, and how
+/// many secrets remain, from the core's achievement query, scrolled to its
+/// own anchor. @spec TUI-NAV-175
+pub fn achievements(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
+    let anchor = match &view.overlay {
+        Some(Overlay::Achievements { anchor }) => *anchor,
+        _ => 0,
+    };
+    let lines = achievement_lines(state, view, area.width as usize);
+    let start = anchor.min(lines.len());
+    let end = (start + area.height as usize).min(lines.len());
+    f.render_widget(Paragraph::new(lines[start..end].to_vec()), area);
+}
+
+/// The scroll at which the scrapbook's last line stands at the foot of
+/// `area`, or none where every line fits. @spec TUI-RENDER-025
+pub fn achievements_max_scroll(state: &GameState, view: &ViewState, area: Rect) -> Option<usize> {
+    let total = achievement_lines(state, view, area.width as usize).len();
+    (total > area.height as usize).then(|| total - area.height as usize)
+}
+
+/// Every line of the scrapbook, top to bottom, before any scroll: the
+/// heading, a blank line, the earned in table order with their words and
+/// when, the locked that aren't secret with their hints in dim, and how many
+/// secrets are left. @spec TUI-NAV-175
+fn achievement_lines(state: &GameState, view: &ViewState, width: usize) -> Vec<Line<'static>> {
+    let list = state.achievement_list();
+    let earned = list.iter().filter(|(_, _, e)| e.is_some()).count();
+    let mut lines = vec![
+        Line::raw(format!("Achievements — {earned} of {} earned", list.len())),
+        Line::raw(String::new()),
+    ];
+    for (id, def, when) in &list {
+        let Some(when) = when else { continue };
+        let mut name = vec![Piece::plain(format!("\u{2605} {}", def.name))];
+        if view.achievements_new.contains(id) {
+            name.push(Piece::plain(" new"));
+        }
+        lines.extend(wrapped(&name, None, 0, width, Style::default(), true));
+        let mut words = crate::render::marked_pieces(def.words);
+        words.push(Piece::plain(" \u{2014}"));
+        let earned_on = Piece::plain(format!(
+            "Gen {}, {}",
+            when.generation,
+            super::chrome::date_words(when.day)
+        ));
+        lines.extend(wrapped(
+            &words,
+            Some(earned_on),
+            2,
+            width,
+            Style::default(),
+            true,
+        ));
+    }
+    for (_, def, when) in &list {
+        if when.is_some() || def.secret {
+            continue;
+        }
+        let locked = [Piece::plain(format!(
+            "\u{25cb} {} \u{2014} {}",
+            def.name, def.hint
+        ))];
+        lines.extend(wrapped(
+            &locked,
+            None,
+            0,
+            width,
+            style_for(Role::Dim),
+            false,
+        ));
+    }
+    let secrets = list
+        .iter()
+        .filter(|(_, def, when)| def.secret && when.is_none())
+        .count();
+    match secrets {
+        0 => {}
+        1 => lines.push(Line::raw("\u{2026}and 1 secret still to find.")),
+        n => lines.push(Line::raw(format!("\u{2026}and {n} secrets still to find."))),
+    }
+    lines
+}
+
+/// Pieces set out over as many lines of `width` columns as they need, then
+/// `whole` after a space, kept on one line — the first line set in by
+/// `indent` blank columns and each after it by two more, breaking only at a
+/// space and never inside a resource's name — so no word is cut.
+/// @spec TUI-NAV-175
+fn wrapped(
+    pieces: &[Piece],
+    whole: Option<Piece>,
+    indent: usize,
+    width: usize,
+    base: Style,
+    coats: bool,
+) -> Vec<Line<'static>> {
+    // Words: runs between spaces, a name staying whole inside its word.
+    let mut words: Vec<Vec<Piece>> = vec![Vec::new()];
+    for piece in pieces {
+        if piece.coat.is_some() {
+            words.last_mut().expect("never empty").push(piece.clone());
+            continue;
+        }
+        for (i, part) in piece.text.split(' ').enumerate() {
+            if i > 0 {
+                words.push(Vec::new());
+            }
+            if !part.is_empty() {
+                words.last_mut().expect("never empty").push(Piece {
+                    text: part.to_string(),
+                    ..piece.clone()
+                });
+            }
+        }
+    }
+    words.extend(whole.map(|w| vec![w]));
+    let chars = |word: &[Piece]| word.iter().map(|p| p.text.chars().count()).sum::<usize>();
+
+    let mut lines = Vec::new();
+    let mut line = vec![Piece::plain(" ".repeat(indent))];
+    let mut used = indent;
+    let mut empty = true;
+    for word in words.into_iter().filter(|w| !w.is_empty()) {
+        let n = chars(&word);
+        if !empty && used + 1 + n > width {
+            lines.push(line_from_pieces(&line, base, coats, width));
+            line = vec![Piece::plain(" ".repeat(indent + 2))];
+            used = indent + 2;
+            empty = true;
+        }
+        if !empty {
+            line.push(Piece::plain(" "));
+            used += 1;
+        }
+        used += n;
+        line.extend(word);
+        empty = false;
+    }
+    lines.push(line_from_pieces(&line, base, coats, width));
+    lines
+}
+
 /// The complete key map and glyph legend. There is no manual; this and the
 /// hint bar are the manual. @spec TUI-NAV-025, TUI-NAV-090, TUI-NAV-146
 pub fn help(f: &mut Frame, area: Rect) {
@@ -598,6 +746,7 @@ pub fn help(f: &mut Frame, area: Rect) {
         ("+ / -", "Increment / decrement a count row"),
         ("/", "Find-anything palette over revealed content"),
         ("e", "Journal: full scrollback + pinned reports"),
+        ("a", "Achievements: what the clowder has earned"),
         ("o", "Observe the sky"),
         ("< / >", "Game speed down / up"),
         ("?", "This help overlay"),

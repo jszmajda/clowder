@@ -76,7 +76,7 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
         | Action::SectionJump(_)
         | Action::GroupNext
         | Action::GroupPrev => {
-            // A full-screen overlay (Journal or help) takes the cursor and
+            // A full-screen overlay (the Journal, the scrapbook, or help) takes the cursor and
             // group keys for its own scrolling — their navigation meaning is
             // suspended, so they neither move the section cursor nor end an
             // arming beneath the overlay. @spec TUI-NAV-076
@@ -148,6 +148,18 @@ pub fn update(action: Action, view: &mut ViewState, state: &GameState) -> Outcom
             }
             open_overlay(view, Overlay::Journal { anchor: 0 })
         }
+        // @spec TUI-NAV-174
+        Action::Achievements => {
+            if matches!(view.overlay, Some(Overlay::Achievements { .. })) {
+                view.overlay = None;
+                view.achievements_new.clear();
+            } else {
+                view.achievements_new.clear();
+                view.overlay = Some(Overlay::Achievements { anchor: 0 });
+                show_achievements(view, state);
+            }
+            Outcome::Handled
+        }
         Action::OpenHelp => open_overlay(view, Overlay::Help),
         Action::OpenPalette => open_overlay(
             view,
@@ -202,7 +214,26 @@ pub fn opening(view: &mut ViewState, state: &GameState) {
         }
     }
     view.done_open = false;
+    // What a sitting opens on was earned before it; a load whose absence
+    // earned more says so itself (TUI-NAV-174).
+    view.achievements_seen = state.achievements.keys().copied().collect();
     enter_section(view, state, Section::Meadow);
+}
+
+/// While the Achievements overlay is open, mark every achievement the core
+/// reports earned as seen, and each that was unseen as ` new` for as long as
+/// the overlay stays open. Run on opening and every frame, independent of
+/// input, so one earned beneath the open overlay is seen as it is drawn.
+/// @spec TUI-NAV-174, TUI-NAV-175
+pub fn show_achievements(view: &mut ViewState, state: &GameState) {
+    if !matches!(view.overlay, Some(Overlay::Achievements { .. })) {
+        return;
+    }
+    for id in state.achievements.keys() {
+        if view.achievements_seen.insert(*id) {
+            view.achievements_new.insert(*id);
+        }
+    }
 }
 
 /// A tab's badge (TUI-NAV-006) tracks whether its section has been visited
@@ -1112,6 +1143,9 @@ pub fn dismiss(view: &mut ViewState, narrow_on_screen: bool) -> Outcome {
         // it read take their ordinary place in the scrollback from here.
         // @spec TUI-NAV-027, TUI-NAV-050
         view.journal_pinned.clear();
+        // And what the Achievements overlay marked new was new to that
+        // opening alone. @spec TUI-NAV-175
+        view.achievements_new.clear();
         return Outcome::Handled;
     }
     if view.armed.take().is_some() {

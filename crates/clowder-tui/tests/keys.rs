@@ -349,6 +349,11 @@ fn global_bindings() -> Vec<(KeyEvent, Action, &'static str)> {
             "/ opens the find-anything palette",
         ),
         (ch('e'), Action::OpenJournal, "e opens the Journal"),
+        (
+            ch('a'),
+            Action::Achievements,
+            "a opens the Achievements overlay",
+        ),
         (ch('o'), Action::ObserveSky, "o observes the sky"),
         (ch('<'), Action::SpeedDown, "< steps the speed ladder down"),
         (ch('>'), Action::SpeedUp, "> steps the speed ladder up"),
