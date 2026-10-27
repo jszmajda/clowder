@@ -620,21 +620,24 @@ fn achievement_lines(state: &GameState, view: &ViewState, width: usize) -> Vec<L
         Line::raw(String::new()),
     ];
     let plain = Style::default();
-    // What the clowder has done, in violet; its words plain, each resource in
-    // its coat; when, receding.
+    // What the clowder has done, in violet, what is new to the player in the
+    // orange of the chip that counted it; its words plain, each resource in
+    // its coat; when, receding. @spec TUI-THEME-015
     for (id, def, when) in &list {
         let Some(when) = when else { continue };
         let mut name = vec![Piece::plain(format!("\u{2605} {}", def.name))];
         if view.achievements_new.contains(id) {
-            name.push(Piece::plain(" new"));
+            name.push(Piece::role(" new", Role::Attention));
         }
+        // The name is plain text, so no coat can land on this violet line
+        // (TUI-THEME-020); letting pieces colour lets the tag wear its own.
         lines.extend(wrapped(
             &name,
             None,
             0,
             width,
             style_for(Role::Milestone),
-            false,
+            true,
         ));
         let mut words = crate::render::marked_pieces(def.words);
         words.push(Piece::role(" \u{2014}", Role::Dim));

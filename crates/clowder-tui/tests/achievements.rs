@@ -526,12 +526,12 @@ fn the_ticker_celebrates_by_name() {
     );
 }
 
-/// Colour does the reading: an earned achievement's line in `milestone`, its
-/// words in the inherited foreground with each named resource in its coat and
-/// when it was earned in `dim`; a locked one's name inherited and its mark and
-/// hint in `dim`; and blank lines part the earned, the locked, and the
-/// secrets.
-/// @spec TUI-NAV-175
+/// Colour does the reading: an earned achievement's `★` and name in
+/// `milestone` and its ` new` in `attention`, apart from the name; its words in
+/// the inherited foreground with each named resource in its coat and when it
+/// was earned in `dim`; a locked one's name inherited and its mark and hint in
+/// `dim`; and blank lines part the earned, the locked, and the secrets.
+/// @spec TUI-NAV-175, TUI-THEME-015
 #[test]
 fn colour_and_space_make_the_scrapbook_easy_to_read() {
     use ratatui::style::Color;
@@ -556,8 +556,17 @@ fn colour_and_space_make_the_scrapbook_easy_to_read() {
         .iter()
         .position(|r| r.trim_start().starts_with(&format!("★ {}", def.name)))
         .unwrap();
-    for needle in ["★", def.name, "new"] {
+    for needle in ["★", def.name] {
         assert_eq!(fg(col(&rows[y], needle), y), milestone, "{needle:?}");
+    }
+    let tag = rows[y].rfind(" new").expect("the tag ends the name line");
+    let new_at = rows[y][..tag].chars().count() + 1;
+    for x in new_at..new_at + 3 {
+        assert_eq!(
+            fg(x, y),
+            Role::Attention.color().unwrap(),
+            "` new` wears the chip's orange, apart from the name"
+        );
     }
     let words = &rows[y + 1];
     let first = words.trim_start().chars().next().unwrap().to_string();

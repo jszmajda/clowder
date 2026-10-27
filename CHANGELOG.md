@@ -8,6 +8,10 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 
 - **Mess can be tidied as the meadow grows.** Mess no longer has to be waited out: there are ways to clear it both when it first turns up and once industry really gets going.
 
+### Changed
+
+- **New achievements stand out from their names.** In the scrapbook, `new` now wears the same orange as the top-bar chip that sent you there, so it reads apart from the achievement it marks.
+
 ### Fixed
 
 - **The mess readout stops at zero.** With nothing left to tidy, it now says mess is holding steady instead of still falling.

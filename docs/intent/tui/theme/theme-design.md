@@ -43,8 +43,8 @@ Six roles. Every value sits in a mid-luminance band so it clears the contrast fl
 | `dim` | `#7C7873` | Revealed but not actionable, owned and done, flavour events, a list's group-header rules and the inspector's `last time` and `about` dividers, a kitten's favourites, spent hints, and in the scrapbook a locked achievement's mark and hint and when an earned one was earned |
 | `ready` | `#3E8E5A` | ● affordable now |
 | `partial` | `#A8802F` | ◐ partially affordable |
-| `attention` | `#C0663A` | Each attention chip whole, the `full` tag on a capped store, a sidebar note's count of capped stores out of view, an armed row's expansion beneath it — and nothing else |
-| `milestone` | `#7E6BA8` | ★ milestones and newly revealed content, an earned achievement's name line in the scrapbook among them |
+| `attention` | `#C0663A` | Each attention chip whole, the `full` tag on a capped store, a sidebar note's count of capped stores out of view, an armed row's expansion beneath it, the scrapbook's ` new` tags — and nothing else |
+| `milestone` | `#7E6BA8` | ★ milestones and newly revealed content, an earned achievement's `★` and name in the scrapbook among them |
 
 Mood takes no colour at all. The navigation leaf already renders it as a word (TUI-NAV-019), and a word is unambiguous, translatable to a screen reader, and immune to every failure mode a five-step colour ramp has. Where a channel is already carrying meaning well, adding colour is noise.
 
@@ -52,7 +52,7 @@ Mood takes no colour at all. The navigation leaf already renders it as a word (T
 
 `attention` means one thing — *this wants you* — and the glance contract depends on it meaning nothing else. An empty chip cluster and no `full` tag or full count is how the player reads, in two seconds, that nothing needs them, and the eye can only learn that if orange appearing is always that signal. So the role is not subdivided by surface, and it is not lent to anything that is merely information.
 
-Six elements wear it, each on exactly the mark that says it wants notice:
+Seven elements wear it, each on exactly the mark that says it wants notice:
 
 - **An attention chip, whole.** Its glyph, its count where it has one, and its word all wear `attention`; the blank columns between chips, and the header's facts beside them, do not. This holds at every width step the header takes (TUI-NAV-086) — a chip that has shed its count is still a chip — and for every chip alike, the `★N new` chip included. That chip counts tabs wearing the `milestone` ★, but the chip itself is asking for the player, and a cluster in two colours would leave the eye to work out which colour means "come look".
 - **The `full` tag on a capped store, and only the tag.** The store's name wears its coat, and its figures, fill bar, and rate are drawn as any store's are. The tag is present exactly while the store is capped (TUI-NAV-022), whereas the bar's cells can read full a little before the cap is reached, so the word is the state's exact mark and the colour sits on it.
@@ -61,7 +61,9 @@ Six elements wear it, each on exactly the mark that says it wants notice:
 - **The `short` tag on the Energy row, and only the tag.** The row's name and figures are drawn as any row's are; the tag is present exactly while the meadow uses more energy than it makes, the same moment the `↯energy` chip is, and the colour sits on the word.
 - **The ticker's sky light, whole.** Its glyph, its word, its clock, and its key all wear `attention`, as the chip it gives a clock to wears it (navigation leaf: The ticker's line); the blank columns around it do not. The light and the chip are one opportunity, and one opportunity in two colours would be two things to learn. The ticker's other lights want nothing and wear none of it (The ticker, below).
 
-All six wear the same `attention` value, whichever surface draws them, so there is one orange to learn.
+- **The scrapbook's ` new` tags, and only the tags.** The `✦N earned` chip asks the player to come and look, and the tags mark what it was counting: each achievement unseen when the overlay opened, or earned while it stood open (navigation leaf: The Achievements Overlay). They wear the chip's orange so the eye goes from the chip to what it pointed at, as the ticker's sky light shares its chip's colour. A tag is drawn only inside the overlay the chip invites the player to open, and only until that overlay closes, so it never stands on the screen a glance reads for calls. The `★` and the name before it stay `milestone`, so the tag stands apart from the name it follows.
+
+All seven wear the same `attention` value, whichever surface draws them, so there is one orange to learn.
 
 Nothing else wears `attention`. A footer note — the reply to a key just pressed (TUI-NAV-014) — is ordinary prose in the inherited foreground. It is drawn where the player is already looking and lasts seconds, so it needs no colour to be seen; in orange it would be one more thing the glance has to rule out before concluding nothing needs the player, and a refused keypress drawn in the colour of an opportunity would read as a scolding.
 
