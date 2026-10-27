@@ -34,6 +34,14 @@ Twist (while active) → goal → reward per completion (LimitedDR-capped):
 
 Rewards stack across completions with per-reward LimitedDR caps (the inspiration's per-effect challenge caps), so an Adventure stays worth re-running without ever breaking balance. All twists are *slowdowns or removals of options*, never deletions of the player's things (Tenet 1).
 
+## What an Adventure Says
+
+Each Adventure carries a **blurb**: a short joke, then in plain words its twist, its goal, and what one completion adds to its reward, marking each resource it names as the curiosity leaf's blurbs do (SIM-CUR-014). The shell shows it as what the Adventure is, so a player declares one knowing what it asks and what it gives (Tenet 3).
+
+- *It states what the core applies.* Every figure a blurb states is the figure the core applies — the twist's, the goal's, and the reward's — and a part of a catalogue entry the core does not apply is left out of its blurb rather than promised. A player reads the blurb to choose, so a promise the meadow does not keep is worse than a shorter blurb.
+- *A reward is stated as a ceiling.* The pool is LimitedDR-capped, so a completion adds its full amount only while the pool is well under its cap, and less as it nears it. The blurb states the reward's per-completion amount as the most one completion adds and its cap as the most every completion together comes to: both are upper bounds, so neither reads as a gain every completion is sure to bring.
+- *Goals by the names the player reads.* A goal that asks for a structure or an idea names it as that item's own row names it, so the blurb points at a row the player can find.
+
 ## Cozy Notes
 
 - The inspiration's challenges include an apocalyptic "Post-Apocalypse" start on a dead world and an "Anarchy" that halves productivity. Clowder keeps the *shape* (a themed constraint that pays a permanent buff) but the constraints are cozy — a quiet retreat, a long winter, a lazy nap — and every one is opt-in.
@@ -46,6 +54,8 @@ Rewards stack across completions with per-reward LimitedDR caps (the inspiration
 | Opt-in, armed before a Move | Declare → active next meadow → complete | Always-on challenge toggles | Matches the inspiration's reset-coupled challenge model and keeps Adventures a deliberate choice |
 | Rewards LimitedDR-capped per effect | Stacking with per-reward caps | Uncapped stacking; one-shot rewards | The inspiration's proven infinite-replay-without-breaking-balance mechanism |
 | Twists are cozy constraints | Slowdowns/removals of options only | Keep the grim challenges (apocalypse, anarchy) | Tenet 1 — the challenge *shape* survives; the theme becomes gentle |
+| What an Adventure says about itself | A hand-written blurb per Adventure, as traditions and rites carry | A statement the shell assembles from the definition's fields | Twists and goals are engine behavior, not definition fields (SIM-ADV-002, SIM-ADV-004), so no field holds them for a shell to state; a blurb keeps the words in the core's table beside the reward they describe |
+| Blurb scope | Only what the core applies, the reward as a ceiling | The catalogue entry as designed; a fixed gain per completion | Tenet 3 — the blurb is the plain statement behind a playful name, and a statement the meadow does not keep, or a gain the LimitedDR cap would shrink, misleads the choice it exists to inform |
 
 ## Open Questions & Future Decisions
 
