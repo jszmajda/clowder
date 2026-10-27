@@ -226,6 +226,8 @@ Every meaning colour carries is carried by something else first — a glyph, a w
 | Affordability | `●` `◐` `○` `✓` | `ready` / `partial` / `dim` |
 | Attention | Glyph + count + word | `attention`, on the whole chip |
 | Capped store | The word `full`, and a filled bar | `attention`, on the word |
+| Energy shortfall | The word `short` | `attention`, on the word |
+| A newly earned achievement | The word `new` | `attention`, on the word |
 | Armed row | Its expansion beneath itself, and its keys in the hint bar | `attention`, on the expansion |
 | Milestone | `★` | `milestone` |
 | Flavour vs mechanical | `·` vs `▪` | `dim` vs inherited |
@@ -240,7 +242,7 @@ Turn every colour off and the game is still completely playable — which is the
 
 The palette's riskiest axis for colour vision is `ready` against `partial` against `attention`, the green–amber–orange run that red-green deficiencies compress. For a player with such a deficiency these three colours are close to one colour, so between these three states the glyph is not a courtesy but the whole distinction. Two rules keep it whole.
 
-**Each of the three has a non-colour channel the other two never use.** Affordable is `●`. Partially affordable is `◐`. Attention is carried by each chip's own glyph (TUI-NAV-020), and by the same glyph and word on the ticker's sky light (TUI-NAV-152), by a word — the `full` tag, or the `full` of a sidebar note's count — or, on an armed row, by the row's expansion beneath itself, whose summary is words (TUI-NAV-077); none of these is ever `●` or `◐`. Every glyph among them is a different single-width character (TUI-NAV-021); none differs from another only by its colour.
+**Each of the three has a non-colour channel the other two never use.** Affordable is `●`. Partially affordable is `◐`. Attention is carried by each chip's own glyph (TUI-NAV-020), and by the same glyph and word on the ticker's sky light (TUI-NAV-152), by a word — the `full` tag, the `full` of a sidebar note's count, the Energy row's `short`, or the scrapbook's `new` — or, on an armed row, by the row's expansion beneath itself, whose summary is words (TUI-NAV-077); none of these is ever `●` or `◐`. Every glyph among them is a different single-width character (TUI-NAV-021); none differs from another only by its colour.
 
 **Among the three colours, each glyph wears only its own.** `●` is never drawn in `partial` or `attention`, `◐` never in `ready` or `attention`, and a chip's glyph never in `ready` or `partial`. If any glyph could appear in a neighbour's colour, the two pairings would be one appearance to exactly the player this section is for — an amber `◐` and an orange `◐` are the same mark once amber and orange are the same colour. Dim lies outside the run and still recedes a marker as TUI-NAV-009 asks: a Teased row's `◐` is drawn dim. A coat lies outside the run too, and no glyph ever wears one: coats sit on letters, and a marker is never a letter.
 
