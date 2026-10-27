@@ -2553,9 +2553,10 @@ fn every_purchasable_item_states_its_blurb() {
 }
 
 /// A row whose action has no content definition — a fixed action, a kitten's
-/// rows, a site, an adventure, a pen pal — has nothing to state beyond its name
-/// (the tinkerers' bench, which states the seats, is swept in `bench.rs`, and
-/// the `about` card beneath a kitten's row in `kitten_card.rs`):
+/// rows, a site, the no-adventure row, a pen pal — has nothing to state beyond
+/// its name (the tinkerers' bench, which states the seats, is swept in
+/// `bench.rs`, the `about` card beneath a kitten's row in `kitten_card.rs`, and
+/// an adventure's row, whose definition carries a blurb, in `adventures.rs`):
 /// no statement, no stand-in, no price, no reason — save, on a row the list
 /// draws with a label in its name's place, that label (TUI-NAV-091). (Pounce
 /// and Trade rows state the core's one-unit price instead, TUI-NAV-073.)
@@ -2573,6 +2574,7 @@ fn a_row_with_no_definition_states_only_its_name() {
                     | RowKey::Bench
                     | RowKey::Energy
                     | RowKey::Mess
+                    | RowKey::Adventure(Some(_))
             ) {
                 continue;
             }

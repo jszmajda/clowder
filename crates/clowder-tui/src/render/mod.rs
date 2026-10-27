@@ -884,9 +884,12 @@ fn row_line(
 
     // The Elder's own row draws the mark in the row's own style instead,
     // stepping down to the glyph alone, then to nothing, by what the name's
-    // column holds beside the whole name. @spec TUI-NAV-104, TUI-NAV-105, TUI-NAV-106
+    // column holds beside the whole name; a chosen adventure's row draws its
+    // words the same way, whole or not at all.
+    // @spec TUI-NAV-104, TUI-NAV-105, TUI-NAV-106, TUI-NAV-178
     if let Some(mark) = elder_mark(state, row)
         .into_iter()
+        .chain(adventure_words(state, row))
         .find(|mark| name_len + 1 + mark.chars().count() <= name_w)
     {
         let trailing = name_w - name_len - 1 - mark.chars().count();
@@ -952,6 +955,26 @@ fn elder_mark(state: &GameState, row: &Row) -> Vec<&'static str> {
     match row.key {
         RowKey::Kitten(ix, _) if state.elder == Some(ix) => vec![ELDER_MARK, ELDER_GLYPH],
         _ => Vec::new(),
+    }
+}
+
+/// The words a declare-list row carries after an adventure's name: which
+/// meadow the core holds that adventure for — active in this one, armed for
+/// the next, or both — read from the core's two slots and no rule of the
+/// shell's own. None on the no-adventure row, and on an adventure's row the
+/// core holds in neither slot. @spec TUI-NAV-178
+fn adventure_words(state: &GameState, row: &Row) -> Option<&'static str> {
+    let RowKey::Adventure(Some(a)) = row.key else {
+        return None;
+    };
+    match (
+        state.active_adventure == Some(a),
+        state.armed_adventure == Some(a),
+    ) {
+        (true, true) => Some("this meadow and next"),
+        (true, false) => Some("this meadow"),
+        (false, true) => Some("next meadow"),
+        (false, false) => None,
     }
 }
 

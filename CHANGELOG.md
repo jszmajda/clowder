@@ -2,6 +2,12 @@
 
 What changed in each release of Clowder, written so it spoils nothing: what changed for the player, never what the new things are called, what they cost, or what they do in numbers. Clowder is meant to be discovered by playing it.
 
+## [Unreleased]
+
+### Fixed
+
+- **Adventures say what they are, and which one you chose.** The list marks the adventure you've picked for the next meadow and the one under way in this one, and the info pane now tells you what each adventure asks of you and what it gives.
+
 ## [1.3.2] — 2026-10-27
 
 ### New

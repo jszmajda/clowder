@@ -1025,6 +1025,18 @@ fn draw_body(
         lines.push(plain(crate::render::ELDER_MARK.to_string()));
     }
 
+    // An adventure's row says, beneath the name, which meadow the core holds
+    // it for: active in this one first, then armed for the next.
+    // @spec TUI-NAV-179
+    if let RowKey::Adventure(Some(a)) = key {
+        if state.active_adventure == Some(*a) {
+            lines.push(plain("Under way in this meadow.".to_string()));
+        }
+        if state.armed_adventure == Some(*a) {
+            lines.push(plain("Chosen for the next meadow.".to_string()));
+        }
+    }
+
     // A later row of a multi-row item states its own label whole, beneath the
     // item's name — never the item's name a second time. @spec TUI-NAV-091
     if let Some(label) = crate::nav::rows::later_row_label(key) {
@@ -1068,6 +1080,12 @@ fn draw_body(
         RowKey::Mess => {
             lines.push(Vec::new());
             lines.extend(mess_lines(state));
+        }
+        // An adventure's definition carries a blurb, and the blurb is its
+        // statement. @spec TUI-NAV-018
+        RowKey::Adventure(Some(a)) => {
+            lines.push(Vec::new());
+            lines.push(blurb_statement(content::adventure_def(*a).blurb));
         }
         _ => {
             if let Some(p) = on_this_row {
