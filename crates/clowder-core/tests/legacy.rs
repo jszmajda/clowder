@@ -1204,6 +1204,22 @@ fn a_goal_that_asks_for_a_move_is_judged_at_the_move() {
     assert!(built.adventure_rewards[silent] > 0.0, "its reward is kept");
 }
 
+/// The other goal that asks for a Move — an idea researched, then a Move — is
+/// judged at the Move too: researching it finishes nothing at day close, and
+/// the Move with it known finishes the adventure before the reset clears it.
+// @spec SIM-ADV-004
+#[test]
+fn a_researched_goal_that_asks_for_a_move_finishes_at_the_move() {
+    let paws = AdventureId::GentlePaws as usize;
+    let mut s = meadow_with(452, 71);
+    s.active_adventure = Some(AdventureId::GentlePaws);
+    s.ideas.insert(IdeaId::PenPalNetworks);
+    run_ticks(&mut s, 5 * content::TICKS_PER_DAY);
+    assert_eq!(s.adventure_completions[paws], 0, "not judged at day close");
+    s.apply(Command::GreatMeadowMove).unwrap();
+    assert_eq!(s.adventure_completions[paws], 1, "the Move finishes it");
+}
+
 // @spec SIM-ADV-004
 #[test]
 fn tidy_meadow_completes_after_a_full_year_of_zero_mess() {

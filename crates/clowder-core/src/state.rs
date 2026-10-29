@@ -1864,7 +1864,7 @@ impl GameState {
     /// Move against the meadow being left rather than at day close.
     /// @spec SIM-ADV-004
     pub(crate) fn adventure_goal_at_move(a: AdventureId) -> bool {
-        matches!(a, AdventureId::SilentSun)
+        matches!(a, AdventureId::SilentSun | AdventureId::GentlePaws)
     }
 
     /// The active adventure's goal predicate, judged when

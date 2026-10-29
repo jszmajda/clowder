@@ -4351,7 +4351,7 @@ static ADVENTURES: [AdventureDef; 7] = [
         reward_per: 0.10,
         reward_cap: 0.20,
         reward_key: Effect::PounceRatio,
-        blurb: "Live and let flutter. While it lasts, pounces bring nothing home. Goal: research Pen Pal Networks. Finishing it adds up to 0.1 to the pounce ratio, at most 0.2 in all.",
+        blurb: "Live and let flutter. While it lasts, pounces bring nothing home. Goal: research Pen Pal Networks, then Move. Finishing it adds up to 0.1 to the pounce ratio, at most 0.2 in all.",
     },
     // TidyMeadow: a full tidy year → an exclusive tradition unlock (one-shot,
     // no stacking effect value).
