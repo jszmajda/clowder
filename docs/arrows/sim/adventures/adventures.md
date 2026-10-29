@@ -4,7 +4,7 @@ Adventures are clowder's challenge modes, reimagined as *optional themed outings
 
 ## Status
 
-**OK** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 5 of 5 active specs implemented.
+**OK** — last audited 2026-10-29 (git SHA `8443eda1698c`). 8 of 8 active specs implemented, each cited by a test and annotated at its entry point.
 
 ## References
 
@@ -16,15 +16,18 @@ Adventures are clowder's challenge modes, reimagined as *optional themed outings
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/adventures/adventures-specs.md` — 5 specs, prefix `SIM-ADV`
+- `docs/intent/sim/adventures/adventures-specs.md` — 8 specs, prefix `SIM-ADV`
 
 ### Tests
+- `crates/clowder-core/tests/blurbs.rs`
+- `crates/clowder-core/tests/economy_depth.rs`
 - `crates/clowder-core/tests/legacy.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`
 - `crates/clowder-core/src/content.rs`
 - `crates/clowder-core/src/effects.rs`
+- `crates/clowder-core/src/gating.rs`
 - `crates/clowder-core/src/state.rs`
 - `crates/clowder-core/src/tick.rs`
 
@@ -32,16 +35,14 @@ Adventures are clowder's challenge modes, reimagined as *optional themed outings
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-ADV-001 – SIM-ADV-005 | 5 | 0 | 0 |
+| All | SIM-ADV-001 – SIM-ADV-008 | 8 | 0 | 0 |
 
-**Summary:** 5 of 5 active specs implemented.
+**Summary:** 8 of 8 active specs implemented.
 
 ## Key Findings
 
-Bootstrapped from existing LID docs without an audit pass. Coverage above is
-read from the spec files' own markers, which record what the project believes;
-they have not been verified against the code by this overlay.
+Audited 2026-10-29 against the source: every spec marked implemented has a test citing it, no `@spec` in the code or tests names a spec that does not exist, and no spec ID is defined twice.
 
 ## Work Required
 
-None recorded — every active spec is marked implemented.
+None.

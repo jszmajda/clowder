@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**PARTIAL** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 35 of 57 active specs implemented.
+**OK** — last audited 2026-10-29 (git SHA `8443eda1698c`). 180 of 180 active specs implemented, each cited by a test and annotated at its entry point.
 
 ## References
 
@@ -16,66 +16,73 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/navigation/navigation-specs.md` — 57 specs, prefix `TUI-NAV`
+- `docs/intent/tui/navigation/navigation-specs.md` — 180 specs, prefix `TUI-NAV`
 
 ### Tests
+- `crates/clowder-tui/tests/achievements.rs`
+- `crates/clowder-tui/tests/act_results.rs`
+- `crates/clowder-tui/tests/adventures.rs`
+- `crates/clowder-tui/tests/armed_summary.rs`
+- `crates/clowder-tui/tests/bench.rs`
 - `crates/clowder-tui/tests/chrome.rs`
 - `crates/clowder-tui/tests/composed.rs`
+- `crates/clowder-tui/tests/count_prompt.rs`
+- `crates/clowder-tui/tests/frame.rs`
 - `crates/clowder-tui/tests/inspector.rs`
+- `crates/clowder-tui/tests/inspector_reasons.rs`
 - `crates/clowder-tui/tests/keys.rs`
+- `crates/clowder-tui/tests/kitten_card.rs`
+- `crates/clowder-tui/tests/loop_body.rs`
+- `crates/clowder-tui/tests/neighbour_offers.rs`
 - `crates/clowder-tui/tests/overlays.rs`
+- `crates/clowder-tui/tests/palette.rs`
+- `crates/clowder-tui/tests/pen_pals.rs`
+- `crates/clowder-tui/tests/pointer.rs`
+- `crates/clowder-tui/tests/readouts.rs`
+- `crates/clowder-tui/tests/report_queue.rs`
+- `crates/clowder-tui/tests/resize.rs`
 - `crates/clowder-tui/tests/rows.rs`
+- `crates/clowder-tui/tests/section_reveal.rs`
+- `crates/clowder-tui/tests/sidebar_scroll.rs`
+- `crates/clowder-tui/tests/sources_hint.rs`
+- `crates/clowder-tui/tests/ticker_lights.rs`
+- `crates/clowder-tui/tests/transients.rs`
 - `crates/clowder-tui/tests/update.rs`
+- `crates/clowder-tui/tests/waking.rs`
 
 ### Code
 - `crates/clowder-tui/src/nav/action.rs`
 - `crates/clowder-tui/src/nav/keys.rs`
+- `crates/clowder-tui/src/nav/mnemonics.rs`
 - `crates/clowder-tui/src/nav/mod.rs`
+- `crates/clowder-tui/src/nav/palette.rs`
+- `crates/clowder-tui/src/nav/pointer.rs`
+- `crates/clowder-tui/src/nav/reports.rs`
 - `crates/clowder-tui/src/nav/rows.rs`
 - `crates/clowder-tui/src/nav/section.rs`
 - `crates/clowder-tui/src/nav/update.rs`
 - `crates/clowder-tui/src/nav/view.rs`
+- `crates/clowder-tui/src/render/fmt.rs`
+- `crates/clowder-tui/src/render/layout.rs`
 - `crates/clowder-tui/src/render/mod.rs`
 - `crates/clowder-tui/src/render/widgets/chrome.rs`
 - `crates/clowder-tui/src/render/widgets/inspector.rs`
 - `crates/clowder-tui/src/render/widgets/overlays.rs`
+- `crates/clowder-tui/src/runtime/mod.rs`
+- `crates/clowder-tui/src/runtime/wake.rs`
 
 ## Spec Coverage
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-NAV-001 – TUI-NAV-057 | 35 | 0 | 22 |
+| All | TUI-NAV-001 – TUI-NAV-180 | 180 | 0 | 0 |
 
-**Summary:** 35 of 57 active specs implemented; gaps below.
+**Summary:** 180 of 180 active specs implemented.
 
 ## Key Findings
 
-Bootstrapped from existing LID docs without an audit pass. Coverage above is
-read from the spec files' own markers, which record what the project believes;
-they have not been verified against the code by this overlay.
+Audited 2026-10-29 against the source: every spec marked implemented has a test citing it, no `@spec` in the code or tests names a spec that does not exist, and no spec ID is defined twice.
 
 ## Work Required
 
-### Must Fix
-1. `TUI-NAV-004` not implemented
-2. `TUI-NAV-037` not implemented
-3. `TUI-NAV-006` not implemented
-4. `TUI-NAV-038` not implemented
-5. `TUI-NAV-053` not implemented
-6. `TUI-NAV-011` not implemented
-7. `TUI-NAV-015` not implemented
-8. `TUI-NAV-041` not implemented
-9. `TUI-NAV-018` not implemented
-10. `TUI-NAV-020` not implemented
-11. `TUI-NAV-022` not implemented
-12. `TUI-NAV-044` not implemented
-13. `TUI-NAV-024` not implemented
-14. `TUI-NAV-046` not implemented
-15. `TUI-NAV-027` not implemented
-16. `TUI-NAV-050` not implemented
-17. `TUI-NAV-055` not implemented
-18. `TUI-NAV-056` not implemented
-19. `TUI-NAV-029` not implemented
-20. `TUI-NAV-030` not implemented
-21. `TUI-NAV-035` not implemented
-22. `TUI-NAV-036` not implemented
+None.

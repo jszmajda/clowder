@@ -4,7 +4,7 @@ The economy is the material world of the game: what exists, what it costs, what 
 
 ## Status
 
-**OK** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 44 of 44 active specs implemented.
+**OK** — last audited 2026-10-29 (git SHA `8443eda1698c`). 52 of 52 active specs implemented, each cited by a test and, save the table properties noted below, annotated at its entry point.
 
 ## References
 
@@ -16,19 +16,23 @@ The economy is the material world of the game: what exists, what it costs, what 
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/economy/economy-specs.md` — 44 specs, prefix `SIM-ECO`
+- `docs/intent/sim/economy/economy-specs.md` — 52 specs, prefix `SIM-ECO`
 
 ### Tests
 - `crates/clowder-core/tests/economy.rs`
 - `crates/clowder-core/tests/economy_depth.rs`
 - `crates/clowder-core/tests/frontier.rs`
+- `crates/clowder-core/tests/queries_bench.rs`
 - `crates/clowder-core/tests/society.rs`
 - `crates/clowder-core/tests/wonder.rs`
+- `crates/clowder-tui/tests/bench.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`
 - `crates/clowder-core/src/content.rs`
 - `crates/clowder-core/src/effects.rs`
+- `crates/clowder-core/src/gating.rs`
+- `crates/clowder-core/src/query.rs`
 - `crates/clowder-core/src/save.rs`
 - `crates/clowder-core/src/state.rs`
 - `crates/clowder-core/src/tick.rs`
@@ -37,16 +41,14 @@ The economy is the material world of the game: what exists, what it costs, what 
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-ECO-001 – SIM-ECO-044 | 44 | 0 | 0 |
+| All | SIM-ECO-001 – SIM-ECO-052 | 52 | 0 | 0 |
 
-**Summary:** 44 of 44 active specs implemented.
+**Summary:** 52 of 52 active specs implemented.
 
 ## Key Findings
 
-Bootstrapped from existing LID docs without an audit pass. Coverage above is
-read from the spec files' own markers, which record what the project believes;
-they have not been verified against the code by this overlay.
+Audited 2026-10-29 against the source: every spec marked implemented has a test citing it, no `@spec` in the code or tests names a spec that does not exist, and no spec ID is defined twice. SIM-ECO-024 and SIM-ECO-047 are properties of the content tables as a whole, so no code decides them, and their tests are their pins.
 
 ## Work Required
 
-None recorded — every active spec is marked implemented.
+None.

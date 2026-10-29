@@ -1,5 +1,5 @@
 schema_version: 2
-last_updated: 2026-09-24
+last_updated: 2026-10-29
 
 # Grouped by the two crates the HLD's architecture splits on: the headless
 # simulation and the terminal shell. Persistence sits with the sim crate it
@@ -59,9 +59,9 @@ arrows:
   adventures:
     status: OK
     parent: sim
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-10-29
+    audited: 2026-10-29
+    audited_sha: 8443eda1698c8df48efd2557f47f3f18455dcf5f
     blocks: [cosmic, dreamtime]
     blockedBy: [ceremonies, colonies, mystic]
     detail: sim/adventures/adventures.md
@@ -125,9 +125,9 @@ arrows:
   economy:
     status: OK
     parent: sim
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-10-29
+    audited: 2026-10-29
+    audited_sha: 8443eda1698c8df48efd2557f47f3f18455dcf5f
     blocks: [curiosity, expeditions, kittens]
     blockedBy: [engine]
     detail: sim/economy/economy.md
@@ -136,9 +136,9 @@ arrows:
   engine:
     status: OK
     parent: sim
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-10-29
+    audited: 2026-10-29
+    audited_sha: 8443eda1698c8df48efd2557f47f3f18455dcf5f
     blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md
@@ -178,15 +178,15 @@ arrows:
     next: null
     drift: null
   navigation:
-    status: PARTIAL
+    status: OK
     parent: tui
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-10-29
+    audited: 2026-10-29
+    audited_sha: 8443eda1698c8df48efd2557f47f3f18455dcf5f
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
-    next: "22 spec(s) not yet implemented"
+    next: null
     drift: null
   persistence:
     status: OK
@@ -202,9 +202,9 @@ arrows:
   prestige:
     status: OK
     parent: sim
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-10-29
+    audited: 2026-10-29
+    audited_sha: 8443eda1698c8df48efd2557f47f3f18455dcf5f
     blocks: [cosmic, dreamtime]
     blockedBy: [ceremonies, colonies, mystic]
     detail: sim/prestige/prestige.md

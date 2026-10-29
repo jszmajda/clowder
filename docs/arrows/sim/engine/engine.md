@@ -4,7 +4,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 ## Status
 
-**OK** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 45 of 45 active specs implemented.
+**OK** — last audited 2026-10-29 (git SHA `8443eda1698c`). 75 of 75 active specs implemented, each cited by a test and, save the table property noted below, annotated at its entry point.
 
 ## References
 
@@ -16,7 +16,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/engine/engine-specs.md` — 45 specs, prefix `SIM-ENG`
+- `docs/intent/sim/engine/engine-specs.md` — 75 specs, prefix `SIM-ENG`
 
 ### Tests
 - `crates/clowder-core/tests/economy_depth.rs`
@@ -25,9 +25,15 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 - `crates/clowder-core/tests/journal.rs`
 - `crates/clowder-core/tests/legacy.rs`
 - `crates/clowder-core/tests/persistence.rs`
+- `crates/clowder-core/tests/queries_bench.rs`
+- `crates/clowder-core/tests/queries_flows.rs`
 - `crates/clowder-core/tests/queries_gating.rs`
 - `crates/clowder-core/tests/queries_rates.rs`
+- `crates/clowder-core/tests/queries_timers.rs`
+- `crates/clowder-core/tests/revealed_resources.rs`
 - `crates/clowder-core/tests/society.rs`
+- `crates/clowder-core/tests/sources.rs`
+- `crates/clowder-core/tests/unit_price.rs`
 - `crates/clowder-core/tests/wonder.rs`
 - `crates/clowder-tui/tests/update.rs`
 
@@ -49,16 +55,14 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-ENG-001 – SIM-ENG-046 | 45 | 0 | 0 |
+| All | SIM-ENG-001 – SIM-ENG-076 | 75 | 0 | 0 |
 
-**Summary:** 45 of 45 active specs implemented.
+**Summary:** 75 of 75 active specs implemented.
 
 ## Key Findings
 
-Bootstrapped from existing LID docs without an audit pass. Coverage above is
-read from the spec files' own markers, which record what the project believes;
-they have not been verified against the code by this overlay.
+Audited 2026-10-29 against the source: every spec marked implemented has a test citing it, no `@spec` in the code or tests names a spec that does not exist, and no spec ID is defined twice. SIM-ENG-076 is a property of the content tables as a whole, so no code decides it, and its tests are its pins.
 
 ## Work Required
 
-None recorded — every active spec is marked implemented.
+None.

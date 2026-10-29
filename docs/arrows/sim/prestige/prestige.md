@@ -4,7 +4,7 @@ Prestige in clowder is **The Great Meadow Move**: when a clowder has grown as la
 
 ## Status
 
-**OK** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 13 of 13 active specs implemented.
+**OK** — last audited 2026-10-29 (git SHA `8443eda1698c`). 15 of 15 active specs implemented, each cited by a test and, save the table property noted below, annotated at its entry point.
 
 ## References
 
@@ -16,11 +16,15 @@ Prestige in clowder is **The Great Meadow Move**: when a clowder has grown as la
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/prestige/prestige-specs.md` — 13 specs, prefix `SIM-MOVE`
+- `docs/intent/sim/prestige/prestige-specs.md` — 15 specs, prefix `SIM-MOVE`
 
 ### Tests
+- `crates/clowder-core/tests/achievements.rs`
+- `crates/clowder-core/tests/blurbs.rs`
 - `crates/clowder-core/tests/frontier.rs`
 - `crates/clowder-core/tests/legacy.rs`
+- `crates/clowder-core/tests/profiles.rs`
+- `crates/clowder-core/tests/wonder.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`
@@ -33,16 +37,14 @@ Prestige in clowder is **The Great Meadow Move**: when a clowder has grown as la
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-MOVE-001 – SIM-MOVE-013 | 13 | 0 | 0 |
+| All | SIM-MOVE-001 – SIM-MOVE-015 | 15 | 0 | 0 |
 
-**Summary:** 13 of 13 active specs implemented.
+**Summary:** 15 of 15 active specs implemented.
 
 ## Key Findings
 
-Bootstrapped from existing LID docs without an audit pass. Coverage above is
-read from the spec files' own markers, which record what the project believes;
-they have not been verified against the code by this overlay.
+Audited 2026-10-29 against the source: every spec marked implemented has a test citing it, no `@spec` in the code or tests names a spec that does not exist, and no spec ID is defined twice. SIM-MOVE-014 is a property of the content tables as a whole, so no code decides it, and its tests are its pins.
 
 ## Work Required
 
-None recorded — every active spec is marked implemented.
+None.
