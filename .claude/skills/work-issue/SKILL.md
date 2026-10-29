@@ -24,7 +24,7 @@ A denied permission prompt for any command this skill needs (a label edit, a com
 - **The labels exist.** The skill uses `approved`, `agent-found`, `in-progress`, and `needs-jess`. If a `gh` label command fails because one is missing, stop. Never carry on without a claim.
 - **Resume before you pick.** Only one `work-issue` loop runs at a time, and its claim on an issue is the `in-progress` label. If an open issue carries it, that issue is yours from an earlier firing: resume it, reading its state from the working copy, the commits above `main@origin`, and the issue's comments.
   - If a background test run of this loop is still going, schedule the heartbeat and end the turn.
-  - If commits for the issue are above `main@origin` and not yet pushed, treat them as unverified: run step 5 before shipping, whatever an earlier firing may have seen.
+  - If commits for the issue are above `main@origin` and not yet pushed, treat them as unverified: run step 6 before shipping, whatever an earlier firing may have seen.
 
 ## 1. Sync
 
@@ -55,7 +55,7 @@ Consult the `linked-intent-dev` skill and run every phase for the change. The st
 - Where a ratified LLD leaves a detail open, pin it in that LLD, resolved against the tenets.
 - Where code has drifted from a ratified design, the design is the intent: fix the code.
 
-Run no audit or experiment skill that spends heavily or wants a scoping conversation, such as the bidirectional differential or the differential audit. The loop has no one to scope it with. The `docs/arrows/` overlay is not part of an issue's work unless the issue is about it.
+Run no experiment skill that spends heavily or wants a scoping conversation, such as the bidirectional differential or the differential audit. The loop has no one to scope it with. Step 5's close-out is the audit this loop runs.
 
 Tests come before code, as the linked-intent-dev skill requires. Write them, see them fail for the right reason, then implement.
 
@@ -71,7 +71,7 @@ To hand it over: leave a comment on the issue asking the question in terms Jess 
 
 ## 4. Commit
 
-Commit each coherent, passing step with `jj commit` as it lands (`AGENTS.md`: commit liberally). The commit that finishes the issue:
+Commit each coherent, passing step with `jj commit` as it lands (`AGENTS.md`: commit liberally). The issue's last commit, usually step 5's close-out:
 
 - says `Fixes #N` in its body;
 - names the segments touched (`Segments touched: …`);
@@ -79,7 +79,24 @@ Commit each coherent, passing step with `jj commit` as it lands (`AGENTS.md`: co
 
 Add one spoiler-free line for the change to `CHANGELOG.md` under `## [Unreleased]` (create that heading above the newest release if it is missing). Follow the file's own rule: say what changed for the player, never what anything is called, what it costs, or what it does in numbers.
 
-## 5. Verify
+## 5. Close out every arrow you touched
+
+An issue is not finished when its own change works. It is finished when every arrow segment it touched is complete. The **touched segments** are every leaf whose LLD, specs, tests, or code the issue changed, plus any segment the change reached by cascade. Work through each one with the `arrow-maintenance` skill's audit (`references/audit-checklist.md`), scoped to those segments. This is the directed pass the loop is authorized to run, and its fixes are yours to make. Commit the close-out as its own step.
+
+For each touched segment, the arrow is complete when all of these hold:
+
+1. **Every `@spec` resolves.** Each ID cited in code or tests exists in a spec file: no reverse orphans. No spec ID is defined twice.
+2. **Every `[x]` is true.** Each spec marked implemented has a test that cites it, and an `@spec` at the entry point of its behaviour, and the behaviour exists. A marker is a claim to check, not a finding (`docs/arrows/README.md`).
+3. **Nothing is silently open.** No `[ ]` is left. Each spec is implemented and marked `[x]`, or marked `[D]` with an entry in the LLD's Deferred list saying what it waits on.
+4. **The LLD and specs agree.** Every behaviour the LLD states has a spec, and no spec says more than the LLD. Open questions the work settled are removed. Every doc reads cold, with no narration of how it changed.
+5. **The cascade landed.** Anything in another segment that states, tests, or depends on what changed (a shell's wording of a core rule, a test pinning old behaviour) is updated, and that segment is closed out too.
+6. **The overlay says so.** Regenerate the segment's arrow doc (`docs/arrows/<path>/<leaf>.md`): its References and Spec Coverage are derived from source scans, never hand-written to disagree with them. Update its `index.yaml` entry: `status` (`OK` when every active spec is implemented and coherent, `PARTIAL` when some are deferred), `next`, `drift`, `audited` (today), and `audited_sha` (the commit the audit read). Bump `last_updated`.
+
+Gaps the segment already had before this issue count too. The arrow is not complete until they close. Fix them as you would the issue: below the HLD they are yours, and the HLD, `AGENTS.md`, and hard-to-undo changes go to Jess (step 3's handover). Where closing a gap would be a feature-sized piece of work of its own, file it (step 8), mark it `[D]` with the issue number in the Deferred entry, and record it in the segment's `next`.
+
+When `AGENTS.md` declares a coherence script under `## LID Tooling`, run it and treat its output as authoritative for the checks it performs.
+
+## 6. Verify
 
 Run the whole workspace once, in the background (`run_in_background`), keeping its log, then schedule the heartbeat and end the turn until it reports:
 
@@ -95,21 +112,21 @@ When it is done, and not while it runs (both wait on the same build lock), run `
 
 **Never push with a failing test.**
 
-## 6. Ship
+## 7. Ship
 
 Pushing to `main` from this skill carries Jess's standing authorization; anywhere else, pushing still waits for her word.
 
-1. `jj git fetch`. If `main@origin` moved since your tests ran, rebase onto it (`jj rebase -b @- -d main@origin`). If the rebase changed anything, run step 5 again before going on; if it conflicts, resolve it through the arrow first.
+1. `jj git fetch`. If `main@origin` moved since your tests ran, rebase onto it (`jj rebase -b @- -d main@origin`). If the rebase changed anything, run steps 5 and 6 again before going on; if it conflicts, resolve it through the arrow first.
 2. Only now, `jj bookmark set main -r @-` (the last commit, not the empty working copy). jj refuses a sideways move without `-B`; never pass it.
 3. `jj git push --bookmark main`. Never force a push. If the push is refused, reset the bookmark (`jj bookmark set main -r main@origin`), then fetch, rebase, verify, and come back to 2.
 4. Confirm the issue closed (`gh issue view N --json state`); GitHub closes it from `Fixes #N`, sometimes after a few seconds. If it is still open, close it with a comment naming the commit. Remove `in-progress`.
 
-## 7. Findings outside the issue
+## 8. Findings outside the issue
 
 Anything you find that the issue does not cover: file it as its own issue rather than widening this one. Use the `create-issue` skill's shape (problem, impact, scope, intent touchpoints, code pointers as `file:line`, spec IDs), written structurally with no game content. Label it `agent-found` plus `bug` or `enhancement`. It waits for Jess's `approved` before any loop works it. Do not interview her; the loop runs unattended.
 
-## 8. Report
+## 9. Report
 
 End the issue with one structural line, then schedule the heartbeat (the next firing picks the next issue):
 
-`#N fixed · segments: a, b · 70/70 test binaries · pushed <short hash> · filed #M (agent-found)`
+`#N fixed · arrows closed: a (OK), b (PARTIAL, 2 deferred) · 70/70 test binaries · pushed <short hash> · filed #M (agent-found)`
