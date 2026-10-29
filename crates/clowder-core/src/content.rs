@@ -4223,7 +4223,7 @@ pub fn tradition_def(t: TraditionId) -> &'static TraditionDef {
 }
 
 /// The prestige shop table, in TraditionId order. @spec SIM-MOVE-010
-static TRADITIONS: [TraditionDef; 30] = [
+static TRADITIONS: [TraditionDef; 31] = [
     TraditionDef { cost_wisdom: 5.0, blurb: "Nothing breaks on the way. Every building's price −1%." },   // CarefulPacking
     TraditionDef { cost_wisdom: 5.0, blurb: "Room for one more. A Move carries 1 more kitten along." },   // TravelingBasketsI
     TraditionDef { cost_wisdom: 35.0, blurb: "Roomier baskets. A Move carries 2 more kittens along." },  // TravelingBasketsII
@@ -4278,6 +4278,7 @@ static TRADITIONS: [TraditionDef; 30] = [
     TraditionDef { cost_wisdom: 25.0, blurb: "Whiskers that twitch before the weather turns. The coming season is always shown, no idea needed." },  // Forecaster
     TraditionDef { cost_wisdom: 125.0, blurb: "Eyes for sparkle. Prism descents and showers of {rainbows|Rainbows} are 10% likelier." }, // PrismSight
     TraditionDef { cost_wisdom: 40.0, blurb: "What's past the fence? Opens Adventures." },  // AdventurousSpirit
+    TraditionDef { cost_wisdom: 50.0, blurb: "Paws wiped at the door, every time. Buildings make 10% less mess." }, // TidyPaws
 ];
 
 // ---- Wave 5: adventures (SIM-ADV) ----
@@ -4291,6 +4292,9 @@ pub struct AdventureDef {
     pub reward_per: f64,
     pub reward_cap: f64,
     pub reward_key: Effect,
+    /// The tradition a one-shot reward opens, which nothing else opens.
+    /// @spec SIM-ADV-007
+    pub unlocks: Option<TraditionId>,
     /// A short joke, then the twist, the goal, and the reward as two bounds —
     /// only what the core applies, every figure the core's own.
     /// @spec SIM-ADV-006
@@ -4308,6 +4312,7 @@ static ADVENTURES: [AdventureDef; 7] = [
         reward_per: 0.05,
         reward_cap: 0.10,
         reward_key: Effect::SeasonResourceRatio(Season::Spring, ResourceId::Catnip),
+        unlocks: None,
         blurb: "Shh, the kittens are reading. While it lasts, no jamboree can be hosted. Goal: a clowder of 50 kittens. Finishing it adds up to 5% to {catnip|Catnip} grown in spring, at most 10% in all.",
     },
     // LongWinter: reach a Sunbeam Altar → +5% winter catnip and +5% Sunning-Deck
@@ -4318,6 +4323,7 @@ static ADVENTURES: [AdventureDef; 7] = [
         reward_per: 0.05,
         reward_cap: 0.10,
         reward_key: Effect::SeasonResourceRatio(Season::Winter, ResourceId::Catnip),
+        unlocks: None,
         blurb: "Scarves on, everyone. While it lasts, it is always winter. Goal: build a Sunbeam Altar. Finishing it adds up to 5% to {catnip|Catnip} grown in winter, at most 10% in all.",
     },
     // NapTime: build a Yarn Computer → +0.2 master-skill multiplier (cap ×4).
@@ -4325,6 +4331,7 @@ static ADVENTURES: [AdventureDef; 7] = [
         reward_per: 0.2,
         reward_cap: 0.8,
         reward_key: Effect::MasterSkillMultiplier,
+        unlocks: None,
         blurb: "Everyone has earned a lie-in. While it lasts, kittens make half as much at their jobs. Goal: build a Yarn Computer. Finishing it makes the skill bonus of the most practised kittens up to 20% stronger, at most 80% in all.",
     },
     // FrugalMeadow: build the full energy set → −2% energy consumption (cap ×1).
@@ -4334,6 +4341,7 @@ static ADVENTURES: [AdventureDef; 7] = [
         reward_per: -0.02,
         reward_cap: 0.02,
         reward_key: Effect::EnergyConsumptionRatio,
+        unlocks: None,
         blurb: "Waste not, want not. While it lasts, everything uses 10% more energy. Goal: build a Dynamo Wheel, a Stream Wheel, and a Star Basin. Finishing it trims up to 2% from energy use, at most 2% in all.",
     },
     // SilentSun: Move with a Memory Chest built → +10% Long Sun effectiveness
@@ -4344,6 +4352,7 @@ static ADVENTURES: [AdventureDef; 7] = [
         reward_per: 0.10,
         reward_cap: 0.4,
         reward_key: Effect::LongSunCapBonus,
+        unlocks: None,
         blurb: "The sun is having a quiet day. While it lasts, nothing can be done in Sunbeams. Goal: Move with a Memory Chest built. Finishing it extends the long sun by up to 0.1, at most 0.4 in all.",
     },
     // GentlePaws: research Pen Pal Networks → +10% pounce ratio (cap ×2).
@@ -4351,15 +4360,17 @@ static ADVENTURES: [AdventureDef; 7] = [
         reward_per: 0.10,
         reward_cap: 0.20,
         reward_key: Effect::PounceRatio,
+        unlocks: None,
         blurb: "Live and let flutter. While it lasts, pounces bring nothing home. Goal: research Pen Pal Networks, then Move. Finishing it adds up to 0.1 to the pounce ratio, at most 0.2 in all.",
     },
-    // TidyMeadow: a full tidy year → an exclusive tradition unlock (one-shot,
-    // no stacking effect value).
+    // TidyMeadow: a full tidy year → the Tidy Paws tradition, opened once
+    // (no stacking effect value). @spec SIM-ADV-007
     AdventureDef {
         reward_per: 0.0,
         reward_cap: 1.0,
         reward_key: Effect::MasterSkillMultiplier,
-        blurb: "A place for everything. While it lasts, mess builds up twice as fast. Goal: a whole year without any mess.",
+        unlocks: Some(TraditionId::TidyPaws),
+        blurb: "A place for everything. While it lasts, mess builds up twice as fast. Goal: a whole year without any mess. Finishing it opens the Tidy Paws tradition, which nothing else does.",
     },
 ];
 

@@ -469,11 +469,14 @@ impl GameState {
         } else {
             1.0
         };
-        let tidy_mult = if self.active_adventure == Some(AdventureId::TidyMeadow) {
+        let tidy_twist = if self.active_adventure == Some(AdventureId::TidyMeadow) {
             content::TIDY_MESS_MULT
         } else {
             1.0
         };
+        // What scales the mess made, and never the tidying: the twist, and
+        // the mess-accrual effects (Tidy Paws). @spec SIM-ECO-052
+        let tidy_mult = tidy_twist * (1.0 + self.effect(crate::effects::Effect::MessAccrualRatio));
         // The mystic tier's own multiplier on Unicorn Meadow output — NOT a
         // global layer. Only Unicorn Meadows produce unicorns, so the effect
         // scan is skipped entirely when none are built. @spec SIM-UNI-002

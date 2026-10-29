@@ -37,7 +37,7 @@ A Move never reduces any legacy currency and never empties the Family Album. It 
 
 ## Traditions
 
-The prestige shop (`BuyTradition`), Elder-Wisdom-priced, permanent across Moves — the delight centerpiece. ~30 traditions in families (all contribute effect-key values):
+The prestige shop (`BuyTradition`), Elder-Wisdom-priced, permanent across Moves — the delight centerpiece. ~30 traditions in families, one of them earned by an adventure rather than open from the first Move (all contribute effect-key values):
 
 | # | Tradition | Cost (Elder Wisdom) | Effect |
 |---|---|---|---|
@@ -62,6 +62,7 @@ The prestige shop (`BuyTradition`), Elder-Wisdom-priced, permanent across Moves 
 | 27 | Forecaster | 25 | the season forecast is always available (no idea needed) |
 | 28 | Prism Sight | 125 | prism-descent and rainbow-shower chances ×1.1 (mystic leaf) |
 | 29 | Adventurous Spirit | 40 | unlocks the Adventures surface (SIM-ADV) |
+| 30 | Tidy Paws | 50 | mess made −10% — shown and sold only once the Tidy Meadow adventure has been completed (the adventure's reward, SIM-ADV-007) |
 
 Each tradition carries a **blurb**: a short joke and then its effect in plain words, marking each resource it names as the curiosity leaf's blurbs do (SIM-CUR-014). The shell shows it as what the tradition does, so every one says why it is worth having before it is bought (Tenet 3).
 

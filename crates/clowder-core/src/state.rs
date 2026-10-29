@@ -1147,10 +1147,11 @@ pub enum TraditionId {
     Forecaster,
     PrismSight,
     AdventurousSpirit,
+    TidyPaws,
 }
 
 impl TraditionId {
-    pub const ALL: [TraditionId; 30] = [
+    pub const ALL: [TraditionId; 31] = [
         TraditionId::CarefulPacking,
         TraditionId::TravelingBasketsI,
         TraditionId::TravelingBasketsII,
@@ -1181,6 +1182,7 @@ impl TraditionId {
         TraditionId::Forecaster,
         TraditionId::PrismSight,
         TraditionId::AdventurousSpirit,
+        TraditionId::TidyPaws,
     ];
     pub fn ix(self) -> usize {
         self as usize
@@ -1887,6 +1889,16 @@ impl GameState {
         }
     }
 
+    /// Whether a tradition is open to the shop: every tradition is, save one an
+    /// adventure's reward unlocks (SIM-ADV-007), which opens with that
+    /// adventure's first completion and stays open. @spec SIM-ADV-007
+    pub fn tradition_open(&self, t: TraditionId) -> bool {
+        AdventureId::ALL
+            .into_iter()
+            .filter(|a| content::adventure_def(*a).unlocks == Some(t))
+            .all(|a| self.adventure_completions[a.ix()] > 0)
+    }
+
     /// Complete the active adventure if its goal is met and is judged now —
     /// `at_move` for the check the Move makes before its reset, otherwise the
     /// day-close check — at most once per meadow: the completion count, the
@@ -2534,7 +2546,7 @@ impl GameState {
             // shop opens with the generation that earns it. Ungated, a fresh
             // meadow would report the whole prestige ladder and its prices —
             // the reveal pacing every other kind honours. @spec SIM-ENG-032
-            ContentId::Tradition(_) => self.generation >= 1,
+            ContentId::Tradition(t) => self.generation >= 1 && self.tradition_open(t),
             // Likewise the loom ladder waits on the idea that introduces it.
             // @spec SIM-ENG-032
             ContentId::DreamLoom(_) => self.ideas.contains(&IdeaId::DeepNapTheory),

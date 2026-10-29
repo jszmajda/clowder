@@ -690,11 +690,11 @@ fn passed_down_wisdom_is_a_second_capped_production_and_storage_pool() {
 
 // @spec SIM-MOVE-010
 #[test]
-fn the_traditions_table_is_thirty_in_shop_order_with_wisdom_costs() {
+fn the_traditions_table_is_in_shop_order_with_wisdom_costs() {
     assert_eq!(
         TraditionId::ALL.len(),
-        30,
-        "exactly 30 traditions, append-only"
+        31,
+        "exactly 31 traditions, append-only"
     );
     // Shop-table ordering (indices are load-bearing: the Nine Lives ladder and
     // the derived nine_lives_ratio both count owned traditions).
@@ -705,6 +705,7 @@ fn the_traditions_table_is_thirty_in_shop_order_with_wisdom_costs() {
     assert_eq!(TraditionId::NineLivesX as usize, 21);
     assert_eq!(TraditionId::GoodNeighbours as usize, 22);
     assert_eq!(TraditionId::AdventurousSpirit as usize, 29);
+    assert_eq!(TraditionId::TidyPaws as usize, 30);
     // Elder-Wisdom costs from the shop table.
     let cost = |t| content::tradition_def(t).cost_wisdom;
     assert!((cost(TraditionId::CarefulPacking) - 5.0).abs() < TOL);
@@ -713,6 +714,7 @@ fn the_traditions_table_is_thirty_in_shop_order_with_wisdom_costs() {
     assert!((cost(TraditionId::Renaissance) - 750.0).abs() < TOL);
     assert!((cost(TraditionId::NineLivesX) - 60_000.0).abs() < TOL);
     assert!((cost(TraditionId::AdventurousSpirit) - 40.0).abs() < TOL);
+    assert!((cost(TraditionId::TidyPaws) - 50.0).abs() < TOL);
 }
 
 // @spec SIM-MOVE-010, SIM-MOVE-012
@@ -1242,6 +1244,55 @@ fn tidy_meadow_completes_after_a_full_year_of_zero_mess() {
         messy.adventure_completions[AdventureId::TidyMeadow as usize],
         0,
         "a year that never reached zero mess does not complete"
+    );
+}
+
+/// Tidy Meadow's reward is a one-shot unlock: before its first completion the
+/// Tidy Paws tradition is unrevealed and refused, however much Elder Wisdom is
+/// held; the completion reveals it and it sells like any tradition; a second
+/// completion adds nothing more.
+// @spec SIM-ADV-007
+#[test]
+fn finishing_tidy_meadow_opens_a_tradition_nothing_else_opens() {
+    let tidy = AdventureId::TidyMeadow as usize;
+    let paws = ContentId::Tradition(TraditionId::TidyPaws);
+    let mut s = GameState::new(453);
+    s.generation = 1;
+    s.elder_wisdom = 1.0e6;
+    assert_eq!(
+        s.availability(paws),
+        Availability::Hidden,
+        "unrevealed before"
+    );
+    assert!(!s.command_gate_open(&Command::BuyTradition(TraditionId::TidyPaws)));
+    assert_eq!(
+        s.apply(Command::BuyTradition(TraditionId::TidyPaws)),
+        Err(CommandError::Locked),
+        "refused before, whatever Elder Wisdom is held"
+    );
+
+    // A fresh meadow has no mess: a full year completes Tidy Meadow.
+    s.active_adventure = Some(AdventureId::TidyMeadow);
+    run_ticks(
+        &mut s,
+        (content::DAYS_PER_YEAR + 1) * content::TICKS_PER_DAY,
+    );
+    assert_eq!(s.adventure_completions[tidy], 1, "fixture: completed");
+    assert_ne!(s.availability(paws), Availability::Hidden, "revealed after");
+    assert!(s.command_gate_open(&Command::BuyTradition(TraditionId::TidyPaws)));
+    let before = s.elder_wisdom;
+    s.apply(Command::BuyTradition(TraditionId::TidyPaws))
+        .unwrap();
+    assert!(s.traditions.contains(&TraditionId::TidyPaws));
+    assert!(
+        (before - s.elder_wisdom - content::tradition_def(TraditionId::TidyPaws).cost_wisdom).abs()
+            < TOL
+    );
+
+    // A second completion adds nothing: no reward pool, no second unlock.
+    assert_eq!(
+        s.adventure_rewards[tidy], 0.0,
+        "a one-shot, not a stacking pool"
     );
 }
 

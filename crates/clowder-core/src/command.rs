@@ -1199,6 +1199,11 @@ impl GameState {
         if self.traditions.contains(&t) {
             return Err(CommandError::AlreadyResearched);
         }
+        // A tradition an adventure unlocks is refused until it does.
+        // @spec SIM-ADV-007
+        if !self.tradition_open(t) {
+            return Err(CommandError::Locked);
+        }
         let cost = content::tradition_def(t).cost_wisdom;
         if self.elder_wisdom + EPSILON < cost {
             return Err(CommandError::InsufficientResources {

@@ -1210,6 +1210,43 @@ fn a_faster_mess_twist_scales_what_is_made_and_never_the_tidying() {
     );
 }
 
+/// A mess-accrual ratio scales what is made and never the tidying, and it
+/// stacks with an adventure twist that speeds accrual: both scale the made sum.
+// @spec SIM-ECO-052
+#[test]
+fn a_slower_mess_effect_scales_what_is_made_and_never_the_tidying() {
+    // 4 Gravel Pits make 1.0; the rota'd Toy Workshop tidies 2.0.
+    let calm = || {
+        let mut s = messy_meadow(
+            1408,
+            50_000.0,
+            &[(StructureId::GravelPit, 4), (StructureId::ToyWorkshop, 1)],
+        );
+        s.refinements.insert(RefinementId::TidyUpRota);
+        s.traditions.insert(TraditionId::TidyPaws);
+        s
+    };
+    let ratio = 1.0 + calm().effect(Effect::MessAccrualRatio);
+    assert!(ratio < 1.0, "fixture: the tradition slows mess ({ratio})");
+
+    let mut slowed = calm();
+    run_ticks(&mut slowed, 1);
+    assert!(
+        (slowed.mess - (50_000.0 + 1.0 * ratio - 2.0 - 5.0)).abs() < 1e-9,
+        "the made 1.0 is slowed, the tidied 2.0 is not: {}",
+        slowed.mess
+    );
+
+    let mut both = calm();
+    both.active_adventure = Some(AdventureId::TidyMeadow);
+    run_ticks(&mut both, 1);
+    assert!(
+        (both.mess - (50_000.0 + 1.0 * content::TIDY_MESS_MULT * ratio - 2.0 - 5.0)).abs() < 1e-9,
+        "twist and ratio both scale the made sum: {}",
+        both.mess
+    );
+}
+
 // @spec SIM-ECO-037
 #[test]
 fn mess_stops_at_zero_and_tidying_banks_nothing() {

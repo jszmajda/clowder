@@ -61,9 +61,10 @@ fn reward_figure(key: Effect, x: f64) -> String {
 }
 
 /// Every Adventure carries a blurb: a joke, then its twist, its goal by the
-/// names its rows carry, and — where the core applies a reward — the reward's
-/// per-completion amount and its cap as the core's own figures, each a bound.
-/// An Adventure whose completion adds nothing states no reward.
+/// names its rows carry, and its reward — a stacking reward's per-completion
+/// amount and cap as the core's own figures, each a bound, or the name of the
+/// tradition a one-shot unlock opens. An Adventure whose completion adds
+/// nothing states no reward.
 /// @spec SIM-ADV-006
 #[test]
 fn every_adventure_says_its_twist_goal_and_reward() {
@@ -89,13 +90,19 @@ fn every_adventure_says_its_twist_goal_and_reward() {
         );
         assert!(text.contains("Goal: "), "{a:?} states its goal: {text:?}");
 
-        let rewards = def.reward_per != 0.0;
+        let rewards = def.reward_per != 0.0 || def.unlocks.is_some();
         assert_eq!(
             text.contains("Finishing it "),
             rewards,
             "{a:?}: a reward is stated exactly where the core applies one: {text:?}"
         );
-        if rewards {
+        if let Some(t) = def.unlocks {
+            let name = spaced(&format!("{t:?}"));
+            assert!(
+                text.contains(&format!("Finishing it opens the {name} tradition")),
+                "{a:?}: a one-shot unlock names what it opens: {text:?}"
+            );
+        } else if rewards {
             let per = reward_figure(def.reward_key, def.reward_per);
             let cap = reward_figure(def.reward_key, def.reward_cap);
             assert!(
@@ -156,4 +163,16 @@ fn every_adventure_says_its_twist_goal_and_reward() {
         "fixture: the twist the blurb words as twice"
     );
     assert!(names(AdventureId::TidyMeadow).contains("twice as fast"));
+}
+
+/// An identifier spelled as words, as the shell names a tradition's row.
+fn spaced(tag: &str) -> String {
+    let mut out = String::new();
+    for (i, c) in tag.chars().enumerate() {
+        if i > 0 && c.is_uppercase() {
+            out.push(' ');
+        }
+        out.push(c);
+    }
+    out
 }

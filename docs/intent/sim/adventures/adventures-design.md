@@ -24,15 +24,17 @@ Twist (while active) → goal → reward per completion (LimitedDR-capped):
 
 | # | Adventure | Twist | Goal | Reward |
 |---|---|---|---|---|
-| 0 | **Quiet Retreat** | no jamborees, softer arrivals | reach 50 kittens | +5% spring catnip (cap ×2) |
+| 0 | **Quiet Retreat** | no jamborees — so arrivals keep their everyday pace, with no jamboree to double it | reach 50 kittens | +5% spring catnip (cap ×2) |
 | 1 | **Long Winter** | perpetual winter | reach a Sunbeam Altar | +5% winter catnip and +5% Sunning-Deck summer energy (cap ×2) |
 | 2 | **Nap Time** | kittens half as productive (lazy) | build a Yarn Computer | +0.2 master-skill multiplier (cap ×4) |
 | 3 | **Frugal Meadow** | energy costs +10% | build the full energy set (Dynamo, Stream Wheel, Star Basin) | −2% energy consumption (cap ×1) |
 | 4 | **Silent Sun** | ceremonies unavailable | Move with a Memory Chest built in the meadow | +10% Long Sun effectiveness and +cap (cap ×4) |
-| 5 | **Gentle Paws** | pounces yield nothing | research the Pen Pal Networks idea, then Move | +10% pounce ratio and +1 trade-knowledge (cap ×2) |
-| 6 | **Tidy Meadow** | mess accrues faster | reduce mess to zero for a full year | −exclusive tidy tradition unlock (one-shot) |
+| 5 | **Gentle Paws** | pounces yield nothing | research the Pen Pal Networks idea, then Move | +10% pounce ratio (cap ×2) |
+| 6 | **Tidy Meadow** | mess accrues faster | reduce mess to zero for a full year | unlocks the Tidy Paws tradition (one-shot) |
 
-Rewards stack across completions with per-reward LimitedDR caps (the inspiration's per-effect challenge caps), so an Adventure stays worth re-running without ever breaking balance. All twists are *slowdowns or removals of options*, never deletions of the player's things (Tenet 1).
+Rewards stack across completions with per-reward LimitedDR caps (the inspiration's per-effect challenge caps), so an Adventure stays worth re-running without ever breaking balance.
+
+Tidy Meadow's reward is the one that does not stack: a **one-shot unlock**. Until Tidy Meadow has been completed, the Tidy Paws tradition is neither shown in the traditions shop nor sold; its first completion opens it for good, to be bought with Elder Wisdom like any tradition (prestige leaf), and later completions add nothing. Nothing else opens it, so it is the one tradition a player can only earn by an adventure. All twists are *slowdowns or removals of options*, never deletions of the player's things (Tenet 1).
 
 ## What an Adventure Says
 
@@ -54,6 +56,9 @@ Each Adventure carries a **blurb**: a short joke, then in plain words its twist,
 | Opt-in, armed before a Move | Declare → active next meadow → complete | Always-on challenge toggles | Matches the inspiration's reset-coupled challenge model and keeps Adventures a deliberate choice |
 | An unfinished Adventure at a Move with none armed | Ends with its meadow | Carries into the next meadow until another is armed | Opt-in: a twist applies only to a meadow the player declared it for, so declaring none, or standing down, always means a meadow with no twist; re-declaring costs one keypress |
 | What the Silent Sun goal asks | A Memory Chest structure built in the meadow being left, judged at the Move | Any Memory Chest carryover, judged at day close; every capped store at its cap at the Move | The Memory Chest traditions carry over every Move, so a goal they alone meet is met with nothing done; the chest has no cap for "full" to name; the structure is what this meadow builds, and owning one is plain to see |
+| Quiet Retreat's softer arrivals | The softness is the missing jamboree's doubling, the twist's one rule | A second arrival slowdown beside the jamboree ban | Cozy: two slowdowns on the one goal the adventure sets is harsher than an opt-in outing asks, and one rule reads plainly |
+| Gentle Paws's reward | Pounce ratio alone | A trade-knowledge half beside it | The colonies leaf has no trade-knowledge for a reward to raise, and the pounce reward answers the pounce twist |
+| Tidy Meadow's one-shot reward | Its first completion opens a tradition nothing else opens, bought with Elder Wisdom like any other | The tradition granted outright on completion; a stacking effect like the rest | The inspiration's challenge-exclusive unlock; opening the shop row keeps every tradition bought the one way the Legacy screen teaches, and a one-shot gives a mess-themed adventure a mess-themed keepsake rather than another percentage |
 | Rewards LimitedDR-capped per effect | Stacking with per-reward caps | Uncapped stacking; one-shot rewards | The inspiration's proven infinite-replay-without-breaking-balance mechanism |
 | Twists are cozy constraints | Slowdowns/removals of options only | Keep the grim challenges (apocalypse, anarchy) | Tenet 1 — the challenge *shape* survives; the theme becomes gentle |
 | What an Adventure says about itself | A hand-written blurb per Adventure, as traditions and rites carry | A statement the shell assembles from the definition's fields | Twists and goals are engine behavior, not definition fields (SIM-ADV-002, SIM-ADV-004), so no field holds them for a shell to state; a blurb keeps the words in the core's table beside the reward they describe |

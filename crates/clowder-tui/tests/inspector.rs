@@ -51,8 +51,8 @@ use std::collections::BTreeSet;
 
 use clowder_core::content::structure_def;
 use clowder_core::{
-    ContentId, GameState, JobId, Kitten, KittenTrait, Location, LockReason, ResourceId,
-    StructureGate, StructureId, TraditionId,
+    AdventureId, ContentId, GameState, JobId, Kitten, KittenTrait, Location, LockReason,
+    ResourceId, StructureGate, StructureId, TraditionId,
 };
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
@@ -2440,6 +2440,8 @@ fn rows_of_blurbed_kinds_state_their_blurb_and_no_stand_in() {
         let mut open = GameState::new(11);
         open.generation = 1;
         open.elder_wisdom = 1.0e9;
+        // Every adventure finished once, so a tradition one opens is shown.
+        open.adventure_completions = [1; AdventureId::ALL.len()];
         let mut held = open.clone();
         held.traditions.insert(t);
         cases.push((Section::Legacy, id, held, open, None));

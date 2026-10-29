@@ -98,6 +98,9 @@ pub enum Effect {
     MasterSkillMultiplier,
     /// Energy-consumption reduction reward (Frugal Meadow). @spec SIM-ADV-005
     EnergyConsumptionRatio,
+    /// Ratio on the mess structures make, never on what they tidy (Tidy Paws).
+    /// @spec SIM-ECO-052
+    MessAccrualRatio,
     /// Per-season, per-resource production bonus (Quiet Retreat, Long Winter).
     /// @spec SIM-ADV-005
     SeasonResourceRatio(Season, ResourceId),
@@ -487,6 +490,7 @@ fn tradition_effect(t: TraditionId, key: Effect) -> f64 {
         (T::GoodNeighbours, StandingRatio) => 0.10,
         (T::WellRested, KittenGrowthRatio) => 0.75,
         (T::BrightEyed, KittenGrowthRatio) => 1.5,
+        (T::TidyPaws, MessAccrualRatio) => -0.10,
         _ => 0.0,
     }
 }

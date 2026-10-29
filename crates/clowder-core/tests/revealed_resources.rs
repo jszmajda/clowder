@@ -112,6 +112,8 @@ fn everything_in_view() -> GameState {
     s.discovered = ColonyId::ALL.into_iter().collect();
     s.whale_visit_years = 5;
     s.generation = 1;
+    // Every adventure finished once, so a tradition one opens is in view.
+    s.adventure_completions = [1; AdventureId::ALL.len()];
     s.kittens = vec![kitten("Bramble", None)];
 
     for id in every_content_id() {

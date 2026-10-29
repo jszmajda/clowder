@@ -111,6 +111,10 @@ impl GameState {
                 if self.traditions.contains(&t) {
                     return Some(LockReason::AlreadyYours);
                 }
+                // @spec SIM-ADV-007
+                if !self.tradition_open(t) {
+                    return Some(LockReason::Prerequisite);
+                }
                 let cost = content::tradition_def(t).cost_wisdom;
                 if self.elder_wisdom + EPSILON < cost {
                     // Elder Wisdom is not a `ResourceId`, so — exactly as the
@@ -365,7 +369,7 @@ impl GameState {
             }
             // The ladder is bought with what only a Move can grant, so a meadow
             // that has never moved has nothing to spend and nothing to see.
-            C::BuyTradition(_) => self.generation >= 1,
+            C::BuyTradition(t) => self.generation >= 1 && self.tradition_open(*t),
             // A bind wants a kitten holding the Tinkerer job; before the job
             // exists no press could ever make one. @spec SIM-ECO-046
             C::AssignTinkerer(_) | C::UnassignTinkerer(_) => {
