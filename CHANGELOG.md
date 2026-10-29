@@ -7,6 +7,10 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 ### Fixed
 
 - **Adventures say what they are, and which one you chose.** The list marks the adventure you've picked for the next meadow and the one under way in this one, and the info pane now tells you what each adventure asks of you and what it gives.
+- **Choosing no adventure means none.** An adventure you didn't finish no longer follows you into the next meadow unless you choose it again.
+- **Adventure goals can't finish themselves.** Goals that ask you to move on are now checked when you move, so none can complete before you've done anything.
+- **Every adventure gives what it promises.** Finishing each one now brings what its description says, including one that used to bring nothing.
+- **The adventure under way is always shown.** If the adventure list closes after a move, the adventure you're on keeps its row, so you can still see what's in effect.
 
 ## [1.3.2] — 2026-10-27
 
