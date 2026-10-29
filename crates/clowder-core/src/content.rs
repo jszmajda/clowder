@@ -4336,7 +4336,7 @@ static ADVENTURES: [AdventureDef; 7] = [
         reward_key: Effect::EnergyConsumptionRatio,
         blurb: "Waste not, want not. While it lasts, everything uses 10% more energy. Goal: build a Dynamo Wheel, a Stream Wheel, and a Star Basin. Finishing it trims up to 2% from energy use, at most 2% in all.",
     },
-    // SilentSun: Move with a full Memory Chest → +10% Long Sun effectiveness
+    // SilentSun: Move with a Memory Chest built → +10% Long Sun effectiveness
     // and +cap (cap ×4). The reward raises the Long Sun cap through the real
     // LongSunCapBonus key (the "+cap" half; the effectiveness half rides the
     // same raised cap). @spec SIM-ADV-005, SIM-SKY-005
@@ -4344,7 +4344,7 @@ static ADVENTURES: [AdventureDef; 7] = [
         reward_per: 0.10,
         reward_cap: 0.4,
         reward_key: Effect::LongSunCapBonus,
-        blurb: "The sun is having a quiet day. While it lasts, nothing can be done in Sunbeams. Goal: have a Memory Chest ready to carry stores. Finishing it extends the long sun by up to 0.1, at most 0.4 in all.",
+        blurb: "The sun is having a quiet day. While it lasts, nothing can be done in Sunbeams. Goal: Move with a Memory Chest built. Finishing it extends the long sun by up to 0.1, at most 0.4 in all.",
     },
     // GentlePaws: research Pen Pal Networks → +10% pounce ratio (cap ×2).
     AdventureDef {

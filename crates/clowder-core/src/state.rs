@@ -1860,7 +1860,16 @@ impl GameState {
         r
     }
 
-    /// The active adventure's goal predicate (checked at day close).
+    /// Whether an adventure's goal asks for a Move, and so is judged at the
+    /// Move against the meadow being left rather than at day close.
+    /// @spec SIM-ADV-004
+    pub(crate) fn adventure_goal_at_move(a: AdventureId) -> bool {
+        matches!(a, AdventureId::SilentSun)
+    }
+
+    /// The active adventure's goal predicate, judged when
+    /// `complete_adventure_if_met` asks: at day close, or at the Move for a
+    /// goal that asks for one.
     /// @spec SIM-ADV-004
     pub(crate) fn adventure_goal_met(&self, a: AdventureId) -> bool {
         match a {
@@ -1872,10 +1881,34 @@ impl GameState {
                     && self.structures[StructureId::StreamWheel.ix()] >= 1
                     && self.structures[StructureId::StarBasin.ix()] >= 1
             }
-            AdventureId::SilentSun => self.memory_chest_ratio() > 0.0,
+            AdventureId::SilentSun => self.structures[StructureId::MemoryChest.ix()] >= 1,
             AdventureId::GentlePaws => self.ideas.contains(&IdeaId::PenPalNetworks),
             AdventureId::TidyMeadow => self.tidy_progress >= content::DAYS_PER_YEAR as u32,
         }
+    }
+
+    /// Complete the active adventure if its goal is met and is judged now —
+    /// `at_move` for the check the Move makes before its reset, otherwise the
+    /// day-close check — at most once per meadow: the completion count, the
+    /// reward pool, and the event. @spec SIM-ADV-004
+    pub(crate) fn complete_adventure_if_met(
+        &mut self,
+        at_move: bool,
+        events: &mut Vec<crate::events::Event>,
+    ) {
+        let Some(a) = self.active_adventure else {
+            return;
+        };
+        if self.adventure_done
+            || Self::adventure_goal_at_move(a) != at_move
+            || !self.adventure_goal_met(a)
+        {
+            return;
+        }
+        self.adventure_done = true;
+        self.adventure_completions[a.ix()] += 1;
+        self.adventure_rewards[a.ix()] += content::adventure_def(a).reward_per;
+        events.push(crate::events::Event::AdventureCompleted { id: a });
     }
 
     /// The stacked structure-price multiplier from price-reduction Traditions:

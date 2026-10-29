@@ -370,13 +370,8 @@ impl GameState {
                     self.tidy_progress = 0;
                 }
             }
-            if !self.adventure_done && self.adventure_goal_met(a) {
-                self.adventure_done = true;
-                self.adventure_completions[a.ix()] += 1;
-                self.adventure_rewards[a.ix()] += content::adventure_def(a).reward_per;
-                events.push(Event::AdventureCompleted { id: a });
-            }
         }
+        self.complete_adventure_if_met(false, events);
     }
 
     /// The Cogworks year-close auto-craft: 2% per Cogworks (max 50%) of each

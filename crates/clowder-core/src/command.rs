@@ -1047,6 +1047,11 @@ impl GameState {
             });
         }
 
+        // ---- 0. A goal that asks for a Move is judged now, against the
+        // meadow being left. @spec SIM-ADV-004 ----
+        let mut events = Vec::new();
+        self.complete_adventure_if_met(true, &mut events);
+
         // ---- 1. Snapshot everything the reset would erase ----
         let old_ticks = self.ticks;
         let old_stocks = self.resources;
@@ -1172,9 +1177,10 @@ impl GameState {
             self.structures[StructureId::CozyCushion.ix()] += 1;
         }
 
-        Ok(vec![Event::MeadowMoved {
+        events.push(Event::MeadowMoved {
             generation: self.generation,
-        }])
+        });
+        Ok(events)
     }
 
     /// Convert all Elder Wisdom into Passed-Down Wisdom (one-way). @spec SIM-MOVE-009

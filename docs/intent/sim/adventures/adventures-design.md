@@ -15,7 +15,7 @@ The leaf owns the Adventure catalogue, the declare/complete lifecycle, and the p
 
 - `DeclareAdventure(id)` (available once the Adventures surface is unlocked — the Adventurous Spirit prestige tradition OR the same-named curiosity idea, either suffices) arms an Adventure for the *next* Move. Only one may be armed at a time; re-declaring replaces it; declaring None disarms.
 - On every Move, the armed Adventure becomes *active* for the new meadow, applying its twist, and the armed slot clears. Where none is armed, the new meadow has no Adventure active, whatever the old meadow had.
-- While active, the meadow tracks the Adventure's goal. When the goal is met, the Adventure is *completed*: its completion count increments and its reward pool grows (LimitedDR-capped), and the twist lifts at the following Move.
+- While active, the meadow tracks the Adventure's goal. When the goal is met, the Adventure is *completed*: its completion count increments and its reward pool grows (LimitedDR-capped), and the twist lifts at the following Move. A goal is judged at each day's close, save a goal that asks for a Move, which is judged at the Move itself, against the meadow being left and before anything resets: finishing it *is* the Move, and its reward applies from the new meadow on.
 - An Adventure lasts exactly the meadow it was declared for. A never-completed one simply stays active for the rest of that meadow — no failure state, no timer, no penalty — and ends at the following Move like a completed one. Trying it again means declaring it again, one keypress on the declare list.
 
 ## The Catalogue (~7 adventures)
@@ -28,7 +28,7 @@ Twist (while active) → goal → reward per completion (LimitedDR-capped):
 | 1 | **Long Winter** | perpetual winter | reach a Sunbeam Altar | +5% winter catnip and +5% Sunning-Deck summer energy (cap ×2) |
 | 2 | **Nap Time** | kittens half as productive (lazy) | build a Yarn Computer | +0.2 master-skill multiplier (cap ×4) |
 | 3 | **Frugal Meadow** | energy costs +10% | build the full energy set (Dynamo, Stream Wheel, Star Basin) | −2% energy consumption (cap ×1) |
-| 4 | **Silent Sun** | ceremonies unavailable | Move with a full Memory Chest | +10% Long Sun effectiveness and +cap (cap ×4) |
+| 4 | **Silent Sun** | ceremonies unavailable | Move with a Memory Chest built in the meadow | +10% Long Sun effectiveness and +cap (cap ×4) |
 | 5 | **Gentle Paws** | pounces yield nothing | research the Pen Pal Networks idea, then Move | +10% pounce ratio and +1 trade-knowledge (cap ×2) |
 | 6 | **Tidy Meadow** | mess accrues faster | reduce mess to zero for a full year | −exclusive tidy tradition unlock (one-shot) |
 
@@ -53,6 +53,7 @@ Each Adventure carries a **blurb**: a short joke, then in plain words its twist,
 |----------|--------|------------------------|-----------|
 | Opt-in, armed before a Move | Declare → active next meadow → complete | Always-on challenge toggles | Matches the inspiration's reset-coupled challenge model and keeps Adventures a deliberate choice |
 | An unfinished Adventure at a Move with none armed | Ends with its meadow | Carries into the next meadow until another is armed | Opt-in: a twist applies only to a meadow the player declared it for, so declaring none, or standing down, always means a meadow with no twist; re-declaring costs one keypress |
+| What the Silent Sun goal asks | A Memory Chest structure built in the meadow being left, judged at the Move | Any Memory Chest carryover, judged at day close; every capped store at its cap at the Move | The Memory Chest traditions carry over every Move, so a goal they alone meet is met with nothing done; the chest has no cap for "full" to name; the structure is what this meadow builds, and owning one is plain to see |
 | Rewards LimitedDR-capped per effect | Stacking with per-reward caps | Uncapped stacking; one-shot rewards | The inspiration's proven infinite-replay-without-breaking-balance mechanism |
 | Twists are cozy constraints | Slowdowns/removals of options only | Keep the grim challenges (apocalypse, anarchy) | Tenet 1 — the challenge *shape* survives; the theme becomes gentle |
 | What an Adventure says about itself | A hand-written blurb per Adventure, as traditions and rites carry | A statement the shell assembles from the definition's fields | Twists and goals are engine behavior, not definition fields (SIM-ADV-002, SIM-ADV-004), so no field holds them for a shell to state; a blurb keeps the words in the core's table beside the reward they describe |

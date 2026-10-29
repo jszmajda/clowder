@@ -1159,6 +1159,51 @@ fn a_never_completed_adventure_carries_no_penalty() {
     );
 }
 
+/// A goal that asks for a Move is judged at the Move, against the meadow being
+/// left: the carryover traditions alone never meet it, a built chest does not
+/// finish it at any day's close, and the Move with one built finishes it, the
+/// completion's event among the Move's own and its reward kept into the new
+/// meadow.
+// @spec SIM-ADV-004
+#[test]
+fn a_goal_that_asks_for_a_move_is_judged_at_the_move() {
+    let silent = AdventureId::SilentSun as usize;
+
+    let mut traditions_only = meadow_with(450, 71);
+    traditions_only.traditions.insert(TraditionId::MemoryChestI);
+    traditions_only
+        .traditions
+        .insert(TraditionId::MemoryChestII);
+    traditions_only.active_adventure = Some(AdventureId::SilentSun);
+    run_ticks(&mut traditions_only, 5 * content::TICKS_PER_DAY);
+    traditions_only.apply(Command::GreatMeadowMove).unwrap();
+    assert_eq!(
+        traditions_only.adventure_completions[silent], 0,
+        "carryover traditions alone never meet the goal"
+    );
+
+    let mut built = meadow_with(451, 71);
+    built.active_adventure = Some(AdventureId::SilentSun);
+    built.structures[StructureId::MemoryChest as usize] = 1;
+    run_ticks(&mut built, 5 * content::TICKS_PER_DAY);
+    assert_eq!(
+        built.adventure_completions[silent], 0,
+        "a goal that asks for a Move is not judged at day close"
+    );
+    let events = built.apply(Command::GreatMeadowMove).unwrap();
+    assert_eq!(
+        built.adventure_completions[silent], 1,
+        "the Move finishes it"
+    );
+    assert!(
+        events.contains(&Event::AdventureCompleted {
+            id: AdventureId::SilentSun
+        }),
+        "the completion is told among the Move's events: {events:?}"
+    );
+    assert!(built.adventure_rewards[silent] > 0.0, "its reward is kept");
+}
+
 // @spec SIM-ADV-004
 #[test]
 fn tidy_meadow_completes_after_a_full_year_of_zero_mess() {
