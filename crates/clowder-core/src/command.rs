@@ -1219,9 +1219,8 @@ impl GameState {
     /// Adventures surface is open (the Adventurous Spirit tradition or idea).
     /// @spec SIM-ADV-001
     fn declare_adventure(&mut self, id: Option<AdventureId>) -> Result<Vec<Event>, CommandError> {
-        let unlocked = self.traditions.contains(&TraditionId::AdventurousSpirit)
-            || self.ideas.contains(&IdeaId::AdventurousSpirit);
-        if !unlocked {
+        // @spec SIM-ADV-001, SIM-ADV-008
+        if !self.adventures_open() {
             return Err(CommandError::Locked);
         }
         self.armed_adventure = id;

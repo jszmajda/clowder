@@ -673,12 +673,11 @@ fn legacy_rows(state: &GameState) -> Vec<Row> {
     }
     out.extend(headed_group(state, "traditions", traditions));
 
-    let adventures_open = state
-        .traditions
-        .contains(&clowder_core::TraditionId::AdventurousSpirit)
-        || state.ideas.contains(&IdeaId::AdventurousSpirit);
+    // The declare list while the core reports the surface open; while it is
+    // closed, the adventure under way keeps its row, display-only.
+    // @spec TUI-NAV-097, TUI-NAV-180
     let mut adventures = Vec::new();
-    if adventures_open {
+    if state.adventures_open() {
         adventures.push(Row {
             key: RowKey::Adventure(None),
             kind: act(Command::DeclareAdventure(None), CountSemantics::Single),
@@ -691,6 +690,12 @@ fn legacy_rows(state: &GameState) -> Vec<Row> {
                 heavy: false,
             });
         }
+    } else if let Some(a) = state.active_adventure {
+        adventures.push(Row {
+            key: RowKey::Adventure(Some(a)),
+            kind: RowKind::Display,
+            heavy: false,
+        });
     }
     out.extend(headed_group(state, "adventures", adventures));
     out

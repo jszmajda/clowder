@@ -1889,6 +1889,13 @@ impl GameState {
         }
     }
 
+    /// Whether the Adventures surface is open: the Adventurous Spirit tradition
+    /// held, or the same-named idea known — either suffices. @spec SIM-ADV-008
+    pub fn adventures_open(&self) -> bool {
+        self.traditions.contains(&TraditionId::AdventurousSpirit)
+            || self.ideas.contains(&IdeaId::AdventurousSpirit)
+    }
+
     /// Whether a tradition is open to the shop: every tradition is, save one an
     /// adventure's reward unlocks (SIM-ADV-007), which opens with that
     /// adventure's first completion and stays open. @spec SIM-ADV-007

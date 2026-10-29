@@ -899,6 +899,30 @@ fn declare_adventure_arms_only_once_the_surface_is_unlocked() {
     assert_eq!(s.armed_adventure, Some(AdventureId::QuietRetreat));
 }
 
+/// The core answers whether the Adventures surface is open — the tradition or
+/// the idea, either one — and DeclareAdventure is refused exactly where it
+/// answers no.
+// @spec SIM-ADV-008
+#[test]
+fn the_core_says_whether_the_adventures_surface_is_open() {
+    for (tradition, idea) in [(false, false), (true, false), (false, true), (true, true)] {
+        let mut s = meadow_with(454, 71);
+        if tradition {
+            s.traditions.insert(TraditionId::AdventurousSpirit);
+        }
+        if idea {
+            s.ideas.insert(IdeaId::AdventurousSpirit);
+        }
+        assert_eq!(s.adventures_open(), tradition || idea);
+        let declared = s.apply(Command::DeclareAdventure(Some(AdventureId::NapTime)));
+        assert_eq!(
+            declared.is_ok(),
+            s.adventures_open(),
+            "tradition: {tradition}, idea: {idea}"
+        );
+    }
+}
+
 // =====================================================================
 // SIM-ADV-002 — armed → active on a Move; the twists
 // =====================================================================

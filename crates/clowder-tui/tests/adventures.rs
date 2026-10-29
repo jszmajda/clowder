@@ -406,3 +406,64 @@ fn an_adventures_inspector_states_its_blurb() {
         }
     }
 }
+
+/// While the surface is closed and an adventure is active — a Move made after
+/// the surface was opened only by meadow knowledge — the adventures group
+/// lists that adventure's row alone, display-only: a blank marker, its words,
+/// and its inspector's line and blurb. With none active, no group at all.
+///
+/// @spec TUI-NAV-180
+#[test]
+fn the_adventure_under_way_keeps_its_row_while_the_surface_is_closed() {
+    for a in AdventureId::ALL {
+        let mut state = meadow(Some(a), None);
+        state.traditions.clear();
+        assert!(!state.adventures_open(), "fixture: the surface is closed");
+        let listed: Vec<_> = rows(&state, Section::Legacy)
+            .into_iter()
+            .filter(|r| matches!(r.key, RowKey::Adventure(_)))
+            .collect();
+        assert_eq!(listed.len(), 1, "{a:?}: the active adventure's row alone");
+        assert_eq!(listed[0].key, RowKey::Adventure(Some(a)));
+        assert!(
+            matches!(listed[0].kind, clowder_tui::nav::rows::RowKind::Display),
+            "{a:?}: display-only, every declaration being closed"
+        );
+
+        for w in WIDTHS {
+            let (buf, rect) = list_frame(&state, RowKey::Adventure(Some(a)), w);
+            let lines = region_lines(&buf, rect);
+            let n = name(a);
+            let (_, line) = row_line(&lines, &n).unwrap_or_else(|| {
+                panic!("at {w} columns, {n}'s row is drawn:\n{}", lines.join("\n"))
+            });
+            assert_eq!(
+                line.chars().nth(2),
+                Some(' '),
+                "at {w} columns, {n}'s row wears no marker: {line:?}"
+            );
+            assert_eq!(
+                line.chars().skip(4).collect::<String>().trim_end(),
+                format!("{n} this meadow"),
+                "at {w} columns, {n}'s row carries its words"
+            );
+            let inspector = inspector_lines(&state, Some(a), w).join(" ");
+            assert!(
+                inspector.contains("Under way in this meadow."),
+                "{inspector}"
+            );
+            let blurb = blurb_text(adventure_def(a).blurb);
+            let squash = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");
+            assert!(squash(&inspector).contains(&squash(&blurb)), "{inspector}");
+        }
+    }
+
+    let mut none = meadow(None, None);
+    none.traditions.clear();
+    assert!(
+        !rows(&none, Section::Legacy)
+            .iter()
+            .any(|r| matches!(r.key, RowKey::Adventure(_)) || r.key == RowKey::Fixed("adventures")),
+        "with the surface closed and none active, no adventures group"
+    );
+}
