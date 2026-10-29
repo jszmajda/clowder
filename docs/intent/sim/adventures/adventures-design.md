@@ -14,9 +14,9 @@ The leaf owns the Adventure catalogue, the declare/complete lifecycle, and the p
 ## Lifecycle
 
 - `DeclareAdventure(id)` (available once the Adventures surface is unlocked — the Adventurous Spirit prestige tradition OR the same-named curiosity idea, either suffices) arms an Adventure for the *next* Move. Only one may be armed at a time; re-declaring replaces it; declaring None disarms.
-- On the next Move, the armed Adventure becomes *active* for the new meadow, applying its twist.
+- On every Move, the armed Adventure becomes *active* for the new meadow, applying its twist, and the armed slot clears. Where none is armed, the new meadow has no Adventure active, whatever the old meadow had.
 - While active, the meadow tracks the Adventure's goal. When the goal is met, the Adventure is *completed*: its completion count increments and its reward pool grows (LimitedDR-capped), and the twist lifts at the following Move.
-- A never-completed Adventure simply stays active until the player Moves again with a different (or no) Adventure armed — no failure state, no penalty.
+- An Adventure lasts exactly the meadow it was declared for. A never-completed one simply stays active for the rest of that meadow — no failure state, no timer, no penalty — and ends at the following Move like a completed one. Trying it again means declaring it again, one keypress on the declare list.
 
 ## The Catalogue (~7 adventures)
 
@@ -52,6 +52,7 @@ Each Adventure carries a **blurb**: a short joke, then in plain words its twist,
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
 | Opt-in, armed before a Move | Declare → active next meadow → complete | Always-on challenge toggles | Matches the inspiration's reset-coupled challenge model and keeps Adventures a deliberate choice |
+| An unfinished Adventure at a Move with none armed | Ends with its meadow | Carries into the next meadow until another is armed | Opt-in: a twist applies only to a meadow the player declared it for, so declaring none, or standing down, always means a meadow with no twist; re-declaring costs one keypress |
 | Rewards LimitedDR-capped per effect | Stacking with per-reward caps | Uncapped stacking; one-shot rewards | The inspiration's proven infinite-replay-without-breaking-balance mechanism |
 | Twists are cozy constraints | Slowdowns/removals of options only | Keep the grim challenges (apocalypse, anarchy) | Tenet 1 — the challenge *shape* survives; the theme becomes gentle |
 | What an Adventure says about itself | A hand-written blurb per Adventure, as traditions and rites carry | A statement the shell assembles from the definition's fields | Twists and goals are engine behavior, not definition fields (SIM-ADV-002, SIM-ADV-004), so no field holds them for a shell to state; a blurb keeps the words in the core's table beside the reward they describe |

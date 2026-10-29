@@ -311,7 +311,8 @@ fn a_move_preserves_the_legacy_set_and_resets_everything_else() {
     s.traditions.insert(TraditionId::CarefulPacking);
     s.traditions.insert(TraditionId::WellRested);
     s.family_album.push(archived("Ancestor", 0));
-    s.active_adventure = Some(AdventureId::LongWinter);
+    s.active_adventure = Some(AdventureId::NapTime);
+    s.armed_adventure = Some(AdventureId::LongWinter);
     s.speed = 2.0;
     let gen0 = s.generation;
     // ---- Meadow state to RESET ----
@@ -367,8 +368,9 @@ fn a_move_preserves_the_legacy_set_and_resets_everything_else() {
     assert_eq!(
         s.active_adventure,
         Some(AdventureId::LongWinter),
-        "active adventure persists"
+        "the Adventures state passes through the armed → active transition"
     );
+    assert_eq!(s.armed_adventure, None, "…which clears the armed slot");
     assert_eq!(s.speed, 2.0, "the game-speed setting persists");
     assert_eq!(
         s.generation,
@@ -925,6 +927,53 @@ fn a_move_activates_the_armed_adventure_and_long_winter_forces_winter() {
         Season::Winter,
         "…still Winter, whatever the ticks say"
     );
+}
+
+/// An Adventure lasts exactly the meadow it was declared for: a Move with none
+/// armed leaves the new meadow with none active, whether the old meadow's was
+/// finished or not, and standing down before the Move means the same. Arming
+/// the same Adventure again carries it on.
+// @spec SIM-ADV-002
+#[test]
+fn a_move_with_none_armed_leaves_no_adventure_active() {
+    for done in [false, true] {
+        for stood_down in [false, true] {
+            let mut s = meadow_with(448, 71);
+            s.traditions.insert(TraditionId::AdventurousSpirit);
+            s.active_adventure = Some(AdventureId::QuietRetreat);
+            if stood_down {
+                s.apply(Command::DeclareAdventure(Some(AdventureId::NapTime)))
+                    .unwrap();
+                s.apply(Command::DeclareAdventure(None)).unwrap();
+            }
+            if done {
+                // The roster already meets the goal, so the first day close
+                // completes it.
+                run_ticks(&mut s, content::TICKS_PER_DAY);
+                assert_eq!(
+                    s.adventure_completions[AdventureId::QuietRetreat as usize],
+                    1,
+                    "fixture: the adventure was finished this meadow"
+                );
+            }
+            s.apply(Command::GreatMeadowMove).unwrap();
+            assert_eq!(
+                s.active_adventure, None,
+                "finished: {done}, stood down: {stood_down} — a Move with none armed leaves \
+                 no adventure active"
+            );
+            assert_eq!(s.armed_adventure, None);
+        }
+    }
+
+    // Re-arming the active Adventure carries it into the next meadow.
+    let mut s = meadow_with(449, 71);
+    s.traditions.insert(TraditionId::AdventurousSpirit);
+    s.active_adventure = Some(AdventureId::QuietRetreat);
+    s.apply(Command::DeclareAdventure(Some(AdventureId::QuietRetreat)))
+        .unwrap();
+    s.apply(Command::GreatMeadowMove).unwrap();
+    assert_eq!(s.active_adventure, Some(AdventureId::QuietRetreat));
 }
 
 // @spec SIM-ADV-002

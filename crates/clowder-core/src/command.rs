@@ -1059,8 +1059,6 @@ impl GameState {
         let cap = self.basket_capacity() as usize;
         let second_wind = self.traditions.contains(&TraditionId::SecondWind);
         let old_armed = self.armed_adventure;
-        let old_active = self.active_adventure;
-        let old_done = self.adventure_done;
         let old_roster = std::mem::take(&mut self.kittens);
 
         // ---- 2. Earn the legacies (never decreasing) ----
@@ -1155,15 +1153,10 @@ impl GameState {
         self.generation = gen + 1;
         self.rebuild_unrevealed();
 
-        // ---- 7. Adventures: armed → active; a completed twist lifts, an
-        // unfinished one carries over. @spec SIM-ADV-002, SIM-ADV-004 ----
-        self.active_adventure = if let Some(a) = old_armed {
-            Some(a)
-        } else if old_done {
-            None
-        } else {
-            old_active
-        };
+        // ---- 7. Adventures: armed → active. An Adventure lasts exactly the
+        // meadow it was declared for, finished or not, so with none armed
+        // the new meadow has none. @spec SIM-ADV-002, SIM-ADV-004 ----
+        self.active_adventure = old_armed;
         self.armed_adventure = None;
         self.adventure_done = false;
 
