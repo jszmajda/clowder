@@ -288,7 +288,7 @@ pub const DREAM_DRIFT_THROTTLE: f64 = 0.25; // while any dreamcorn already dream
 pub const SKY_ARCH_PRISM_DRIFT: f64 = 0.00002; // per tick, the Sky Arch's steady drift
                                                // @spec SIM-UNI-005
 pub const RAINBOW_SHOWER_AMOUNT: f64 = 5000.0;
-/// Prism Sight's brightening of the prism and rainbow chances. @spec SIM-MOVE-013
+/// Prism Sight's brightening of the prism and rainbow chances. @spec SIM-MOVE-015
 pub const PRISM_SIGHT_RATIO: f64 = 1.1; // a windfall on a shower day
                                         // @spec SIM-UNI-009, SIM-UNI-010
 pub const PROMISE_ECHO_COST: f64 = 1.0;

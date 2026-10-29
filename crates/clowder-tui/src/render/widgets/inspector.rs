@@ -431,9 +431,8 @@ fn blurb_statement(blurb: &str) -> Pieces {
 /// The plain mechanical statement behind a piece of content — what the row's
 /// flavour name is borrowing against. For a kind whose definition carries a
 /// blurb, the blurb *is* the statement and its effect fields are not restated.
-/// A rite, an arch, a tradition, and a dream loom carry nothing past name,
-/// price, and gate, so they have none. Every resource the statement names
-/// wears its coat. @spec TUI-NAV-018, TUI-THEME-022
+/// Every resource the statement names wears its coat.
+/// @spec TUI-NAV-018, TUI-THEME-022
 fn statement(id: ContentId) -> Pieces {
     match id {
         ContentId::Structure(s) => structure_statement(s),

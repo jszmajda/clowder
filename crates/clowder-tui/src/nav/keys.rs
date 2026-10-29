@@ -41,8 +41,9 @@ pub fn resolve(key: KeyEvent, view: &ViewState) -> Action {
     let field_open = view.prompt.is_some() || matches!(view.overlay, Some(Overlay::Palette { .. }));
 
     // A field captures the keyboard: every printable character (and digit)
-    // routes into it, and every global single-key binding is suspended.
-    // @spec TUI-NAV-037
+    // routes into it, and every global single-key binding is suspended. The
+    // arrows, Tab, and BackTab do nothing there, so nothing moves beneath it.
+    // @spec TUI-NAV-037, TUI-NAV-059
     if field_open {
         return match key.code {
             KeyCode::Enter => Action::Activate,

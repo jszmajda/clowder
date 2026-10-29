@@ -1756,6 +1756,8 @@ impl GameState {
         }
     }
 
+    /// Reveal a resource quietly: no event and no journal entry.
+    /// @spec SIM-ENG-056
     fn reveal_resource(&mut self, r: ResourceId) {
         if self.revealed_resources.insert(r) {
             self.unrevealed_resources.retain(|u| *u != r);
@@ -2316,13 +2318,13 @@ impl GameState {
 
     /// A jamboree runs while ticks < jamboree_until. @spec SIM-KIT-025
     /// Each day's chance of a prism descending, brightened by Prism Sight.
-    /// @spec SIM-UNI-006, SIM-MOVE-013
+    /// @spec SIM-UNI-006, SIM-MOVE-015
     pub fn prism_descent_chance(&self) -> f64 {
         self.effect(crate::effects::Effect::PrismDescentChance) * self.prism_sight()
     }
 
     /// Each day's chance of a rainbow shower, brightened by Prism Sight.
-    /// @spec SIM-UNI-005, SIM-MOVE-013
+    /// @spec SIM-UNI-005, SIM-MOVE-015
     pub fn rainbow_shower_chance(&self) -> f64 {
         self.effect(crate::effects::Effect::RainbowShowerChance) * self.prism_sight()
     }

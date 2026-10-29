@@ -48,13 +48,15 @@ impl Journal {
     /// everything else joins the rolling window, evicting the oldest entry
     /// when it is full. Replay events never reach here — SIM-ENG-028 keeps
     /// them out by routing replay through its own non-journaling tick.
-    /// @spec SIM-ENG-027, SIM-ENG-028, SIM-ENG-029
+    /// Where an entry lives is decided here, once, by its event's class as it
+    /// is recorded; a load restores the entries as saved.
+    /// @spec SIM-ENG-027, SIM-ENG-028, SIM-ENG-029, SIM-ENG-059
     pub fn record(&mut self, tick: u64, event: &Event) {
         match event {
             // Speed is the pace you watch the meadow at, not something that
             // happens in it. Keeping it out is also what preserves the
             // invariant that two meadows differing only in speed are
-            // otherwise identical. @spec SIM-ENG-024, SIM-ENG-028
+            // otherwise identical. @spec SIM-ENG-024, SIM-ENG-028, SIM-ENG-043
             Event::SpeedChanged { .. } => return,
             // A nap's report was already retained as its away entry; journaling
             // the event too would record one sleep in two places.

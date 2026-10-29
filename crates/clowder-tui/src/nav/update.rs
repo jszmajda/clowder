@@ -803,7 +803,7 @@ fn activate_heavy(view: &mut ViewState, key: &RowKey, command: Command) -> Outco
 /// that row's identity, never to whatever the cursor reads by the time Enter
 /// arrives; if that row has left its list since — the sim keeps ticking
 /// under an open prompt — the prompt closes with no effect and says so.
-/// @spec TUI-NAV-011, TUI-NAV-031, TUI-NAV-036, TUI-NAV-072
+/// @spec TUI-NAV-011, TUI-NAV-031, TUI-NAV-036, TUI-NAV-070, TUI-NAV-072
 fn accept_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
     let prompt = view.prompt.take().expect("checked Some above");
     let n: u32 = prompt.digits.parse().unwrap_or(0);
@@ -920,6 +920,9 @@ fn counted_command(command: Command, n: u32) -> Command {
 // x — count prompt — TUI-NAV-011, TUI-NAV-036, TUI-NAV-041
 // ---------------------------------------------------------------------------
 
+/// Open the count prompt on a row that takes a count, with no affordability
+/// check of the shell's own: the core judges the count when Enter sends it.
+/// @spec TUI-NAV-011, TUI-NAV-071
 fn handle_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
     let Some(row) = current_row(view, state) else {
         return no_row_to_act_on(view);

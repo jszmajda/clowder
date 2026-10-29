@@ -21,5 +21,5 @@
 - [x] **SIM-MOVE-011**: The Nine Lives traditions shall each add 0.05 to nine_lives_ratio (default 1.0), raising both the slope and the +200% cap of Elder Wisdom's production contribution.
 - [x] **SIM-MOVE-013**: The system shall apply structure-price-reduction traditions through a GlobalPriceRatioDelta effect consumed by next_cost() (and the reveal-cost path): cost = base × ratio^owned × (1 − limited_dr(price_delta, 0.5)), so stacked reductions are DR-clamped and a price multiplier can never reach zero.
 - [x] **SIM-MOVE-012**: The system shall apply Tradition effects (price reductions, basket capacity, memory-chest ratio, arrival speed, and the rest) through the typed effect-key system, and no Tradition shall ever be un-bought or disabled.
-- [x] **SIM-MOVE-013**: Where the Prism Sight tradition is held, the system shall multiply each day's prism-descent chance and rainbow-shower chance by 1.1.
+- [x] **SIM-MOVE-015**: Where the Prism Sight tradition is held, the system shall multiply each day's prism-descent chance and rainbow-shower chance by 1.1.
 - [x] **SIM-MOVE-014**: The system shall give every Tradition a blurb — a short joke, then the tradition's effect in plain words — marking each resource it names as SIM-CUR-014 marks them.

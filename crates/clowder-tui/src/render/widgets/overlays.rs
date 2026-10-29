@@ -782,6 +782,8 @@ pub fn help(f: &mut Frame, area: Rect) {
         // listed beside them as a per-screen key. @spec TUI-NAV-122
         ("Ideas", "d show or fold done"),
     ];
+    // Every glyph the screen draws, the Elder's mark and a clock light's
+    // included. @spec TUI-NAV-025, TUI-NAV-109, TUI-NAV-154
     const LEGEND: &[(&str, &str)] = &[
         ("\u{25cf}", "affordable now"),
         ("\u{25d0}", "partially affordable"),

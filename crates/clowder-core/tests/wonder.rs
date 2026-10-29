@@ -1447,7 +1447,7 @@ fn a_played_wonder_state_round_trips_losslessly() {
 }
 
 /// Prism Sight makes each day's prism descent and rainbow shower 10% likelier.
-/// @spec SIM-MOVE-013
+/// @spec SIM-MOVE-015
 #[test]
 fn prism_sight_brightens_the_sky_events() {
     let mut s = GameState::new(1303);

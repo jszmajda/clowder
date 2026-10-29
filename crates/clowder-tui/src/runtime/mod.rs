@@ -638,7 +638,9 @@ impl App {
                             // An accepted nap returns its own report among its
                             // events — the one route to a retained report
                             // that runs through a command rather than a load.
-                            // @spec TUI-NAV-027, TUI-NAV-050, TUI-NAV-107
+                            // An accepted command whose event the ticker tells
+                            // leaves no footer note of its own.
+                            // @spec TUI-NAV-027, TUI-NAV-050, TUI-NAV-107, TUI-NAV-155
                             Ok(events) => {
                                 crate::nav::queue_command_reports(
                                     &mut self.view,
