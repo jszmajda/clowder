@@ -17,3 +17,9 @@ serde_json = { version = "1", features = ["float_roundtrip"] }
 directories = "5"
 ratatui = "0.29"
 crossterm = { version = "0.28", features = ["use-dev-tty"] }
+
+# Debug builds, and so the tests, are lightly optimised. The slowest tests simulate and render a lot,
+# and opt-level 1 runs them several times faster than an unoptimised build for a few more seconds on
+# a cold build. Overflow checks and debug assertions stay on, as in any dev build.
+[profile.dev]
+opt-level = 1
