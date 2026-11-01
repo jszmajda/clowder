@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-01 (commit `c5a6aacb2ccc`). 197 of 197 active specs implemented, each cited by a test.
+**PARTIAL** — last audited 2026-11-01 (commit `3fb11a5d7099`). 200 of 200 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/navigation/navigation-specs.md` — 197 specs, prefix `TUI-NAV`
+- `docs/intent/tui/navigation/navigation-specs.md` — 200 specs, prefix `TUI-NAV`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/achievements.rs`
@@ -43,6 +43,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 - `crates/clowder-tui/tests/integration/resize.rs`
 - `crates/clowder-tui/tests/integration/rows.rs`
 - `crates/clowder-tui/tests/integration/section_reveal.rs`
+- `crates/clowder-tui/tests/integration/sidebar_links.rs`
 - `crates/clowder-tui/tests/integration/sidebar_scroll.rs`
 - `crates/clowder-tui/tests/integration/sources_hint.rs`
 - `crates/clowder-tui/tests/integration/store_card.rs`
@@ -76,13 +77,13 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-NAV-001 – TUI-NAV-197 | 197 | 0 | 0 |
+| All | TUI-NAV-001 – TUI-NAV-200 | 200 | 0 | 0 |
 
-**Summary:** 197 of 197 active specs implemented.
+**Summary:** 200 of 200 active specs implemented.
 
 ## Key Findings
 
-Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Issue #2 added what a store's card opens with (TUI-NAV-197). The audit found the persistent inspector repeating an arming's summary (fixed, TUI-NAV-077) and a placement helper no frame calls (annotation removed, the rest filed).
+Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Issue #2 added what a store's card opens with (TUI-NAV-197). The audit found the persistent inspector repeating an arming's summary (fixed, TUI-NAV-077) and a placement helper no frame calls (annotation removed, the rest filed). Issue #3 added the sidebar's store-link marks (TUI-NAV-198, TUI-NAV-199, TUI-NAV-200), with marks read off drawn frames over every row of every section.
 
 ## Work Required
 

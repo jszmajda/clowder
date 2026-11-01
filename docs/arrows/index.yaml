@@ -138,7 +138,7 @@ arrows:
     parent: sim
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
+    audited_sha: 3fb11a5d70996230468fe19e494c2d3a211cbbf4
     blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md
@@ -182,7 +182,7 @@ arrows:
     parent: tui
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: c5a6aacb2cccb97e19ac2830ce3b93d60479fb84
+    audited_sha: 3fb11a5d70996230468fe19e494c2d3a211cbbf4
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
@@ -215,7 +215,7 @@ arrows:
     parent: tui
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: c5a6aacb2cccb97e19ac2830ce3b93d60479fb84
+    audited_sha: 3fb11a5d70996230468fe19e494c2d3a211cbbf4
     blocks: []
     blockedBy: [navigation, runtime, theme]
     detail: tui/render/render.md

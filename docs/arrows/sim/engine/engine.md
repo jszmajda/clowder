@@ -4,7 +4,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 ## Status
 
-**OK** — last audited 2026-11-01 (commit `7ad9e6ec6caa`). 77 of 77 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-01 (commit `3fb11a5d7099`). 82 of 82 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/engine/engine-specs.md` — 77 specs, prefix `SIM-ENG`
+- `docs/intent/sim/engine/engine-specs.md` — 82 specs, prefix `SIM-ENG`
 
 ### Tests
 - `crates/clowder-core/tests/integration/economy_depth.rs`
@@ -33,6 +33,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 - `crates/clowder-core/tests/integration/revealed_resources.rs`
 - `crates/clowder-core/tests/integration/society.rs`
 - `crates/clowder-core/tests/integration/sources.rs`
+- `crates/clowder-core/tests/integration/store_links.rs`
 - `crates/clowder-core/tests/integration/structure_fields.rs`
 - `crates/clowder-core/tests/integration/unit_price.rs`
 - `crates/clowder-core/tests/integration/wonder.rs`
@@ -56,13 +57,13 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-ENG-001 – SIM-ENG-078 | 77 | 0 | 0 |
+| All | SIM-ENG-001 – SIM-ENG-083 | 82 | 0 | 0 |
 
-**Summary:** 77 of 77 active specs implemented.
+**Summary:** 82 of 82 active specs implemented.
 
 ## Key Findings
 
-Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. SIM-ENG-076 is a property of the content tables as a whole, so no code decides it, and its tests are its pins. SIM-ENG-018's order is correct by reading but pinned by no running test past the early rolls (#14).
+Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. SIM-ENG-076 is a property of the content tables as a whole, so no code decides it, and its tests are its pins. SIM-ENG-018's order is correct by reading but pinned by no running test past the early rolls (#14). Issue #3 added the store-links query (SIM-ENG-079 to SIM-ENG-083), read by a reader given only the arrow artifacts, its findings then checked by hand: items growing a store the first draft missed, a recipe not yet learned leaking through a year-close craft, and a pounce reporting goods it would not bring were all fixed and tested, and a fixed act's links are held to what applying it moves. The sources query now takes each source's goods from one function, and lists a loom it had left out.
 
 ## Work Required
 

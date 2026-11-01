@@ -511,7 +511,7 @@ fn a_fixed_acts_links_hold_true_to_what_it_moves() {
             "fixture: {cmd:?}'s row is listed"
         );
         let links = s.store_links(&cmd);
-        let before = s.resources.clone();
+        let before = s.resources;
         if let Err(e) = s.apply(cmd) {
             panic!("fixture: {cmd:?} should apply, refused with {e:?}");
         }
