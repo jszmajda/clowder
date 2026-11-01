@@ -9,6 +9,7 @@ pub mod fmt;
 pub mod layout;
 pub mod pointer;
 pub(crate) mod portrait;
+pub mod store_art;
 pub mod widgets;
 
 use clowder_core::{content, Command, ContentId, GameState, Location, LockReason, ResourceId};

@@ -5,8 +5,8 @@
 - [x] **SIM-ECO-001**: The system shall track exactly the resources of the economy design's RES table (46 ids, append-only) as f64 stocks, with each resource's base cap and tier as tabled; uncapped (∞) resources are never clamped.
 - [x] **SIM-ECO-002**: The system shall extend storage caps by the cap effects of owned structures exactly as the economy design's BLD table specifies (including multi-resource extenders like the Shed and Porch).
 - [x] **SIM-ECO-003**: During the clamp phase, the system shall trim each stock to its cap; production may exceed caps transiently within a tick, and consumption may draw from that transient before clamping.
-- [ ] **SIM-ECO-061**: The system shall give every resource of the economy design's RES table a description in its content tables: one or two sentences, each closed, of at most ninety characters in all, saying what the store is.
-- [ ] **SIM-ECO-062**: The system shall state no figure in a resource's description, and shall name in it no resource, its own included, and no structure, job, idea, recipe, refinement, rule, rite, arch upgrade, colony, tradition, adventure, site, or dream loom.
+- [x] **SIM-ECO-061**: The system shall give every resource of the economy design's RES table a description in its content tables: one or two sentences, each closed, of at most ninety characters in all, saying what the store is.
+- [x] **SIM-ECO-062**: The system shall state no figure in a resource's description, and shall name in it no resource, its own included, and no structure, job, idea, recipe, refinement, rule, rite, arch upgrade, colony, tradition, adventure, site, or dream loom.
 - [x] **SIM-ECO-022**: The system shall use epsilon-tolerant affordability checks (stock + 1e-9 ≥ cost) for all spends, and deductions shall floor the stock at zero.
 
 ## Manual Actions

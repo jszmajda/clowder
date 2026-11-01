@@ -11,7 +11,7 @@
 //! three-column split are breakpoints, and live in `render::layout` beside the
 //! render specs that state them a second time.
 //! @spec TUI-NAV-017, TUI-NAV-018, TUI-NAV-029, TUI-NAV-078, TUI-NAV-079,
-//!       TUI-NAV-080, TUI-NAV-108, TUI-NAV-135
+//!       TUI-NAV-080, TUI-NAV-108, TUI-NAV-135, TUI-NAV-197
 
 use clowder_core::content::{self, TICKS_PER_SECOND};
 use clowder_core::{
@@ -998,16 +998,27 @@ fn flow_source_name(src: FlowSource) -> String {
 /// @spec TUI-NAV-080, TUI-RENDER-012
 /// @spec TUI-NAV-135, TUI-NAV-136, TUI-NAV-137, TUI-NAV-138, TUI-NAV-139
 fn store_lines(state: &GameState, r: ResourceId) -> Vec<Pieces> {
+    store_lines_with(state, r, str::to_string)
+}
+
+/// A store's figures and flow lines, each figure passed through `figure` on
+/// its way to the line: as it reads when drawn, or at a fixed width when the
+/// card is measured. A flow's standing on the card is judged on what it reads.
+fn store_lines_with(
+    state: &GameState,
+    r: ResourceId,
+    figure: impl Fn(&str) -> String,
+) -> Vec<Pieces> {
     let cap = state.cap(r);
     let cap_text = if cap.is_finite() {
-        fmt::exact(cap)
+        figure(&fmt::exact(cap))
     } else {
         "none".to_string()
     };
     let mut lines = vec![plain(format!(
         "Stock: {}. Cap: {cap_text}. Net rate: {} per game second.",
-        fmt::exact(state.stock(r)),
-        signed_rate(state.net_rate(r)),
+        figure(&fmt::exact(state.stock(r))),
+        figure(&signed_rate(state.net_rate(r))),
     ))];
 
     let mut ins = Vec::new();
@@ -1017,7 +1028,7 @@ fn store_lines(state: &GameState, r: ResourceId) -> Vec<Pieces> {
         if text == "0" {
             continue;
         }
-        let line = plain(format!("{} {text}", flow_source_name(src)));
+        let line = plain(format!("{} {}", flow_source_name(src), figure(&text)));
         if rate > 0.0 {
             ins.push(line);
         } else {
@@ -1036,6 +1047,51 @@ fn store_lines(state: &GameState, r: ResourceId) -> Vec<Pieces> {
         lines.extend(outs);
     }
     lines
+}
+
+/// How wide a figure counts as when a store's card is measured: a seven-digit
+/// stock with its fraction and a sign. @spec TUI-RENDER-033
+const MEASURED_FIGURE: usize = 12;
+
+/// The rows `lines` take at `width`, wrapped as the inspector wraps them.
+fn rows_taken(lines: Vec<Line<'static>>, width: u16) -> usize {
+    Paragraph::new(lines)
+        .wrap(Wrap { trim: true })
+        .line_count(width)
+}
+
+/// What a stores row states between its name and its figures: its drawing and
+/// its description where the card has room for them, the drawing given up
+/// first and then the description, so neither pushes a figure or a flow line
+/// past the pane's foot. The card is measured with every figure at one fixed
+/// width, so a figure changing its digits never puts either in or out.
+/// @spec TUI-NAV-197, TUI-RENDER-032, TUI-RENDER-033
+fn store_opening(state: &GameState, r: ResourceId, area: Rect) -> Vec<Line<'static>> {
+    let dim = crate::render::style_for(Role::Dim);
+    let caption = Line::styled(format!("\u{b7} {}", content::resource_description(r)), dim);
+    let drawing = crate::render::store_art::drawing_lines(r);
+
+    let measured = |extra: &[Line<'static>]| {
+        let mut lines: Vec<Line<'static>> = vec![Line::raw(resource_label(r)), Line::raw("")];
+        lines.extend_from_slice(extra);
+        lines.extend(
+            store_lines_with(state, r, |_| "0".repeat(MEASURED_FIGURE))
+                .iter()
+                .map(|l| line_from_pieces(l, Style::default(), true, usize::MAX)),
+        );
+        rows_taken(lines, area.width)
+    };
+    let height = area.height as usize;
+    let without_drawing = measured(std::slice::from_ref(&caption));
+    if without_drawing + drawing.len() <= height {
+        let mut out = drawing;
+        out.push(caption);
+        out
+    } else if without_drawing <= height {
+        vec![caption]
+    } else {
+        Vec::new()
+    }
 }
 
 /// What the row's act brought home the last time it was taken: its newest
@@ -1275,6 +1331,9 @@ fn draw_body(
         })
         .collect();
     let mut out = out;
+    if let RowKey::Resource(r) = key {
+        out.splice(1..1, store_opening(state, *r, area));
+    }
     if let RowKey::Kitten(ix, _) = key {
         out.extend(about_lines(state, *ix, area.width as usize));
     }

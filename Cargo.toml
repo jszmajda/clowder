@@ -15,7 +15,7 @@ publish = false
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 directories = "5"
-ratatui = "0.29"
+ratatui = { version = "0.29", features = ["unstable-rendered-line-info"] }
 crossterm = { version = "0.28", features = ["use-dev-tty"] }
 
 # Debug builds, and so the tests, are lightly optimised. The slowest tests simulate and render a lot,

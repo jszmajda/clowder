@@ -43,7 +43,7 @@
 - [x] **TUI-THEME-024**: When the ticker's line or a Journal line states a time away's gains or changed stores or what an act brought home, and when a footer note states that a refused command is short of a resource, the system shall draw each resource it names in that resource's coat as TUI-THEME-023 lays one.
 - [x] **TUI-THEME-025**: The system shall draw the ticker's newest entry in the inherited foreground, save a flavor event, which it shall draw in `dim`, laying no faint attribute over either.
 - [x] **TUI-THEME-026**: The system shall draw each of the ticker's lights other than the sky's with its glyph and word in the inherited foreground and its clock in `dim`.
-- [ ] **TUI-THEME-031**: The system shall paint each `█` cell of a store's drawing in the colour of its column under the store's coat, laid by TUI-THEME-017 as across a name with as many characters as the drawing's widest row has columns, and shall draw every other mark of the drawing in the inherited foreground, wearing no state colour on any cell and varying with no stock, cap, rate, or other state.
+- [x] **TUI-THEME-031**: The system shall paint each `█` cell of a store's drawing in the colour of its column under the store's coat, laid by TUI-THEME-017 as across a name with as many characters as the drawing's widest row has columns, and shall draw every other mark of the drawing in the inherited foreground, wearing no state colour on any cell and varying with no stock, cap, rate, or other state.
 
 ## Fur
 

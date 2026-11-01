@@ -49,6 +49,62 @@ pub fn tier(r: ResourceId) -> Tier {
     }
 }
 
+/// What a store is, to a player who has just met it: flavour, stating no
+/// figure and naming no resource and nothing else from the content tables, so
+/// it never gets ahead of what the player has found.
+/// @spec SIM-ECO-061, SIM-ECO-062
+pub fn resource_description(r: ResourceId) -> &'static str {
+    use ResourceId::*;
+    match r {
+        Catnip => "The green stuff. Every kitten in the meadow agrees it's the best smell there is.",
+        Twigs => "Small, snappable, and endlessly satisfying to carry about in your mouth.",
+        Fluff => "Soft drifts of moulted kitten. Nobody admits to it, and everybody naps in it.",
+        Curiosity => "That itch behind the ears that says something worth poking is just out of reach.",
+        Pebbles => "Smooth, round, and perfect for nudging off the edge of things to see what happens.",
+        Buttons => "Bright little discs that skitter beautifully across any floor, then vanish.",
+        Embers => "Glowing bits of leftover fire, kept at a careful distance by everyone with whiskers.",
+        Shinies => "Anything that glints. No kitten can explain why it matters, and none will give it back.",
+        Dew => "Cold, clear drops gathered at dawn. Best tapped with one paw, then regretted.",
+        Moonstone => "Pale rock that looks lit from inside. It is colder than it looks, and proud of it.",
+        Stardust => "What falls off the sky when nobody's looking. It gets in your whiskers and stays.",
+        Hushfelt => "The softest felt there is, found where it's very quiet. Even a pounce lands silent.",
+        Pep => "The wiggle before the leap. It comes in bursts and leaves suddenly, usually at midnight.",
+        Charm => "The slow blink, the tilted head, the paw placed just so. It works on almost everyone.",
+        Warmth => "The glow of a kitten who has found the sunny spot and means to stay there.",
+        Skymaps => "Careful scratchings of where the stars were last night, in case they try anything.",
+        Feathers => "Light, tickly, and impossible to leave alone. Having some about cheers everybody up.",
+        Bells => "Tiny and jingly. A kitten wearing one fools nobody, and has never once minded.",
+        Mint => "A sharp, cool scent that makes every whisker stand up and take notice.",
+        Unicorns => "Real ones, and very polite about it. They tread softly and leave sparkles on the rug.",
+        Rainbows => "Every colour at once, folded up neatly and sent back with thanks.",
+        Prisms => "Clear wedges of caught light, throwing little colours that cannot be pounced on. Yet.",
+        Starshards => "Sharp little slivers of night sky. Someone has filed the points down, to be safe.",
+        Echoes => "Faint voices of a very old clowder, still purring somewhere just out of earshot.",
+        Dreamcorns => "Small bright things that wandered into a shared dream and fell fast asleep there.",
+        JarsOfPurrs => "Contentment, condensed and sealed. Lift the lid and the whole room starts to rumble.",
+        Reverie => "The drifting, golden haze of a day you're almost sure you've lived before.",
+        Wands => "A stick, a string, and a dangling promise. No kitten has ever caught the end of it.",
+        Tiles => "Flat, square, and cool in summer. Mostly used for lying on in the way of everything.",
+        Badges => "Little round proofs of a job well done, worn with enormous and earned dignity.",
+        Brass => "Warm yellow metal with a good ring to it, and smug about how well it polishes up.",
+        Cogs => "Toothed wheels that turn each other round and round. A kitten could watch for hours.",
+        Moonsteel => "Pale metal with a night-time sheen, stronger than it has any right to be.",
+        Lattices => "Neat crossed slats, made for climbing and for poking one paw through at passers-by.",
+        Pavers => "Good square stones for a good flat path, so nobody gets muddy paws on the way to lunch.",
+        Quills => "Cut and sharpened for writing. Also excellent for flicking off the table.",
+        Stories => "Tales told over and over until they're true. Each has a kitten at the heart of it.",
+        Anthologies => "A whole shelf of tales bound up together, and very comfortable to sit on.",
+        Schemes => "Plans drawn up in secret with a great deal of tail-twitching. Some of them even work.",
+        Cairns => "Rocks stacked with great care, so that there's something tall to knock over later.",
+        Kites => "Paper, string, and the wind's good opinion. The whole clowder chases the shadow.",
+        Balloons => "Round, floaty, and full of lift. Nobody is to bring their claws anywhere near them.",
+        Moonmilk => "A pale glowing drink that fizzes on the tongue, and goes a very long way indeed.",
+        Dreamweave => "Cloth spun from sleep itself, so fine you can only see it with your eyes closed.",
+        Cometsilk => "A shimmer of thread drawn out of a long bright tail. Pull it gently and it sings.",
+        Cleverness => "What a very big ball of yarn thinks about when it has been left alone for too long.",
+    }
+}
+
 const INF: f64 = f64::INFINITY;
 
 /// Base storage caps in RES-table order; ∞ = uncapped (clamp skips it, and

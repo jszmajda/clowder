@@ -38,6 +38,7 @@ mod section_reveal;
 mod session;
 mod sidebar_scroll;
 mod sources_hint;
+mod store_card;
 mod terminal_lost;
 mod ticker_lights;
 mod transients;

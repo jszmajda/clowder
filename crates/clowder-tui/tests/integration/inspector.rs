@@ -3531,9 +3531,10 @@ fn a_stores_row_states_its_exact_stock_its_cap_or_none_and_its_net_rate_per_game
         // (TUI-NAV-135); the facts this test is about stand above them.
         let mut allowed: BTreeSet<String> = [stock, rate].into_iter().collect();
         allowed.extend(state.flows(r).iter().map(|(_, f)| bare(*f)));
+        // What opens the card above them differs store by store (TUI-NAV-197).
         let body: Vec<String> = lines_of(&shown)
             .into_iter()
-            .skip(1)
+            .skip_while(|l| !l.starts_with("Stock: "))
             .take_while(|l| l != FLOWS_IN && l != FLOWS_OUT)
             .map(|l| masked(&l))
             .collect();
