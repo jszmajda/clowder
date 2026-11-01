@@ -298,7 +298,7 @@ fn archived(name: &str, generation: u32) -> ArchivedKitten {
 // SIM-MOVE-004 — exact persist / reset
 // =====================================================================
 
-// @spec SIM-MOVE-004
+// @spec SIM-MOVE-004, SIM-SUN-003
 #[test]
 fn a_move_preserves_the_legacy_set_and_resets_everything_else() {
     let mut s = meadow_with(409, 71);

@@ -1260,3 +1260,158 @@ fn lucid_naps_bring_reverie_and_deep_cushions_cheapen_naps() {
         s.stock(ResourceId::Reverie)
     );
 }
+
+// ---- Closing the audit's gaps: each pins a clause no test exercised ----
+
+/// A meadow one tick short of a season boundary whose déjà-vu roll is certain.
+fn on_the_eve_of_a_certain_deja_vu(seed: u64) -> GameState {
+    let mut s = GameState::new(seed);
+    grant(&mut s, StructureId::MemoryChest, 100);
+    assert!(s.effect(Effect::DejaVuChance) >= 1.0, "fixture: certain");
+    s.ticks = content::DAYS_PER_SEASON * content::TICKS_PER_DAY - 1;
+    s
+}
+
+// @spec SIM-DREAM-004
+#[test]
+fn a_deja_vu_day_holds_production_still_for_exactly_one_day_of_ticks() {
+    let mut s = on_the_eve_of_a_certain_deja_vu(1305);
+    grant(&mut s, StructureId::CatnipPatch, 10);
+    give(&mut s, ResourceId::Catnip, 0.0);
+    s.tick();
+    assert!(s.deja_vu_until > s.ticks, "the boundary's roll landed");
+    let mut held = 0;
+    for _ in 0..content::TICKS_PER_DAY * 2 {
+        let before = s.stock(ResourceId::Catnip);
+        s.tick();
+        if s.stock(ResourceId::Catnip) != before {
+            break;
+        }
+        held += 1;
+    }
+    assert_eq!(held, content::TICKS_PER_DAY);
+}
+
+// @spec SIM-DREAM-004
+#[test]
+fn the_deja_vu_roll_comes_only_at_a_season_boundary() {
+    let mut s = GameState::new(1306);
+    grant(&mut s, StructureId::MemoryChest, 100);
+    let boundary = content::DAYS_PER_SEASON * content::TICKS_PER_DAY;
+    while s.ticks + 1 < boundary {
+        s.tick();
+        assert_eq!(s.deja_vu_until, 0, "no roll at tick {}", s.ticks);
+    }
+    s.tick();
+    assert!(s.deja_vu_until > s.ticks, "the boundary rolls");
+}
+
+// @spec SIM-DREAM-004
+#[test]
+fn reverie_yield_effects_raise_what_a_deja_vu_day_gathers() {
+    let mut plain = on_the_eve_of_a_certain_deja_vu(1307);
+    let mut netted = plain.clone();
+    netted.dream_looms.insert(DreamLoomId::ReverieNet);
+    plain.tick();
+    netted.tick();
+    let gathered = plain.stock(ResourceId::Reverie);
+    assert!(gathered > 0.0);
+    assert!((netted.stock(ResourceId::Reverie) - gathered * 1.5).abs() < TOL);
+}
+
+// @spec SIM-DREAM-006
+#[test]
+fn each_woven_loom_gives_its_tabled_effect() {
+    let table: [(DreamLoomId, Effect, f64); 5] = [
+        (DreamLoomId::SoftPillow, Effect::HeatEfficiency, 0.10),
+        (DreamLoomId::WarmBlanket, Effect::HeatDissipation, 0.20),
+        (DreamLoomId::DreamCatcher, Effect::DejaVuChance, 0.25),
+        (DreamLoomId::CozyCave, Effect::HeatEfficiency, 0.15),
+        (DreamLoomId::ReverieNet, Effect::ReverieYield, 0.50),
+    ];
+    for (loom, key, want) in table {
+        let mut s = GameState::new(1308);
+        assert_eq!(s.effect(key), 0.0, "{loom:?}");
+        s.dream_looms.insert(loom);
+        assert!((s.effect(key) - want).abs() < TOL, "{loom:?}");
+    }
+}
+
+// @spec SIM-DREAM-001
+#[test]
+fn a_nap_outside_its_bounds_or_unaffordable_is_refused_and_changes_nothing() {
+    let mut s = GameState::new(1309);
+    assert_eq!(
+        s.apply(Command::DeepNap(1)).unwrap_err(),
+        CommandError::Locked
+    );
+    s.ideas.insert(IdeaId::DeepNapTheory);
+    let too_long = s.max_nap_length() + 1;
+    give(&mut s, ResourceId::Starshards, 1e12);
+    for years in [0, too_long] {
+        assert_eq!(
+            s.apply(Command::DeepNap(years)).unwrap_err(),
+            CommandError::InsufficientResources {
+                missing: Vec::new()
+            },
+            "{years} years"
+        );
+    }
+    give(&mut s, ResourceId::Starshards, 0.0);
+    let cost = s.starshard_cost(1);
+    assert_eq!(
+        s.apply(Command::DeepNap(1)).unwrap_err(),
+        CommandError::InsufficientResources {
+            missing: vec![(ResourceId::Starshards, cost)]
+        }
+    );
+    assert_eq!(s.ticks, 0, "no refused nap advances the meadow");
+}
+
+/// What a nap reports: the time it covered, and what the replay moved. The
+/// starshards it cost are spent before the replay and are not among them.
+/// @spec SIM-DREAM-001, SIM-DREAM-011
+#[test]
+fn a_naps_report_counts_what_the_replay_moved_and_lucid_reverie() {
+    let mut s = GameState::new(1310);
+    s.ideas.insert(IdeaId::DeepNapTheory);
+    s.dream_looms.insert(DreamLoomId::LucidNap);
+    give(&mut s, ResourceId::Starshards, 1e6);
+    let cost = s.starshard_cost(2);
+    let events = s.apply(Command::DeepNap(2)).unwrap();
+    assert_eq!(s.stock(ResourceId::Starshards), 1e6 - cost);
+    let report = events
+        .iter()
+        .find_map(|e| match e {
+            Event::Napped { report, .. } => Some(report),
+            _ => None,
+        })
+        .expect("a nap reports");
+    assert_eq!(report.resource_deltas[ResourceId::Starshards.ix()], 0.0);
+    assert!((report.resource_deltas[ResourceId::Reverie.ix()] - 0.2).abs() < TOL);
+    assert_eq!(report.elapsed_seconds, 2000 / content::TICKS_PER_SECOND);
+}
+
+// @spec SIM-DREAM-002
+#[test]
+fn a_naps_heat_is_its_years_at_the_rate_less_heat_efficiency() {
+    let mut s = GameState::new(1311);
+    s.ideas.insert(IdeaId::DeepNapTheory);
+    s.dream_looms.insert(DreamLoomId::SoftPillow);
+    give(&mut s, ResourceId::Starshards, 1e6);
+    s.apply(Command::DeepNap(3)).unwrap();
+    assert!((s.stirred_dreams - 3.0 * content::HEAT_PER_YEAR * 0.9).abs() < TOL);
+}
+
+// @spec SIM-DREAM-011
+#[test]
+fn the_deep_cushion_discount_multiplies_with_long_slumbers() {
+    let r = content::STARSHARD_COST_RATIO;
+    let raw = content::STARSHARD_COST_BASE * (r.powf(50.0) - 1.0) / (r - 1.0);
+    let mut s = GameState::new(1312);
+    s.dream_looms.insert(DreamLoomId::DeepCushion);
+    s.dream_looms.insert(DreamLoomId::LongSlumber);
+    let discount =
+        (1.0 - content::LONG_SLUMBER_COST_DISCOUNT) * (1.0 - content::DEEP_CUSHION_COST_DISCOUNT);
+    assert_eq!(s.starshard_cost(50), (raw * discount).ceil());
+}

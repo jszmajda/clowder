@@ -294,3 +294,24 @@ fn energy_made_is_seasonal_exactly_where_the_definition_marks_it() {
         }
     }
 }
+
+/// A fuel-scaled structure's fuel fraction is the throttle of its converter's
+/// inputs over its copies, and it scales both figures the mark covers.
+/// @spec SIM-ECO-059
+#[test]
+fn a_fuel_scaled_structures_figures_follow_the_throttle_of_its_inputs() {
+    let b = StructureId::DynamoWheel;
+    let d = structure_def(b);
+    let (fuel, per_copy) = d.converter.as_ref().unwrap().inputs[0];
+    let mut s = GameState::new(8);
+    grant(&mut s, b, 2);
+    // Half of what two copies draw in a tick.
+    s.resources[fuel.ix()] = per_copy;
+    let fraction = s.throttle_fraction(&[(fuel, per_copy * 2.0)]);
+    assert!(fraction > 0.0 && fraction < 1.0, "fixture: partly starved");
+    assert_eq!(s.energy_production(), d.energy_prod * 2.0 * fraction);
+    assert_eq!(
+        s.effect(Effect::GlobalProductionRatio),
+        d.global_ratio * 2.0 * fraction
+    );
+}

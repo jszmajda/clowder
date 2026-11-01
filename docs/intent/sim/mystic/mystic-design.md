@@ -14,7 +14,7 @@ The mystic leaf is the unicorn economy and everything glittering that follows fr
 | Currency | Gained by | Role |
 |---|---|---|
 | **unicorns** | Unicorn Meadow (economy, +0.001/t × mystic multipliers), Pounces | held for Parades; Meadow production is multiplied by this leaf's `unicornsRatio` effects |
-| **rainbows** | **Parade** (`HoldParade`): 2500 unicorns → rainbows × (Rainbow Arches built) | buy Arch upgrades |
+| **rainbows** | **Parade** (`HoldParade`): 2500 unicorns → 2500 rainbows per Rainbow Arch built, × (1 + parade ratio) | buy Arch upgrades |
 | **prisms** | rare descents (day-boundary event; base chance from each Rainbow Arch *structure* plus Arch *upgrades*) | refined into starshards; or drift into dreams |
 | **starshards** | **refine** 25 prisms → 1 starshard × (1 + shard_refine) | dreamtime currency (skips), gate craft for high research |
 | **echoes** | refine 25 starshards → 1 echo × (1 + echo-refine effects) | cryptotheology-analog currency (ceremonies/dreamtime) |
@@ -25,7 +25,7 @@ Every conversion is an *offering that returns more than it takes* or a *transfor
 
 ## Rainbow Arches
 
-Arches (economy structure, gated by the Parade Routes idea) are the Parade exchange rate — `rainbows_per_parade = arches_built`. **Researching Parade Routes grants the first Rainbow Arch free** (the SIM-TRADE-008 precedent), so the first Parade already returns rainbows and the arch's base prism-descent chance seeds the prism supply — the loop bootstraps without a chicken-and-egg. Arch upgrades (`BuyArch`, rainbow + prism priced, ~8):
+Arches (economy structure, gated by the Parade Routes idea) are the Parade exchange rate — `rainbows_per_parade = 2500 × arches_built × (1 + parade_ratio)`. **Researching Parade Routes grants the first Rainbow Arch free** (the SIM-TRADE-008 precedent), so the first Parade already returns rainbows and the arch's base prism-descent chance seeds the prism supply — the loop bootstraps without a chicken-and-egg. Arch upgrades (`BuyArch`, rainbow + prism priced, ~8):
 
 | # | Arch upgrade | Cost | Effect |
 |---|---|---|---|
@@ -48,7 +48,7 @@ The **Memory Arch upgrade** turns the clowder's Rainbow Arches into a dreamcorn 
 
 ## Promises to the Night Court
 
-`Promises` (the inspiration's pacts, ~post-Enlightenment): each Promise costs echoes and fills a limited slot (slots from Everdream content), consuming 0.0005 dreamcorn/day as gentle upkeep and granting a small global effect (global storage +0.05%, global production +0.05%, warmth +0.1%, craft +0.1%). A Promise with insufficient dreamcorn upkeep **goes quiet** — its effect suspends and its slot is held — and wakes automatically when dreamcorns are available again. Nothing shatters, nothing is destroyed; a neglected Promise simply naps until the clowder can keep it. (Contrast the inspiration's Fracture, which permanently destroys pacts, alicorns, and all skills — Clowder has no such state.)
+`Promises` (the inspiration's pacts, ~post-Enlightenment): each Promise costs echoes and fills a limited slot (slots from Everdream content), consuming 0.0005 dreamcorn/day as gentle upkeep and granting global production +0.05%. A Promise with insufficient dreamcorn upkeep **goes quiet** — its effect suspends and its slot is held — and wakes automatically when dreamcorns are available again. Nothing shatters, nothing is destroyed; a neglected Promise simply naps until the clowder can keep it. (Contrast the inspiration's Fracture, which permanently destroys pacts, alicorns, and all skills — Clowder has no such state.)
 
 ## Jars of Purrs
 
@@ -58,7 +58,8 @@ Condensing 10000 rainbows into 1 Jar of Purrs is the condensed-contentment curre
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
-| Parade exchange rate = arches | rainbows_per_parade scales with Arches built | Fixed rate; rate as an upgrade | The inspiration's ziggurat-count-as-tears-rate pattern; makes Arches doubly valuable (rate + upgrades) |
+| Parade exchange rate from arches | rainbows_per_parade scales with Arches built | Fixed rate; rate as an upgrade | The inspiration's ziggurat-count-as-tears-rate pattern; makes Arches doubly valuable (rate + upgrades) |
+| What a Promise grants | Global production +0.05% | The same plus storage, warmth, and craft ratios | A quiet Promise suspends its effect, and a suspended storage ratio would trim stocks to the lower cap: confiscation by clamp, which Tenet 1 rules out (the Porch's kite ratchet exists to avoid the same thing). The other channels add no decision at this size |
 | Dreaming has a floor | The last prism never sleeps | Allow full conversion | Cozy: something must stay awake to dream; also keeps a prism faucet alive |
 | Dreamcorn engine scales with Rainbow Arch structures | Memory Arch upgrade enables it; rate = per-arch drift × Rainbow Arch structure count | Flat rate gated on the once-bought Memory Arch upgrade | A once-bought flat trickle never grows, so reaching the dreamcorn endgame (Everdream Arch → Jar cap) took ~10× the design horizon; scaling with the buildable arch count makes the engine a build target that keeps pace with play |
 | Promises go quiet, never break | Suspend + auto-resume on upkeep | Permanent destruction (Fracture) | Tenet 1 — depth needs upkeep tension, not catastrophic permanent loss |

@@ -953,7 +953,10 @@ impl GameState {
         {
             let chance = self.effect(crate::effects::Effect::DejaVuChance);
             if chance > 0.0 && self.rng.chance(chance) {
-                self.deja_vu_until = self.ticks + content::TICKS_PER_DAY;
+                // +1: the roll lands after this tick's production, so the window
+                // extends one past the arithmetic end for exactly one day of
+                // paused production ticks.
+                self.deja_vu_until = self.ticks + content::TICKS_PER_DAY + 1;
                 let amount = (content::DEJA_VU_REVERIE_BASE
                     + self.rng.uniform() * content::DEJA_VU_REVERIE_SPREAD)
                     * (1.0 + self.effect(crate::effects::Effect::ReverieYield));

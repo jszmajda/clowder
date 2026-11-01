@@ -808,7 +808,7 @@ fn dreaming_drifts_prisms_into_dreamcorns_but_never_the_last_one() {
 
 // @spec SIM-UNI-008
 #[test]
-fn dreamcorns_are_the_softest_resource_never_spent_but_by_a_promise() {
+fn as_time_passes_dreamcorns_fall_only_to_a_promises_upkeep() {
     // With no Promises and no Memory Arches, the dreamcorn stock is inviolate —
     // nothing in ordinary play reduces it.
     let mut s = GameState::new(338);
@@ -1505,4 +1505,240 @@ fn the_pen_pal_query_says_what_letters_have_done() {
     let foxes = s.pen_pal(ColonyId::Foxes).unwrap();
     assert_eq!(foxes.standing, 0.0);
     assert_eq!(foxes.next_warmth, 0.0, "already neutral");
+}
+
+// ---- Closing the audit's gaps: each pins a clause no test exercised ----
+
+// @spec SIM-UNI-004
+#[test]
+fn condensing_with_no_jar_cap_left_is_refused_and_spends_nothing() {
+    let mut s = GameState::new(360);
+    s.arches_bought.insert(ArchId::EverdreamArch);
+    let cap = s.cap(ResourceId::JarsOfPurrs);
+    assert!(cap > 1.0, "fixture: the arch gives the jars room");
+    give(&mut s, ResourceId::JarsOfPurrs, cap);
+    give(&mut s, ResourceId::Rainbows, content::JAR_RAINBOW_COST);
+    assert_eq!(
+        s.apply(Command::CondenseJar).unwrap_err(),
+        CommandError::StorageFull
+    );
+    assert_eq!(s.stock(ResourceId::Rainbows), content::JAR_RAINBOW_COST);
+    assert_eq!(s.stock(ResourceId::JarsOfPurrs), cap);
+
+    // Room for part of a jar still condenses, clamped to the cap.
+    give(&mut s, ResourceId::JarsOfPurrs, cap - 0.5);
+    s.apply(Command::CondenseJar).unwrap();
+    assert_eq!(s.stock(ResourceId::JarsOfPurrs), cap);
+    assert_eq!(s.stock(ResourceId::Rainbows), 0.0);
+}
+
+// @spec SIM-UNI-007, SIM-UNI-015
+#[test]
+fn dream_drift_accrues_each_copys_field_times_the_dream_boost() {
+    let per_copy = content::structure_def(StructureId::RainbowArch).dream_drift;
+    let mut s = GameState::new(361);
+    s.arches_bought.insert(ArchId::MemoryArch);
+    grant(&mut s, StructureId::RainbowArch, 7);
+    off_boundary(&mut s);
+    let boost = 1.0 + s.effect(Effect::DreamBoost);
+    s.tick();
+    assert!((s.dream_drift - per_copy * 7.0 * boost).abs() < 1e-15);
+}
+
+// @spec SIM-UNI-007, SIM-UNI-008
+#[test]
+fn drift_banks_while_the_last_prism_stays_awake_and_pays_out_later() {
+    let mut s = GameState::new(362);
+    s.arches_bought.insert(ArchId::MemoryArch);
+    off_boundary(&mut s);
+    s.dream_drift = 2.5;
+    give(&mut s, ResourceId::Prisms, 1.0);
+    s.tick();
+    assert_eq!(s.stock(ResourceId::Prisms), 1.0, "never the last prism");
+    assert_eq!(s.stock(ResourceId::Dreamcorns), 0.0);
+    assert_eq!(s.dream_drift, 2.5, "the drift keeps what it has banked");
+
+    give(&mut s, ResourceId::Prisms, 5.0);
+    s.tick();
+    assert_eq!(s.stock(ResourceId::Prisms), 3.0, "two whole drifts pay out");
+    assert_eq!(s.stock(ResourceId::Dreamcorns), 2.0);
+    assert!(s.dream_drift < 1.0);
+}
+
+// @spec SIM-UNI-005
+#[test]
+fn a_rainbow_shower_brings_its_windfall() {
+    let mut s = GameState::new(363);
+    s.arches_bought.insert(ArchId::PrismArch);
+    assert!(s.rainbow_shower_chance() > 0.0);
+    run_days(&mut s, 20_000);
+    let rainbows = s.stock(ResourceId::Rainbows);
+    assert!(rainbows > 0.0, "some shower landed");
+    assert_eq!(
+        rainbows % content::RAINBOW_SHOWER_AMOUNT,
+        0.0,
+        "showers bring whole windfalls"
+    );
+}
+
+// @spec SIM-UNI-009
+#[test]
+fn a_promise_needs_its_idea_a_free_slot_and_an_echo() {
+    let mut s = GameState::new(364);
+    give(&mut s, ResourceId::Echoes, 10.0);
+    assert_eq!(
+        s.apply(Command::MakePromise).unwrap_err(),
+        CommandError::Locked
+    );
+    s.ideas.insert(IdeaId::NightCourtEtiquette);
+    assert_eq!(
+        s.apply(Command::MakePromise).unwrap_err(),
+        CommandError::NoSeats,
+        "no slots before the slot-granting arch"
+    );
+    s.arches_bought.insert(ArchId::EverdreamArch);
+    give(&mut s, ResourceId::Echoes, 0.0);
+    assert!(matches!(
+        s.apply(Command::MakePromise).unwrap_err(),
+        CommandError::InsufficientResources { .. }
+    ));
+    give(&mut s, ResourceId::Echoes, 10.0);
+    for _ in 0..content::PROMISE_SLOTS_PER_EVERDREAM {
+        s.apply(Command::MakePromise).unwrap();
+    }
+    assert_eq!(
+        s.apply(Command::MakePromise).unwrap_err(),
+        CommandError::NoSeats,
+        "every slot is full"
+    );
+    let spent = content::PROMISE_ECHO_COST * content::PROMISE_SLOTS_PER_EVERDREAM as f64;
+    assert_eq!(s.stock(ResourceId::Echoes), 10.0 - spent);
+}
+
+// @spec SIM-SUN-004, SIM-SUN-010
+#[test]
+fn each_copy_and_tier_widens_the_long_sun_cap() {
+    let per_tier = content::structure_def(StructureId::Sunstone).long_sun_tier_cap;
+    let flat = content::structure_def(StructureId::AuroraLantern).long_sun_cap;
+    let mut s = GameState::new(365);
+    s.rites.insert(RiteId::TheLongSun);
+    s.devotion = 1.0e12;
+    s.enlightenment_tier = 4;
+    let bare = limited_dr(unlimited_dr(s.devotion, 1000.0) / 100.0, 10.0);
+    assert!((s.long_sun_bonus() - bare).abs() < 1e-9);
+
+    grant(&mut s, StructureId::Sunstone, 3);
+    let cap = 10.0 + per_tier * 4.0 * 3.0;
+    let widened = limited_dr(unlimited_dr(s.devotion, 1000.0) / 100.0, cap);
+    assert!((s.long_sun_bonus() - widened).abs() < 1e-9);
+    assert!(widened > bare, "a wider cap lifts a devotion that was held");
+
+    grant(&mut s, StructureId::AuroraLantern, 2);
+    let cap = cap + flat * 2.0;
+    let wider = limited_dr(unlimited_dr(s.devotion, 1000.0) / 100.0, cap);
+    assert!((s.long_sun_bonus() - wider).abs() < 1e-9);
+}
+
+// @spec SIM-SUN-008
+#[test]
+fn enlighten_is_locked_before_its_rite_and_short_of_serenity_names_no_stand_in() {
+    let mut s = GameState::new(366);
+    assert_eq!(
+        s.apply(Command::Enlighten).unwrap_err(),
+        CommandError::Locked
+    );
+    s.rites.insert(RiteId::Enlightenment);
+    assert_eq!(
+        s.apply(Command::Enlighten).unwrap_err(),
+        CommandError::InsufficientResources {
+            missing: Vec::new()
+        },
+        "serenity is no resource, so the shortfall names none in its place"
+    );
+}
+
+// @spec SIM-SUN-008
+#[test]
+fn enlightening_raises_the_long_sun_cap() {
+    let mut s = GameState::new(367);
+    s.rites.insert(RiteId::Enlightenment);
+    s.rites.insert(RiteId::TheLongSun);
+    grant(&mut s, StructureId::Sunstone, 10);
+    s.devotion = 1.0e12;
+    s.serenity = 1.0;
+    let before = s.long_sun_bonus();
+    s.apply(Command::Enlighten).unwrap();
+    assert!(s.long_sun_bonus() > before);
+}
+
+// @spec SIM-SUN-005
+#[test]
+fn each_altar_hosted_rite_gives_its_tabled_magnitude() {
+    use ResourceId::{Charm, Pep};
+    const ALTARS: f64 = 2.0;
+    let altar_output = |r| Effect::StructureOutputAdd(StructureId::SunbeamAltar, r);
+    let table: [(RiteId, Effect, f64); 4] = [
+        (RiteId::StainedSunlight, altar_output(Charm), 0.05),
+        (RiteId::GrandBasking, altar_output(Charm), 0.1),
+        (RiteId::GrandBasking, Effect::MaxCap(Charm), 60.0 * ALTARS),
+        (RiteId::SunWardensOath, Effect::MaxCap(Pep), 25.0 * ALTARS),
+    ];
+    for (rite, key, want) in table {
+        let mut s = GameState::new(368);
+        grant(&mut s, StructureId::SunbeamAltar, ALTARS as u32);
+        let before = s.effect(key);
+        s.rites.insert(rite);
+        s.rite_counts[rite.ix()] = 1;
+        assert!(
+            (s.effect(key) - before - want).abs() < 1e-9,
+            "{rite:?} on {key:?}"
+        );
+    }
+}
+
+// @spec SIM-SUN-005
+#[test]
+fn everwarm_frescoes_give_each_sun_room_warmth_cap_from_warm_memories() {
+    let key = Effect::MaxCap(ResourceId::Warmth);
+    let mut s = GameState::new(369);
+    grant(&mut s, StructureId::SunRoom, 3);
+    s.warm_memories = 40.0;
+    let before = s.effect(key);
+    s.rites.insert(RiteId::EverwarmFrescoes);
+    s.rite_counts[RiteId::EverwarmFrescoes.ix()] = 1;
+    let want = unlimited_dr(1.0, 1.65) * 40.0 * 3.0;
+    assert!((s.effect(key) - before - want).abs() < 1e-9);
+}
+
+// @spec SIM-SUN-006
+#[test]
+fn the_rites_outside_the_stack_stay_single_purchase_under_enlightenment() {
+    for rite in [
+        RiteId::TheLongSun,
+        RiteId::TheReverie,
+        RiteId::Enlightenment,
+        RiteId::EverwarmFrescoes,
+    ] {
+        let mut s = GameState::new(370);
+        s.peak_devotion = 1.0e9;
+        s.rites.insert(RiteId::Enlightenment);
+        s.rite_counts[RiteId::Enlightenment.ix()] = u32::from(rite == RiteId::Enlightenment);
+        if rite == RiteId::Enlightenment {
+            assert_eq!(
+                s.apply(Command::BuyRite(rite)).unwrap_err(),
+                CommandError::AlreadyResearched,
+                "{rite:?}"
+            );
+            continue;
+        }
+        for (r, amount) in content::rite_def(rite).cost {
+            give(&mut s, *r, *amount * 2.0);
+        }
+        s.apply(Command::BuyRite(rite)).unwrap();
+        assert_eq!(
+            s.apply(Command::BuyRite(rite)).unwrap_err(),
+            CommandError::AlreadyResearched,
+            "{rite:?}"
+        );
+    }
 }

@@ -933,7 +933,8 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         gate: StructureGate::Idea(IdeaId::UnicornLore),
         ..BLD
     },
-    // 38: Rainbow Arch — cross-leaf (mystic rules). @spec SIM-ECO-028, SIM-UNI-005
+    // 38: Rainbow Arch — cross-leaf (mystic rules).
+    // @spec SIM-ECO-028, SIM-UNI-005, SIM-UNI-013, SIM-UNI-014, SIM-UNI-015
     StructureDef {
         name: "Rainbow Arch",
         base_costs: &[(ResourceId::Rainbows, 5000.0), (ResourceId::Cairns, 25.0)],
@@ -3886,6 +3887,7 @@ pub fn rite_def(r: RiteId) -> &'static RiteDef {
     &RITES[r as usize]
 }
 
+// @spec SIM-SUN-009
 static RITES: [RiteDef; 11] = [
     RiteDef {
         name: "Morning Stretch",
@@ -3949,7 +3951,7 @@ static RITES: [RiteDef; 11] = [
     },
     RiteDef {
         name: "Everwarm Frescoes",
-        blurb: "Murals that remember every summer. Every Sun Room gains {warmth|Warmth} cap from Warm Memories, more with each fresco.",
+        blurb: "Murals that remember every summer. Every Sun Room gains {warmth|Warmth} cap from Warm Memories.",
         cost: &[
             (ResourceId::Warmth, 4000.0),
             (ResourceId::Shinies, 1800.0),
@@ -3991,6 +3993,7 @@ pub fn arch_def(a: ArchId) -> &'static ArchDef {
     &ARCHES[a as usize]
 }
 
+// @spec SIM-UNI-012
 static ARCHES: [ArchDef; 8] = [
     ArchDef {
         name: "Ribbon Arch",
@@ -4043,7 +4046,7 @@ static ARCHES: [ArchDef; 8] = [
     },
     ArchDef {
         name: "Everdream Arch",
-        blurb: "A doorway into the softest dream. {jars of purrs|JarsOfPurrs} cap +2; opens condensing jars.",
+        blurb: "A doorway into the softest dream. {jars of purrs|JarsOfPurrs} cap +2; opens condensing {jars|JarsOfPurrs} and three Promise slots.",
         cost: &[
             (ResourceId::Dreamcorns, 100.0),
             (ResourceId::Cairns, 1000.0),
@@ -4622,6 +4625,7 @@ pub fn dream_loom_def(l: DreamLoomId) -> &'static DreamLoomDef {
     &DREAM_LOOMS[l.ix()]
 }
 
+// @spec SIM-DREAM-012
 static DREAM_LOOMS: [DreamLoomDef; 9] = [
     DreamLoomDef {
         name: "Soft Pillow",
@@ -4635,7 +4639,7 @@ static DREAM_LOOMS: [DreamLoomDef; 9] = [
     },
     DreamLoomDef {
         name: "Dream Catcher",
-        blurb: "Catches the good ones. Déjà-vu days come 25% more often.",
+        blurb: "Catches the good ones. Adds 25% to each season's chance of a déjà-vu day.",
         cost: &[(ResourceId::Reverie, 40.0)],
     },
     DreamLoomDef {
@@ -4665,7 +4669,7 @@ static DREAM_LOOMS: [DreamLoomDef; 9] = [
     },
     DreamLoomDef {
         name: "The Distant Dawn",
-        blurb: "A warm sunrise after the longest night. At year 40000 the Distant Dawn rises: Passed-Down Wisdom's caps ×4, for good.",
+        blurb: "A warm sunrise after the longest night. At year 40000 the Distant Dawn rises: Passed-Down Wisdom's cap ×4, for good.",
         cost: &[
             (ResourceId::Reverie, 10000.0),
             (ResourceId::JarsOfPurrs, 100.0),

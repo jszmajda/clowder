@@ -746,7 +746,9 @@ impl GameState {
         let cost = enlighten_total_cost(t + 1) - enlighten_total_cost(t);
         if self.serenity + EPSILON < cost {
             return Err(CommandError::InsufficientResources {
-                missing: vec![(ResourceId::Reverie, cost - self.serenity)],
+                // Serenity is not a `ResourceId`, so the shortfall names no
+                // amount rather than another store in its place.
+                missing: Vec::new(),
             });
         }
         self.serenity = (self.serenity - cost).max(0.0);
@@ -804,12 +806,15 @@ impl GameState {
         Ok(vec![Event::EchoRefined])
     }
 
-    /// Condense 10000 rainbows → 1 Jar of Purrs (needs the Everdream Arch,
-    /// clamped to the Jar cap).
+    /// Condense 10000 rainbows → 1 Jar of Purrs (needs the Everdream Arch and
+    /// room in the Jar cap, clamped to that cap).
     // @spec SIM-UNI-004
     fn condense_jar(&mut self) -> Result<Vec<Event>, CommandError> {
         if !self.arches_bought.contains(&ArchId::EverdreamArch) {
             return Err(CommandError::Locked);
+        }
+        if self.stock(ResourceId::JarsOfPurrs) + EPSILON >= self.cap(ResourceId::JarsOfPurrs) {
+            return Err(CommandError::StorageFull);
         }
         self.spend(&[(ResourceId::Rainbows, content::JAR_RAINBOW_COST)])?;
         let ix = ResourceId::JarsOfPurrs.ix();
@@ -1113,7 +1118,8 @@ impl GameState {
         }
 
         // ---- 6. Move in: reset the meadow in place (NOT GameState::new, which
-        // would reseed the RNG); the legacy set below is left untouched. ----
+        // would reseed the RNG); the legacy set below is left untouched.
+        // @spec SIM-SUN-003 ----
         self.structures = [0; STRUCTURE_COUNT];
         self.ideas.clear();
         self.refinements.clear();
@@ -1382,6 +1388,7 @@ impl GameState {
         Ok(events)
     }
 
+    // A Dream Loom purchase is reverie's one spend. @spec SIM-DREAM-005
     /// Weave a Dream Loom upgrade: reverie (and, for Distant Dawn, Jars) spent
     /// all-or-nothing, once each. @spec SIM-DREAM-006
     fn buy_dream_loom(&mut self, id: DreamLoomId) -> Result<Vec<Event>, CommandError> {

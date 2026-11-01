@@ -1479,7 +1479,8 @@ pub struct GameState {
     /// Devotion pool, offered up by Basking. @spec SIM-SUN-001
     #[serde(default)]
     pub devotion: f64,
-    /// Legacy serenity — only ever grows, persists the Move. @spec SIM-SUN-002
+    /// Legacy serenity: persists the Move and falls only by the Enlighten spend.
+    /// @spec SIM-SUN-002, SIM-SUN-003
     #[serde(default)]
     pub serenity: f64,
     /// The high-water mark of devotion ever reached — the Rite worship-gate.
@@ -2028,7 +2029,7 @@ impl GameState {
             return 0.0;
         }
         let tier = self.enlightenment_tier as f64;
-        // Aurora Lanterns extend the Long Sun cap (+2 each). @spec SIM-SKY-005
+        // Aurora Lanterns extend the Long Sun cap (+2 each). @spec SIM-SUN-004
         let cap = 10.0
             + self.structure_sum(|d| d.long_sun_tier_cap * tier)
             + self.effect(crate::effects::Effect::LongSunCapBonus);
