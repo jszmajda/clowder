@@ -21,7 +21,7 @@ Clowder targets **Kittens-Game-scale depth**: a dozen interlocking subsystems, e
    - No structure is destroyed against the player's will.
    - No stock falls except by consumption, player-chosen spending, storage-overflow trimming, or player-accepted conversion. Systems that in the inspiration *destroy* things instead *relocate, suspend, or hide* them, reversibly (see § Cozy Inversions).
    - Every negative pressure is a multiplier on gains — moods, seasons, mess, energy deficits — never a confiscation.
-3. **Whimsy with clarity** (Tenet 3): every flavor-named entity carries a plain mechanical description in its content definition; the shell always has truth to show one keypress away.
+3. **Whimsy with clarity** (Tenet 3): every flavor-named entity carries a plain mechanical description in its content definition; the shell always has truth to show one keypress away. For a structure that description is its definition's fields, so what a structure does per copy, and each way a rule scales a figure the definition gives, is a field of the definition that the rule reads, never a constant or a branch on the structure's id held beside the rule. A rule and the statement of it then read one value and cannot disagree.
 
 ## Cozy Inversions (normative for all leaves)
 

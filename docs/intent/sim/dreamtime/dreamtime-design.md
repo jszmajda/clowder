@@ -23,7 +23,7 @@ The leaf owns the starshard-fueled Deep Nap (year-skipping), the stirred-dreams 
 
 ## Déjà-Vu Days
 
-Occasionally a nap (or a season boundary, at `deja_vu_chance` per season from Memory Chests) produces a **déjà-vu day**: a strange, half-remembered day where ordinary production pauses and the clowder gathers **reverie** instead (`+rand-ish reverie/day`, deterministic from the RNG). Reverie is the dreamtime currency — earned only in these uncanny days, spent on the Deep-Nap infrastructure.
+Occasionally a nap (or a season boundary, at `deja_vu_chance` per season, a field of each structure's definition that the Memory Chest sets) produces a **déjà-vu day**: a strange, half-remembered day where ordinary production pauses and the clowder gathers **reverie** instead (`+rand-ish reverie/day`, deterministic from the RNG). Reverie is the dreamtime currency — earned only in these uncanny days, spent on the Deep-Nap infrastructure.
 
 ## The Dream Loom
 

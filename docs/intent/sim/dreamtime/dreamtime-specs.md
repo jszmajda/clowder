@@ -9,6 +9,7 @@
 ## Déjà-Vu Days & Reverie
 
 - [x] **SIM-DREAM-004**: At each season boundary, the system shall roll a déjà-vu day with probability equal to the summed déjà-vu-chance effects (Memory Chests, Dream Loom); on a déjà-vu day both ordinary production AND catnip consumption pause (so a dreamy day never causes a shortfall — Tenet 1) and the clowder gathers reverie (a deterministic amount from the RNG, raised by reverie-yield effects) instead.
+- [ ] **SIM-DREAM-013**: The system shall give every structure definition the chance each copy adds to a season boundary's déjà-vu roll — 1% for the Memory Chest and none for any other structure — and shall contribute that field × copies to the summed déjà-vu-chance effects.
 - [x] **SIM-DREAM-005**: The system shall only ever increase reverie (earned in déjà-vu days and, with the Lucid Nap upgrade, a little per nap); no mechanic shall reduce reverie except a player-chosen Dream Loom purchase.
 
 ## The Dream Loom

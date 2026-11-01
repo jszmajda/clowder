@@ -55,11 +55,11 @@ Job yields are per effective worker (SIM-KIT: Home kittens holding the job) per 
 
 ## Depth: Structures (BLD facet)
 
-- [x] **SIM-ECO-028**: The system shall define exactly the structures of the economy design's BLD table (55 structures, append-only) — ids, costs, ratios, effects, and gates — with no staged rebuilds; a structure's gate is Always, an Idea, or a cosmic Site (the outposts 40–52 are gated on their site being reached, not an idea, and are Locked until then). Cross-leaf structures carry costs/ramps here and effects in their owning leaves.
+- [x] **SIM-ECO-028**: The system shall define exactly the structures of the economy design's BLD table (55 structures, append-only) — ids, costs, ratios, effects, and gates — with no staged rebuilds; a structure's gate is Always, an Idea, or a cosmic Site (the outposts 40–52 are gated on their site being reached, not an idea, and are Locked until then). Cross-leaf structures carry costs, ramps, and definition fields here, and the rules those fields feed live in their owning leaves.
 - [x] **SIM-ECO-029**: The system shall run every converter structure (Hearth, Kiln, Treat Bakery, Prism Spinner, Dynamo Wheel fuel draw) through the engine's throttle: all inputs and outputs scale by the worst-supplied input fraction each tick.
-- [x] **SIM-ECO-030**: The system shall scale Treat Bakery output by the pep-cap ratio mpr = pep_cap × 0.007 / 100 (feathers ×1.25·mpr, bells ×0.3·mpr per active bakery per tick) — storage feeding production.
-- [x] **SIM-ECO-031**: The system shall multiply all Porch cap extensions by 1 + limited_dr(0.01 × the highest kite stock ever held, 2.25) — a persisted high-water ratchet, so spending kites never shrinks storage.
-- [x] **SIM-ECO-032**: The system shall contribute global production (layer 6) as +2% per active Dynamo Wheel × (1 + 0.15 × Cogworks owned) plus +5% per active Star Basin, applied to material-tier flows only.
+- [ ] **SIM-ECO-030**: The system shall add each cap-fed output of a running converter (SIM-ECO-056) as its multiplier × the cap of the resource it names × the rate per unit of that cap, per active copy per tick, scaled by the converter's throttle — storage feeding production.
+- [ ] **SIM-ECO-031**: The system shall multiply the cap extensions of every structure whose definition marks them kite-ratcheted (SIM-ECO-058) by 1 + limited_dr(0.01 × the highest kite stock ever held, 2.25) — a persisted high-water ratchet, so spending kites never shrinks storage.
+- [ ] **SIM-ECO-032**: The system shall contribute global production (layer 6) as the sum, over every structure, of its definition's global ratio × its active copies, where a structure whose definition marks it fuel-scaled (SIM-ECO-059) has that term × its fuel fraction × (1 + the sum, over every structure, of its fuel-scaled boost (SIM-ECO-055) × copies), applied to material-tier flows only: +2% per active Dynamo Wheel and +5% per active Star Basin.
 
 ## Depth: Crafting (CRAFT facet)
 
@@ -69,14 +69,14 @@ Job yields are per effective worker (SIM-KIT: Home kittens holding the job) per 
 
 ## Depth: Energy (NRG facet)
 
-- [x] **SIM-ECO-035**: The system shall sum energy production and consumption over active structures per the BLD table — Sunning Decks seasonal (winter ×0.75, summer ×1.25), Yarn Computers consuming 2n + n²/2 total at n copies — and expose both as derived queries.
+- [ ] **SIM-ECO-035**: The system shall sum energy production and consumption over active structures from their definitions — energy made × the season factor (winter ×0.75, summer ×1.25) where the definition marks it seasonal (SIM-ECO-060) and × the fuel fraction where it marks the structure fuel-scaled (SIM-ECO-059), energy used as energy used per copy × n + energy used per copy squared × n² at n copies (SIM-ECO-057) — and expose both as derived queries.
 - [x] **SIM-ECO-036**: While energy consumption exceeds production, the system shall multiply the contributions of production-stack layers 6–8 by clamp(production/consumption, 0.25, 1.0) — a brownout, never a blackout; while production exceeds consumption, effects that name the surplus (Moonlight Stage charm) scale by min(production/max(consumption, 1), 1.75).
 
 ## Depth: Mess (MESS facet)
 
 - [x] **SIM-ECO-037**: The system shall change mess each tick by the tick's mess accrual less its tidying (SIM-ECO-050) less dissipation of 1e-4 × current mess, never letting mess fall below zero; mess level = floor(log10(mess/1e4)) when mess ≥ 1e4.
 - [x] **SIM-ECO-038**: While mess level is 0 or higher, the system shall multiply catnip growth by 0.8 per level step (floor ×0.25); at level 1+, arrival chance ×0.75; at level 2+, −5 happiness points per level above 1 — slowdowns only, never loss or confiscation.
-- [x] **SIM-ECO-039**: Where Cogworks exist at year close, the system shall auto-craft 2% per Cogworks (max 50%) of each raw resource standing at ≥98% of cap into its single-input crafted form, once per year, unjammed (twigs→wands, pebbles→tiles, buttons→badges, dew→moonmilk, stardust→cometsilk; other raws skipped) — overflow becomes goods, not waste.
+- [ ] **SIM-ECO-039**: Where a structure whose definition carries a year-close craft (SIM-ECO-054) has copies at year close, the system shall auto-craft its share per copy × copies, at most its share maximum, of each raw resource its pairs name standing at or above its threshold of cap into that pair's single-input crafted form, once per year, unjammed, other raws skipped — overflow becomes goods, not waste.
 - [x] **SIM-ECO-040**: The system shall define the Rummager job yielding 0.02 pebbles/tick per effective worker, assignable after its granting idea (SIM-CUR) is researched.
 - [x] **SIM-ECO-041**: The system shall define the Pouncer job yielding 0.06 pep/tick per effective worker, assignable after the expedition-surface idea (SIM-CUR) is researched.
 - [x] **SIM-ECO-042**: The system shall define the Sunwarden job yielding 0.0015 warmth/tick per effective worker, assignable after the ceremonies-surface idea (SIM-CUR) is researched.
@@ -89,3 +89,11 @@ Job yields are per effective worker (SIM-KIT: Home kittens holding the job) per 
 - [x] **SIM-ECO-050**: The system shall take each built structure's mess per copy as its BLD-table mess plus the tidy effects that name it, scaled for a converter by its throttle fraction, and shall sum the positive per-copy amounts over copies as the tick's mess accrual and the magnitudes of the negative ones as the tick's tidying.
 - [x] **SIM-ECO-051**: The system shall define structure mess so that, at 20 copies of every structure with every tidy effect in the content tables applied, the summed per-copy mess is below zero — tidying can always outpace mess-making (property-tested).
 - [x] **SIM-ECO-052**: The system shall scale the tick's mess accrual (SIM-ECO-050), and never its tidying, by the active adventure twist's accrual multiplier (SIM-ADV-002) and by 1 plus the summed MessAccrualRatio effects.
+- [ ] **SIM-ECO-053**: The system shall give every structure definition the trade ratio each copy adds — 1.5% for the Gift Stand and none for any other structure — and shall contribute that field × copies to the summed trade-ratio effect.
+- [ ] **SIM-ECO-054**: The system shall give every structure definition its year-close craft, if any — for the Cogworks a share of 2% per copy, a share maximum of 50%, a threshold of 98% of cap, and the pairs twigs→wands, pebbles→tiles, buttons→badges, dew→moonmilk, stardust→cometsilk, and none for any other structure.
+- [ ] **SIM-ECO-055**: The system shall give every structure definition the boost each copy gives a fuel-scaled structure's global ratio — 15% for the Cogworks and none for any other structure.
+- [ ] **SIM-ECO-056**: The system shall give every converter definition its cap-fed outputs, if any — for the Treat Bakery, on the pep cap at a rate of 0.007 / 100 per unit of cap, feathers at ×1.25 and bells at ×0.3, and none for any other converter.
+- [ ] **SIM-ECO-057**: The system shall give every structure definition the energy it uses per copy squared — 0.5 for the Yarn Computer, whose energy used per copy is 2, and none for any other structure.
+- [ ] **SIM-ECO-058**: The system shall mark on every structure definition whether its cap extensions are kite-ratcheted — the Porch alone.
+- [ ] **SIM-ECO-059**: The system shall mark on every structure definition whether it is fuel-scaled — the Dynamo Wheel alone — and shall take a structure's fuel fraction as the throttle fraction of its converter's inputs over its copies held.
+- [ ] **SIM-ECO-060**: The system shall mark on every structure definition whether its energy made is seasonal — the Sunning Deck and the Solar Array alone.
