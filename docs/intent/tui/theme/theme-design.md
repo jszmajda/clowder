@@ -40,7 +40,7 @@ Six roles. Every value sits in a mid-luminance band so it clears the contrast fl
 | Role | Value | Carries |
 |---|---|---|
 | *(inherited)* | terminal foreground | All ordinary text — counts, costs, prose, and every name that wears no coat |
-| `dim` | `#7C7873` | Revealed but not actionable, owned and done, flavour events, a list's group-header rules and the inspector's `last time` and `about` dividers, a kitten's favourites, spent hints, and in the scrapbook a locked achievement's mark and hint and when an earned one was earned |
+| `dim` | `#7C7873` | Revealed but not actionable, owned and done, flavour events, a list's group-header rules and the inspector's `last time` and `about` dividers, a kitten's favourites, a store's description, spent hints, and in the scrapbook a locked achievement's mark and hint and when an earned one was earned |
 | `ready` | `#3E8E5A` | ● affordable now |
 | `partial` | `#A8802F` | ◐ partially affordable |
 | `attention` | `#C0663A` | Each attention chip whole, the `full` tag on a capped store, a sidebar note's count of capped stores out of view, an armed row's expansion beneath it, the scrapbook's ` new` tags — and nothing else |
@@ -122,7 +122,7 @@ A surface whose text names no resource — the header's facts, the hint bar, the
 
 A sentence spells a resource as a sentence does: a blurb may name one in the singular or in lower case, as the craft that makes it, or at the start of a sentence, and a footer note names it in lower case. The coat is laid across the characters as the sentence spells them, by its dressing, as across a name of that many characters, so a blended coat still runs end to end and a patched coat still divides the word it is on. A coat is worn at its full strength wherever it is worn: a line drawn quiet, as the ticker is, keeps its quiet on its own words, and the names in it wear their coats as they do everywhere else, with no faint attribute — the same coat in every place is the point.
 
-Only the name wears the coat. The figures beside it, the `/` between a stock and its cap, a cost's separators, the `:` after a cost line's name, the words and punctuation of a sentence around it, and every blank column wear the line's own colour, so a column of figures reads as one column.
+On a line of words, only the name wears the coat. The figures beside it, the `/` between a stock and its cap, a cost's separators, the `:` after a cost line's name, the words and punctuation of a sentence around it, and every blank column wear the line's own colour, so a column of figures reads as one column.
 
 ### Which lines a coat may sit on
 
@@ -133,6 +133,10 @@ A coat is not worn on three kinds of line, each of which is already saying one t
 - **A row in `dim`.** A teased row, an owned or completed one-shot, an unaffordable row: a finished or out-of-reach row recedes whole (TUI-THEME-014, TUI-NAV-009), and a coat on its cost would make it the liveliest row on the list.
 - **A line in `attention` or `milestone`.** An armed row's expansion is one signal, and a coat inside it would be a second colour inside the one that means "this wants you"; a line drawn whole in `milestone` is the same case.
 - **A reversed line.** Focus is the terminal's own pair inverted (Three Things the Palette Does Not Cover), on the whole line, and the report banner is reversed the same way; a coat under a reversal is a block of colour the design never chose, since a reversal turns a text colour into a ground.
+
+### A store's drawing
+
+A store's drawing (render leaf: A store's drawing) wears the store's coat, the one place a coat sits off a name, because the picture beneath a name in that coat is the same store, and a resource looks like one thing wherever it stands. The drawing's painted cells wear the coat laid across its columns: the coat falls as it would across a name with as many characters as the drawing's widest row has columns, and each painted cell takes the colour of its column. So a solid coat is one colour throughout, a patched coat falls in upright bands, and a blended coat runs from left to right. Every other mark is outline, in the inherited foreground. Every colour there is one a name of that length could wear, so the ring's band and clearance already hold, and no new colour enters the palette. Like the name, the drawing says nothing a state colour would: it is the same at every stock, cap, and rate, and with colour off it is still the same picture beneath the same name.
 
 ### A shortened name
 
@@ -231,7 +235,7 @@ Every meaning colour carries is carried by something else first — a glyph, a w
 | Armed row | Its expansion beneath itself, and its keys in the hint bar | `attention`, on the expansion |
 | Milestone | `★` | `milestone` |
 | Flavour vs mechanical | `·` vs `▪` | `dim` vs inherited |
-| Which resource | The name itself | Its coat |
+| Which resource | The name itself | Its coat, on the name and on its drawing's painted cells |
 | A kitten's fur and eyes | The fur's words, the eyes' words, and each swatch's colour name | The portrait's cells and the swatches |
 | Mood | The word itself | *(none)* |
 | Season | The season's name in the header | Chrome accent |
@@ -281,6 +285,7 @@ Both rules hold whatever values the palette settles on (Deferred 1). Retuning th
 | A name a sentence spells otherwise | The coat laid across the characters as the sentence spells them | Coat only a spelling that matches the stores' exactly; compute the coat over the stores' spelling and cut it to the word | Sentences say "a twig" and "catnip"; coating only exact spellings leaves most of a blurb's resources plain. Laying the dressing across the word as written keeps each dressing's look on every spelling, where a cut coat would stop a blend partway |
 | What beside the name wears the coat | Nothing: figures, separators, and blanks wear the line's colour | The whole component, figure and name | A column of figures in mixed colours reads as several columns |
 | A shortened name's colours | Each kept character keeps its colour; the ellipsis wears the replaced character's | Recomputed over the drawn text; the ellipsis in `dim` | A store should look like itself at every width, and a dim ellipsis would be a second meaning on the one glyph that already says "cut" |
+| A store's drawing's colour | The store's coat on its painted cells, laid by column, outline in the inherited foreground | True-to-life colours of its own, as fur has; no colour at all; the coat on every cell, outline included | Colours of its own would make a third table outside the ring, and a store whose picture does not match the name above it reads as two things. With no colour the card stays as dry as a ledger. Outline in the foreground keeps the shape reading the way a portrait's does and leaves the coat on the part that is the store's stuff |
 | A kitten's portrait | Painted in its true fur and eye colours on block cells, outline in the inherited foreground | No portrait, the fur in words alone; fur colours held to the mid-luminance band; a painted ground behind the portrait | Words alone lose the delight the portrait is for. Held to the band, every black cat draws charcoal and every white one grey, which is not the cat. A painted ground breaks the rule that the ground is the terminal's, and in one polarity or the other it is a patch pasted on the pane. The outline in the inherited foreground keeps the shape on any ground at no cost to the fur |
 | Where fur colour may go | A portrait's cells and swatch blocks only, never a name, mark, figure, or word | A kitten's name in its fur colour | A name in fur colour is a coat on a kitten, a vocabulary nothing matches against (Which identities wear a coat); and fur colours are outside the band, so text in them would fail the contrast floor |
 | Background | Inherit the terminal's | Paint a designed ground; detect and switch | Inheriting is legible in light and dark with no detection, and looks native beside other panes; detection is unreliable under tmux and a wrong guess is worse than none |
