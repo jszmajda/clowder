@@ -24,6 +24,7 @@ Jess (the player-owner) wants to **discover the game's content by playing it**. 
 - Version control is **jj** (Jujutsu), colocated with git. Prefer `jj` commands over bare `git`.
 - Commit liberally: commit each coherent step with `jj commit` as soon as it is complete and its tests pass, without waiting to be asked and without batching unrelated work into one change.
 - Content (buildings, jobs, upgrades, resources) lives in typed Rust tables in `clowder-core`, not external data files.
+- Each crate's integration tests build into one binary: a new test file is a module of `crates/<crate>/tests/integration/`, declared in its `main.rs`, never a new file directly under `tests/`. Only a test file that changes process-wide state (environment variables, signals sent to its own process) is a test target of its own.
 - The theme assumes 24-bit truecolor; no low-color fallback palettes.
 - Keybindings must coexist with default tmux bindings: plain printable keys, Tab, and arrows only — no Ctrl chords (except Ctrl-C), no Alt/Meta, no function keys.
 
