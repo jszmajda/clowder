@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 use clowder_core::*;
 use common::*;
@@ -341,7 +341,7 @@ fn the_default_path_is_the_platform_data_dir() {
 // @spec SAVE-013
 #[test]
 fn v1_saves_migrate_forward_losslessly() {
-    let fixture = include_str!("fixtures/save_v1.json");
+    let fixture = include_str!("../fixtures/save_v1.json");
     let loaded = load_string(fixture, 1_751_700_000).expect("v1 fixture loads");
     let s = &loaded.state;
     assert_eq!(s.ticks, 45, "old meadow preserved exactly");
@@ -1919,7 +1919,7 @@ fn v5_fixture() -> String {
 /// The committed fixture of every version before the revealed-resource set.
 fn fixtures_without_the_set() -> Vec<(u32, String)> {
     vec![
-        (1, include_str!("fixtures/save_v1.json").to_string()),
+        (1, include_str!("../fixtures/save_v1.json").to_string()),
         (2, v2_fixture()),
         (3, v3_fixture()),
         (4, v4_fixture()),

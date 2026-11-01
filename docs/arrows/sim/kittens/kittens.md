@@ -19,9 +19,9 @@ Kittens are the heart of the game and the reason the cozy invariants exist. This
 - `docs/intent/sim/kittens/kittens-specs.md` — 30 specs, prefix `SIM-KIT`
 
 ### Tests
-- `crates/clowder-core/tests/kittens.rs`
-- `crates/clowder-core/tests/legacy.rs`
-- `crates/clowder-core/tests/society.rs`
+- `crates/clowder-core/tests/integration/kittens.rs`
+- `crates/clowder-core/tests/integration/legacy.rs`
+- `crates/clowder-core/tests/integration/society.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`

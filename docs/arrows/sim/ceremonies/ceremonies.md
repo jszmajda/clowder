@@ -19,8 +19,8 @@ Ceremonies are clowder's faith system, reimagined as warmth and devotion rather 
 - `docs/intent/sim/ceremonies/ceremonies-specs.md` — 8 specs, prefix `SIM-SUN`
 
 ### Tests
-- `crates/clowder-core/tests/legacy.rs`
-- `crates/clowder-core/tests/wonder.rs`
+- `crates/clowder-core/tests/integration/legacy.rs`
+- `crates/clowder-core/tests/integration/wonder.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`

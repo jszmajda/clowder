@@ -19,23 +19,23 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 - `docs/intent/sim/engine/engine-specs.md` — 75 specs, prefix `SIM-ENG`
 
 ### Tests
-- `crates/clowder-core/tests/economy_depth.rs`
-- `crates/clowder-core/tests/engine.rs`
-- `crates/clowder-core/tests/frontier.rs`
-- `crates/clowder-core/tests/journal.rs`
-- `crates/clowder-core/tests/legacy.rs`
-- `crates/clowder-core/tests/persistence.rs`
-- `crates/clowder-core/tests/queries_bench.rs`
-- `crates/clowder-core/tests/queries_flows.rs`
-- `crates/clowder-core/tests/queries_gating.rs`
-- `crates/clowder-core/tests/queries_rates.rs`
-- `crates/clowder-core/tests/queries_timers.rs`
-- `crates/clowder-core/tests/revealed_resources.rs`
-- `crates/clowder-core/tests/society.rs`
-- `crates/clowder-core/tests/sources.rs`
-- `crates/clowder-core/tests/unit_price.rs`
-- `crates/clowder-core/tests/wonder.rs`
-- `crates/clowder-tui/tests/update.rs`
+- `crates/clowder-core/tests/integration/economy_depth.rs`
+- `crates/clowder-core/tests/integration/engine.rs`
+- `crates/clowder-core/tests/integration/frontier.rs`
+- `crates/clowder-core/tests/integration/journal.rs`
+- `crates/clowder-core/tests/integration/legacy.rs`
+- `crates/clowder-core/tests/integration/persistence.rs`
+- `crates/clowder-core/tests/integration/queries_bench.rs`
+- `crates/clowder-core/tests/integration/queries_flows.rs`
+- `crates/clowder-core/tests/integration/queries_gating.rs`
+- `crates/clowder-core/tests/integration/queries_rates.rs`
+- `crates/clowder-core/tests/integration/queries_timers.rs`
+- `crates/clowder-core/tests/integration/revealed_resources.rs`
+- `crates/clowder-core/tests/integration/society.rs`
+- `crates/clowder-core/tests/integration/sources.rs`
+- `crates/clowder-core/tests/integration/unit_price.rs`
+- `crates/clowder-core/tests/integration/wonder.rs`
+- `crates/clowder-tui/tests/integration/update.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`

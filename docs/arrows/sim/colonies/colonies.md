@@ -19,7 +19,7 @@ Colonies are clowder's trade and diplomacy: eight neighbouring animal colonies t
 - `docs/intent/sim/colonies/colonies-specs.md` — 8 specs, prefix `SIM-TRADE`
 
 ### Tests
-- `crates/clowder-core/tests/wonder.rs`
+- `crates/clowder-core/tests/integration/wonder.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`

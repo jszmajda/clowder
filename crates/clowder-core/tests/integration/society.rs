@@ -3,7 +3,7 @@
 //! rules. Written tests-first from the specs — they compile against the Depth
 //! Wave 3 API contract and fail until the content lands.
 
-mod common;
+use crate::common;
 
 use clowder_core::*;
 use common::*;
@@ -1800,7 +1800,7 @@ fn skills_exp_ranks_and_traits_round_trip_through_the_save() {
 // @spec SIM-KIT-027, SAVE-013
 #[test]
 fn v1_save_kittens_get_society_defaults() {
-    let fixture = include_str!("fixtures/save_v1.json");
+    let fixture = include_str!("../fixtures/save_v1.json");
     let loaded = load_string(fixture, 1_751_700_000).expect("v1 fixture still loads");
     let s = &loaded.state;
     assert_eq!(s.kittens.len(), 2);

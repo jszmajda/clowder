@@ -8,7 +8,7 @@
 //!   * SIM-MOVE-004 — kept across a Move
 //!   * SAVE-030 — saved, and a v9 save migrating with an empty record
 
-mod common;
+use crate::common;
 
 use std::collections::BTreeSet;
 
@@ -362,7 +362,7 @@ fn a_move_keeps_the_record() {
 // SAVE-030 — saved and migrated
 // ---------------------------------------------------------------------------
 
-const V9_FIXTURE: &str = include_str!("fixtures/save_v9.json");
+const V9_FIXTURE: &str = include_str!("../fixtures/save_v9.json");
 
 /// The record survives a save and a load, under a version newer than v9.
 /// @spec SAVE-030

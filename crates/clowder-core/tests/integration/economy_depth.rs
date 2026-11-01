@@ -3,7 +3,7 @@
 //! they compile against the Depth Wave 2 API contract and fail until the
 //! content lands.
 
-mod common;
+use crate::common;
 
 use clowder_core::*;
 use common::*;
@@ -1878,7 +1878,7 @@ fn a_visible_sky_event_stays_observable_for_one_game_year() {
 // @spec SAVE-013, SIM-ECO-001
 #[test]
 fn v1_saves_zero_fill_the_widened_arrays_and_new_fields() {
-    let fixture = include_str!("fixtures/save_v1.json");
+    let fixture = include_str!("../fixtures/save_v1.json");
     let loaded = load_string(fixture, 1_751_700_000).expect("v1 fixture still loads");
     let s = &loaded.state;
     // The v1 fixture carries 4 resources and 7 structures; the rest zero-fill.

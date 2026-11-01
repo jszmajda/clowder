@@ -18,13 +18,13 @@ Persistence turns the deterministic sim into a game that survives closing the te
 - `docs/intent/persistence/persistence-specs.md` — 17 specs, prefix `SAVE`
 
 ### Tests
-- `crates/clowder-core/tests/economy_depth.rs`
-- `crates/clowder-core/tests/frontier.rs`
-- `crates/clowder-core/tests/legacy.rs`
-- `crates/clowder-core/tests/persistence.rs`
-- `crates/clowder-core/tests/society.rs`
-- `crates/clowder-core/tests/wonder.rs`
-- `crates/clowder-tui/tests/persist.rs`
+- `crates/clowder-core/tests/integration/economy_depth.rs`
+- `crates/clowder-core/tests/integration/frontier.rs`
+- `crates/clowder-core/tests/integration/legacy.rs`
+- `crates/clowder-core/tests/integration/persistence.rs`
+- `crates/clowder-core/tests/integration/society.rs`
+- `crates/clowder-core/tests/integration/wonder.rs`
+- `crates/clowder-tui/tests/integration/persist.rs`
 
 ### Code
 - `crates/clowder-core/src/journal.rs`

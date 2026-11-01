@@ -19,7 +19,7 @@ The mystic leaf is the unicorn economy and everything glittering that follows fr
 - `docs/intent/sim/mystic/mystic-specs.md` — 11 specs, prefix `SIM-UNI`
 
 ### Tests
-- `crates/clowder-core/tests/wonder.rs`
+- `crates/clowder-core/tests/integration/wonder.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`

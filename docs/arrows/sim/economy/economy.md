@@ -19,13 +19,13 @@ The economy is the material world of the game: what exists, what it costs, what 
 - `docs/intent/sim/economy/economy-specs.md` — 52 specs, prefix `SIM-ECO`
 
 ### Tests
-- `crates/clowder-core/tests/economy.rs`
-- `crates/clowder-core/tests/economy_depth.rs`
-- `crates/clowder-core/tests/frontier.rs`
-- `crates/clowder-core/tests/queries_bench.rs`
-- `crates/clowder-core/tests/society.rs`
-- `crates/clowder-core/tests/wonder.rs`
-- `crates/clowder-tui/tests/bench.rs`
+- `crates/clowder-core/tests/integration/economy.rs`
+- `crates/clowder-core/tests/integration/economy_depth.rs`
+- `crates/clowder-core/tests/integration/frontier.rs`
+- `crates/clowder-core/tests/integration/queries_bench.rs`
+- `crates/clowder-core/tests/integration/society.rs`
+- `crates/clowder-core/tests/integration/wonder.rs`
+- `crates/clowder-tui/tests/integration/bench.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`

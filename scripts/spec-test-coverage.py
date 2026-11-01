@@ -40,7 +40,9 @@ def main() -> int:
                     marked.add(found.group(1))
 
     cited, on_test = collections.defaultdict(set), collections.defaultdict(set)
-    sources = glob.glob("crates/*/tests/*.rs") + glob.glob("crates/*/src/**/*.rs", recursive=True)
+    sources = glob.glob("crates/*/tests/**/*.rs", recursive=True) + glob.glob(
+        "crates/*/src/**/*.rs", recursive=True
+    )
     for path in sources:
         with open(path) as fh:
             lines = fh.read().splitlines()

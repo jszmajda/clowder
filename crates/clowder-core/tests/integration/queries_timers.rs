@@ -1,7 +1,7 @@
 //! What runs on a clock: the timed states the meadow holds, each with the
 //! ticks it has left. Written tests-first from SIM-ENG-069 and SIM-ENG-070.
 
-mod common;
+use crate::common;
 
 use clowder_core::*;
 use common::*;

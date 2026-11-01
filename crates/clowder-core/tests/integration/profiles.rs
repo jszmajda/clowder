@@ -9,7 +9,7 @@
 //!   * SAVE-027, 028 — profiles are saved, and a save from before them draws
 //!     its kittens' profiles on load.
 
-mod common;
+use crate::common;
 
 use std::collections::BTreeSet;
 
@@ -771,7 +771,7 @@ fn facts_report_when_it_joined() {
 // SAVE-027, 028 — saved, and drawn for a save from before profiles
 // ---------------------------------------------------------------------------
 
-const V7_FIXTURE: &str = include_str!("fixtures/save_v7.json");
+const V7_FIXTURE: &str = include_str!("../fixtures/save_v7.json");
 
 /// Kitten and memorial profiles survive a save and a load, under a version
 /// newer than v7.
@@ -920,7 +920,7 @@ fn a_hand_edited_save_missing_a_profile_gets_one() {
     );
 }
 
-const V8_FIXTURE: &str = include_str!("fixtures/save_v8.json");
+const V8_FIXTURE: &str = include_str!("../fixtures/save_v8.json");
 
 /// A v8 save's kittens and memorials keep the fur and eyes they stored and
 /// gain favourites of varied kinds and a pose, as their names and

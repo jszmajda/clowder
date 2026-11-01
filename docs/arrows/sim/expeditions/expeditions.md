@@ -19,7 +19,7 @@ Pouncing expeditions are the active-play burst: the player spends stored pep on 
 - `docs/intent/sim/expeditions/expeditions-specs.md` — 6 specs, prefix `SIM-EXP`
 
 ### Tests
-- `crates/clowder-core/tests/society.rs`
+- `crates/clowder-core/tests/integration/society.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`

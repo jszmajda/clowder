@@ -19,10 +19,10 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 - `docs/intent/tui/render/render-specs.md` — 15 specs, prefix `TUI-RENDER`
 
 ### Tests
-- `crates/clowder-tui/tests/composed.rs`
-- `crates/clowder-tui/tests/fmt.rs`
-- `crates/clowder-tui/tests/frame.rs`
-- `crates/clowder-tui/tests/layout.rs`
+- `crates/clowder-tui/tests/integration/composed.rs`
+- `crates/clowder-tui/tests/integration/fmt.rs`
+- `crates/clowder-tui/tests/integration/frame.rs`
+- `crates/clowder-tui/tests/integration/layout.rs`
 
 ### Code
 - `crates/clowder-tui/src/render/fmt.rs`

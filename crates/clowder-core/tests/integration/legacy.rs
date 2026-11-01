@@ -49,7 +49,7 @@
 //!   tested through observable production and cap(), never a named query.
 #![allow(clippy::type_complexity, clippy::doc_overindented_list_items)]
 
-mod common;
+use crate::common;
 
 use clowder_core::*;
 use common::*;
@@ -1617,7 +1617,7 @@ fn the_long_sun_layer_eight_is_now_deficit_dimmed_too() {
 // @spec SAVE-013
 #[test]
 fn v1_saves_still_load_with_legacy_fields_defaulted() {
-    let fixture = include_str!("fixtures/save_v1.json");
+    let fixture = include_str!("../fixtures/save_v1.json");
     let loaded = load_string(fixture, 1_751_700_000).expect("v1 fixture still loads");
     let st = &loaded.state;
     assert_eq!(st.ticks, 45, "the old meadow is preserved exactly");

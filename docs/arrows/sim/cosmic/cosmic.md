@@ -19,7 +19,7 @@ The cosmic leaf is clowder's late-game frontier: once the clowder has mastered i
 - `docs/intent/sim/cosmic/cosmic-specs.md` — 8 specs, prefix `SIM-SKY`
 
 ### Tests
-- `crates/clowder-core/tests/frontier.rs`
+- `crates/clowder-core/tests/integration/frontier.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`

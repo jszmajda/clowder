@@ -19,9 +19,9 @@ Adventures are clowder's challenge modes, reimagined as *optional themed outings
 - `docs/intent/sim/adventures/adventures-specs.md` — 8 specs, prefix `SIM-ADV`
 
 ### Tests
-- `crates/clowder-core/tests/blurbs.rs`
-- `crates/clowder-core/tests/economy_depth.rs`
-- `crates/clowder-core/tests/legacy.rs`
+- `crates/clowder-core/tests/integration/blurbs.rs`
+- `crates/clowder-core/tests/integration/economy_depth.rs`
+- `crates/clowder-core/tests/integration/legacy.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`

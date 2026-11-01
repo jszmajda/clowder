@@ -9,7 +9,7 @@
 //!   * SAVE-026 — reach and learned goods are saved, a v6 save migrates with
 //!     none, and stray entries are dropped on load.
 
-mod common;
+use crate::common;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -325,7 +325,7 @@ fn a_good_for_closer_friends_is_offered_once_the_level_is_met() {
 // SAVE-026 — saved, migrated, normalized
 // ---------------------------------------------------------------------------
 
-const V6_FIXTURE: &str = include_str!("fixtures/save_v6.json");
+const V6_FIXTURE: &str = include_str!("../fixtures/save_v6.json");
 
 /// Reach and learned goods survive a save and a load, under a version newer
 /// than v6.

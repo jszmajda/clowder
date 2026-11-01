@@ -10,7 +10,7 @@
 //! figure credited to it. A credit landing on the wrong source passes the sum
 //! and fails the differential.
 
-mod common;
+use crate::common;
 
 use clowder_core::content;
 use clowder_core::*;

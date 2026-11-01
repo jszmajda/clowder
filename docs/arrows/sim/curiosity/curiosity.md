@@ -19,10 +19,10 @@ Curiosity is the game's research system: kittens investigate the world and their
 - `docs/intent/sim/curiosity/curiosity-specs.md` — 15 specs, prefix `SIM-CUR`
 
 ### Tests
-- `crates/clowder-core/tests/curiosity.rs`
-- `crates/clowder-core/tests/economy_depth.rs`
-- `crates/clowder-core/tests/society.rs`
-- `crates/clowder-core/tests/wonder.rs`
+- `crates/clowder-core/tests/integration/curiosity.rs`
+- `crates/clowder-core/tests/integration/economy_depth.rs`
+- `crates/clowder-core/tests/integration/society.rs`
+- `crates/clowder-core/tests/integration/wonder.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`

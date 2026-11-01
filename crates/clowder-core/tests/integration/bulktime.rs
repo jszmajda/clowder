@@ -27,7 +27,7 @@
 //!      "elapsed years"; the report type offline absence uses carries
 //!      `elapsed_seconds`).
 
-mod common;
+use crate::common;
 
 use clowder_core::*;
 use common::*;

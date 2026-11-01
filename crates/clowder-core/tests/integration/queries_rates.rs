@@ -10,7 +10,7 @@
 //! that agrees on a plain meadow and forgets one multiplier fails the moment
 //! that multiplier is switched on.
 
-mod common;
+use crate::common;
 
 use clowder_core::content;
 use clowder_core::*;

@@ -11,7 +11,7 @@
 //!   * SIM-ENG-073 — the bench: seats, every binding by roster position with
 //!     its recipe, and every Tinkerer at home waiting without one.
 
-mod common;
+use crate::common;
 
 use clowder_core::*;
 use common::*;

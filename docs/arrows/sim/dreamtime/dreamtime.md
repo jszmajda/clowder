@@ -19,8 +19,8 @@ Dreamtime is clowder's time layer, reimagined as *napping*: a well-rested clowde
 - `docs/intent/sim/dreamtime/dreamtime-specs.md` — 8 specs, prefix `SIM-DREAM`
 
 ### Tests
-- `crates/clowder-core/tests/bulktime.rs`
-- `crates/clowder-core/tests/frontier.rs`
+- `crates/clowder-core/tests/integration/bulktime.rs`
+- `crates/clowder-core/tests/integration/frontier.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`

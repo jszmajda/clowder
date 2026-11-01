@@ -5,7 +5,7 @@
 //!     stock through.
 //!   * SIM-ENG-075 — whether the player knows each source yet.
 
-mod common;
+use crate::common;
 
 use std::collections::BTreeSet;
 

@@ -19,11 +19,11 @@ This leaf owns the boundary between the operating system and the pure core: term
 - `docs/intent/tui/runtime/runtime-specs.md` — 32 specs, prefix `TUI-RUN`
 
 ### Tests
-- `crates/clowder-tui/tests/clock.rs`
-- `crates/clowder-tui/tests/lock.rs`
-- `crates/clowder-tui/tests/loop_body.rs`
-- `crates/clowder-tui/tests/loop_order.rs`
-- `crates/clowder-tui/tests/persist.rs`
+- `crates/clowder-tui/tests/integration/clock.rs`
+- `crates/clowder-tui/tests/integration/lock.rs`
+- `crates/clowder-tui/tests/integration/loop_body.rs`
+- `crates/clowder-tui/tests/integration/loop_order.rs`
+- `crates/clowder-tui/tests/integration/persist.rs`
 - `crates/clowder-tui/tests/term.rs`
 
 ### Code

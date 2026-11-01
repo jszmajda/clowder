@@ -2,7 +2,7 @@
 //! that napped and each store the trade raised, by the amount it rose.
 //! Written tests-first from SIM-TRADE-009 and SAVE-025.
 
-mod common;
+use crate::common;
 
 use clowder_core::*;
 use common::*;

@@ -21,7 +21,7 @@
 //! the coupling SIM-ENG-026 describes: classification is what lets the journal
 //! know what it may never evict.
 
-mod common;
+use crate::common;
 
 use clowder_core::*;
 use common::*;

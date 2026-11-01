@@ -19,12 +19,12 @@ Prestige in clowder is **The Great Meadow Move**: when a clowder has grown as la
 - `docs/intent/sim/prestige/prestige-specs.md` — 15 specs, prefix `SIM-MOVE`
 
 ### Tests
-- `crates/clowder-core/tests/achievements.rs`
-- `crates/clowder-core/tests/blurbs.rs`
-- `crates/clowder-core/tests/frontier.rs`
-- `crates/clowder-core/tests/legacy.rs`
-- `crates/clowder-core/tests/profiles.rs`
-- `crates/clowder-core/tests/wonder.rs`
+- `crates/clowder-core/tests/integration/achievements.rs`
+- `crates/clowder-core/tests/integration/blurbs.rs`
+- `crates/clowder-core/tests/integration/frontier.rs`
+- `crates/clowder-core/tests/integration/legacy.rs`
+- `crates/clowder-core/tests/integration/profiles.rs`
+- `crates/clowder-core/tests/integration/wonder.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`

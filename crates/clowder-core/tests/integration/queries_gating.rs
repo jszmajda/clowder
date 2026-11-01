@@ -40,7 +40,7 @@
 //!      uniform fractions, the empty case, and the "1 exactly when the gate
 //!      stops rejecting" coupling the spec's rationale states.
 
-mod common;
+use crate::common;
 
 use clowder_core::*;
 use common::*;

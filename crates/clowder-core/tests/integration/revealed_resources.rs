@@ -40,7 +40,7 @@
 //! every applied command, and a price after every applied command — any
 //! command, the one that changes nothing included (SIM-ENG-054).
 
-mod common;
+use crate::common;
 
 use clowder_core::content::MEADOW_MOVE_MIN_KITTENS;
 use clowder_core::*;

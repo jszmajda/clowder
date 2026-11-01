@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 use clowder_core::*;
 use common::*;

@@ -53,7 +53,7 @@
 //!   outdoor_transfer() -> f64 (a state-independent constant fraction, 0 < t < 1).
 #![allow(clippy::type_complexity, clippy::doc_overindented_list_items)]
 
-mod common;
+use crate::common;
 
 use clowder_core::*;
 use common::*;
@@ -1194,7 +1194,7 @@ fn a_fresh_meadow_defaults_every_wave_six_field() {
 // @spec SAVE-013
 #[test]
 fn a_v1_save_migrates_with_wave_six_fields_at_defaults() {
-    let fixture = include_str!("fixtures/save_v1.json");
+    let fixture = include_str!("../fixtures/save_v1.json");
     let loaded = load_string(fixture, 1_751_700_000).expect("v1 fixture loads");
     let s = &loaded.state;
     assert!(s.sites_reached.is_empty(), "old saves reach no sites");

@@ -32,7 +32,7 @@
 //! on the save being present or readable, simultaneous launches cannot both
 //! pass, and a launch that refuses after acquiring leaves nothing behind.
 
-#[path = "../src/runtime/lock.rs"]
+#[path = "../../src/runtime/lock.rs"]
 #[allow(dead_code)]
 mod lock;
 

@@ -20,12 +20,12 @@ This leaf owns every colour decision in clowder: the palette, what each colour i
 
 ### Tests
 - `crates/clowder-tui/tests/theme.rs`
-- `crates/clowder-tui/tests/chrome.rs`
-- `crates/clowder-tui/tests/frame.rs`
-- `crates/clowder-tui/tests/rows.rs`
-- `crates/clowder-tui/tests/inspector.rs`
-- `crates/clowder-tui/tests/overlays.rs`
-- `crates/clowder-tui/tests/armed_summary.rs`
+- `crates/clowder-tui/tests/integration/chrome.rs`
+- `crates/clowder-tui/tests/integration/frame.rs`
+- `crates/clowder-tui/tests/integration/rows.rs`
+- `crates/clowder-tui/tests/integration/inspector.rs`
+- `crates/clowder-tui/tests/integration/overlays.rs`
+- `crates/clowder-tui/tests/integration/armed_summary.rs`
 
 ### Code
 - `crates/clowder-tui/src/render/mod.rs`
