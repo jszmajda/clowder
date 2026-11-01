@@ -758,17 +758,16 @@ impl GameState {
 
     // ---- Mystic (SIM-UNI) ----
 
-    /// Hold a Unicorn Parade: 2500 unicorns → 2500 × arches × (1 + parade
-    /// ratio) rainbows. No RNG.
+    /// Hold a Unicorn Parade: 2500 unicorns → each structure's Parade rainbows
+    /// × its copies × (1 + parade ratio) rainbows. No RNG.
     // @spec SIM-UNI-001
     fn hold_parade(&mut self) -> Result<Vec<Event>, CommandError> {
         if !self.ideas.contains(&IdeaId::ParadeRoutes) {
             return Err(CommandError::Locked);
         }
         self.spend(&[(ResourceId::Unicorns, content::PARADE_UNICORN_COST)])?;
-        let arches = self.structures[StructureId::RainbowArch.ix()] as f64;
         let ratio = 1.0 + self.effect(crate::effects::Effect::ParadeRatio);
-        let rainbows = content::PARADE_RAINBOWS_PER_ARCH * arches * ratio;
+        let rainbows = self.structure_sum(|d| d.parade_rainbows) * ratio;
         self.resources[ResourceId::Rainbows.ix()] += rainbows;
         Ok(vec![Event::ParadeHeld { rainbows }])
     }

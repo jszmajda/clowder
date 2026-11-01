@@ -319,7 +319,7 @@ impl GameState {
         // Cogworks convert capped raws into goods — overflow, not waste.
         // @spec SIM-ECO-039
         if self.day().is_multiple_of(content::DAYS_PER_YEAR) {
-            self.cogworks_autocraft();
+            self.year_close_crafts();
             // The Star Whale's visit ticks down a year; at zero it drifts calmly
             // on, never angry. @spec SIM-SKY-007
             if self.whale_visit_years > 0 {
@@ -374,38 +374,42 @@ impl GameState {
         self.complete_adventure_if_met(false, events);
     }
 
-    /// The Cogworks year-close auto-craft: 2% per Cogworks (max 50%) of each
-    /// raw standing at ≥98% of its cap converts through its single-input
-    /// recipe, once per year, unjammed, no RNG. Inputs leave at face value;
-    /// output rides the craft ratio.
+    /// Each year-close craft a definition carries: its share per copy (up to
+    /// its maximum) of each raw standing at or above its threshold of cap
+    /// converts through its single-input recipe, once per year, unjammed, no
+    /// RNG. Inputs leave at face value; output rides the craft ratio.
     // @spec SIM-ECO-039
-    fn cogworks_autocraft(&mut self) {
-        let cogworks = self.structures[StructureId::Cogworks.ix()];
-        if cogworks == 0 {
-            return;
-        }
-        let share =
-            (content::COGWORKS_CONVERT_PER * cogworks as f64).min(content::COGWORKS_CONVERT_MAX);
-        for (raw, craft) in content::COGWORKS_AUTOCRAFT {
-            if !self.craft_unlocked(craft) {
+    fn year_close_crafts(&mut self) {
+        for s in StructureId::ALL {
+            let copies = self.structures[s.ix()];
+            if copies == 0 {
                 continue;
             }
-            let cap = self.cap(raw);
-            if !cap.is_finite() || cap <= 0.0 {
+            let Some(year_craft) = &content::structure_def(s).year_craft else {
                 continue;
+            };
+            let share = (year_craft.share * copies as f64).min(year_craft.share_max);
+            for (raw, craft) in year_craft.pairs.iter().copied() {
+                if !self.craft_unlocked(craft) {
+                    continue;
+                }
+                let cap = self.cap(raw);
+                if !cap.is_finite() || cap <= 0.0 {
+                    continue;
+                }
+                let stock = self.stock(raw);
+                if stock + EPSILON < year_craft.threshold * cap {
+                    continue;
+                }
+                let amount = share * stock;
+                let per_batch = content::craft_def(craft).inputs[0].1;
+                let batches = amount / per_batch;
+                let output = content::craft_output(craft);
+                self.resources[raw.ix()] = (stock - amount).max(0.0);
+                let boosted = batches * (1.0 + self.craft_ratio_for(craft));
+                let ix = output.ix();
+                self.resources[ix] = (self.resources[ix] + boosted).min(self.cap(output));
             }
-            let stock = self.stock(raw);
-            if stock + EPSILON < content::COGWORKS_THRESHOLD * cap {
-                continue;
-            }
-            let amount = share * stock;
-            let per_batch = content::craft_def(craft).inputs[0].1;
-            let batches = amount / per_batch;
-            let output = content::craft_output(craft);
-            self.resources[raw.ix()] = (stock - amount).max(0.0);
-            let boosted = batches * (1.0 + self.craft_ratio_for(craft));
-            let ix = output.ix();
-            self.resources[ix] = (self.resources[ix] + boosted).min(self.cap(output));
         }
     }
 
@@ -780,16 +784,15 @@ impl GameState {
                     credit(ledger, src, r, add * count as f64 * fraction);
                 }
             }
-            // The Treat Bakery's outputs ride the pep *cap* (mpr), not a
-            // recipe table. @spec SIM-ECO-030
-            if s == StructureId::TreatBakery {
-                let mpr = self.cap(ResourceId::Pep) * content::BAKERY_MPR_PER_PEP_CAP;
-                let feathers = content::BAKERY_FEATHERS_MPR * mpr * count as f64 * fraction;
-                let bells = content::BAKERY_BELLS_MPR * mpr * count as f64 * fraction;
-                self.resources[ResourceId::Feathers.ix()] += feathers;
-                self.resources[ResourceId::Bells.ix()] += bells;
-                credit(ledger, src, ResourceId::Feathers, feathers);
-                credit(ledger, src, ResourceId::Bells, bells);
+            // Cap-fed outputs ride a resource's cap, not a flat rate.
+            // @spec SIM-ECO-030
+            if let Some(fed) = &converter.cap_fed {
+                let rate = self.cap(fed.cap) * fed.per_cap;
+                for (r, multiplier) in fed.outputs {
+                    let made = multiplier * rate * count as f64 * fraction;
+                    self.resources[r.ix()] += made;
+                    credit(ledger, src, *r, made);
+                }
             }
         }
         (made, tidied)
@@ -924,11 +927,11 @@ impl GameState {
         self.sky_events(events);
 
         // Mystic day-boundary rolls, appended AFTER the sky rolls: a prism
-        // descent, then a rainbow shower. Both draw only when a Rainbow Arch
-        // structure or an Arch upgrade exists (else the chances are 0), keeping
+        // descent, then a rainbow shower. Both draw only when a structure seeds
+        // the descent or an Arch upgrade exists (else the chances are 0), keeping
         // the arch-free hot path free of effect scans.
         // @spec SIM-UNI-006, SIM-UNI-005
-        if self.structures[StructureId::RainbowArch.ix()] > 0 || !self.arches_bought.is_empty() {
+        if self.structure_sum(|d| d.prism_descent) > 0.0 || !self.arches_bought.is_empty() {
             let descent = self.prism_descent_chance();
             if descent > 0.0 && self.rng.chance(descent) {
                 self.resources[ResourceId::Prisms.ix()] += 1.0;
@@ -941,12 +944,12 @@ impl GameState {
         }
 
         // Déjà-vu roll — appended AFTER the mystic rolls, at season boundaries
-        // only (the SIM-ENG-018 schedule extension). Guarded so the chest/loom-free
+        // only (the SIM-ENG-018 schedule extension). Guarded so the chance-free
         // hot path draws nothing. On a hit the day pauses production and
         // consumption and gathers reverie (a deterministic RNG draw).
         // @spec SIM-DREAM-004, SIM-ENG-018
         if self.day().is_multiple_of(content::DAYS_PER_SEASON)
-            && (self.structures[StructureId::MemoryChest.ix()] > 0 || !self.dream_looms.is_empty())
+            && (self.structure_sum(|d| d.deja_vu_chance) > 0.0 || !self.dream_looms.is_empty())
         {
             let chance = self.effect(crate::effects::Effect::DejaVuChance);
             if chance > 0.0 && self.rng.chance(chance) {
@@ -962,7 +965,7 @@ impl GameState {
 
     /// Per-tick dreaming: the Memory Arch upgrade turns the clowder's Rainbow
     /// Arch *structures* into a dreamcorn engine — dream-drift accrues per tick
-    /// as 0.000001 × Rainbow Arch structures × (1 + dream-boost effects),
+    /// as each structure's dream-drift × its copies × (1 + dream-boost effects),
     /// throttled ×0.25 while any dreamcorn already dreams; at ≥ 1 a prism naps
     /// into a dreamcorn — never the last prism. A Sky Arch adds a steady prism
     /// drift.
@@ -982,19 +985,19 @@ impl GameState {
             );
         }
         // The Memory Arch upgrade ENABLES the engine; the drift RATE scales with
-        // the buildable Rainbow Arch structure count, so the engine grows as the
-        // player raises more arches (not a flat once-bought trickle).
+        // the copies built, so the engine grows as the player raises more arches
+        // (not a flat once-bought trickle).
         if !self.arches_bought.contains(&ArchId::MemoryArch) {
             return;
         }
-        let arches = self.structures[StructureId::RainbowArch.ix()] as f64;
+        let drift = self.structure_sum(|d| d.dream_drift);
         let throttle = if self.stock(ResourceId::Dreamcorns) > EPSILON {
             content::DREAM_DRIFT_THROTTLE
         } else {
             1.0
         };
         let boost = 1.0 + self.effect(crate::effects::Effect::DreamBoost);
-        self.dream_drift += content::DREAM_DRIFT_PER_ARCH * arches * boost * throttle;
+        self.dream_drift += drift * boost * throttle;
         // A prism must stay awake to keep the dream going (the cozy floor).
         while self.dream_drift >= 1.0 && self.stock(ResourceId::Prisms) >= 2.0 - EPSILON {
             self.dream_drift -= 1.0;
@@ -1007,8 +1010,8 @@ impl GameState {
     }
 
     /// Day-close sky processing: an expired observation window fades
-    /// silently; then, where Ledges exist and nothing is pending, roll for an
-    /// event and (on a hit) for lucky self-observation.
+    /// silently; then, where a structure seeds sky events and nothing is
+    /// pending, roll for an event and (on a hit) for lucky self-observation.
     // @spec SIM-ENG-025
     fn sky_events(&mut self, events: &mut Vec<Event>) {
         if let Some(expiry) = self.pending_sky_event {
@@ -1016,18 +1019,16 @@ impl GameState {
                 self.pending_sky_event = None; // it simply faded
             }
         }
-        let ledges = self.structures[StructureId::StargazingLedge.ix()];
-        if ledges == 0 || self.pending_sky_event.is_some() {
+        let seeded = self.structure_sum(|d| d.sky_event_chance);
+        if seeded == 0.0 || self.pending_sky_event.is_some() {
             return; // no draw at all: at most one pending event at a time
         }
-        let event_chance = content::SKY_EVENT_CHANCE_PER_LEDGE
-            * ledges as f64
-            * (1.0 + self.effect(crate::effects::Effect::SkyEventChanceRatio));
+        let event_chance =
+            seeded * (1.0 + self.effect(crate::effects::Effect::SkyEventChanceRatio));
         if !self.rng.chance(event_chance) {
             return;
         }
-        let observe_chance = content::SKY_AUTO_OBSERVE_PER_LEDGE
-            * ledges as f64
+        let observe_chance = self.structure_sum(|d| d.sky_auto_observe)
             * (1.0 + self.effect(crate::effects::Effect::AutoObserveChanceRatio));
         if self.rng.chance(observe_chance) {
             // Someone happened to be looking up.

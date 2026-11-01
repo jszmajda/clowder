@@ -170,6 +170,7 @@ impl GameState {
                 | Effect::ResourceRatio(_)
                 | Effect::CraftRatio
                 | Effect::LuxuryDemandRatio
+                | Effect::TradeRatio
                 | Effect::PrismDescentChance
                 | Effect::GlobalProductionRatio
                 | Effect::OutdoorProductionRatio
@@ -191,9 +192,9 @@ impl GameState {
                     for (cr, amount) in def.cap_bonuses {
                         if *cr == r {
                             let mut value = amount * count;
-                            // The Porch's caps ratchet on the kite high-water.
+                            // Marked caps ratchet on the kite high-water.
                             // @spec SIM-ECO-031
-                            if s == StructureId::Porch {
+                            if def.caps_kite_ratcheted {
                                 value *= 1.0
                                     + limited_dr(
                                         content::PORCH_KITE_PER * self.kites_high_water,
@@ -216,20 +217,17 @@ impl GameState {
                 }
                 Effect::CraftRatio => sum += def.craft_ratio * count,
                 Effect::LuxuryDemandRatio => sum += def.luxury_demand * count,
-                // Each Rainbow Arch *structure* seeds the prism supply.
+                // @spec SIM-ECO-053
+                Effect::TradeRatio => sum += def.trade_ratio * count,
                 // @spec SIM-UNI-006
-                Effect::PrismDescentChance if s == StructureId::RainbowArch => {
-                    sum += content::RAINBOW_ARCH_PRISM_DESCENT * count;
-                }
+                Effect::PrismDescentChance => sum += def.prism_descent * count,
                 // @spec SIM-ECO-032
                 Effect::GlobalProductionRatio => {
                     let mut value = def.global_ratio * count;
-                    if s == StructureId::DynamoWheel {
-                        // A starved wheel spins down; Cogworks amplify it.
-                        value *= self.dynamo_fuel_fraction()
-                            * (1.0
-                                + content::COGWORKS_DYNAMO_BOOST
-                                    * self.structures[StructureId::Cogworks.ix()] as f64);
+                    if def.fuel_scaled {
+                        // A starved structure spins down; boosts amplify it.
+                        value *= self.fuel_fraction(s)
+                            * (1.0 + self.structure_sum(|d| d.fuel_global_boost));
                     }
                     sum += value;
                 }
@@ -237,10 +235,8 @@ impl GameState {
                 // @spec SIM-SKY-004, SIM-SKY-005
                 Effect::OutdoorProductionRatio => sum += def.outdoor_ratio * count,
                 Effect::LongSunCapBonus => sum += def.long_sun_cap * count,
-                // Memory Chests drive the per-season déjà-vu roll. @spec SIM-DREAM-004
-                Effect::DejaVuChance if s == StructureId::MemoryChest => {
-                    sum += content::MEMORY_CHEST_DEJA_VU * count;
-                }
+                // @spec SIM-DREAM-004, SIM-DREAM-013
+                Effect::DejaVuChance => sum += def.deja_vu_chance * count,
                 _ => {}
             }
         }

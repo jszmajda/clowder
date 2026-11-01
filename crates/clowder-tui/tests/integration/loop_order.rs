@@ -93,8 +93,12 @@ impl TempDir {
     fn new(tag: &str) -> TempDir {
         static COUNTER: AtomicU32 = AtomicU32::new(0);
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path =
-            std::env::temp_dir().join(format!("clowder-loop-order-{}-{}-{}", std::process::id(), tag, n));
+        let path = std::env::temp_dir().join(format!(
+            "clowder-loop-order-{}-{}-{}",
+            std::process::id(),
+            tag,
+            n
+        ));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).expect("a scratch directory should be creatable");
         TempDir { path }

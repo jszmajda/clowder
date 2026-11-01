@@ -1849,8 +1849,22 @@ impl GameState {
         cap
     }
 
-    /// Memory Chest carry fraction: I +1.5%, II +3%, plus 1.5% per Memory Chest
-    /// structure owned in the CURRENT meadow (read before the Move's reset).
+    /// The sum, over every structure, of a definition's per-copy figure × the
+    /// copies held: how a rule reads a rate its definition gives, so that no
+    /// rule names a structure to find its rate.
+    pub(crate) fn structure_sum(&self, per_copy: impl Fn(&content::StructureDef) -> f64) -> f64 {
+        self.structures
+            .iter()
+            .enumerate()
+            .filter(|(_, count)| **count != 0)
+            .map(|(ix, count)| {
+                per_copy(content::structure_def(StructureId::ALL[ix])) * *count as f64
+            })
+            .sum()
+    }
+
+    /// Memory Chest carry fraction: I +1.5%, II +3%, plus each structure's carry
+    /// share per copy owned in the CURRENT meadow (read before the Move's reset).
     /// @spec SIM-MOVE-003
     pub fn memory_chest_ratio(&self) -> f64 {
         let mut r = 0.0;
@@ -1860,7 +1874,7 @@ impl GameState {
         if self.traditions.contains(&TraditionId::MemoryChestII) {
             r += 0.03;
         }
-        r += 0.015 * self.structures[StructureId::MemoryChest.ix()] as f64;
+        r += self.structure_sum(|d| d.move_carry);
         r
     }
 
@@ -2007,15 +2021,16 @@ impl GameState {
 
     /// The Long Sun production bonus (layer 8), 0 without the Long Sun rite;
     /// else limited_dr(unlimited_dr(devotion, 1000) / 100, cap), where
-    /// cap = 10 + 0.05 × enlightenment_tier per Sunstone. @spec SIM-SUN-004
+    /// cap = 10 + each structure's cap per enlightenment tier × the tier × its
+    /// copies. @spec SIM-SUN-004
     pub fn long_sun_bonus(&self) -> f64 {
         if !self.rites.contains(&RiteId::TheLongSun) {
             return 0.0;
         }
-        let sunstones = self.structures[StructureId::Sunstone.ix()] as f64;
+        let tier = self.enlightenment_tier as f64;
         // Aurora Lanterns extend the Long Sun cap (+2 each). @spec SIM-SKY-005
         let cap = 10.0
-            + 0.05 * self.enlightenment_tier as f64 * sunstones
+            + self.structure_sum(|d| d.long_sun_tier_cap * tier)
             + self.effect(crate::effects::Effect::LongSunCapBonus);
         crate::effects::limited_dr(
             crate::effects::unlimited_dr(self.devotion, 1000.0) / 100.0,
@@ -2343,26 +2358,26 @@ impl GameState {
 
     // ---- Derived energy queries (NRG facet) ----
 
-    /// The Dynamo Wheel's fuel satisfaction (0..=1) over all active wheels.
-    pub(crate) fn dynamo_fuel_fraction(&self) -> f64 {
-        let wheels = self.structures[StructureId::DynamoWheel.ix()];
-        if wheels == 0 {
+    /// A structure's fuel satisfaction (0..=1) over its copies held: the
+    /// throttle fraction of its converter's inputs. @spec SIM-ECO-059
+    pub(crate) fn fuel_fraction(&self, s: StructureId) -> f64 {
+        let copies = self.structures[s.ix()];
+        if copies == 0 {
             return 0.0;
         }
-        let inputs = content::structure_def(StructureId::DynamoWheel)
+        let inputs = content::structure_def(s)
             .converter
-            .expect("the Dynamo Wheel draws fuel")
+            .expect("a fuel-scaled structure draws fuel")
             .inputs;
         let demands: Vec<(ResourceId, f64)> = inputs
             .iter()
-            .map(|(r, d)| (*r, d * wheels as f64))
+            .map(|(r, d)| (*r, d * copies as f64))
             .collect();
         self.throttle_fraction(&demands)
     }
 
-    /// Energy produced by active structures: linear rates from the BLD table,
-    /// the Sunning Deck breathing with the season, the Dynamo Wheel scaled by
-    /// its fuel fraction.
+    /// Energy produced by active structures: each definition's rate, marked
+    /// structures breathing with the season or scaled by their fuel fraction.
     // @spec SIM-ECO-035
     pub fn energy_production(&self) -> f64 {
         StructureId::ALL.iter().map(|s| self.energy_of(*s).0).sum()
@@ -2378,17 +2393,14 @@ impl GameState {
             return (0.0, 0.0);
         }
         let def = content::structure_def(s);
-        let made = match s {
-            StructureId::SunningDeck | StructureId::SolarArray => {
-                def.energy_prod * count * content::sunning_deck_season_factor(self.season())
-            }
-            StructureId::DynamoWheel => def.energy_prod * count * self.dynamo_fuel_fraction(),
-            _ => def.energy_prod * count,
+        let made = if def.energy_seasonal {
+            def.energy_prod * count * content::sunning_deck_season_factor(self.season())
+        } else if def.fuel_scaled {
+            def.energy_prod * count * self.fuel_fraction(s)
+        } else {
+            def.energy_prod * count
         };
-        let used = match s {
-            StructureId::YarnComputer => 2.0 * count + count * count / 2.0,
-            _ => def.energy_cons * count,
-        };
+        let used = def.energy_cons * count + def.energy_cons_sq * count * count;
         (made, used)
     }
 
@@ -2400,8 +2412,8 @@ impl GameState {
         (1.0 + self.effect(crate::effects::Effect::EnergyConsumptionRatio)).max(0.0)
     }
 
-    /// Energy consumed by active structures; Yarn Computers draw
-    /// 2n + n²/2 in total at n copies.
+    /// Energy consumed by active structures: at n copies, each definition's
+    /// use per copy × n plus its use per copy squared × n².
     // @spec SIM-ECO-035
     pub fn energy_consumption(&self) -> f64 {
         let sum: f64 = StructureId::ALL.iter().map(|s| self.energy_of(*s).1).sum();
@@ -2434,22 +2446,9 @@ impl GameState {
             if count == 0 {
                 continue;
             }
-            let s = StructureId::ALL[ix];
-            let n = count as f64;
-            let def = content::structure_def(s);
-            if def.energy_prod != 0.0 {
-                prod += match s {
-                    StructureId::SunningDeck | StructureId::SolarArray => {
-                        def.energy_prod * n * content::sunning_deck_season_factor(self.season())
-                    }
-                    StructureId::DynamoWheel => def.energy_prod * n * self.dynamo_fuel_fraction(),
-                    _ => def.energy_prod * n,
-                };
-            }
-            cons += match s {
-                StructureId::YarnComputer => 2.0 * n + n * n / 2.0,
-                _ => def.energy_cons * n,
-            };
+            let (made, used) = self.energy_of(StructureId::ALL[ix]);
+            prod += made;
+            cons += used;
         }
         // Frugal Meadow scales consumption through the EnergyConsumptionRatio key
         // (twist raises, reward lowers) — kept byte-identical to

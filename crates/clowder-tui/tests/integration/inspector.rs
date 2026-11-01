@@ -1924,6 +1924,60 @@ fn structure_fields(s: StructureId) -> Vec<(String, Vec<String>)> {
     if d.long_sun_cap != 0.0 {
         out.push(("long sun extension".into(), vec![bare(d.long_sun_cap)]));
     }
+    if d.long_sun_tier_cap != 0.0 {
+        out.push(("long sun per tier".into(), vec![bare(d.long_sun_tier_cap)]));
+    }
+    if d.energy_cons_sq != 0.0 {
+        out.push((
+            "energy per copy squared".into(),
+            vec![bare(d.energy_cons_sq)],
+        ));
+    }
+    if d.trade_ratio != 0.0 {
+        out.push(("trade ratio".into(), vec![percent(d.trade_ratio)]));
+    }
+    if d.parade_rainbows != 0.0 {
+        out.push(("parade rainbows".into(), vec![bare(d.parade_rainbows)]));
+    }
+    if d.prism_descent != 0.0 {
+        out.push(("prism descent".into(), vec![percent(d.prism_descent)]));
+    }
+    if d.dream_drift != 0.0 {
+        out.push(("dream drift".into(), vec![per_second(d.dream_drift)]));
+    }
+    if d.move_carry != 0.0 {
+        out.push(("carry share".into(), vec![percent(d.move_carry)]));
+    }
+    if d.deja_vu_chance != 0.0 {
+        out.push(("deja vu chance".into(), vec![percent(d.deja_vu_chance)]));
+    }
+    if d.sky_event_chance != 0.0 {
+        out.push(("sky event chance".into(), vec![percent(d.sky_event_chance)]));
+    }
+    if d.sky_auto_observe != 0.0 {
+        out.push(("auto observe".into(), vec![percent(d.sky_auto_observe)]));
+    }
+    if d.fuel_global_boost != 0.0 {
+        out.push(("fuel boost".into(), vec![percent(d.fuel_global_boost)]));
+    }
+    if let Some(craft) = &d.year_craft {
+        out.push(("year craft share".into(), vec![percent(craft.share)]));
+        out.push((
+            "year craft threshold".into(),
+            vec![percent(craft.threshold)],
+        ));
+        out.push(("year craft maximum".into(), vec![percent(craft.share_max)]));
+    }
+    if let Some(fed) = d.converter.as_ref().and_then(|c| c.cap_fed.as_ref()) {
+        // The sentence's own unit of storage, and what that unit yields.
+        out.push(("cap-fed unit".into(), vec![bare(100.0)]));
+        for (r, multiplier) in fed.outputs {
+            out.push((
+                format!("cap-fed output {r:?}"),
+                vec![per_second(multiplier * fed.per_cap * 100.0)],
+            ));
+        }
+    }
     out
 }
 
@@ -2107,6 +2161,307 @@ fn a_structures_mess_is_stated_as_made_or_tidied_by_its_sign() {
     );
 }
 
+/// The sentence a structure's statement gives each behaviour its rules read,
+/// word for word, from the definition's field. Each is stated exactly where the
+/// field departs from its baseline, on every structure the tables define.
+/// @spec TUI-NAV-181, TUI-NAV-182, TUI-NAV-183, TUI-NAV-184, TUI-NAV-185
+/// @spec TUI-NAV-186, TUI-NAV-187, TUI-NAV-189, TUI-NAV-191, TUI-NAV-196
+#[test]
+fn a_structures_rule_held_rates_are_stated_word_for_word_from_its_fields() {
+    type Sentence = (fn(&tables::StructureDef) -> f64, fn(f64) -> String);
+    let sentences: [Sentence; 10] = [
+        (
+            |d| d.parade_rainbows,
+            |v| format!("Brings {} Rainbows per parade.", bare(v)),
+        ),
+        (
+            |d| d.prism_descent,
+            |v| {
+                format!(
+                    "Adds {}% to each day's chance that Prisms descend.",
+                    percent(v)
+                )
+            },
+        ),
+        (
+            |d| d.dream_drift,
+            |v| {
+                format!(
+                    "Turns {} Prisms into Dreamcorns per second once its dreaming upgrade is \
+                     bought, more slowly while any Dreamcorns dream.",
+                    per_second(v)
+                )
+            },
+        ),
+        (
+            |d| d.move_carry,
+            |v| {
+                format!(
+                    "Carries {}% of every stock into the next meadow.",
+                    percent(v)
+                )
+            },
+        ),
+        (
+            |d| d.deja_vu_chance,
+            |v| {
+                format!(
+                    "Adds {}% to each season's chance of a déjà-vu day.",
+                    percent(v)
+                )
+            },
+        ),
+        (
+            |d| d.sky_event_chance,
+            |v| format!("Adds {}% to each day's chance of a sky event.", percent(v)),
+        ),
+        (
+            |d| d.sky_auto_observe,
+            |v| {
+                format!(
+                    "Adds {}% to the chance a sky event is observed on its own.",
+                    percent(v)
+                )
+            },
+        ),
+        (
+            |d| d.fuel_global_boost,
+            |v| {
+                format!(
+                    "Raises the global ratio of fuel-scaled structures by {}%.",
+                    percent(v)
+                )
+            },
+        ),
+        (
+            |d| d.long_sun_tier_cap,
+            |v| {
+                format!(
+                    "Extends the long sun by {} per enlightenment tier.",
+                    bare(v)
+                )
+            },
+        ),
+        (
+            |d| d.trade_ratio,
+            |v| format!("Raises trade yields by {}%.", percent(v)),
+        ),
+    ];
+    for (field, words) in sentences {
+        let mut stated = 0;
+        for s in StructureId::ALL {
+            let value = field(tables::structure_def(s));
+            if value == 0.0 {
+                continue;
+            }
+            stated += 1;
+            let (_, shown) = structure_pane(s);
+            let flat = shown.split_whitespace().collect::<Vec<_>>().join(" ");
+            let want = words(value);
+            assert!(
+                flat.contains(&want),
+                "{s:?} must say {want:?}; read:\n{shown}"
+            );
+        }
+        assert!(stated > 0, "fixture: some structure carries each field");
+    }
+}
+
+/// A year-close craft states its share, threshold, and most, then each pair.
+/// @spec TUI-NAV-188
+#[test]
+fn a_structures_year_close_craft_is_stated_with_each_of_its_pairs() {
+    let mut stated = 0;
+    for s in StructureId::ALL {
+        let Some(craft) = &tables::structure_def(s).year_craft else {
+            continue;
+        };
+        stated += 1;
+        let pairs: Vec<String> = craft
+            .pairs
+            .iter()
+            .map(|(raw, recipe)| format!("{raw:?} into {:?}", tables::craft_output(*recipe)))
+            .collect();
+        let want = format!(
+            "At year close, crafts {}% of any stock standing at {}% of its cap or more, up to {}%: {}.",
+            percent(craft.share),
+            percent(craft.threshold),
+            percent(craft.share_max),
+            pairs.join(", ")
+        );
+        let (_, shown) = structure_pane(s);
+        let flat = shown.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            flat.contains(&want),
+            "{s:?} must say {want:?}; read:\n{shown}"
+        );
+    }
+    assert!(
+        stated > 0,
+        "fixture: some structure carries a year-close craft"
+    );
+}
+
+/// Outputs fed by a cap are stated per 100 of that cap, each per game second.
+/// @spec TUI-NAV-190
+#[test]
+fn a_converters_cap_fed_outputs_are_stated_per_hundred_of_the_cap() {
+    let mut stated = 0;
+    for s in StructureId::ALL {
+        let conv = tables::structure_def(s).converter.as_ref();
+        let Some(fed) = conv.and_then(|c| c.cap_fed.as_ref()) else {
+            continue;
+        };
+        let (_, shown) = structure_pane(s);
+        let flat = shown.split_whitespace().collect::<Vec<_>>().join(" ");
+        for (r, multiplier) in fed.outputs {
+            stated += 1;
+            let want = format!(
+                "Yields {} {r:?} per second for each 100 {:?} of storage.",
+                per_second(multiplier * fed.per_cap * 100.0),
+                fed.cap
+            );
+            assert!(
+                flat.contains(&want),
+                "{s:?} must say {want:?}; read:\n{shown}"
+            );
+        }
+    }
+    assert!(stated > 0, "fixture: some converter has cap-fed outputs");
+}
+
+/// A running cost that escalates says so in the energy-used sentence.
+/// @spec TUI-NAV-192
+#[test]
+fn an_escalating_running_cost_is_stated_per_copy_squared() {
+    let mut stated = 0;
+    for s in StructureId::ALL {
+        let d = tables::structure_def(s);
+        if d.energy_cons_sq == 0.0 {
+            continue;
+        }
+        stated += 1;
+        let (_, shown) = structure_pane(s);
+        let flat = shown.split_whitespace().collect::<Vec<_>>().join(" ");
+        let want = format!(
+            "Uses {} energy, plus {} energy per copy squared.",
+            bare(d.energy_cons),
+            bare(d.energy_cons_sq)
+        );
+        assert!(
+            flat.contains(&want),
+            "{s:?} must say {want:?}; read:\n{shown}"
+        );
+    }
+    assert!(
+        stated > 0,
+        "fixture: some structure escalates its energy use"
+    );
+}
+
+/// Scaling marks qualify the figure they scale, where the definition sets them
+/// and nowhere else.
+/// @spec TUI-NAV-193, TUI-NAV-194, TUI-NAV-195
+#[test]
+fn a_figure_a_rule_scales_says_so_where_it_stands() {
+    let mut seen = (0, 0, 0);
+    for s in StructureId::ALL {
+        let d = tables::structure_def(s);
+        let (_, shown) = structure_pane(s);
+        let flat = shown.split_whitespace().collect::<Vec<_>>().join(" ");
+
+        let ratchet = "Its storage grows with the most Kites ever held.";
+        assert_eq!(
+            flat.contains(ratchet),
+            d.caps_kite_ratcheted,
+            "{s:?}: {shown}"
+        );
+        seen.0 += d.caps_kite_ratcheted as u32;
+
+        let fuel = flat.contains("scaled by its fuel");
+        assert_eq!(fuel, d.fuel_scaled, "{s:?}: {shown}");
+        if d.fuel_scaled {
+            seen.1 += 1;
+            let ratio = format!(
+                "Raises the global ratio by {}%, scaled by its fuel.",
+                percent(d.global_ratio)
+            );
+            let energy = format!("Makes {} energy, scaled by its fuel.", bare(d.energy_prod));
+            assert!(flat.contains(&ratio), "{s:?} must say {ratio:?}: {shown}");
+            assert!(flat.contains(&energy), "{s:?} must say {energy:?}: {shown}");
+        }
+
+        let seasonal = format!("Makes {} energy, seasonal.", bare(d.energy_prod));
+        assert_eq!(
+            flat.contains(&seasonal),
+            d.energy_seasonal,
+            "{s:?}: {shown}"
+        );
+        seen.2 += d.energy_seasonal as u32;
+    }
+    assert!(
+        seen.0 > 0 && seen.1 > 0 && seen.2 > 0,
+        "fixture: the tables set each mark"
+    );
+}
+
+/// Each resource a rule-held statement names wears its coat, as every resource
+/// in the statement does.
+/// @spec TUI-THEME-022, TUI-NAV-188, TUI-NAV-193
+#[test]
+fn the_resources_a_rule_held_statement_names_wear_their_coats() {
+    use clowder_tui::theme::{coat, coat_colours};
+    use ratatui::style::Color;
+
+    let rect = pane_rect(WIDE, TALL);
+    let mut checked = 0;
+    for s in [
+        StructureId::RainbowArch,
+        StructureId::Porch,
+        StructureId::Cogworks,
+        StructureId::TreatBakery,
+    ] {
+        let (state, _) = structure_pane(s);
+        let buf = render(
+            &state,
+            &looking_at(Section::Meadow, structure_row(s)),
+            WIDE,
+            TALL,
+            rect,
+        );
+        let cells = description_cells(&buf, rect);
+        let text: String = cells.iter().map(|(c, _)| *c).collect();
+        for r in match s {
+            StructureId::RainbowArch => {
+                vec![
+                    ResourceId::Rainbows,
+                    ResourceId::Prisms,
+                    ResourceId::Dreamcorns,
+                ]
+            }
+            StructureId::Porch => vec![ResourceId::Kites],
+            StructureId::Cogworks => vec![ResourceId::Twigs, ResourceId::Wands],
+            _ => vec![ResourceId::Feathers, ResourceId::Pep],
+        } {
+            let name = format!("{r:?}");
+            let at = text
+                .find(&name)
+                .unwrap_or_else(|| panic!("{s:?}: {name} is not in {text:?}"));
+            let at = text[..at].chars().count();
+            let want = coat_colours(coat(r), name.chars().count());
+            for (k, colour) in want.iter().enumerate() {
+                let (c, got): (char, Color) = cells[at + k];
+                assert_eq!(
+                    &got, colour,
+                    "{s:?}: {c:?} of {name} wears {got:?}: {text:?}"
+                );
+            }
+            checked += 1;
+        }
+    }
+    assert!(checked > 0);
+}
+
 /// The qualifiers that shape a structure's productions — seasonal, scaled by
 /// the energy surplus, routed through the outdoor channel — are stated exactly
 /// where the definition sets them. Wording-free: some word must appear on every
@@ -2131,7 +2486,10 @@ fn a_structures_qualifiers_are_stated_exactly_where_its_definition_sets_them() {
 
     type Qualifier = (&'static str, fn(StructureId) -> bool);
     let qualifiers: [Qualifier; 3] = [
-        ("seasonal", |s| tables::structure_def(s).seasonal),
+        ("seasonal", |s| {
+            let d = tables::structure_def(s);
+            d.seasonal || d.energy_seasonal
+        }),
         ("scaled by the energy surplus", |s| {
             tables::structure_def(s).surplus_scaled
         }),

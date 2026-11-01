@@ -235,6 +235,10 @@ fn sentences(parts: Vec<Pieces>) -> Pieces {
 /// name, its price and that price's escalation, its reveal threshold, and its
 /// gate, wherever the field departs from its baseline. Per-tick fields are
 /// stated per game second; ratios as the percentage they add.
+/// @spec TUI-NAV-181, TUI-NAV-182, TUI-NAV-183, TUI-NAV-184, TUI-NAV-185
+/// @spec TUI-NAV-186, TUI-NAV-187, TUI-NAV-188, TUI-NAV-189, TUI-NAV-190
+/// @spec TUI-NAV-191, TUI-NAV-192, TUI-NAV-193, TUI-NAV-194, TUI-NAV-195
+/// @spec TUI-NAV-196
 fn structure_statement(s: clowder_core::StructureId) -> Pieces {
     let d = content::structure_def(s);
     let mut parts: Vec<Pieces> = Vec::new();
@@ -282,6 +286,13 @@ fn structure_statement(s: clowder_core::StructureId) -> Pieces {
             Piece::plain("."),
         ]);
     }
+    if d.caps_kite_ratcheted {
+        parts.push(vec![
+            Piece::plain("Its storage grows with the most "),
+            resource(ResourceId::Kites),
+            Piece::plain(" ever held."),
+        ]);
+    }
     if d.happiness_points != 0.0 {
         parts.push(plain(format!(
             "Lifts mood by {} points.",
@@ -325,10 +336,27 @@ fn structure_statement(s: clowder_core::StructureId) -> Pieces {
             percent(d.jamboree_arrival)
         )));
     }
+    let fuel = if d.fuel_scaled {
+        ", scaled by its fuel"
+    } else {
+        ""
+    };
     if d.global_ratio != 0.0 {
         parts.push(plain(format!(
-            "Raises the global ratio by {}%.",
+            "Raises the global ratio by {}%{fuel}.",
             percent(d.global_ratio)
+        )));
+    }
+    if d.fuel_global_boost != 0.0 {
+        parts.push(plain(format!(
+            "Raises the global ratio of fuel-scaled structures by {}%.",
+            percent(d.fuel_global_boost)
+        )));
+    }
+    if d.trade_ratio != 0.0 {
+        parts.push(plain(format!(
+            "Raises trade yields by {}%.",
+            percent(d.trade_ratio)
         )));
     }
     if let Some(conv) = &d.converter {
@@ -346,6 +374,38 @@ fn structure_statement(s: clowder_core::StructureId) -> Pieces {
                 Piece::plain(" per second."),
             ]);
         }
+        if let Some(fed) = &conv.cap_fed {
+            for (r, multiplier) in fed.outputs {
+                parts.push(vec![
+                    Piece::plain(format!(
+                        "Yields {} ",
+                        per_second(multiplier * fed.per_cap * 100.0)
+                    )),
+                    resource(*r),
+                    Piece::plain(" per second for each 100 "),
+                    resource(fed.cap),
+                    Piece::plain(" of storage."),
+                ]);
+            }
+        }
+    }
+    if let Some(craft) = &d.year_craft {
+        let mut sentence = vec![Piece::plain(format!(
+            "At year close, crafts {}% of any stock standing at {}% of its cap or more, up to {}%: ",
+            percent(craft.share),
+            percent(craft.threshold),
+            percent(craft.share_max)
+        ))];
+        for (i, (raw, recipe)) in craft.pairs.iter().enumerate() {
+            if i > 0 {
+                sentence.push(Piece::plain(", "));
+            }
+            sentence.push(resource(*raw));
+            sentence.push(Piece::plain(" into "));
+            sentence.push(resource(content::craft_output(*recipe)));
+        }
+        sentence.push(Piece::plain("."));
+        parts.push(sentence);
     }
     // A negative mess field tidies; it is stated as what it tidies.
     // @spec TUI-NAV-177
@@ -361,13 +421,25 @@ fn structure_statement(s: clowder_core::StructureId) -> Pieces {
         )));
     }
     if d.energy_prod != 0.0 {
+        let seasonal = if d.energy_seasonal { ", seasonal" } else { "" };
         parts.push(plain(format!(
-            "Makes {} energy.",
+            "Makes {} energy{seasonal}{fuel}.",
             fmt::exact(d.energy_prod)
         )));
     }
-    if d.energy_cons != 0.0 {
-        parts.push(plain(format!("Uses {} energy.", fmt::exact(d.energy_cons))));
+    if d.energy_cons != 0.0 || d.energy_cons_sq != 0.0 {
+        let squared = if d.energy_cons_sq != 0.0 {
+            format!(
+                ", plus {} energy per copy squared",
+                fmt::exact(d.energy_cons_sq)
+            )
+        } else {
+            String::new()
+        };
+        parts.push(plain(format!(
+            "Uses {} energy{squared}.",
+            fmt::exact(d.energy_cons)
+        )));
     }
     if d.outdoor_ratio != 0.0 {
         parts.push(plain(format!(
@@ -379,6 +451,64 @@ fn structure_statement(s: clowder_core::StructureId) -> Pieces {
         parts.push(plain(format!(
             "Extends the long sun by {}.",
             fmt::exact(d.long_sun_cap)
+        )));
+    }
+    if d.long_sun_tier_cap != 0.0 {
+        parts.push(plain(format!(
+            "Extends the long sun by {} per enlightenment tier.",
+            fmt::exact(d.long_sun_tier_cap)
+        )));
+    }
+    if d.parade_rainbows != 0.0 {
+        parts.push(vec![
+            Piece::plain(format!("Brings {} ", fmt::exact(d.parade_rainbows))),
+            resource(ResourceId::Rainbows),
+            Piece::plain(" per parade."),
+        ]);
+    }
+    if d.prism_descent != 0.0 {
+        parts.push(vec![
+            Piece::plain(format!(
+                "Adds {}% to each day's chance that ",
+                percent(d.prism_descent)
+            )),
+            resource(ResourceId::Prisms),
+            Piece::plain(" descend."),
+        ]);
+    }
+    if d.dream_drift != 0.0 {
+        parts.push(vec![
+            Piece::plain(format!("Turns {} ", per_second(d.dream_drift))),
+            resource(ResourceId::Prisms),
+            Piece::plain(" into "),
+            resource(ResourceId::Dreamcorns),
+            Piece::plain(" per second once its dreaming upgrade is bought, more slowly while any "),
+            resource(ResourceId::Dreamcorns),
+            Piece::plain(" dream."),
+        ]);
+    }
+    if d.move_carry != 0.0 {
+        parts.push(plain(format!(
+            "Carries {}% of every stock into the next meadow.",
+            percent(d.move_carry)
+        )));
+    }
+    if d.deja_vu_chance != 0.0 {
+        parts.push(plain(format!(
+            "Adds {}% to each season's chance of a déjà-vu day.",
+            percent(d.deja_vu_chance)
+        )));
+    }
+    if d.sky_event_chance != 0.0 {
+        parts.push(plain(format!(
+            "Adds {}% to each day's chance of a sky event.",
+            percent(d.sky_event_chance)
+        )));
+    }
+    if d.sky_auto_observe != 0.0 {
+        parts.push(plain(format!(
+            "Adds {}% to the chance a sky event is observed on its own.",
+            percent(d.sky_auto_observe)
         )));
     }
 

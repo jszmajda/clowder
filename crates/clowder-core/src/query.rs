@@ -153,8 +153,6 @@ const RULED_SOURCES: &[(Source, &[ResourceId])] = {
     use crate::state::{ArchId as A, DreamLoomId as L, RiteId as T, StructureId as S};
     use ResourceId as R;
     &[
-        // The bakery's outputs scale by the pep cap (tick.rs, Treat Bakery).
-        (Source::Structure(S::TreatBakery), &[R::Feathers, R::Bells]),
         // Sky events: seen by chance at a day close (tick.rs, sky events).
         (
             Source::Structure(S::StargazingLedge),
@@ -416,10 +414,11 @@ impl GameState {
         let mut found: std::collections::BTreeSet<Source> = std::collections::BTreeSet::new();
         for s in StructureId::ALL {
             let d = content::structure_def(s);
-            let converts = d
-                .converter
-                .as_ref()
-                .is_some_and(|c| c.outputs.iter().any(|(x, _)| *x == r));
+            let converts = d.converter.as_ref().is_some_and(|c| {
+                c.outputs.iter().any(|(x, _)| *x == r)
+                    || c.cap_fed
+                        .is_some_and(|fed| fed.outputs.iter().any(|(x, _)| *x == r))
+            });
             if converts || d.productions.iter().any(|(x, _)| *x == r) {
                 found.insert(Source::Structure(s));
             }

@@ -118,8 +118,6 @@ pub const MESS_HAPPINESS_POINTS: f64 = 5.0; // per level above 1, level 2 up
 
 // ---- Sky events ----
 // @spec SIM-ENG-025
-pub const SKY_EVENT_CHANCE_PER_LEDGE: f64 = 0.002; // per day close
-pub const SKY_AUTO_OBSERVE_PER_LEDGE: f64 = 0.01;
 pub const SKY_OBSERVE_CURIOSITY: f64 = 25.0; // × (1 + curiosity ratios)
 pub const SKY_OBSERVE_SKYMAPS: f64 = 1.0;
 /// How long a visible sky event stays observable: one game year from the
@@ -139,16 +137,9 @@ pub fn sunning_deck_season_factor(season: Season) -> f64 {
     }
 }
 
-/// Treat Bakery output rate: mpr = pep cap × 0.007 / 100 — storage feeding
-/// production. @spec SIM-ECO-030
-pub const BAKERY_MPR_PER_PEP_CAP: f64 = 0.007 / 100.0;
-pub const BAKERY_FEATHERS_MPR: f64 = 1.25;
-pub const BAKERY_BELLS_MPR: f64 = 0.3;
-
 // ---- Global production layer (stack layer 6) ----
 // @spec SIM-ECO-032
 pub const DYNAMO_GLOBAL_RATIO: f64 = 0.02; // per active wheel, × fuel fraction
-pub const COGWORKS_DYNAMO_BOOST: f64 = 0.15; // × owned Cogworks, on the dynamo term
 pub const STAR_BASIN_GLOBAL_RATIO: f64 = 0.05; // per active basin
 
 // ---- Porch kite ratchet ----
@@ -246,21 +237,6 @@ pub const TINKER_BATCHES_PER_TICK: f64 = 0.0017; // × (1 + speed) × effectiven
 pub const TINKER_TIER_PENALTY: f64 = 0.15; // per tier above rank + 1
 pub const TINKER_EFFECTIVENESS_FLOOR: f64 = 0.25;
 
-// ---- The Cogworks year-close auto-craft ----
-// @spec SIM-ECO-039
-pub const COGWORKS_CONVERT_PER: f64 = 0.02; // of stock, per Cogworks
-pub const COGWORKS_CONVERT_MAX: f64 = 0.5; // never more than half the pile
-pub const COGWORKS_THRESHOLD: f64 = 0.98; // of cap; below it, skipped
-
-/// The single-input raw → craft pairs the Cogworks converts, in fixed order.
-pub const COGWORKS_AUTOCRAFT: [(ResourceId, CraftId); 5] = [
-    (ResourceId::Twigs, CraftId::Wands),
-    (ResourceId::Pebbles, CraftId::Tiles),
-    (ResourceId::Buttons, CraftId::Badges),
-    (ResourceId::Dew, CraftId::Moonmilk),
-    (ResourceId::Stardust, CraftId::Cometsilk),
-];
-
 /// The (structure, resource) pairs any StructureOutputAdd effect may target;
 /// the production phase consults this list so refinement-granted outputs
 /// land without scanning every key combination.
@@ -273,17 +249,13 @@ pub const STRUCTURE_OUTPUT_ADD_TARGETS: [(StructureId, ResourceId); 3] = [
 ];
 
 // ---- Wave 4: ceremonies / mystic / colonies ----
-// @spec SIM-UNI-006
-pub const RAINBOW_ARCH_PRISM_DESCENT: f64 = 0.0002; // per day per Rainbow Arch structure
-                                                    // @spec SIM-UNI-001
+// @spec SIM-UNI-001
 pub const PARADE_UNICORN_COST: f64 = 2500.0;
-pub const PARADE_RAINBOWS_PER_ARCH: f64 = 2500.0;
 // @spec SIM-UNI-003
 pub const REFINE_INPUT: f64 = 25.0; // 25 prisms → 1 starshard, 25 starshards → 1 echo
                                     // @spec SIM-UNI-004
 pub const JAR_RAINBOW_COST: f64 = 10000.0;
 // @spec SIM-UNI-007
-pub const DREAM_DRIFT_PER_ARCH: f64 = 0.000001; // per tick per Memory Arch
 pub const DREAM_DRIFT_THROTTLE: f64 = 0.25; // while any dreamcorn already dreams
 pub const SKY_ARCH_PRISM_DRIFT: f64 = 0.00002; // per tick, the Sky Arch's steady drift
                                                // @spec SIM-UNI-005
@@ -340,6 +312,32 @@ pub const FLAVOR_DAILY_CHANCE: f64 = 0.08;
 pub struct Converter {
     pub inputs: &'static [(ResourceId, f64)],
     pub outputs: &'static [(ResourceId, f64)],
+    /// Outputs that ride a resource's cap rather than a flat rate.
+    /// @spec SIM-ECO-056
+    pub cap_fed: Option<CapFed>,
+}
+
+/// A converter's outputs fed by a cap: per active copy per tick, each output
+/// makes its multiplier × that cap × `per_cap`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CapFed {
+    pub cap: ResourceId,
+    pub per_cap: f64,
+    pub outputs: &'static [(ResourceId, f64)],
+}
+
+/// A year-close conversion of capped raws into their crafted forms.
+/// @spec SIM-ECO-054
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct YearCraft {
+    /// Share of a stock converted, per copy.
+    pub share: f64,
+    /// The most that share can reach, however many copies stand.
+    pub share_max: f64,
+    /// The fraction of its cap a stock must stand at to be converted.
+    pub threshold: f64,
+    /// The single-input (raw, recipe) pairs converted, in fixed order.
+    pub pairs: &'static [(ResourceId, CraftId)],
 }
 
 pub struct StructureDef {
@@ -353,7 +351,7 @@ pub struct StructureDef {
     /// (resource, amount per tick per copy). Structure production takes only
     /// the ☆ stack layers: base, per-source ratio, season.
     pub productions: &'static [(ResourceId, f64)],
-    /// The patch alone is seasonal.
+    /// Productions scale with the season modifier. The patch alone.
     pub seasonal: bool,
     /// The Moonlight Stage alone scales by the energy surplus ratio.
     pub surplus_scaled: bool,
@@ -371,14 +369,47 @@ pub struct StructureDef {
     pub jamboree_ratio: f64,
     /// Bonus on the jamboree arrival factor per copy (Tea Houses).
     pub jamboree_arrival: f64,
-    /// Layer-6 contribution per active copy (dynamo term is fuel-scaled and
-    /// Cogworks-amplified in the effect sum).
+    /// Layer-6 contribution per active copy (a `fuel_scaled` structure's term
+    /// is scaled and boosted in the effect sum).
     pub global_ratio: f64,
     pub converter: Option<Converter>,
     /// Mess per active copy per tick; converters scale by their throttle.
     pub mess: f64,
     pub energy_prod: f64,
     pub energy_cons: f64,
+    /// Energy used per copy squared, on top of `energy_cons` per copy.
+    /// @spec SIM-ECO-057
+    pub energy_cons_sq: f64,
+    /// Energy made breathes with the season. @spec SIM-ECO-060
+    pub energy_seasonal: bool,
+    /// Global ratio and energy made scale by the structure's fuel fraction.
+    /// @spec SIM-ECO-059
+    pub fuel_scaled: bool,
+    /// Per-copy boost on a fuel-scaled structure's global ratio. @spec SIM-ECO-055
+    pub fuel_global_boost: f64,
+    /// Cap extensions ratchet on the kite high-water. @spec SIM-ECO-058
+    pub caps_kite_ratcheted: bool,
+    /// Trade ratio each copy adds. @spec SIM-ECO-053
+    pub trade_ratio: f64,
+    /// A year-close craft of capped raws. @spec SIM-ECO-054
+    pub year_craft: Option<YearCraft>,
+    /// Rainbows each copy brings to a Parade. @spec SIM-UNI-013
+    pub parade_rainbows: f64,
+    /// Chance each copy adds to a day's prism descent. @spec SIM-UNI-014
+    pub prism_descent: f64,
+    /// Dream-drift each copy accrues per tick. @spec SIM-UNI-015
+    pub dream_drift: f64,
+    /// Share of each stock each copy carries through a Move. @spec SIM-MOVE-016
+    pub move_carry: f64,
+    /// Chance each copy adds to a season boundary's déjà-vu roll.
+    /// @spec SIM-DREAM-013
+    pub deja_vu_chance: f64,
+    /// Long Sun cap each copy adds per enlightenment tier. @spec SIM-SUN-010
+    pub long_sun_tier_cap: f64,
+    /// Chance each copy adds to a day close's sky event. @spec SIM-ENG-077
+    pub sky_event_chance: f64,
+    /// Chance each copy adds to a sky event being auto-observed. @spec SIM-ENG-078
+    pub sky_auto_observe: f64,
     pub gate: StructureGate,
     /// A cosmic outpost: its raw material output routes through the outdoor
     /// channel (the global layers at a reduced transfer). @spec SIM-SKY-004
@@ -415,6 +446,21 @@ const BLD: StructureDef = StructureDef {
     mess: 0.0,
     energy_prod: 0.0,
     energy_cons: 0.0,
+    energy_cons_sq: 0.0,
+    energy_seasonal: false,
+    fuel_scaled: false,
+    fuel_global_boost: 0.0,
+    caps_kite_ratcheted: false,
+    trade_ratio: 0.0,
+    year_craft: None,
+    parade_rainbows: 0.0,
+    prism_descent: 0.0,
+    dream_drift: 0.0,
+    move_carry: 0.0,
+    deja_vu_chance: 0.0,
+    long_sun_tier_cap: 0.0,
+    sky_event_chance: 0.0,
+    sky_auto_observe: 0.0,
     gate: StructureGate::Always,
     outdoor: false,
     outdoor_ratio: 0.0,
@@ -524,6 +570,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         converter: Some(Converter {
             inputs: &[(ResourceId::Twigs, 0.05), (ResourceId::Pebbles, 0.10)],
             outputs: &[(ResourceId::Buttons, 0.02), (ResourceId::Embers, 0.001)],
+            cap_fed: None,
         }),
         happiness_points: 2.0,
         mess: 0.1,
@@ -541,6 +588,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         converter: Some(Converter {
             inputs: &[(ResourceId::Pebbles, 0.5), (ResourceId::Dew, 0.024)],
             outputs: &[(ResourceId::Buttons, 0.15), (ResourceId::Moonstone, 0.0005)],
+            cap_fed: None,
         }),
         mess: 1.0,
         gate: StructureGate::Idea(IdeaId::CeramicArts),
@@ -567,7 +615,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             (ResourceId::Badges, 60.0),
             (ResourceId::Lattices, 4.0),
         ],
-        // All Porch caps ratchet on the kite high-water. @spec SIM-ECO-031
+        caps_kite_ratcheted: true,
         cap_bonuses: &[
             (ResourceId::Catnip, 1000.0),
             (ResourceId::Twigs, 400.0),
@@ -603,6 +651,8 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         ratio: 1.10,
         resource_ratios: &[(ResourceId::Curiosity, 0.25)],
         cap_bonuses: &[(ResourceId::Curiosity, 800.0), (ResourceId::Skymaps, 10.0)],
+        sky_event_chance: 0.002,
+        sky_auto_observe: 0.01,
         gate: StructureGate::Idea(IdeaId::SkyCharts),
         ..BLD
     },
@@ -648,7 +698,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             (ResourceId::Pebbles, 150.0),
             (ResourceId::Shinies, 8.0),
         ],
-        // Trade ratio +1.5%/bld lands with the colonies leaf.
+        trade_ratio: 0.015,
         luxury_demand: -0.04,
         gate: StructureGate::Idea(IdeaId::GiftEconomy),
         ..BLD
@@ -704,10 +754,14 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             (ResourceId::Shinies, 150.0),
             (ResourceId::Badges, 150.0),
         ],
-        // Outputs scale with the pep cap (mpr) — see the converter phase.
         converter: Some(Converter {
             inputs: &[(ResourceId::Shinies, 0.004), (ResourceId::Pep, 0.6)],
-            outputs: &[], // computed: feathers 1.25·mpr, bells 0.3·mpr
+            outputs: &[],
+            cap_fed: Some(CapFed {
+                cap: ResourceId::Pep,
+                per_cap: 0.007 / 100.0,
+                outputs: &[(ResourceId::Feathers, 1.25), (ResourceId::Bells, 0.3)],
+            }),
         }),
         gate: StructureGate::Idea(IdeaId::TreatAlchemy),
         ..BLD
@@ -743,8 +797,19 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         name: "Cogworks",
         base_costs: &[(ResourceId::Brass, 50.0), (ResourceId::Cogs, 15.0)],
         ratio: 1.25,
-        // Amplifies dynamos (COGWORKS_DYNAMO_BOOST); converts capped raws at
-        // year close (SIM-ECO-039).
+        fuel_global_boost: 0.15,
+        year_craft: Some(YearCraft {
+            share: 0.02,
+            share_max: 0.5, // never more than half the pile
+            threshold: 0.98,
+            pairs: &[
+                (ResourceId::Twigs, CraftId::Wands),
+                (ResourceId::Pebbles, CraftId::Tiles),
+                (ResourceId::Buttons, CraftId::Badges),
+                (ResourceId::Dew, CraftId::Moonmilk),
+                (ResourceId::Stardust, CraftId::Cometsilk),
+            ],
+        }),
         energy_prod: 3.0,
         mess: 0.5,
         gate: StructureGate::Idea(IdeaId::Cogwheels),
@@ -761,17 +826,20 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         converter: Some(Converter {
             inputs: &[(ResourceId::Dew, 0.05)],
             outputs: &[], // a pure fuel draw: the output is the global layer
+            cap_fed: None,
         }),
         global_ratio: DYNAMO_GLOBAL_RATIO,
-        energy_prod: 5.0, // × fuel fraction
-        mess: 5.0,        // a starved wheel spins down proportionally
+        fuel_scaled: true,
+        energy_prod: 5.0,
+        mess: 5.0, // a starved wheel spins down proportionally
         gate: StructureGate::Idea(IdeaId::Dynamos),
         ..BLD
     },
     StructureDef {
         name: "Sunning Deck",
         base_costs: &[(ResourceId::Moonstone, 60.0)],
-        energy_prod: 2.0, // winter ×0.75, summer ×1.25
+        energy_prod: 2.0,
+        energy_seasonal: true,
         gate: StructureGate::Idea(IdeaId::SolarBasking),
         ..BLD
     },
@@ -807,6 +875,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         converter: Some(Converter {
             inputs: &[(ResourceId::Moonstone, 0.004)],
             outputs: &[(ResourceId::Stardust, 0.0006)],
+            cap_fed: None,
         }),
         energy_cons: 2.0,
         gate: StructureGate::Idea(IdeaId::PrismCraft),
@@ -838,8 +907,8 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             (ResourceId::Schemes, 25.0),
         ],
         ratio: 1.25,
-        // Move carryover and déjà-vu chance land with the prestige/dreamtime
-        // leaves.
+        move_carry: 0.015,
+        deja_vu_chance: 0.01,
         energy_cons: 20.0,
         gate: StructureGate::Idea(IdeaId::MemoryWeaving),
         ..BLD
@@ -851,7 +920,8 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             (ResourceId::Curiosity, 60000.0),
         ],
         productions: &[(ResourceId::Cleverness, 0.02)],
-        energy_cons: 0.0, // special-cased: 2n + n²/2 in total at n copies
+        energy_cons: 2.0,
+        energy_cons_sq: 0.5,
         gate: StructureGate::Idea(IdeaId::YarnComputing),
         ..BLD
     },
@@ -863,15 +933,18 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         gate: StructureGate::Idea(IdeaId::UnicornLore),
         ..BLD
     },
-    // 38: Rainbow Arch — cross-leaf (mystic effects). @spec SIM-ECO-028, SIM-UNI-005
+    // 38: Rainbow Arch — cross-leaf (mystic rules). @spec SIM-ECO-028, SIM-UNI-005
     StructureDef {
         name: "Rainbow Arch",
         base_costs: &[(ResourceId::Rainbows, 5000.0), (ResourceId::Cairns, 25.0)],
         ratio: 1.15,
+        parade_rainbows: 2500.0,
+        prism_descent: 0.0002,
+        dream_drift: 0.000001,
         gate: StructureGate::Idea(IdeaId::ParadeRoutes),
         ..BLD
     },
-    // 39: Sunstone — cross-leaf (ceremonies effects). @spec SIM-ECO-028, SIM-SUN-004
+    // 39: Sunstone — cross-leaf (ceremonies rules). @spec SIM-ECO-028, SIM-SUN-004
     StructureDef {
         name: "Sunstone",
         base_costs: &[
@@ -880,6 +953,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
             (ResourceId::Echoes, 1.0),
         ],
         ratio: 1.15,
+        long_sun_tier_cap: 0.05,
         energy_cons: 1.0,
         gate: StructureGate::Idea(IdeaId::LongSunMasonry),
         ..BLD
@@ -920,7 +994,8 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
     StructureDef {
         name: "Solar Array",
         base_costs: &[(ResourceId::Skymaps, 200.0), (ResourceId::Moonstone, 100.0)],
-        energy_prod: 12.0, // winter ×0.75, summer ×1.25 (seasonal, like the Sunning Deck)
+        energy_prod: 12.0,
+        energy_seasonal: true,
         gate: StructureGate::Site(SiteId::SunnyHill),
         outdoor: true,
         ..BLD
@@ -4414,8 +4489,6 @@ pub const HEAT_DISSIPATION_PER_TICK: f64 = 0.5;
 /// Meadow-year the Distant Dawn era lights (with the loom). @spec SIM-DREAM-007
 pub const DISTANT_DAWN_YEAR: u64 = 40000;
 
-/// Per-Memory-Chest déjà-vu chance per season boundary. @spec SIM-DREAM-004
-pub const MEMORY_CHEST_DEJA_VU: f64 = 0.01;
 /// Reverie gathered on a déjà-vu day (a deterministic RNG draw in this band),
 /// raised by reverie-yield effects. @spec SIM-DREAM-004
 pub const DEJA_VU_REVERIE_BASE: f64 = 0.5;
