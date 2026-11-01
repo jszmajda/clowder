@@ -358,3 +358,64 @@ fn a_narrow_place_cuts_the_figures_and_keeps_short_whole() {
     );
     assert_eq!(roomy_at, tight_at, "the text begins at one column");
 }
+
+/// With the cursor on the row its line reverses, and a reversed line wears no
+/// state colour on its tag: the word `short` says it alone.
+/// @spec TUI-THEME-015
+#[test]
+fn on_a_reversed_row_short_takes_the_lines_colour_and_still_says_it() {
+    let short = powered(1, 3);
+    let d = draw(&short, &meadow_view(Some(RowKey::Energy)), WIDEST, TALL);
+    let rect = list_rect(&d);
+    let lines = region(&d.buffer, rect);
+    let y = lines
+        .iter()
+        .position(|l| l.contains("Energy"))
+        .expect("drawn");
+    let at = lines[y].chars().count()
+        - lines[y][lines[y].find("short").expect("the word stands")..]
+            .chars()
+            .count();
+    for x in at..at + 5 {
+        let cell = d
+            .buffer
+            .cell((rect.x + x as u16, rect.y + y as u16))
+            .unwrap();
+        assert_ne!(cell.fg, Role::Attention.color().unwrap(), "column {x}");
+        assert!(cell.modifier.contains(ratatui::style::Modifier::REVERSED));
+    }
+}
+
+/// A readout's sentence that names a store names it in its coat.
+/// @spec TUI-THEME-022
+#[test]
+fn a_mess_sentence_names_its_store_in_its_coat() {
+    use clowder_core::ResourceId;
+    use clowder_tui::theme::{coat, coat_colours};
+    let mut s = powered(1, 1);
+    s.mess = 1.0e6;
+    let d = draw(&s, &meadow_view(Some(RowKey::Mess)), WIDEST, TALL);
+    let Body::Wide { inspector, .. } = d.layout.body else {
+        panic!("fixture: the inspector pane");
+    };
+    let lines = region(&d.buffer, inspector);
+    let y = lines
+        .iter()
+        .position(|l| l.starts_with("Catnip grows"))
+        .expect("the sentence stands");
+    let colours = coat_colours(coat(ResourceId::Catnip), "Catnip".chars().count());
+    for (x, want) in colours.iter().enumerate() {
+        let got = d
+            .buffer
+            .cell((inspector.x + x as u16, inspector.y + y as u16))
+            .unwrap()
+            .fg;
+        assert_eq!(got, *want, "character {x} of {:?}", lines[y]);
+    }
+    let past = d
+        .buffer
+        .cell((inspector.x + 8, inspector.y + y as u16))
+        .unwrap()
+        .fg;
+    assert_eq!(past, Color::Reset, "the words around it wear no coat");
+}

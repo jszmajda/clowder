@@ -173,9 +173,12 @@ pub(crate) fn date_words(day: u64) -> String {
 
 /// The five glance facts in full wording, joined `·`. @spec TUI-NAV-086
 fn full_facts(state: &GameState) -> Vec<String> {
+    let day = state.day();
     vec![
         format!("Gen {}", state.generation),
-        date_words(state.day()),
+        // The season the meadow is in, which the calendar need not say, so
+        // the word and the chrome's accent never disagree. @spec TUI-THEME-008
+        format!("{:?} Day {day} Year {}", state.season(), state.year()),
         format!("{} kittens", state.kittens.len()),
         mood_word(state.mood_tier()).to_string(),
         format!("×{}", state.speed),

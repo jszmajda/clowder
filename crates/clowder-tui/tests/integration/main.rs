@@ -40,6 +40,7 @@ mod sidebar_scroll;
 mod sources_hint;
 mod store_card;
 mod terminal_lost;
+mod theme_frames;
 mod ticker_lights;
 mod transients;
 mod update;

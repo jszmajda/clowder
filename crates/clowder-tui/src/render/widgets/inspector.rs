@@ -1437,10 +1437,14 @@ fn mess_lines(state: &GameState) -> Vec<Pieces> {
         None => out.push(plain("Not enough to slow anything down.".to_string())),
         Some(_) => {
             if r.catnip < 1.0 {
-                out.push(plain(format!(
-                    "Catnip grows at {}% of its pace.",
-                    fmt::exact(r.catnip * 100.0)
-                )));
+                // @spec TUI-THEME-022
+                out.push(vec![
+                    resource(ResourceId::Catnip),
+                    Piece::plain(format!(
+                        " grows at {}% of its pace.",
+                        fmt::exact(r.catnip * 100.0)
+                    )),
+                ]);
             }
             if r.arrival < 1.0 {
                 out.push(plain(format!(

@@ -198,7 +198,7 @@ fn name_piece(row: &Row, drawn: &str, full: &str) -> Piece {
 /// worked out here — never from a price or a threshold of the shell's own.
 /// `None` is a display-only row: an empty marker slot. Glyph first: the
 /// marker is legible with every colour stripped.
-/// @spec TUI-NAV-009, TUI-NAV-053, TUI-THEME-014
+/// @spec TUI-NAV-009, TUI-NAV-053, TUI-THEME-011, TUI-THEME-014
 fn marker_for(state: &GameState, row: &Row) -> Option<(&'static str, Role)> {
     use clowder_core::{Availability, LockReason};
 
@@ -1344,9 +1344,12 @@ pub fn frame_recorded(
                 // TUI-NAV-035's count-prompt substitution belongs to the
                 // narrow-mode swap alone — "while the inspector holds the
                 // list's space" — so the persistent pane never loses its next
-                // cost or lock reason to an open prompt on the same row.
+                // cost or lock reason to an open prompt on the same row. The
+                // armed summary's copy is the swap's alone too: here the list
+                // beside it already shows the summary. @spec TUI-NAV-077
                 let pane_view = ViewState {
                     prompt: None,
+                    armed: None,
                     ..view.clone()
                 };
                 widgets::inspector::draw(f, inspector, state, &pane_view);

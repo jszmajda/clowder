@@ -22,13 +22,12 @@ pub enum Role {
     /// The terminal's own foreground. Ordinary text takes no colour at all.
     Inherited,
     /// Revealed but not actionable, owned and done, flavour, chrome rules.
-    /// @spec TUI-THEME-014
     Dim,
     /// Affordable now.
     Ready,
     /// Partially affordable.
     Partial,
-    /// Wants notice — a chip, a capped store, an armed row. @spec TUI-THEME-015
+    /// Wants notice — a chip, a capped store, an armed row.
     Attention,
     /// A moment worth remembering, and newly revealed content.
     Milestone,
@@ -83,7 +82,7 @@ pub fn truecolor_advertised() -> bool {
 /// A hue of the ring the coats are cut from. Seven, every one in the same
 /// mid-luminance band as the state colours with the chroma turned up, and no
 /// yellow: in the band a yellow is the amber of `partial`. The ring keeps a
-/// measured distance from every state colour. @spec TUI-THEME-004, TUI-THEME-018
+/// measured distance from every state colour. @spec TUI-THEME-004
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Hue {
     Poppy,

@@ -10,6 +10,9 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 
 ### Fixed
 
+- **The header's season always matches the rest of the screen.** At wide widths its word could disagree with the colours beside it.
+- **The info pane no longer repeats a confirmation.** At wide widths, a summary the list already shows was drawn a second time beside it.
+- **A store named in one more sentence wears its colours.**
 - **A long list says what's below it.** With the cursor partway down, the note saying more rows lie below no longer falls off the pane.
 - **Adventures say what they are, and which one you chose.** The list marks the adventure you've picked for the next meadow and the one under way in this one, and the info pane now tells you what each adventure asks of you and what it gives.
 - **Choosing no adventure means none.** An adventure you didn't finish no longer follows you into the next meadow unless you choose it again.

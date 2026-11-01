@@ -1550,3 +1550,27 @@ fn an_armed_rows_expansion_keeps_attention_on_what_is_drawn_and_nothing_else_tak
          view beneath a row at the list's end ({none})"
     );
 }
+
+/// Beside the list, the persistent inspector carries no copy of the summary:
+/// that copy is the narrow-mode swap's alone, the list already showing it here.
+/// @spec TUI-NAV-077
+#[test]
+fn the_persistent_pane_carries_no_copy_of_an_armings_summary() {
+    let state = meadow();
+    let view = armed_by_enter(&state, Section::Ideas, &rule_key(&state, RuleId::ALL[0]));
+    let size = tall(&state);
+    let armed = draw(&state, &view, size);
+    let plain = draw(&state, &unarmed(&view), size);
+    let Body::Wide { inspector, .. } = armed.layout.body else {
+        panic!("fixture: {size:?} lays out three columns");
+    };
+    assert_eq!(
+        region_lines(&armed.buffer, inspector),
+        region_lines(&plain.buffer, inspector),
+        "the pane reads the same armed or not"
+    );
+    assert!(
+        !expansion(&state, &view, size).is_empty(),
+        "fixture: the list shows the expansion"
+    );
+}
