@@ -127,7 +127,7 @@ arrows:
     parent: sim
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
+    audited_sha: c5a6aacb2cccb97e19ac2830ce3b93d60479fb84
     blocks: [curiosity, expeditions, kittens]
     blockedBy: [engine]
     detail: sim/economy/economy.md
@@ -178,15 +178,15 @@ arrows:
     next: "#13, #14, #15, #16: blurb truth, draw order, sourceless effect keys, unpinned constants"
     drift: null
   navigation:
-    status: OK
+    status: PARTIAL
     parent: tui
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
+    audited_sha: c5a6aacb2cccb97e19ac2830ce3b93d60479fb84
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
-    next: null
+    next: "#22: a placement helper no frame calls"
     drift: null
   persistence:
     status: OK
@@ -213,13 +213,13 @@ arrows:
   render:
     status: PARTIAL
     parent: tui
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-11-01
+    audited: 2026-11-01
+    audited_sha: c5a6aacb2cccb97e19ac2830ce3b93d60479fb84
     blocks: []
     blockedBy: [navigation, runtime, theme]
     detail: tui/render/render.md
-    next: "1 spec(s) not yet implemented"
+    next: "#18, #21: the frame budget, one untested clause"
     drift: null
   runtime:
     status: OK
@@ -233,15 +233,15 @@ arrows:
     next: null
     drift: null
   theme:
-    status: IMPLEMENTED
+    status: PARTIAL
     parent: tui
-    sampled: 2026-10-14
-    audited: null
-    audited_sha: null
+    sampled: 2026-11-01
+    audited: 2026-11-01
+    audited_sha: c5a6aacb2cccb97e19ac2830ce3b93d60479fb84
     blocks: [render]
     blockedBy: []
     detail: tui/theme/theme.md
-    next: null
+    next: "#19, #20, #21: a focused row's reversal, three undrawn colours, thin tests"
     drift: null
 
 unmapped:

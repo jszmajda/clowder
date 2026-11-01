@@ -4,7 +4,7 @@ The economy is the material world of the game: what exists, what it costs, what 
 
 ## Status
 
-**OK** — last audited 2026-11-01 (commit `7ad9e6ec6caa`). 60 of 60 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-01 (commit `c5a6aacb2ccc`). 62 of 62 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ The economy is the material world of the game: what exists, what it costs, what 
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/economy/economy-specs.md` — 60 specs, prefix `SIM-ECO`
+- `docs/intent/sim/economy/economy-specs.md` — 62 specs, prefix `SIM-ECO`
 
 ### Tests
 - `crates/clowder-core/tests/integration/economy.rs`
@@ -24,6 +24,7 @@ The economy is the material world of the game: what exists, what it costs, what 
 - `crates/clowder-core/tests/integration/frontier.rs`
 - `crates/clowder-core/tests/integration/queries_bench.rs`
 - `crates/clowder-core/tests/integration/society.rs`
+- `crates/clowder-core/tests/integration/store_descriptions.rs`
 - `crates/clowder-core/tests/integration/structure_fields.rs`
 - `crates/clowder-core/tests/integration/wonder.rs`
 - `crates/clowder-tui/tests/integration/bench.rs`
@@ -42,13 +43,13 @@ The economy is the material world of the game: what exists, what it costs, what 
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-ECO-001 – SIM-ECO-060 | 60 | 0 | 0 |
+| All | SIM-ECO-001 – SIM-ECO-062 | 62 | 0 | 0 |
 
-**Summary:** 60 of 60 active specs implemented.
+**Summary:** 62 of 62 active specs implemented.
 
 ## Key Findings
 
-Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. The structure table was read row by row against the definitions: one effect it listed had never reached the rules, and now does (SIM-ECO-053). Rule-held structure behaviour now lives in definition fields, and no rule branches on a structure's id to find a rate. SIM-ECO-024 and SIM-ECO-047 are properties of the content tables as a whole, so no code decides them and their tests are their pins.
+Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. The structure table was read row by row against the definitions: one effect it listed had never reached the rules, and now does (SIM-ECO-053). Rule-held structure behaviour now lives in definition fields, and no rule branches on a structure's id to find a rate. SIM-ECO-024 and SIM-ECO-047 are properties of the content tables as a whole, so no code decides them and their tests are their pins. Issue #2 gave every store a description (SIM-ECO-061, SIM-ECO-062), held to its limits by tests over the whole table.
 
 ## Work Required
 

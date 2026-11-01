@@ -4,7 +4,7 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 
 ## Status
 
-**PARTIAL** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 14 of 15 active specs implemented.
+**PARTIAL** — last audited 2026-11-01 (commit `c5a6aacb2ccc`). 32 of 32 active specs implemented, each cited by a test; 1 deferred.
 
 ## References
 
@@ -16,35 +16,50 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/render/render-specs.md` — 15 specs, prefix `TUI-RENDER`
+- `docs/intent/tui/render/render-specs.md` — 33 specs, prefix `TUI-RENDER`
 
 ### Tests
+- `crates/clowder-tui/tests/integration/armed_summary.rs`
+- `crates/clowder-tui/tests/integration/bench.rs`
+- `crates/clowder-tui/tests/integration/chrome.rs`
 - `crates/clowder-tui/tests/integration/composed.rs`
+- `crates/clowder-tui/tests/integration/count_prompt.rs`
 - `crates/clowder-tui/tests/integration/fmt.rs`
 - `crates/clowder-tui/tests/integration/frame.rs`
+- `crates/clowder-tui/tests/integration/inspector.rs`
+- `crates/clowder-tui/tests/integration/kitten_card.rs`
 - `crates/clowder-tui/tests/integration/layout.rs`
+- `crates/clowder-tui/tests/integration/pointer.rs`
+- `crates/clowder-tui/tests/integration/readouts.rs`
+- `crates/clowder-tui/tests/integration/resize.rs`
+- `crates/clowder-tui/tests/integration/sidebar_scroll.rs`
+- `crates/clowder-tui/tests/integration/store_card.rs`
 
 ### Code
 - `crates/clowder-tui/src/render/fmt.rs`
 - `crates/clowder-tui/src/render/layout.rs`
 - `crates/clowder-tui/src/render/mod.rs`
+- `crates/clowder-tui/src/render/pointer.rs`
+- `crates/clowder-tui/src/render/portrait.rs`
+- `crates/clowder-tui/src/render/store_art.rs`
+- `crates/clowder-tui/src/render/widgets/chrome.rs`
+- `crates/clowder-tui/src/render/widgets/inspector.rs`
+- `crates/clowder-tui/src/render/widgets/overlays.rs`
 - `crates/clowder-tui/src/runtime/mod.rs`
 
 ## Spec Coverage
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-RENDER-001 – TUI-RENDER-015 | 14 | 0 | 1 |
+| All | TUI-RENDER-001 – TUI-RENDER-033 | 32 | 1 | 0 |
 
-**Summary:** 14 of 15 active specs implemented; gaps below.
+**Summary:** 32 of 32 active specs implemented; 1 deferred.
 
 ## Key Findings
 
-Bootstrapped from existing LID docs without an audit pass. Coverage above is
-read from the spec files' own markers, which record what the project believes;
-they have not been verified against the code by this overlay.
+Audited 2026-11-01. First full audit: every spec read against its code, its tests, and the design by a reader given only the arrow artifacts, its findings then checked by hand. It found an overflow note clipped with the cursor mid-list (fixed, TUI-RENDER-011), a rate that is not a number signed as a drain (fixed, TUI-RENDER-012), ties judged two ways in the compact form (fixed and pinned, TUI-RENDER-017), specs that left out what a frame really reads (corrected, TUI-RENDER-001), an inspector minimum the dead-band undercuts (stated and tested, TUI-RENDER-008), and annotations on shapes and helpers (moved). A reader's pass is no proof: specs 002 to 007, 010, 013, 014, and 023 were read more lightly than the rest.
 
 ## Work Required
 
-### Must Fix
-1. `TUI-RENDER-012` not implemented
+- #18: the frame budget's unmet part (TUI-RENDER-015, deferred).
+- #21: the last clause of TUI-RENDER-028 is untested and may be unreachable.
