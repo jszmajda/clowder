@@ -47,10 +47,20 @@ LID keeps a single chain of intent, the *arrow*: high-level design → component
 Requirement IDs follow the design tree's path, and code and tests cite them in `// @spec` comments. `grep -rn TUI-NAV` therefore gathers the navigation component's requirements, the tests that verify them and the code that implements them.
 
 ```sh
-cargo test                              # everything
-cargo test -p clowder-core              # game rules only, no terminal needed
-python3 scripts/spec-test-coverage.py   # every implemented requirement has a test citing it
+cargo test                                              # everything
+cargo test -p clowder-core                              # game rules only, no terminal needed
+cargo test -p clowder-core --test integration <file>::  # one test file's tests
+python3 scripts/spec-test-coverage.py                   # every implemented requirement has a test citing it
 ```
+
+Each crate's integration tests build into one binary, `tests/integration/main.rs`, so its tests run in parallel and the suite links once. A new test file goes in that directory as a module.
+
+## Developing on macOS
+
+Two machine-level problems can each make every first launch of a newly built test binary stall for 30–70 seconds. Nothing fails; a full test run just takes an hour instead of minutes. `python3 scripts/launch-check.py` relinks a test binary, launches it, and reports which problem is present.
+
+- **macOS scans new executables before they run.** Exempt the app your shell runs under: in *System Settings → Privacy & Security → Developer Tools*, add it and switch it on. For a local shell that is your terminal app. For SSH sessions it is `/usr/libexec/sshd-keygen-wrapper` (press ⇧⌘G in the file picker to type the path). If the Developer Tools pane is missing, `sudo spctl developer-mode enable-terminal` makes it appear.
+- **`target/` grows until launches stall.** Cargo never deletes superseded build output, and on macOS a debug build keeps its debug information in its object files, so `target/` collects them by the hundred thousand. `cargo clean` clears it, and the workspace rebuilds from scratch in about 15 seconds. Run it after each Rust toolchain update, and whenever the check reports a stall.
 
 ## Contributing
 
