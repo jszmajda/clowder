@@ -4143,3 +4143,35 @@ fn a_stores_row_wears_its_coat_on_its_name() {
         );
     }
 }
+
+/// With rows off both ends, both notes stand, every row between them counts,
+/// and nothing is lost off the pane's foot.
+/// @spec TUI-RENDER-011
+#[test]
+fn a_cursor_mid_list_says_what_lies_above_and_what_lies_below() {
+    let state = long_meadow();
+    let selectable: Vec<Row> = meadow_rows(&state)
+        .into_iter()
+        .filter(|r| r.selectable())
+        .collect();
+    let mid = selectable[selectable.len() / 2].key.clone();
+    let view = looking_at(mid);
+    let total = clowder_tui::nav::rows::drawn_rows(&state, Section::Meadow, &view).len();
+    let lines = list_lines(&cold(&state, &view, WIDE, FLOOR_H));
+    let at = |word: &str| {
+        lines
+            .iter()
+            .position(|l| l.contains(word))
+            .unwrap_or_else(|| panic!("no {word:?} note:\n{}", lines.join("\n")))
+    };
+    let (above_at, below_at) = (at("more above"), at("more below"));
+    assert_eq!(above_at, 0, "the note above heads the list");
+    let above = first_number(&lines[above_at]).expect("a count") as usize;
+    let below = first_number(&lines[below_at]).expect("a count") as usize;
+    assert_eq!(
+        above + (below_at - above_at - 1) + below,
+        total,
+        "every row is drawn or counted:\n{}",
+        lines.join("\n")
+    );
+}

@@ -1,7 +1,7 @@
 //! Where things go. Fixed chrome around a flexible body, stated as an algebra
 //! rather than a table of sizes so the regions always sum to the terminal's
 //! height and no arithmetic drifts as the chrome changes.
-//! @spec TUI-RENDER-002, TUI-RENDER-004..008
+//! @spec TUI-RENDER-002
 
 use clowder_core::ResourceId;
 use ratatui::layout::Rect;
@@ -18,14 +18,12 @@ use crate::render::fmt;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Body {
     /// Under 80 columns or 24 rows. Nothing else is drawn — and the sim keeps
-    /// ticking regardless. @spec TUI-RENDER-004
+    /// ticking regardless.
     TooSmall(Rect),
     /// 80–99: the inspector appears only in place of the list.
-    /// @spec TUI-RENDER-005
     Narrow { sidebar: Rect, main: Rect },
     /// 100+: sidebar, list, and inspector side by side. At 120+ the list is
     /// capped and the surplus goes to the inspector.
-    /// @spec TUI-RENDER-006, TUI-RENDER-007
     Wide {
         sidebar: Rect,
         list: Rect,
@@ -39,7 +37,7 @@ pub struct Layout {
     pub header: Rect,
     pub tabs: Rect,
     /// Present only while an unread away-report banner shows; it takes its row
-    /// from the body rather than growing the frame. @spec TUI-RENDER-003
+    /// from the body rather than growing the frame.
     pub banner: Option<Rect>,
     pub body: Body,
     /// One row at the floor; more only where width allows.

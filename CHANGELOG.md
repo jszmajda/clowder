@@ -4,8 +4,13 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 
 ## [Unreleased]
 
+### New
+
+- **Stores say what they are.** With the cursor on a store, the info pane now opens with a little drawing in that store's colours and a line about what it is. In a pane too short to hold everything, these step aside so the figures stay.
+
 ### Fixed
 
+- **A long list says what's below it.** With the cursor partway down, the note saying more rows lie below no longer falls off the pane.
 - **Adventures say what they are, and which one you chose.** The list marks the adventure you've picked for the next meadow and the one under way in this one, and the info pane now tells you what each adventure asks of you and what it gives.
 - **Choosing no adventure means none.** An adventure you didn't finish no longer follows you into the next meadow unless you choose it again.
 - **Adventure goals can't finish themselves.** Goals that ask you to move on are now checked when you move, so none can complete before you've done anything.

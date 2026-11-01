@@ -505,7 +505,7 @@ pub(crate) fn count_prompt_preview_pieces(
 /// A row's stable display name — a later row's own label (TUI-NAV-089) where
 /// it has one, the content name where the row is content, or a readable label
 /// invented from the row's own fixed key otherwise.
-/// @spec TUI-RENDER-001, TUI-NAV-089
+/// @spec TUI-NAV-089
 fn row_label(state: &GameState, row: &Row) -> String {
     if let Some(label) = crate::nav::rows::later_row_label(&row.key) {
         return label.to_string();
@@ -540,7 +540,7 @@ fn row_label(state: &GameState, row: &Row) -> String {
 ///
 /// Traditions carry no name in their def (only their Elder-Wisdom price), so
 /// a Tradition row's label is invented from its id the same way a fixed row's
-/// is. @spec TUI-RENDER-001
+/// is.
 fn content_name(id: ContentId) -> String {
     match id {
         ContentId::Structure(s) => content::structure_def(s).name.to_string(),
@@ -660,18 +660,22 @@ fn window_for(total: usize, cursor: usize, capacity: usize) -> Window {
         };
     }
 
-    // One row of the pane is reserved for the overflow note, so the rows
-    // themselves get `capacity - 1`. @spec TUI-RENDER-011
+    // A row of the pane goes to each overflow note drawn, one where rows lie
+    // off only one end and two where they lie off both. @spec TUI-RENDER-011
     let usable = capacity.saturating_sub(1).max(1);
     const MARGIN: usize = 3;
 
     let max_start = total - usable;
     let start = cursor.saturating_sub(MARGIN).min(max_start);
-    let hidden = total - (start + usable);
+    let len = if start > 0 && start < max_start {
+        usable.saturating_sub(1).max(1)
+    } else {
+        usable
+    };
     Window {
         start,
-        len: usable,
-        hidden,
+        len,
+        hidden: total - (start + len),
     }
 }
 

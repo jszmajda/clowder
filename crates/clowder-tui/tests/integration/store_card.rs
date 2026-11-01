@@ -11,6 +11,8 @@ use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
+use ratatui::text::Line;
+use ratatui::widgets::{Paragraph, Wrap};
 use ratatui::Terminal;
 
 use clowder_tui::nav::{RowKey, Section, ViewState};
@@ -23,8 +25,10 @@ use clowder_tui::theme::{coat, coat_colours, Role};
 const WIDE: u16 = 100;
 /// Taller than any card.
 const TALL: u16 = 70;
-/// The inspector's narrowest width.
-const NARROWEST: u16 = 20;
+/// The inspector's narrowest width, in the cap's dead-band.
+const NARROWEST: u16 = 16;
+/// How wide the card counts a figure.
+const MEASURED: usize = 12;
 
 /// A meadow where every store is listed and structures move many of them.
 fn meadow() -> GameState {
@@ -419,4 +423,65 @@ fn a_figure_changing_its_digits_never_moves_the_picture_in_or_out() {
         wraps_differ,
         "fixture: the two stocks wrap differently somewhere"
     );
+}
+
+/// The rows the card counts at width `w` without the drawing: the card's lines
+/// read from a pane wide enough that none wraps, each figure stood in for at
+/// its measured width, then wrapped as the inspector wraps them.
+fn counted_rows(s: &GameState, r: ResourceId, w: u16) -> (usize, usize) {
+    let wide = text(&card(s, r, 300, TALL));
+    let figure = "0".repeat(MEASURED);
+    let cap = if s.cap(r).is_finite() {
+        figure.as_str()
+    } else {
+        "none"
+    };
+    let mut rest: Vec<Line<'static>> = Vec::new();
+    for l in &wide[drawn_rows(r).len() + 2..] {
+        let stood = if l.starts_with("Stock: ") {
+            format!("Stock: {figure}. Cap: {cap}. Net rate: {figure} per game second.")
+        } else {
+            match l.rsplit_once(' ') {
+                Some((name, rate)) if rate.starts_with(['+', '-']) => format!("{name} {figure}"),
+                _ => l.clone(),
+            }
+        };
+        rest.push(Line::raw(stood));
+    }
+    let rows = |lines: Vec<Line<'static>>| {
+        Paragraph::new(lines)
+            .wrap(Wrap { trim: true })
+            .line_count(w)
+    };
+    let mut bare = vec![Line::raw(wide[0].clone())];
+    bare.extend(rest);
+    let caption = rows(vec![Line::raw(caption(r))]);
+    (rows(bare), caption)
+}
+
+/// At widths where lines wrap, the card gives way exactly where its rows as
+/// wrapped, every figure counted at twelve columns, say it should.
+/// @spec TUI-RENDER-032, TUI-RENDER-033
+#[test]
+fn the_card_gives_way_by_its_rows_as_wrapped_with_every_figure_at_twelve_columns() {
+    let s = meadow();
+    for w in [NARROWEST, 20, 24, 30, 40, 60] {
+        for r in ResourceId::ALL {
+            let (bare, caption_rows) = counted_rows(&s, r, w);
+            let n = drawn_rows(r).len();
+            let with_caption = bare + caption_rows;
+            let opening = |h: usize| {
+                let lines = text(&card(&s, r, w, h as u16));
+                let rows = drawn_rows(r);
+                (
+                    lines.len() > n && lines[1..=n] == rows[..],
+                    lines.iter().any(|l| l.starts_with("\u{b7} ")),
+                )
+            };
+            assert_eq!(opening(with_caption + n), (true, true), "{r:?} at {w}");
+            assert_eq!(opening(with_caption + n - 1), (false, true), "{r:?} at {w}");
+            assert_eq!(opening(with_caption), (false, true), "{r:?} at {w}");
+            assert_eq!(opening(with_caption - 1), (false, false), "{r:?} at {w}");
+        }
+    }
 }

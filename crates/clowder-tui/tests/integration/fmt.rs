@@ -605,7 +605,7 @@ fn magnitude_sweep() -> Vec<f64> {
 /// @spec TUI-RENDER-017
 #[test]
 fn the_compact_form_reads_as_the_spec_spells_it_at_every_edge() {
-    let cases: [(f64, &str); 48] = [
+    let cases: [(f64, &str); 50] = [
         (0.0, "0"),
         (-0.0, "0"),
         (3.0, "3"),
@@ -642,6 +642,10 @@ fn the_compact_form_reads_as_the_spec_spells_it_at_every_edge() {
         (0.9994, "0.999"),
         (0.9996, "1"),
         (0.0005, "0.001"),
+        // A tie is judged on the digits the figure reads as, below one as
+        // above it, though the nearest double sits just under the tie.
+        (0.5005, "0.501"),
+        (0.5004, "0.5"),
         (0.001, "0.001"),
         // At or above the display floor, rounding to nothing in three places.
         (0.0004, "<0.001"),
@@ -965,4 +969,29 @@ fn every_sidebar_rate_is_its_sign_and_the_compact_form_of_its_size() {
             );
         }
     }
+}
+
+/// Not a number is neither above zero nor below it, so it wears no sign, in
+/// the compact form or the exact one.
+/// @spec TUI-RENDER-012
+#[test]
+fn a_rate_that_is_no_number_wears_no_sign() {
+    for text in [fmt::rate(f64::NAN), fmt::exact_rate(f64::NAN)] {
+        assert!(
+            !text.starts_with(['+', '-']),
+            "not a number read as {text:?}"
+        );
+    }
+    assert!(fmt::exact_rate(0.5).starts_with('+'));
+    assert!(fmt::exact_rate(-0.5).starts_with('-'));
+    assert_eq!(fmt::exact_rate(0.0), "0");
+}
+
+/// A value that is not finite reads as beyond reach whichever its sign, and
+/// only a finite value below zero reads `0`.
+/// @spec TUI-RENDER-017
+#[test]
+fn a_negative_infinity_reads_as_not_finite_rather_than_below_zero() {
+    assert_eq!(fmt::compact(f64::NEG_INFINITY), ">999Q");
+    assert_eq!(fmt::compact(-1.0), "0");
 }

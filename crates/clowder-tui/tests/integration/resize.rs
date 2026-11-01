@@ -517,7 +517,7 @@ fn the_inspector_call_survives_a_round_trip_through_the_pane_and_the_card() {
 /// meanwhile — the same frame a session that had never been under the card
 /// draws from that state and view.
 ///
-/// @spec TUI-NAV-029
+/// @spec TUI-NAV-029, TUI-RENDER-004
 #[test]
 fn under_the_card_the_sim_advances_and_the_frame_returns_as_the_view_describes() {
     for (w, h) in [(79u16, 24u16), (80, 23), (60, 20), (200, 10), (1, 1)] {

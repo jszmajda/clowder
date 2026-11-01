@@ -107,8 +107,18 @@ pub fn compact(value: f64) -> String {
     if abs < 1.0 {
         // Below one, there is no magnitude marker to spend width on: at most
         // three decimal places, rounded to the nearest, tie away from zero.
-        let scaled = (abs * 1000.0).round();
-        let scaled_i = scaled as i64;
+        let (digits, exp) = digits_and_exp(abs);
+        // Digit `i` stands at 10^(exp - i), so `exp + 4` of them reach the
+        // thousandths; the next one rounds them, as `round_to_digits` does.
+        let scaled_i: i64 = match usize::try_from(exp + 4) {
+            Err(_) => 0,
+            Ok(keep) => {
+                let kept = (0..keep).fold(0i64, |n, i| {
+                    n * 10 + i64::from(digits.get(i).copied().unwrap_or(0))
+                });
+                kept + i64::from(digits.get(keep).is_some_and(|d| *d >= 5))
+            }
+        };
         if scaled_i <= 0 {
             return "<0.001".to_string();
         }
@@ -197,8 +207,26 @@ pub fn rate(per_second: f64) -> String {
     }
     if per_second > 0.0 {
         format!("+{size}")
-    } else {
+    } else if per_second < 0.0 {
         format!("-{size}")
+    } else {
+        size
+    }
+}
+
+/// A rate in the exact form: its size behind `+` above zero and `-` below, with
+/// no sign where the size reads `0` or the rate is not a number, which is
+/// neither above zero nor below it. @spec TUI-RENDER-012
+pub fn exact_rate(rate: f64) -> String {
+    let size = exact(rate.abs());
+    if size == "0" {
+        size
+    } else if rate > 0.0 {
+        format!("+{size}")
+    } else if rate < 0.0 {
+        format!("-{size}")
+    } else {
+        size
     }
 }
 

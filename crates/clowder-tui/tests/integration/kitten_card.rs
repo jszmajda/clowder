@@ -668,3 +668,30 @@ fn a_swatch_wears_its_colour_and_its_name_does_not() {
         x += 2 + 1 + name.chars().count() + 2;
     }
 }
+
+/// The words stand beside the cat at exactly the width that holds the pose,
+/// the three blank columns, and the longer of the two, and beneath it one
+/// column narrower.
+/// @spec TUI-RENDER-029
+#[test]
+fn the_words_go_beneath_the_moment_the_width_cannot_hold_them_beside() {
+    let fur = fur_of(FurPattern::Tabby);
+    for pose in Pose::ALL {
+        let d = drawing(pose);
+        let s = meadow(kitten(
+            "Pip",
+            Some(profile(fur.clone(), EyeLook::Green, pose)),
+        ));
+        let widest = d.art.iter().map(|r| r.chars().count()).max().unwrap();
+        let words = fur_words(&fur);
+        let eyes = content::eye_look_def(EyeLook::Green).words;
+        let fits = (widest + 3 + words.chars().count().max(eyes.chars().count())) as u16;
+        let beside = |w: u16| {
+            let lines = text(&card(&s, w));
+            let top = row_of(&lines, d.art[0]);
+            lines[top + 1].contains(words.as_str())
+        };
+        assert!(beside(fits), "{pose:?} at exactly {fits} columns");
+        assert!(!beside(fits - 1), "{pose:?} at {} columns", fits - 1);
+    }
+}

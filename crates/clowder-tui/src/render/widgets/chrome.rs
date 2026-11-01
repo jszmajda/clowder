@@ -493,7 +493,6 @@ fn store_lines(
 
 /// Whether a sidebar `height` lines tall holds stores out of view: whether
 /// the stores the stores group lists outrun its lines at two lines each.
-/// @spec TUI-RENDER-022
 pub fn stores_out_of_view(state: &GameState, height: u16) -> bool {
     2 * listed_stores(state).len() > height as usize
 }

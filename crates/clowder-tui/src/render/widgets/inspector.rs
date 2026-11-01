@@ -967,14 +967,7 @@ fn bound_tinkerers(state: &GameState, c: clowder_core::CraftId) -> usize {
 /// where it is above zero and `-` where it is below, with no sign where it
 /// reads `0`. @spec TUI-RENDER-012
 fn signed_rate(rate: f64) -> String {
-    let size = fmt::exact(rate.abs());
-    if size == "0" {
-        size
-    } else if rate > 0.0 {
-        format!("+{size}")
-    } else {
-        format!("-{size}")
-    }
+    fmt::exact_rate(rate)
 }
 
 /// The name a stores row gives a flow's source: an item as its own row names
@@ -1583,7 +1576,6 @@ const PANE_BREAKPOINT: u16 = 100;
 /// Whether the inspector shows as a persistent pane, swaps in over the list, or
 /// is absent — a pure function of width and whether the player asked for it, so
 /// it cannot disagree with the layout after a resize.
-/// @spec TUI-NAV-017, TUI-NAV-029
 pub fn placement(width: u16, wanted: bool) -> Placement {
     if width >= PANE_BREAKPOINT {
         Placement::Pane

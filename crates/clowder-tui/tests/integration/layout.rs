@@ -888,3 +888,24 @@ fn the_previous_layout_is_the_only_state_carried_between_calls() {
         "a fresh call must not inherit a previous frame's side of the boundary"
     );
 }
+
+/// On any walk down or up the widths, the dead-band included, the inspector is
+/// never narrower than the widest thing drawn whole in it.
+/// @spec TUI-RENDER-008
+#[test]
+fn the_inspector_is_never_narrower_than_sixteen_columns_on_any_walk() {
+    let down: Vec<u16> = (FLOOR_W..=CAP_BREAKPOINT + 10).rev().collect();
+    let up: Vec<u16> = (FLOOR_W..=CAP_BREAKPOINT + 10).collect();
+    let mut narrowest = u16::MAX;
+    for walk in [down, up] {
+        let mut prev: Option<Layout> = None;
+        for w in walk {
+            let l = compute(area(w, FLOOR_H), prev.as_ref(), false);
+            if let Body::Wide { inspector, .. } = l.body {
+                narrowest = narrowest.min(inspector.width);
+            }
+            prev = Some(l);
+        }
+    }
+    assert_eq!(narrowest, 16, "the narrowest the inspector stands");
+}

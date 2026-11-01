@@ -327,3 +327,34 @@ fn the_energy_chip_shows_while_short() {
     assert!(narrow.contains("↯energy"), "kept at the floor: {narrow}");
     let _ = Color::Reset;
 }
+
+/// In a place too narrow for the whole text, the figures are cut and `short`
+/// stands whole, beginning where the figures always begin and ending the place.
+/// @spec TUI-RENDER-030
+#[test]
+fn a_narrow_place_cuts_the_figures_and_keeps_short_whole() {
+    let line = |s: &GameState| -> (String, usize) {
+        let d = draw(s, &meadow_view(None), 150, TALL);
+        let lines = region(&d.buffer, list_rect(&d));
+        let row = lines
+            .iter()
+            .find(|l| l.contains("Energy"))
+            .expect("drawn")
+            .clone();
+        let start = row.find("Energy").unwrap() + "Energy".len();
+        let begins = row[start..].find(|c: char| c != ' ').unwrap();
+        (row.trim_end().to_string(), start + begins)
+    };
+    let (roomy, roomy_at) = line(&powered(1, 3));
+    assert!(roomy.ends_with("· short"), "{roomy:?}");
+    let (tight, tight_at) = line(&powered(411, 2839));
+    assert!(
+        tight.contains('\u{2026}'),
+        "fixture: the figures are cut: {tight:?}"
+    );
+    assert!(
+        tight.ends_with(" · short"),
+        "the clause stands whole: {tight:?}"
+    );
+    assert_eq!(roomy_at, tight_at, "the text begins at one column");
+}
