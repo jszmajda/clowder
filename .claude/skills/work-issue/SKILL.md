@@ -57,7 +57,7 @@ cargo test --workspace --no-fail-fast > target/work-issue-test.log 2>&1; echo "e
 
 Then run `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets`, after the tests rather than alongside them, since they share the build lock. Add no clippy warnings to files you touched.
 
-A lone failure in a held-key test that paces itself with real sleeps is a known flake under load (`~/src/papercuts.md`). Rerun that binary alone, and note the occurrence there. Fix any other failure. If you can't, hand the issue to Jess. **Never push with a failing test.**
+A lone failure in a TUI test that waits on the real clock is a known flake under load (`~/src/papercuts.md`). Rerun that test alone, by name, and note the occurrence there. Fix any other failure. If you can't, hand the issue to Jess. **Never push with a failing test.**
 
 ## 5. Ship
 
@@ -73,4 +73,4 @@ File anything the issue doesn't cover as its own issue, in `create-issue`'s shap
 
 One structural line per issue, then set up the next firing:
 
-`#N fixed · arrows closed: a (OK), b (PARTIAL, 2 deferred) · 70/70 test binaries · pushed <short hash> · filed #M (agent-found)`
+`#N fixed · arrows closed: a (OK), b (PARTIAL, 2 deferred) · all tests green · pushed <short hash> · filed #M (agent-found)`
