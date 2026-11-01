@@ -4,7 +4,7 @@ Dreamtime is clowder's time layer, reimagined as *napping*: a well-rested clowde
 
 ## Status
 
-**OK** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 8 of 8 active specs implemented.
+**PARTIAL** — last audited 2026-11-01 (commit `7ad9e6ec6caa`). 11 of 11 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,11 +16,13 @@ Dreamtime is clowder's time layer, reimagined as *napping*: a well-rested clowde
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/dreamtime/dreamtime-specs.md` — 8 specs, prefix `SIM-DREAM`
+- `docs/intent/sim/dreamtime/dreamtime-specs.md` — 11 specs, prefix `SIM-DREAM`
 
 ### Tests
+- `crates/clowder-core/tests/integration/blurbs.rs`
 - `crates/clowder-core/tests/integration/bulktime.rs`
 - `crates/clowder-core/tests/integration/frontier.rs`
+- `crates/clowder-core/tests/integration/structure_fields.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`
@@ -36,16 +38,16 @@ Dreamtime is clowder's time layer, reimagined as *napping*: a well-rested clowde
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-DREAM-001 – SIM-DREAM-008 | 8 | 0 | 0 |
+| All | SIM-DREAM-001 – SIM-DREAM-013 | 11 | 0 | 0 |
 
-**Summary:** 8 of 8 active specs implemented.
+**Summary:** 11 of 11 active specs implemented.
 
 ## Key Findings
 
-Bootstrapped from existing LID docs without an audit pass. Coverage above is
-read from the spec files' own markers, which record what the project believes;
-they have not been verified against the code by this overlay.
+Audited 2026-11-01. First full audit, by the same route as the mystic leaf. It found a timed pause one tick short (fixed, SIM-DREAM-004) and a blurb stating a relative change for a rule that adds an absolute one (blurb corrected to the rule, which the spec and design agree with). Design and spec disagreements were reconciled, and untested clauses were tested. SIM-DREAM-005 is a negative requirement annotated at the one spend it permits.
 
 ## Work Required
 
-None recorded — every active spec is marked implemented.
+- #13: blurbs are tested for marks, not truth (SIM-DREAM-012).
+- #14: draw order (SIM-DREAM-004).
+- #16: unpinned constants (SIM-DREAM-001 through SIM-DREAM-004).

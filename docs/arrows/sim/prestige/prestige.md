@@ -4,7 +4,7 @@ Prestige in clowder is **The Great Meadow Move**: when a clowder has grown as la
 
 ## Status
 
-**OK** — last audited 2026-10-29 (git SHA `8443eda1698c`). 15 of 15 active specs implemented, each cited by a test and, save the table property noted below, annotated at its entry point.
+**OK** — last audited 2026-11-01 (commit `7ad9e6ec6caa`). 16 of 16 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ Prestige in clowder is **The Great Meadow Move**: when a clowder has grown as la
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/prestige/prestige-specs.md` — 15 specs, prefix `SIM-MOVE`
+- `docs/intent/sim/prestige/prestige-specs.md` — 16 specs, prefix `SIM-MOVE`
 
 ### Tests
 - `crates/clowder-core/tests/integration/achievements.rs`
@@ -24,6 +24,7 @@ Prestige in clowder is **The Great Meadow Move**: when a clowder has grown as la
 - `crates/clowder-core/tests/integration/frontier.rs`
 - `crates/clowder-core/tests/integration/legacy.rs`
 - `crates/clowder-core/tests/integration/profiles.rs`
+- `crates/clowder-core/tests/integration/structure_fields.rs`
 - `crates/clowder-core/tests/integration/wonder.rs`
 
 ### Code
@@ -37,13 +38,13 @@ Prestige in clowder is **The Great Meadow Move**: when a clowder has grown as la
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-MOVE-001 – SIM-MOVE-015 | 15 | 0 | 0 |
+| All | SIM-MOVE-001 – SIM-MOVE-016 | 16 | 0 | 0 |
 
-**Summary:** 15 of 15 active specs implemented.
+**Summary:** 16 of 16 active specs implemented.
 
 ## Key Findings
 
-Audited 2026-10-29 against the source: every spec marked implemented has a test citing it, no `@spec` in the code or tests names a spec that does not exist, and no spec ID is defined twice. SIM-MOVE-014 is a property of the content tables as a whole, so no code decides it, and its tests are its pins.
+Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. SIM-MOVE-014 is a property of the content tables as a whole, so no code decides it, and its tests are its pins.
 
 ## Work Required
 

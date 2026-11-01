@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-10-29 (git SHA `8443eda1698c`). 180 of 180 active specs implemented, each cited by a test and annotated at its entry point.
+**OK** — last audited 2026-11-01 (commit `7ad9e6ec6caa`). 196 of 196 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/navigation/navigation-specs.md` — 180 specs, prefix `TUI-NAV`
+- `docs/intent/tui/navigation/navigation-specs.md` — 196 specs, prefix `TUI-NAV`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/achievements.rs`
@@ -75,13 +75,13 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-NAV-001 – TUI-NAV-180 | 180 | 0 | 0 |
+| All | TUI-NAV-001 – TUI-NAV-196 | 196 | 0 | 0 |
 
-**Summary:** 180 of 180 active specs implemented.
+**Summary:** 196 of 196 active specs implemented.
 
 ## Key Findings
 
-Audited 2026-10-29 against the source: every spec marked implemented has a test citing it, no `@spec` in the code or tests names a spec that does not exist, and no spec ID is defined twice.
+Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Issue #4 added the statements of rule-held structure behaviour; each is held word for word to its definition field by a test quantified over every structure.
 
 ## Work Required
 

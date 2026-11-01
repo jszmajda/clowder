@@ -1,5 +1,5 @@
 schema_version: 2
-last_updated: 2026-10-29
+last_updated: 2026-11-01
 
 # Grouped by the two crates the HLD's architecture splits on: the headless
 # simulation and the terminal shell. Persistence sits with the sim crate it
@@ -68,15 +68,15 @@ arrows:
     next: null
     drift: null
   ceremonies:
-    status: OK
+    status: PARTIAL
     parent: sim
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-11-01
+    audited: 2026-11-01
+    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/ceremonies/ceremonies.md
-    next: null
+    next: "#13, #17: blurb truth, a citation from the cosmic side"
     drift: null
   colonies:
     status: OK
@@ -112,22 +112,22 @@ arrows:
     next: null
     drift: null
   dreamtime:
-    status: OK
+    status: PARTIAL
     parent: sim
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-11-01
+    audited: 2026-11-01
+    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
     blocks: []
     blockedBy: [adventures, prestige]
     detail: sim/dreamtime/dreamtime.md
-    next: null
+    next: "#13, #14, #16: blurb truth, draw order, unpinned constants"
     drift: null
   economy:
     status: OK
     parent: sim
-    sampled: 2026-10-29
-    audited: 2026-10-29
-    audited_sha: 8443eda1698c8df48efd2557f47f3f18455dcf5f
+    sampled: 2026-11-01
+    audited: 2026-11-01
+    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
     blocks: [curiosity, expeditions, kittens]
     blockedBy: [engine]
     detail: sim/economy/economy.md
@@ -136,9 +136,9 @@ arrows:
   engine:
     status: OK
     parent: sim
-    sampled: 2026-10-29
-    audited: 2026-10-29
-    audited_sha: 8443eda1698c8df48efd2557f47f3f18455dcf5f
+    sampled: 2026-11-01
+    audited: 2026-11-01
+    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
     blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md
@@ -167,22 +167,22 @@ arrows:
     next: null
     drift: null
   mystic:
-    status: OK
+    status: PARTIAL
     parent: sim
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-11-01
+    audited: 2026-11-01
+    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/mystic/mystic.md
-    next: null
+    next: "#13, #14, #15, #16: blurb truth, draw order, sourceless effect keys, unpinned constants"
     drift: null
   navigation:
     status: OK
     parent: tui
-    sampled: 2026-10-29
-    audited: 2026-10-29
-    audited_sha: 8443eda1698c8df48efd2557f47f3f18455dcf5f
+    sampled: 2026-11-01
+    audited: 2026-11-01
+    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
@@ -202,9 +202,9 @@ arrows:
   prestige:
     status: OK
     parent: sim
-    sampled: 2026-10-29
-    audited: 2026-10-29
-    audited_sha: 8443eda1698c8df48efd2557f47f3f18455dcf5f
+    sampled: 2026-11-01
+    audited: 2026-11-01
+    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
     blocks: [cosmic, dreamtime]
     blockedBy: [ceremonies, colonies, mystic]
     detail: sim/prestige/prestige.md

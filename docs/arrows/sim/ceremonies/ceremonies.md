@@ -4,7 +4,7 @@ Ceremonies are clowder's faith system, reimagined as warmth and devotion rather 
 
 ## Status
 
-**OK** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 8 of 8 active specs implemented.
+**PARTIAL** — last audited 2026-11-01 (commit `7ad9e6ec6caa`). 10 of 10 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,10 +16,12 @@ Ceremonies are clowder's faith system, reimagined as warmth and devotion rather 
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/ceremonies/ceremonies-specs.md` — 8 specs, prefix `SIM-SUN`
+- `docs/intent/sim/ceremonies/ceremonies-specs.md` — 10 specs, prefix `SIM-SUN`
 
 ### Tests
+- `crates/clowder-core/tests/integration/blurbs.rs`
 - `crates/clowder-core/tests/integration/legacy.rs`
+- `crates/clowder-core/tests/integration/structure_fields.rs`
 - `crates/clowder-core/tests/integration/wonder.rs`
 
 ### Code
@@ -33,16 +35,15 @@ Ceremonies are clowder's faith system, reimagined as warmth and devotion rather 
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-SUN-001 – SIM-SUN-008 | 8 | 0 | 0 |
+| All | SIM-SUN-001 – SIM-SUN-010 | 10 | 0 | 0 |
 
-**Summary:** 8 of 8 active specs implemented.
+**Summary:** 10 of 10 active specs implemented.
 
 ## Key Findings
 
-Bootstrapped from existing LID docs without an audit pass. Coverage above is
-read from the spec files' own markers, which record what the project believes;
-they have not been verified against the code by this overlay.
+Audited 2026-11-01. First full audit, by the same route as the mystic leaf. It found a shortfall naming an unrelated resource (fixed, SIM-SUN-008), an absolute claim its sibling spec contradicted (corrected, SIM-SUN-003), a formula missing a term and a factor (corrected, SIM-SUN-004), and clauses no test exercised (tested).
 
 ## Work Required
 
-None recorded — every active spec is marked implemented.
+- #13: blurbs are tested for marks, not truth (SIM-SUN-009).
+- #17: an effect cited from the cosmic side (SIM-SUN-004).
