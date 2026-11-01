@@ -449,6 +449,7 @@ fn store_lines(
     r: ResourceId,
     name_col: usize,
     width: usize,
+    mark: char,
 ) -> [Line<'static>; 2] {
     let stock = state.stock(r);
     let cap = state.cap(r);
@@ -460,14 +461,15 @@ fn store_lines(
         " ".repeat(7)
     };
     // The name wears its coat — a cut name keeping each character's colour by
-    // its position in the whole — and the figures beside it wear none.
-    // @spec TUI-THEME-019, TUI-THEME-021
+    // its position in the whole — and the figures beside it wear none. The
+    // link mark, or a blank, takes the column left of the stock's field.
+    // @spec TUI-THEME-019, TUI-THEME-021, TUI-RENDER-034
     let pad = name_col.saturating_sub(name.chars().count());
     let first = crate::render::line_from_pieces(
         &[
             crate::render::Piece::name(r, name, label.chars().count()),
             crate::render::Piece::plain(format!(
-                "{} {:>6}{cap_part}",
+                "{}{mark}{:>6}{cap_part}",
                 " ".repeat(pad),
                 fmt::compact(stock)
             )),
@@ -492,6 +494,32 @@ fn store_lines(
         spans.push(Span::raw(" ".repeat(width - drawn_len)));
     }
     [first, Line::from(spans)]
+}
+
+/// The glyph saying what the row under the cursor does to a store.
+/// @spec TUI-NAV-198
+fn link_mark(link: clowder_core::StoreLink) -> char {
+    match link {
+        clowder_core::StoreLink::Raises => '\u{25b5}',
+        clowder_core::StoreLink::Lowers => '\u{25bf}',
+        clowder_core::StoreLink::Both => '\u{25ca}',
+    }
+}
+
+/// What the row under the cursor does to the stores, as the core reports it for
+/// the row's command: the row the list highlights, a count row by its
+/// increment. Nothing where the row has no command.
+/// @spec TUI-NAV-198, TUI-NAV-199
+fn row_links(state: &GameState, view: &ViewState) -> Vec<(ResourceId, clowder_core::StoreLink)> {
+    let section = view.section.unwrap_or(Section::Meadow);
+    let all = crate::nav::rows::drawn_rows(state, section, view);
+    let row = crate::nav::rows::cursor_index(&all, view.focus[section.index()].as_ref())
+        .and_then(|cursor| all.get(cursor));
+    match row.map(|r| &r.kind) {
+        Some(RowKind::Act { command, .. }) => state.store_links(command),
+        Some(RowKind::Count { increment, .. }) => state.store_links(increment),
+        _ => Vec::new(),
+    }
 }
 
 /// Whether a sidebar `height` lines tall holds stores out of view: whether
@@ -576,8 +604,13 @@ pub fn sidebar(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) -
     if start > 0 {
         lines.push(sidebar_note('▴', start, full_in(0..start), width));
     }
+    let links = row_links(state, view);
     for r in &listed[start..start + drawn] {
-        lines.extend(store_lines(state, *r, name_col, width));
+        let mark = links
+            .iter()
+            .find(|(x, _)| x == r)
+            .map_or(' ', |(_, link)| link_mark(*link));
+        lines.extend(store_lines(state, *r, name_col, width, mark));
     }
     let below = k - start - drawn;
     if below > 0 {

@@ -28,6 +28,7 @@ mod revealed_resources;
 mod society;
 mod sources;
 mod store_descriptions;
+mod store_links;
 mod structure_fields;
 mod trade_returns;
 mod unit_price;

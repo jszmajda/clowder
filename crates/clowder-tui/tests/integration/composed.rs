@@ -1150,7 +1150,7 @@ fn the_help_overlay_packs_the_legend_before_the_key_map() {
         overlay: Some(Overlay::Help),
         ..looking_at(&state, near_row())
     };
-    let d = cold(&state, &view, 100, 31);
+    let d = cold(&state, &view, 100, 32);
     let lines = region_lines(&d.buffer, d.buffer.area);
     let line_of = |needle: &str| lines.iter().find(|l| l.contains(needle)).unwrap();
     for needle in &HELP_ENTRIES[..KEY_ENTRY_COUNT] {
@@ -1161,7 +1161,7 @@ fn the_help_overlay_packs_the_legend_before_the_key_map() {
             .count();
         assert_eq!(
             others, 0,
-            "at 100x31 the key map is packed although the legend alone would fit: {line:?}"
+            "at 100x32 the key map is packed although the legend alone would fit: {line:?}"
         );
     }
     let packed = HELP_ENTRIES[KEY_ENTRY_COUNT + SCREEN_ENTRIES.len()..]
@@ -1175,7 +1175,7 @@ fn the_help_overlay_packs_the_legend_before_the_key_map() {
         });
     assert!(
         packed,
-        "at 100x31 the legend should be packed for the overlay to fit:\n{}",
+        "at 100x32 the legend should be packed for the overlay to fit:\n{}",
         lines.join("\n")
     );
 }
@@ -1234,6 +1234,7 @@ const HELP_ENTRIES: &[&str] = &[
     "the Elder",
     "unread offline report",
     "open sky-event window",
+    "row raises, lowers, both",
 ];
 
 /// An open palette is the palette widget's drawing, and the chrome keeps

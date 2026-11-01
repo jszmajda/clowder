@@ -783,7 +783,7 @@ pub fn help(f: &mut Frame, area: Rect) {
         ("Ideas", "d show or fold done"),
     ];
     // Every glyph the screen draws, the Elder's mark and a clock light's
-    // included. @spec TUI-NAV-025, TUI-NAV-109, TUI-NAV-154
+    // included. @spec TUI-NAV-025, TUI-NAV-109, TUI-NAV-154, TUI-NAV-200
     const LEGEND: &[(&str, &str)] = &[
         ("\u{25cf}", "affordable now"),
         ("\u{25d0}", "partially affordable"),
@@ -797,7 +797,8 @@ pub fn help(f: &mut Frame, area: Rect) {
         ("\u{25c6}", "the Elder"),
         ("~", "unread offline report"),
         ("!", "open sky-event window"),
-        ("\u{25c7}", "running on a clock, with its time left"),
+        ("\u{25c7}", "running on a clock"),
+        ("\u{25b5} \u{25bf} \u{25ca}", "row raises, lowers, both"),
     ];
 
     let width = area.width as usize;

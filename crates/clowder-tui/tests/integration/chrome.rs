@@ -409,7 +409,12 @@ fn sidebar_lines(state: &GameState, w: u16, h: u16) -> Vec<String> {
         chrome::sidebar(f, side, state, &ViewState::default());
     })
     .expect("TestBackend is infallible");
+    // The column a store's link mark stands in reads as blank here: the marks
+    // have tests of their own (sidebar_links), and these are about the fields.
     region_lines(term.backend().buffer(), side)
+        .into_iter()
+        .map(|l| l.replace(['\u{25b5}', '\u{25bf}', '\u{25ca}'], " "))
+        .collect()
 }
 
 fn blank(lines: &[String]) -> bool {
@@ -5154,7 +5159,9 @@ fn on_a_new_game_the_meadow_is_the_only_section_with_a_tab() {
 
 /// Every glyph the interface uses to carry a meaning. If the legend does not
 /// explain one, the player has a symbol on screen with nowhere to look it up.
-const LEGEND_GLYPHS: [char; 11] = ['●', '◐', '○', '✓', '▸', '★', '◦', '~', '!', '◆', '◇'];
+const LEGEND_GLYPHS: [char; 14] = [
+    '●', '◐', '○', '✓', '▸', '★', '◦', '~', '!', '◆', '◇', '▵', '▿', '◊',
+];
 
 /// The keys whose spelling is not in question: a word, or a single character
 /// that is itself the key.
@@ -5658,7 +5665,13 @@ fn sidebar_in(state: &GameState, w: u16, h: u16) -> (Vec<String>, Buffer) {
     })
     .expect("TestBackend is infallible");
     let buf = term.backend().buffer().clone();
-    (region_lines(&buf, Rect::new(0, 0, w, h)), buf)
+    // The column a store's link mark stands in reads as blank here: the marks
+    // have tests of their own (sidebar_links), and these are about the fields.
+    let lines = region_lines(&buf, Rect::new(0, 0, w, h))
+        .into_iter()
+        .map(|l| l.replace(['\u{25b5}', '\u{25bf}', '\u{25ca}'], " "))
+        .collect();
+    (lines, buf)
 }
 
 /// A store's two lines exactly as TUI-RENDER-019 lays them out in a sidebar

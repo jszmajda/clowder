@@ -36,6 +36,7 @@ mod resize;
 mod rows;
 mod section_reveal;
 mod session;
+mod sidebar_links;
 mod sidebar_scroll;
 mod sources_hint;
 mod store_card;

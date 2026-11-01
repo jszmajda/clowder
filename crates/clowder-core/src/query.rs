@@ -110,6 +110,17 @@ pub enum Act {
     CondenseJar,
 }
 
+/// What a command does to one store.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StoreLink {
+    /// The store ends up with more, or with room for more.
+    Raises,
+    /// The store ends up with less.
+    Lowers,
+    /// Both of those.
+    Both,
+}
+
 /// What the player would take or meet for a store to rise. The variant
 /// order, and each id's order within its variant, is the order a resource's
 /// sources are listed in, so the derived `Ord` is load-bearing.
@@ -191,6 +202,8 @@ const RULED_SOURCES: &[(Source, &[ResourceId])] = {
         (Source::Rite(T::GrandBasking), &[R::Charm]),
         // The loom that brings déjà-vu days (effects.rs, loom_effect).
         (Source::Loom(L::DreamCatcher), &[R::Reverie]),
+        // The loom whose reverie lands with a nap (command.rs, deep_nap).
+        (Source::Loom(L::LucidNap), &[R::Reverie]),
     ]
 };
 
@@ -282,6 +295,67 @@ pub struct Bench {
     /// Every kitten at home holding the Tinkerer job and no binding, by
     /// roster position in roster order: the kittens a bind can take.
     pub waiting: Vec<usize>,
+}
+
+/// Every source there is: each structure, job, recipe, colony, and refinement,
+/// and whatever else the rules decide raises a store.
+fn all_sources() -> Vec<Source> {
+    use crate::state::{ColonyId, RefinementId};
+    let mut all: Vec<Source> = Vec::new();
+    all.extend(StructureId::ALL.map(Source::Structure));
+    all.extend(JobId::ALL.map(Source::Job));
+    all.extend(CraftId::ALL.map(Source::Craft));
+    all.extend(ColonyId::ALL.map(Source::Colony));
+    all.extend(RefinementId::ALL.map(Source::Refinement));
+    all.extend(RULED_SOURCES.iter().map(|(src, _)| *src));
+    all
+}
+
+/// What a source can raise: the definitions' own outputs, a structure's
+/// productions and converter outputs, a job's yield, a recipe's output, a
+/// colony's goods, a refinement's granted outputs, and what `RULED_SOURCES`
+/// restates from the rules. Fixed by the content. @spec SIM-ENG-074
+fn source_goods(src: Source) -> Vec<ResourceId> {
+    use crate::content;
+    use crate::effects::Effect;
+    let mut goods: Vec<ResourceId> = match src {
+        Source::Structure(s) => {
+            let d = content::structure_def(s);
+            let mut out: Vec<ResourceId> = d.productions.iter().map(|(r, _)| *r).collect();
+            if let Some(c) = &d.converter {
+                out.extend(c.outputs.iter().map(|(r, _)| *r));
+                if let Some(fed) = c.cap_fed {
+                    out.extend(fed.outputs.iter().map(|(r, _)| *r));
+                }
+            }
+            out
+        }
+        Source::Job(j) => content::job_def(j)
+            .yield_per_tick
+            .iter()
+            .map(|(r, _)| *r)
+            .collect(),
+        Source::Craft(c) => vec![content::craft_output(c)],
+        Source::Colony(c) => content::colony_goods(c)
+            .into_iter()
+            .map(|(r, _)| r)
+            .collect(),
+        Source::Refinement(f) => content::refinement_def(f)
+            .effects
+            .iter()
+            .filter_map(|(e, _)| match e {
+                Effect::StructureOutputAdd(_, r) => Some(*r),
+                _ => None,
+            })
+            .collect(),
+        Source::Act(_) | Source::Arch(_) | Source::Rite(_) | Source::Loom(_) => Vec::new(),
+    };
+    for (ruled, ruled_goods) in RULED_SOURCES {
+        if *ruled == src {
+            goods.extend_from_slice(ruled_goods);
+        }
+    }
+    goods
 }
 
 impl GameState {
@@ -409,54 +483,179 @@ impl GameState {
     /// `RULED_SOURCES` restates the ones the rules decide. Fixed by the
     /// content: the state decides only what is known. @spec SIM-ENG-074
     pub fn sources_of(&self, r: ResourceId) -> Vec<(Source, bool)> {
-        use crate::content;
-        use crate::state::{ColonyId, RefinementId};
-        let mut found: std::collections::BTreeSet<Source> = std::collections::BTreeSet::new();
-        for s in StructureId::ALL {
-            let d = content::structure_def(s);
-            let converts = d.converter.as_ref().is_some_and(|c| {
-                c.outputs.iter().any(|(x, _)| *x == r)
-                    || c.cap_fed
-                        .is_some_and(|fed| fed.outputs.iter().any(|(x, _)| *x == r))
-            });
-            if converts || d.productions.iter().any(|(x, _)| *x == r) {
-                found.insert(Source::Structure(s));
-            }
-        }
-        for j in JobId::ALL {
-            if content::job_def(j)
-                .yield_per_tick
-                .is_some_and(|(x, _)| x == r)
-            {
-                found.insert(Source::Job(j));
-            }
-        }
-        for c in CraftId::ALL {
-            if content::craft_output(c) == r {
-                found.insert(Source::Craft(c));
-            }
-        }
-        for c in ColonyId::ALL {
-            if content::colony_goods(c).iter().any(|(x, _)| *x == r) {
-                found.insert(Source::Colony(c));
-            }
-        }
-        for f in RefinementId::ALL {
-            let grants = content::refinement_def(f).effects.iter().any(
-                |(e, _)| matches!(e, crate::effects::Effect::StructureOutputAdd(_, x) if *x == r),
-            );
-            if grants {
-                found.insert(Source::Refinement(f));
-            }
-        }
-        for (src, goods) in RULED_SOURCES {
-            if goods.contains(&r) {
-                found.insert(*src);
-            }
-        }
-        found
+        all_sources()
+            .into_iter()
+            .filter(|src| source_goods(*src).contains(&r))
+            .collect::<std::collections::BTreeSet<Source>>()
             .into_iter()
             .map(|src| (src, self.knows(src, r)))
+            .collect()
+    }
+
+    /// What a command does to the stores: each resource it raises, lowers, or
+    /// both, in the core's resource order. A store is lowered by the next
+    /// price, unless the item is the player's already, and by what the item
+    /// draws down while it stands; raised by the goods of the source the item
+    /// is, where the player knows that source for that good, and by what the
+    /// item grows by name. @spec SIM-ENG-079, SIM-ENG-080, SIM-ENG-081
+    pub fn store_links(&self, cmd: &crate::command::Command) -> Vec<(ResourceId, StoreLink)> {
+        use crate::command::Command as C;
+        use crate::content;
+        use crate::effects::{store_effects, EffectItem};
+        use crate::state::ContentId as Id;
+
+        let mut lowers: Vec<ResourceId> = crate::state::GameState::fixed_act_spends(cmd).to_vec();
+        let mut raises: Vec<ResourceId> = Vec::new();
+        let mut priced: Option<Id> = None;
+        let mut source: Option<Source> = None;
+        let mut effects: Option<EffectItem> = None;
+        match *cmd {
+            C::Build(s) => {
+                priced = Some(Id::Structure(s));
+                source = Some(Source::Structure(s));
+                let d = content::structure_def(s);
+                raises.extend(d.cap_bonuses.iter().map(|(r, _)| *r));
+                for (r, ratio) in d.resource_ratios {
+                    if *ratio > 0.0 {
+                        raises.push(*r);
+                    } else if *ratio < 0.0 {
+                        lowers.push(*r);
+                    }
+                }
+                if let Some(c) = &d.converter {
+                    lowers.extend(c.inputs.iter().map(|(r, _)| *r));
+                }
+                if let Some(y) = &d.year_craft {
+                    for (raw, craft) in y.pairs {
+                        if self.craft_unlocked(*craft) {
+                            lowers.push(*raw);
+                            raises.push(content::craft_output(*craft));
+                        }
+                    }
+                }
+                if d.parade_rainbows > 0.0 {
+                    raises.push(ResourceId::Rainbows);
+                }
+                if d.prism_descent > 0.0 {
+                    raises.push(ResourceId::Prisms);
+                }
+                if d.deja_vu_chance > 0.0 {
+                    raises.push(ResourceId::Reverie);
+                }
+                if d.dream_drift > 0.0 {
+                    lowers.push(ResourceId::Prisms);
+                    raises.push(ResourceId::Dreamcorns);
+                }
+            }
+            C::AssignJob(j) => source = Some(Source::Job(j)),
+            C::Craft(c) => {
+                priced = Some(Id::Craft(c));
+                source = Some(Source::Craft(c));
+            }
+            C::AssignTinkerer(c) => {
+                source = Some(Source::Craft(c));
+                lowers.extend(content::craft_def(c).inputs.iter().map(|(r, _)| *r));
+            }
+            C::ResearchIdea(i) => priced = Some(Id::Idea(i)),
+            C::BuyRefinement(f) => {
+                priced = Some(Id::Refinement(f));
+                source = Some(Source::Refinement(f));
+                effects = Some(EffectItem::Refinement(f));
+            }
+            C::AdoptRule(r) => {
+                priced = Some(Id::Rule(r));
+                effects = Some(EffectItem::Rule(r));
+            }
+            C::BuyRite(t) => {
+                priced = Some(Id::Rite(t));
+                source = Some(Source::Rite(t));
+                effects = Some(EffectItem::Rite(t));
+            }
+            C::BuyArch(a) => {
+                priced = Some(Id::Arch(a));
+                source = Some(Source::Arch(a));
+                effects = Some(EffectItem::Arch(a));
+            }
+            C::BuyDreamLoom(l) => {
+                priced = Some(Id::DreamLoom(l));
+                source = Some(Source::Loom(l));
+                effects = Some(EffectItem::Loom(l));
+            }
+            C::BuyTradition(t) => {
+                priced = Some(Id::Tradition(t));
+                effects = Some(EffectItem::Tradition(t));
+            }
+            C::Pounce(_) => {
+                // Under this adventure the squads come home with nothing.
+                if self.active_adventure != Some(crate::state::AdventureId::GentlePaws) {
+                    source = Some(Source::Act(Act::Pounce));
+                }
+                lowers.extend(
+                    self.unit_price(cmd)
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|(r, _)| *r),
+                );
+            }
+            C::Trade(c, _) => {
+                source = Some(Source::Colony(c));
+                lowers.extend(
+                    self.unit_price(cmd)
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|(r, _)| *r),
+                );
+            }
+            C::LaunchExpedition(site) => {
+                lowers.extend(content::site_def(site).mission_fuel.iter().map(|(r, _)| *r));
+            }
+            C::DeepNap(_) => {
+                if self
+                    .dream_looms
+                    .contains(&crate::state::DreamLoomId::LucidNap)
+                {
+                    raises.push(ResourceId::Reverie);
+                }
+            }
+            C::GatherCatnip => source = Some(Source::Act(Act::GatherCatnip)),
+            C::Forage => source = Some(Source::Act(Act::Forage)),
+            C::Rummage => source = Some(Source::Act(Act::Rummage)),
+            C::ObserveSky => source = Some(Source::Act(Act::ObserveSky)),
+            C::HoldParade => source = Some(Source::Act(Act::HoldParade)),
+            C::RefineStarshard => source = Some(Source::Act(Act::RefineStarshard)),
+            C::RefineEcho => source = Some(Source::Act(Act::RefineEcho)),
+            C::CondenseJar => source = Some(Source::Act(Act::CondenseJar)),
+            _ => {}
+        }
+        if let Some(id) = priced {
+            if self.lock_reason(id) != Some(LockReason::AlreadyYours) {
+                lowers.extend(self.cost_of_next(id, 1).iter().map(|(r, _)| *r));
+            }
+        }
+        if let Some(src) = source {
+            raises.extend(
+                source_goods(src)
+                    .into_iter()
+                    .filter(|r| self.knows(src, *r)),
+            );
+        }
+        if let Some(item) = effects {
+            for (r, size) in store_effects(item) {
+                if size > 0.0 {
+                    raises.push(r);
+                } else {
+                    lowers.push(r);
+                }
+            }
+        }
+        ResourceId::ALL
+            .into_iter()
+            .filter_map(|r| match (raises.contains(&r), lowers.contains(&r)) {
+                (true, true) => Some((r, StoreLink::Both)),
+                (true, false) => Some((r, StoreLink::Raises)),
+                (false, true) => Some((r, StoreLink::Lowers)),
+                (false, false) => None,
+            })
             .collect()
     }
 

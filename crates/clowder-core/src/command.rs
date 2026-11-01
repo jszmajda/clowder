@@ -192,6 +192,30 @@ impl GameState {
         }
     }
 
+    /// What a fixed act spends, by name: an act with no definition holds its
+    /// spends here, beside the rules below, for the store-links query. A test
+    /// holds each to what its rule really moves. @spec SIM-ENG-080, SIM-ENG-082
+    pub(crate) fn fixed_act_spends(cmd: &Command) -> &'static [ResourceId] {
+        use ResourceId as R;
+        match *cmd {
+            Command::Forage => &[R::Catnip],
+            Command::HostJamboree => &[R::Pep, R::Charm, R::Quills],
+            Command::Promote(_) => &[R::Shinies],
+            Command::Bask => &[R::Warmth],
+            Command::HoldParade => &[R::Unicorns],
+            Command::RefineStarshard => &[R::Prisms],
+            Command::RefineEcho => &[R::Starshards],
+            Command::CondenseJar => &[R::Rainbows],
+            Command::MakePromise => &[R::Echoes],
+            Command::SendPenPal(_) => &[R::Charm],
+            Command::ScoutPicnic => &[R::Pep],
+            Command::SummonStarWhale => &[R::Curiosity, R::Echoes],
+            Command::FeedWhale => &[R::Dreamcorns],
+            Command::DeepNap(_) => &[R::Starshards],
+            _ => &[],
+        }
+    }
+
     /// The command dispatch itself, kept apart from journaling so a rejected
     /// command (an `Err` here) never reaches `apply`'s recording step.
     // @spec SIM-ENG-005

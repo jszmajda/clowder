@@ -392,6 +392,92 @@ impl GameState {
     }
 }
 
+/// An item whose effects can name a store, for reading what one copy of it
+/// does apart from what the meadow holds.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum EffectItem {
+    Refinement(crate::state::RefinementId),
+    Rule(crate::state::RuleId),
+    Rite(RiteId),
+    Arch(ArchId),
+    Loom(crate::state::DreamLoomId),
+    Tradition(TraditionId),
+}
+
+/// Every effect key that says which store it grows: a store's production or
+/// cap by name, or through the one job, structure, or recipe the key names. A
+/// key across every store at once names none, since marking them all says
+/// nothing. @spec SIM-ENG-081
+fn store_keys() -> Vec<(Effect, ResourceId)> {
+    let mut keys = vec![
+        (Effect::UnicornsRatio, ResourceId::Unicorns),
+        (Effect::StarshardRefine, ResourceId::Starshards),
+        (Effect::ReverieYield, ResourceId::Reverie),
+    ];
+    for r in ResourceId::ALL {
+        keys.push((Effect::ResourceRatio(r), r));
+        keys.push((Effect::MaxCap(r), r));
+        keys.push((Effect::MaxCapRatio(r), r));
+        for season in crate::state::Season::ALL {
+            keys.push((Effect::SeasonResourceRatio(season, r), r));
+        }
+    }
+    for j in JobId::ALL {
+        if let Some((r, _)) = content::job_def(j).yield_per_tick {
+            keys.push((Effect::JobRatio(j), r));
+        }
+    }
+    for c in CraftId::ALL {
+        keys.push((Effect::CraftRatioFor(c), content::craft_output(c)));
+    }
+    for s in StructureId::ALL {
+        let d = content::structure_def(s);
+        for (r, _) in d.productions {
+            keys.push((Effect::StructureRatio(s), *r));
+        }
+        if let Some(c) = &d.converter {
+            for (r, _) in c.outputs {
+                keys.push((Effect::StructureRatio(s), *r));
+            }
+        }
+    }
+    keys
+}
+
+/// Each resource whose production or cap the item's effects name, with the
+/// signed size of what one copy does. @spec SIM-ENG-081
+pub(crate) fn store_effects(item: EffectItem) -> Vec<(ResourceId, f64)> {
+    let of = |key: Effect| -> f64 {
+        let listed = |effects: &[(Effect, f64)]| -> f64 {
+            effects
+                .iter()
+                .filter(|(k, _)| *k == key)
+                .map(|(_, v)| *v)
+                .sum()
+        };
+        match item {
+            EffectItem::Refinement(f) => listed(content::refinement_def(f).effects),
+            EffectItem::Rule(r) => listed(content::rule_def(r).effects),
+            EffectItem::Rite(t) => rite_effect(t, key, 1.0),
+            EffectItem::Arch(a) => arch_effect(a, key),
+            EffectItem::Loom(l) => loom_effect(l, key),
+            EffectItem::Tradition(t) => tradition_effect(t, key),
+        }
+    };
+    let mut sizes: std::collections::BTreeMap<ResourceId, f64> = Default::default();
+    for (key, r) in store_keys() {
+        *sizes.entry(r).or_default() += of(key);
+    }
+    // These two rites shape the warmth cap by their own rules, not by a key.
+    if matches!(
+        item,
+        EffectItem::Rite(RiteId::GoldenHour | RiteId::EverwarmFrescoes)
+    ) {
+        *sizes.entry(ResourceId::Warmth).or_default() += 1.0;
+    }
+    sizes.into_iter().filter(|(_, v)| *v != 0.0).collect()
+}
+
 /// One Sunbeam Rite's per-copy contribution to one effect key. Altar-hosted
 /// rites scale additionally by `altars`. Golden Hour (rite 2) is not here — it
 /// reshapes the warmth cap directly in `cap()`. @spec SIM-SUN-005, SIM-SUN-007

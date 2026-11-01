@@ -6,6 +6,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 
 ### New
 
+- **The sidebar shows what the row under the cursor does to your stores.** A small mark beside a store says whether the row would raise it, lower it, or both, so there's no more matching names by eye. The help screen explains the marks.
 - **Stores say what they are.** With the cursor on a store, the info pane now opens with a little drawing in that store's colours and a line about what it is. In a pane too short to hold everything, these step aside so the figures stay.
 
 ### Fixed
