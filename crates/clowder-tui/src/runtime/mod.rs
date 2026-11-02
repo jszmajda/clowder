@@ -72,6 +72,7 @@ pub fn run() -> ExitCode {
     // both believe they are alone. Every refusal below returns while `_lock`
     // is still in scope, so its Drop releases it — a refusal never leaves a
     // lock behind for the next launch to inherit.
+    // @spec TUI-RUN-007, TUI-RUN-072
     let _lock = match SessionLock::acquire(&save_path, force) {
         Ok(l) => l,
         Err(lock::LockError::Held { pid }) => {

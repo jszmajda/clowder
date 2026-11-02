@@ -33,7 +33,7 @@ impl TerminalGuard {
     /// install the panic hook. Called only after the save has been read, so a
     /// load failure can still print to an ordinary terminal. Where any step
     /// fails, everything entered so far is undone before the failure is
-    /// returned. @spec TUI-RUN-001, TUI-RUN-003, TUI-RUN-060, TUI-RUN-062
+    /// returned. @spec TUI-RUN-001, TUI-RUN-003, TUI-RUN-060, TUI-RUN-062, TUI-RUN-063
     pub fn enter() -> std::io::Result<Self> {
         TAKEN.store(true, Ordering::SeqCst);
         let entered = crossterm::terminal::enable_raw_mode()

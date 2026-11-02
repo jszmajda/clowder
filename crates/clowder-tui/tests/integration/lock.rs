@@ -1,6 +1,7 @@
 //! One session per save — `runtime::lock`.
 //!
 //! @spec TUI-RUN-006, TUI-RUN-007, TUI-RUN-008, TUI-RUN-009, TUI-RUN-029
+//! @spec TUI-RUN-069, TUI-RUN-070, TUI-RUN-071, TUI-RUN-072
 //!
 //! **How this test reaches the code.** `clowder-tui` is a binary crate with no
 //! library target, so an integration test cannot `use clowder_tui::…`.
@@ -22,11 +23,14 @@
 //! asserts it held, so a format that breaks it fails loudly with an explanation
 //! rather than passing hollowly.
 //!
-//! **What is deliberately not tested here.** TUI-RUN-007 also requires the
-//! refusal to *state how to override*; that message is composed on the startup
-//! path (`runtime::run`), not in this module — `LockError` carries the holding
-//! pid and no message — so it is not observable at this seam. TUI-RUN-029's
-//! literal ordering claim ("acquire before reading the save") likewise lives in
+//! **Where the real game comes in.** A time zone reaches `ps` through the
+//! environment, which is the whole process's, so what a launch in another zone
+//! does is asked of the built game run as a child, with the zone its own. That
+//! is also where the words of a refusal are composed (`runtime::run`), since
+//! `LockError` carries the holding pid and no message. No terminal is needed:
+//! the lock is decided before one is taken.
+//!
+//! **What is deliberately not tested here.** TUI-RUN-029's literal ordering claim ("acquire before reading the save") likewise lives in
 //! `runtime::run`, which enters raw mode and belongs to another chunk; what is
 //! checked here are the claim's observable consequences: the lock cannot depend
 //! on the save being present or readable, simultaneous launches cannot both
@@ -622,4 +626,443 @@ fn winners_of_a_contest(save: &Path) -> usize {
             .collect();
         outcomes.iter().filter(|o| o.is_ok()).count()
     })
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-069, TUI-RUN-070 — a holder's start time, wherever it is read from
+// ---------------------------------------------------------------------------
+
+const CLOWDER: &str = env!("CARGO_BIN_EXE_clowder");
+
+/// Twenty-five hours apart, so one of them differs from whatever zone this test
+/// process runs in, and a launch in each reads every local time differently.
+const FAR_EAST: &str = "Pacific/Kiritimati";
+const FAR_WEST: &str = "Pacific/Pago_Pago";
+
+/// Where the game keeps its save under a home of its own.
+fn save_under(home: &Path) -> PathBuf {
+    if cfg!(target_os = "macos") {
+        home.join("Library/Application Support/clowder/save.json")
+    } else {
+        home.join(".local/share/clowder/save.json")
+    }
+}
+
+/// A process's start time as `ps` words it in `zone`, encoded as the lock
+/// encodes it.
+fn start_in_zone(pid: u32, zone: &str) -> u64 {
+    let out = std::process::Command::new("ps")
+        .env("LC_ALL", "C")
+        .env("TZ", zone)
+        .args(["-p", &pid.to_string(), "-o", "lstart="])
+        .output()
+        .expect("ps should run");
+    let text = String::from_utf8_lossy(&out.stdout);
+    lock::encode_lstart(text.trim())
+        .unwrap_or_else(|| panic!("ps should word a running process's start time, got {text:?}"))
+}
+
+/// The tests in another zone mean nothing unless the zones really differ, which
+/// a machine with no time zone database would quietly make untrue.
+fn assert_the_zones_differ(pid: u32) {
+    assert_ne!(
+        start_in_zone(pid, FAR_EAST),
+        start_in_zone(pid, FAR_WEST),
+        "fixture: this machine must tell {FAR_EAST} from {FAR_WEST}"
+    );
+}
+
+/// A running process that is not this one, gone with the test.
+struct Holder(std::process::Child);
+
+impl Holder {
+    fn start() -> Self {
+        Holder(
+            std::process::Command::new("sleep")
+                .arg("600")
+                .spawn()
+                .expect("sleep should start"),
+        )
+    }
+    fn pid(&self) -> u32 {
+        self.0.id()
+    }
+}
+
+impl Drop for Holder {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+/// A lock's words, saying that `pid` holds it and started at `start`. Written
+/// from a genuine lock, so the tests still never name the format.
+fn lock_naming(genuine: &str, pid: u32, start: u64) -> String {
+    let mine = std::process::id().to_string();
+    let (out, changed) = map_number_tokens(genuine, |run| {
+        if run == mine {
+            Some(pid.to_string())
+        } else if run.len() >= 5 {
+            Some(start.to_string())
+        } else {
+            None
+        }
+    });
+    assert_eq!(changed, 2, "a lock records one id and one start time");
+    out
+}
+
+struct Launch {
+    stderr: String,
+    success: bool,
+    timed_out: bool,
+}
+
+/// Run the real game under `home` in `zone`, killing it at a deadline, so a
+/// launch that never comes back is a failure rather than a hung suite.
+fn launch_in_zone(home: &Path, zone: &str) -> Launch {
+    let mut child = std::process::Command::new(CLOWDER)
+        .env_clear()
+        .env("HOME", home)
+        .env("XDG_DATA_HOME", home.join(".local/share"))
+        .env("PATH", "/usr/bin:/bin")
+        .env("TERM", "xterm-256color")
+        .env("TZ", zone)
+        .current_dir(home)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|e| panic!("spawning {CLOWDER}: {e}"));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    let mut timed_out = false;
+    while child.try_wait().expect("polling the child").is_none() {
+        if std::time::Instant::now() >= deadline {
+            timed_out = true;
+            let _ = child.kill();
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    let output = child
+        .wait_with_output()
+        .expect("collecting the child's output");
+    Launch {
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        success: output.status.success(),
+        timed_out,
+    }
+}
+
+/// A refusal says which process holds the game and how to go past it.
+fn assert_refused_naming(launch: &Launch, pid: u32, zone: &str) {
+    assert!(!launch.timed_out, "the launch in {zone} never came back");
+    assert!(
+        !launch.success,
+        "the launch in {zone} should not have started"
+    );
+    assert!(
+        launch.stderr.contains("already open") && launch.stderr.contains(&pid.to_string()),
+        "the launch in {zone} should refuse naming process {pid}, said: {}",
+        launch.stderr
+    );
+    assert!(
+        launch.stderr.contains("--force"),
+        "the refusal in {zone} should state how to override, said: {}",
+        launch.stderr
+    );
+}
+
+/// The issue this guards is a laptop crossing a time zone: nothing about the
+/// holder changed, and a launch in another zone must still see it running.
+///
+/// @spec TUI-RUN-007, TUI-RUN-069
+#[test]
+fn a_running_holder_refuses_a_launch_in_any_time_zone() {
+    let home = scratch_dir("zone-holder");
+    let save = save_under(&home);
+    let me = std::process::id();
+    assert_the_zones_differ(me);
+
+    let _held = SessionLock::acquire(&save, false).expect("an unlocked save should lock");
+    let dir = save.parent().unwrap();
+    let before = lock_text(dir, &save);
+
+    for zone in [FAR_EAST, FAR_WEST] {
+        assert_refused_naming(&launch_in_zone(&home, zone), me, zone);
+        assert_eq!(
+            lock_text(dir, &save),
+            before,
+            "a launch refused in {zone} should leave the holder's lock as it found it"
+        );
+    }
+}
+
+/// What makes the lock readable from any zone is what it records.
+///
+/// @spec TUI-RUN-069
+#[test]
+fn a_lock_records_its_start_time_in_utc() {
+    let dir = scratch_dir("zone-recorded");
+    let save = save_path(&dir);
+    let me = std::process::id();
+    let _held = SessionLock::acquire(&save, false).expect("an unlocked save should lock");
+    let recorded = number_tokens(&lock_text(&dir, &save));
+    let utc = start_in_zone(me, "UTC").to_string();
+    assert!(
+        recorded.contains(&utc),
+        "the lock should record this process's start in UTC ({utc}), recorded {recorded:?}"
+    );
+}
+
+/// A session left running across an upgrade wrote its start time in its own
+/// zone. The next launch in that zone must not clear it.
+///
+/// @spec TUI-RUN-070
+#[test]
+fn a_lock_recorded_in_local_time_still_counts_in_its_own_zone() {
+    let home = scratch_dir("zone-local-form");
+    let save = save_under(&home);
+    let holder = Holder::start();
+    assert_the_zones_differ(holder.pid());
+
+    let dir = save.parent().unwrap().to_path_buf();
+    fs::create_dir_all(&dir).unwrap();
+    let (path, genuine) = genuine_lock(&dir, &save);
+    let local = lock_naming(
+        &genuine,
+        holder.pid(),
+        start_in_zone(holder.pid(), FAR_EAST),
+    );
+    fs::write(&path, &local).unwrap();
+
+    assert_refused_naming(&launch_in_zone(&home, FAR_EAST), holder.pid(), FAR_EAST);
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        local,
+        "the refused launch should leave the lock as it found it"
+    );
+}
+
+/// That reading is a launch's own zone only. A lock recorded in any other zone
+/// tells a launch nothing it can check, so it reads as any mismatch does.
+///
+/// @spec TUI-RUN-070, TUI-RUN-008
+#[test]
+fn a_lock_recorded_in_another_zones_local_time_reads_as_stale() {
+    let home = scratch_dir("zone-other-local");
+    let save = save_under(&home);
+    let holder = Holder::start();
+    assert_the_zones_differ(holder.pid());
+
+    let dir = save.parent().unwrap().to_path_buf();
+    fs::create_dir_all(&dir).unwrap();
+    let (path, genuine) = genuine_lock(&dir, &save);
+    let other = lock_naming(
+        &genuine,
+        holder.pid(),
+        start_in_zone(holder.pid(), FAR_EAST),
+    );
+    fs::write(&path, &other).unwrap();
+
+    let launch = launch_in_zone(&home, FAR_WEST);
+    assert!(!launch.timed_out, "the launch never came back");
+    assert!(
+        !launch.stderr.contains("already open"),
+        "the lock should have read as stale, the launch said: {}",
+        launch.stderr
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-071 — a session releases only its own lock
+// ---------------------------------------------------------------------------
+
+/// A is running, B takes the lock with the override, A quits. The lock is B's,
+/// so it stays, and a third launch is refused against B.
+///
+/// @spec TUI-RUN-071
+#[test]
+fn a_session_leaves_a_lock_another_session_has_taken() {
+    let dir = scratch_dir("release-not-mine");
+    let save = save_path(&dir);
+    let holder = Holder::start();
+
+    let held = SessionLock::acquire(&save, false).expect("an unlocked save should lock");
+    let path = the_lock_file(&dir, &save);
+    let taken = lock_naming(
+        &lock_text(&dir, &save),
+        holder.pid(),
+        start_in_zone(holder.pid(), "UTC"),
+    );
+    fs::write(&path, &taken).unwrap();
+
+    drop(held);
+
+    assert_eq!(
+        fs::read_to_string(&path).expect("the other session's lock should still be there"),
+        taken,
+        "a session ending should not touch a lock it no longer holds"
+    );
+    match SessionLock::acquire(&save, false) {
+        Err(LockError::Held { pid }) => assert_eq!(pid, holder.pid()),
+        other => panic!("a third launch should be refused against the holder, got {other:?}"),
+    }
+}
+
+/// A session whose lock is already gone has nothing to release, and nothing to
+/// complain about.
+///
+/// @spec TUI-RUN-071
+#[test]
+fn a_session_whose_lock_is_gone_ends_quietly() {
+    let dir = scratch_dir("release-gone");
+    let save = save_path(&dir);
+    let held = SessionLock::acquire(&save, false).expect("an unlocked save should lock");
+    fs::remove_file(the_lock_file(&dir, &save)).unwrap();
+    drop(held);
+    assert!(beside_the_save(&dir, &save).is_empty());
+}
+
+/// Between a session seeing that the lock is its own and removing it, a launch
+/// could take the lock, so a session waits its turn behind a launch deciding.
+/// A wait that passes under load only makes this test weaker, never wrong.
+///
+/// @spec TUI-RUN-071
+#[test]
+fn a_session_releases_only_between_launches_deciding() {
+    let dir = scratch_dir("release-guarded");
+    let save = save_path(&dir);
+    let held = SessionLock::acquire(&save, false).expect("an unlocked save should lock");
+    let path = the_lock_file(&dir, &save);
+
+    let deciding = fs::File::open(&dir).unwrap();
+    deciding
+        .lock()
+        .expect("this test should hold the launch's guard");
+
+    let release = std::thread::spawn(move || drop(held));
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    assert!(
+        path.exists(),
+        "a session should not release while a launch is deciding"
+    );
+
+    drop(deciding);
+    release.join().expect("the release should not panic");
+    assert!(!path.exists(), "the session should release once it may");
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-072 — a lock that cannot be removed stops the launch
+// ---------------------------------------------------------------------------
+
+/// Make a directory read-only for as long as this lives. `None` where that
+/// stops nothing, as for a privileged user, so a test has no case to make.
+#[cfg(unix)]
+struct ReadOnly(PathBuf);
+
+#[cfg(unix)]
+impl ReadOnly {
+    fn make(dir: &Path) -> Option<Self> {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(dir, fs::Permissions::from_mode(0o555)).unwrap();
+        let guard = ReadOnly(dir.to_path_buf());
+        let probe = dir.join("probe");
+        if fs::write(&probe, b"").is_ok() {
+            let _ = fs::remove_file(&probe);
+            return None;
+        }
+        Some(guard)
+    }
+}
+
+#[cfg(unix)]
+impl Drop for ReadOnly {
+    fn drop(&mut self) {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&self.0, fs::Permissions::from_mode(0o755));
+    }
+}
+
+/// An acquire that spins forever must fail this test, not hang the suite.
+#[cfg(unix)]
+fn acquire_within_a_deadline(save: &Path, force: bool) -> Result<SessionLock, LockError> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let save = save.to_path_buf();
+    std::thread::spawn(move || {
+        let _ = tx.send(SessionLock::acquire(&save, force));
+    });
+    rx.recv_timeout(std::time::Duration::from_secs(20))
+        .unwrap_or_else(|_| panic!("a launch that cannot clear a lock should say so, not spin"))
+}
+
+/// @spec TUI-RUN-072
+#[cfg(unix)]
+#[test]
+fn a_stale_lock_that_cannot_be_removed_stops_the_launch() {
+    let dir = scratch_dir("unremovable-stale");
+    let save = save_path(&dir);
+    let (path, genuine) = genuine_lock(&dir, &save);
+    let dead = attributed_to_a_dead_process(&genuine, std::process::id());
+    fs::write(&path, &dead).unwrap();
+    let Some(_readonly) = ReadOnly::make(&dir) else {
+        return;
+    };
+
+    match acquire_within_a_deadline(&save, false) {
+        Err(LockError::Io(_)) => {}
+        other => panic!("the launch should stop on the failure, got {other:?}"),
+    }
+    assert_eq!(fs::read_to_string(&path).unwrap(), dead);
+}
+
+/// The override cannot take what cannot be removed either.
+///
+/// @spec TUI-RUN-072, TUI-RUN-009
+#[cfg(unix)]
+#[test]
+fn a_lock_the_override_cannot_remove_stops_the_launch() {
+    let dir = scratch_dir("unremovable-forced");
+    let save = save_path(&dir);
+    let _held = SessionLock::acquire(&save, false).expect("an unlocked save should lock");
+    let Some(_readonly) = ReadOnly::make(&dir) else {
+        return;
+    };
+
+    match acquire_within_a_deadline(&save, true) {
+        Err(LockError::Io(_)) => {}
+        other => panic!("the override should stop on the failure, got {other:?}"),
+    }
+}
+
+/// The player is told, and the game ends rather than sitting silent.
+///
+/// @spec TUI-RUN-072
+#[cfg(unix)]
+#[test]
+fn the_game_states_the_failure_when_it_cannot_clear_a_lock() {
+    let home = scratch_dir("unremovable-game");
+    let save = save_under(&home);
+    let dir = save.parent().unwrap().to_path_buf();
+    fs::create_dir_all(&dir).unwrap();
+    let (path, genuine) = genuine_lock(&dir, &save);
+    fs::write(
+        &path,
+        attributed_to_a_dead_process(&genuine, std::process::id()),
+    )
+    .unwrap();
+    let Some(_readonly) = ReadOnly::make(&dir) else {
+        return;
+    };
+
+    let launch = launch_in_zone(&home, "UTC");
+    assert!(!launch.timed_out, "the launch never came back");
+    assert!(!launch.success, "the launch should not have started");
+    assert!(
+        launch.stderr.contains("session lock"),
+        "the launch should state the failure, said: {}",
+        launch.stderr
+    );
 }

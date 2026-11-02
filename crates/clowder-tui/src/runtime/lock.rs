@@ -4,14 +4,14 @@
 //! accident, and two sessions autosaving one path is silent progress loss. The
 //! lock is taken *before* the save is read: acquiring it afterwards leaves a
 //! window in which two launches both read the same save and both believe they
-//! are alone. @spec TUI-RUN-006..009, TUI-RUN-029
+//! are alone.
 
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Why a launch was refused. @spec TUI-RUN-007
+/// Why a launch was refused.
 #[derive(Debug)]
 pub enum LockError {
     /// Another live session holds the game.
@@ -22,10 +22,13 @@ pub enum LockError {
 }
 
 /// Held for the life of the session; released on every exit path, including
-/// the ones that refuse to start. @spec TUI-RUN-006, TUI-RUN-029
+/// the ones that refuse to start.
 #[derive(Debug)]
 pub struct SessionLock {
     path: PathBuf,
+    /// What this session wrote there, which tells release whether the lock is
+    /// still this session's.
+    contents: String,
 }
 
 /// A crude, dependency-free "process id + start time" identity, derived from
@@ -53,7 +56,7 @@ fn month_number(name: &str) -> Option<u64> {
 /// Parse `ps`'s `lstart` field — a fixed, English, `ctime`-shaped string such
 /// as `"Thu Jul 24 13:45:02 2026"` (guaranteed by requesting it under
 /// `LC_ALL=C`) — into a single comparable decimal.
-fn encode_lstart(text: &str) -> Option<u64> {
+pub(crate) fn encode_lstart(text: &str) -> Option<u64> {
     let parts: Vec<&str> = text.split_whitespace().collect();
     let [_dow, mon, day, time, year] = parts[..] else {
         return None;
@@ -75,14 +78,19 @@ fn encode_lstart(text: &str) -> Option<u64> {
     )
 }
 
-/// The start time of a still-living process named by `pid`, or `None` if no
-/// such process can be found. Backed by `ps`, which reports nothing (and a
-/// non-zero exit) for a pid that is not currently running — that absence is
-/// exactly the "process is gone" signal staleness needs, with no need to
-/// distinguish "never existed" from "exited" from "recycled".
-fn process_start_time(pid: u32) -> Option<u64> {
-    let output = Command::new("ps")
-        .env("LC_ALL", "C")
+/// The start time of a still-living process named by `pid`, as `ps` words it
+/// in `zone`, or in this process's own zone for `None`; `None` if no such
+/// process can be found. `ps` reports nothing (and a non-zero exit) for a pid
+/// that is not currently running — that absence is exactly the "process is
+/// gone" signal staleness needs, with no need to distinguish "never existed"
+/// from "exited" from "recycled".
+fn start_reading(pid: u32, zone: Option<&str>) -> Option<u64> {
+    let mut ps = Command::new("ps");
+    ps.env("LC_ALL", "C");
+    if let Some(zone) = zone {
+        ps.env("TZ", zone);
+    }
+    let output = ps
         .args(["-p", &pid.to_string(), "-o", "lstart="])
         .output()
         .ok()?;
@@ -95,6 +103,33 @@ fn process_start_time(pid: u32) -> Option<u64> {
         return None;
     }
     encode_lstart(text)
+}
+
+/// A process's start time as a lock records it: in UTC, since the same instant
+/// worded in a launch's own zone would differ from one zone to the next.
+fn process_start_time(pid: u32) -> Option<u64> {
+    start_reading(pid, Some("UTC"))
+}
+
+/// Whether the process a lock names is the one that wrote it. A session from a
+/// version that recorded local time wrote its start in its own zone, so a
+/// reading in this launch's zone counts as well: without it, that session left
+/// running across an upgrade would be cleared by the next launch.
+fn holder_is_running(pid: u32, recorded: u64) -> bool {
+    match process_start_time(pid) {
+        None => false,
+        Some(utc) => utc == recorded || start_reading(pid, None) == Some(recorded),
+    }
+}
+
+/// Clear a lock so a launch can try again. One already gone is as good as
+/// cleared, since another launch's lock can come and go; anything else stands
+/// between the launch and the save for good, so it goes back to the player.
+fn clear_lock(path: &Path) -> io::Result<()> {
+    match fs::remove_file(path) {
+        Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e),
+        _ => Ok(()),
+    }
 }
 
 /// Where the lock for a given save lives: beside it, named from it, never
@@ -178,7 +213,8 @@ impl SessionLock {
     /// to a process with a different start time — is cleared and play
     /// continues: a crash must not lock a player out of their own game, and an
     /// id alone can be recycled by something unrelated.
-    /// @spec TUI-RUN-006, TUI-RUN-008, TUI-RUN-009, TUI-RUN-029
+    /// @spec TUI-RUN-006, TUI-RUN-007, TUI-RUN-008, TUI-RUN-009, TUI-RUN-029
+    /// @spec TUI-RUN-069, TUI-RUN-070, TUI-RUN-072
     pub fn acquire(beside: &Path, force: bool) -> Result<Self, LockError> {
         let path = lock_path_for(beside);
         // A first run has no data directory yet — nothing has written a save
@@ -210,12 +246,12 @@ impl SessionLock {
 
         loop {
             match try_create_exclusive(&path, &contents) {
-                Ok(true) => return Ok(SessionLock { path }),
+                Ok(true) => return Ok(SessionLock { path, contents }),
                 Ok(false) => {
                     // Someone else's lock is already there. Force always wins;
                     // otherwise the decision is whether it is still live.
                     if force {
-                        let _ = fs::remove_file(&path);
+                        clear_lock(&path).map_err(LockError::Io)?;
                         continue;
                     }
 
@@ -230,7 +266,7 @@ impl SessionLock {
 
                     match parse_lock(&existing) {
                         Some((holder_pid, holder_start))
-                            if process_start_time(holder_pid) == Some(holder_start) =>
+                            if holder_is_running(holder_pid, holder_start) =>
                         {
                             // Same id, same start time: genuinely still that process.
                             return Err(LockError::Held { pid: holder_pid });
@@ -240,7 +276,7 @@ impl SessionLock {
                             // retry — another launch may win the race, in which
                             // case its lock is live and this loop will refuse
                             // against it on the next pass.
-                            let _ = fs::remove_file(&path);
+                            clear_lock(&path).map_err(LockError::Io)?;
                             continue;
                         }
                     }
@@ -252,8 +288,14 @@ impl SessionLock {
 }
 
 impl Drop for SessionLock {
+    /// Let the lock go, if it is still this session's: the override can take it
+    /// from a session that is still running. The guard keeps a launch from
+    /// taking it between the look and the removal.
+    /// @spec TUI-RUN-006, TUI-RUN-071
     fn drop(&mut self) {
-        // @spec TUI-RUN-006
-        let _ = fs::remove_file(&self.path);
+        let _deciding = launch_guard(&self.path);
+        if fs::read_to_string(&self.path).is_ok_and(|text| text == self.contents) {
+            let _ = fs::remove_file(&self.path);
+        }
     }
 }

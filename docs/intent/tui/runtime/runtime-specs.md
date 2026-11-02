@@ -15,13 +15,13 @@
 ## One Session Per Save
 
 - [x] **TUI-RUN-006**: On startup the system shall acquire a lock beside the save file recording the owning process's id and start time, and shall release it on every exit path.
-- [D] **TUI-RUN-007**: When the lock is held by a process that is still running, the system shall refuse to start, name the holding process, and state how to override.
+- [x] **TUI-RUN-007**: When the lock is held by a process that is still running, the system shall refuse to start, name the holding process, and state how to override.
 - [x] **TUI-RUN-008**: When the lock's recorded process is no longer running — or its id now belongs to a process with a different start time — the system shall treat the lock as stale, clear it, and continue starting.
 - [x] **TUI-RUN-009**: When the override is given, the system shall clear the lock and start even if its holder is live.
-- [ ] **TUI-RUN-069**: The system shall record a lock's start time, and read a holder's start time for comparison, in UTC, so that neither the zone a launch runs in nor a change of zone during a session makes a running holder read as stale.
-- [ ] **TUI-RUN-070**: When a lock's recorded start time differs from its process's start time in UTC but equals that process's start time in the launching process's own zone, the system shall treat the holder as running, so that a session from a version that recorded local time is not cleared by the next launch.
-- [ ] **TUI-RUN-071**: On release, the system shall remove the lock only if it still records this session's process id and start time, leaving in place a lock another session has since taken, and shall check and remove it while holding the advisory lock a launch decides under.
-- [ ] **TUI-RUN-072**: When a stale lock, or a lock the override would clear, cannot be removed, the system shall refuse to start and state the failure rather than retry.
+- [x] **TUI-RUN-069**: The system shall record a lock's start time, and read a holder's start time for comparison, in UTC, so that neither the zone a launch runs in nor a change of zone during a session makes a running holder read as stale.
+- [x] **TUI-RUN-070**: When a lock's recorded start time differs from its process's start time in UTC but equals that process's start time in the launching process's own zone, the system shall treat the holder as running, so that a session from a version that recorded local time is not cleared by the next launch.
+- [x] **TUI-RUN-071**: On release, the system shall remove the lock only if it still records this session's process id and start time, leaving in place a lock another session has since taken, and shall check and remove it while holding the advisory lock a launch decides under.
+- [x] **TUI-RUN-072**: When a stale lock, or a lock the override would clear, cannot be removed, the system shall refuse to start and state the failure rather than retry.
 - [x] **TUI-RUN-029**: The system shall acquire the lock before reading the save, and shall release it on every path that then refuses to start, so that two simultaneous launches cannot both pass the check and no refusal leaves a lock behind.
 
 ## Load Failure Policy
