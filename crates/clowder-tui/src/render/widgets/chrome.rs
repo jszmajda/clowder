@@ -123,7 +123,7 @@ fn live_opportunities(state: &GameState, view: &ViewState) -> [bool; 6] {
 }
 
 /// The live chips at either detail level TUI-NAV-086 steps through, each a
-/// whole label — with a count between glyph and word on the two chips that
+/// whole label — with a count between glyph and word on the chips that
 /// count, or — once the header has shed the count first — glyph directly
 /// before word on every chip. Which chips are live never changes between the
 /// two; only whether the count is drawn does. Each label is later drawn as
@@ -171,6 +171,21 @@ pub(crate) fn date_words(day: u64) -> String {
     )
 }
 
+/// The kitten count, and once the clowder has a home the room it holds, the
+/// free slots where the header's step keeps them. All three are the core's
+/// figures. @spec TUI-NAV-202
+fn kitten_fact(state: &GameState, with_free: bool) -> String {
+    let kittens = state.kittens.len();
+    let room = state.housing_capacity();
+    if room == 0 {
+        format!("{kittens} kittens")
+    } else if with_free {
+        format!("{kittens}/{room} kittens ({} free)", state.free_slots())
+    } else {
+        format!("{kittens}/{room} kittens")
+    }
+}
+
 /// The five glance facts in full wording, joined `·`. @spec TUI-NAV-086
 fn full_facts(state: &GameState) -> Vec<String> {
     let day = state.day();
@@ -179,21 +194,21 @@ fn full_facts(state: &GameState) -> Vec<String> {
         // The season the meadow is in, which the calendar need not say, so
         // the word and the chrome's accent never disagree. @spec TUI-THEME-008
         format!("{:?} Day {day} Year {}", state.season(), state.year()),
-        format!("{} kittens", state.kittens.len()),
+        kitten_fact(state, true),
         mood_word(state.mood_tier()).to_string(),
         format!("×{}", state.speed),
     ]
 }
 
 /// The same five facts in compact wording — generation, day, and year
-/// shortened to their letter, season to its first three letters, kitten count
-/// and mood and speed unchanged. @spec TUI-NAV-086
-fn compact_facts(state: &GameState) -> Vec<String> {
+/// shortened to their letter, season to its first three letters, the kitten
+/// fact and mood and speed unchanged. @spec TUI-NAV-086
+fn compact_facts(state: &GameState, with_free: bool) -> Vec<String> {
     let season: String = format!("{:?}", state.season()).chars().take(3).collect();
     vec![
         format!("G{}", state.generation),
         format!("{season} D{} Y{}", state.day(), state.year()),
-        format!("{} kittens", state.kittens.len()),
+        kitten_fact(state, with_free),
         mood_word(state.mood_tier()).to_string(),
         format!("×{}", state.speed),
     ]
@@ -243,13 +258,15 @@ pub fn header(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
     let without_labels = chip_labels(state, view, false);
     let with_counts = with_labels.join("  ");
     let without_counts = without_labels.join("  ");
-    let compact = compact_facts(state);
+    let roomy = compact_facts(state, true);
+    let compact = compact_facts(state, false);
 
-    let steps: [(Option<String>, &Vec<String>); 6] = [
+    let steps: [(Option<String>, &Vec<String>); 7] = [
         (
             fit(&full_facts(state).join(" · "), &with_counts, width),
             &with_labels,
         ),
+        (fit(&roomy.join(" "), &with_counts, width), &with_labels),
         (fit(&compact.join(" "), &with_counts, width), &with_labels),
         (
             fit(&compact.join(" "), &without_counts, width),

@@ -1545,25 +1545,38 @@ fn one_press_carrying_two_signals_moves_each_chip_by_its_own() {
 // TUI-NAV-086 — the header's width
 // ---------------------------------------------------------------------------
 
+/// The kitten fact TUI-NAV-202 pins: the count alone until the clowder has a
+/// home, then the room beside it, with the free slots where the step keeps them.
+fn kitten_fact(s: &GameState, with_free: bool) -> String {
+    let (kittens, room) = (s.kittens.len(), s.housing_capacity());
+    if room == 0 {
+        format!("{kittens} kittens")
+    } else if with_free {
+        format!("{kittens}/{room} kittens ({} free)", s.free_slots())
+    } else {
+        format!("{kittens}/{room} kittens")
+    }
+}
+
 /// The five facts in the full wording: the generation, the date, the kitten
-/// count, the mood word, the speed.
+/// count with the room, the mood word, the speed.
 fn full_facts(s: &GameState) -> Vec<String> {
     vec![
         format!("Gen {}", s.generation),
         format!("{:?} Day {} Year {}", s.season(), s.day(), s.year()),
-        format!("{} kittens", s.kittens.len()),
+        kitten_fact(s, true),
         mood_name(s.mood_tier()).to_string(),
         format!("×{}", s.speed),
     ]
 }
 
 /// The same five facts in the compact wording.
-fn compact_facts(s: &GameState) -> Vec<String> {
+fn compact_facts(s: &GameState, with_free: bool) -> Vec<String> {
     let season: String = format!("{:?}", s.season()).chars().take(3).collect();
     vec![
         format!("G{}", s.generation),
         format!("{season} D{} Y{}", s.day(), s.year()),
-        format!("{} kittens", s.kittens.len()),
+        kitten_fact(s, with_free),
         mood_name(s.mood_tier()).to_string(),
         format!("×{}", s.speed),
     ]
@@ -1580,16 +1593,18 @@ fn pinned_header(
     w: usize,
 ) -> Option<(usize, String)> {
     let full = full_facts(s).join(" · ");
-    let compact = compact_facts(s);
+    let roomy = compact_facts(s, true);
+    let compact = compact_facts(s, false);
     let with_counts = chip_cluster(live, Some(counts));
     let without = chip_cluster(live, None);
     let mut steps: Vec<(usize, String, String)> = vec![
         (1, full, with_counts.clone()),
-        (2, compact.join(" "), with_counts),
-        (3, compact.join(" "), without.clone()),
+        (2, roomy.join(" "), with_counts.clone()),
+        (3, compact.join(" "), with_counts),
+        (4, compact.join(" "), without.clone()),
     ];
     for shed in 1..=3 {
-        steps.push((4, compact[shed..].join(" "), without.clone()));
+        steps.push((5, compact[shed..].join(" "), without.clone()));
     }
     steps.into_iter().find_map(|(step, facts, chips)| {
         let fw = facts.chars().count();
@@ -1604,12 +1619,12 @@ fn pinned_header(
 
 /// At every width from the narrowest any step can draw up past the full line,
 /// the header is exactly the first step that fits: the full line; the compact
-/// facts; the chips without their counts; the compact facts shed whole —
-/// generation, then date, then kitten count — never the mood word or the
-/// speed. No live chip is cut or dropped and no figure is cut at any width,
-/// which the exact line carries. Swept for all four chips live, for none, for
-/// two, and for figures long enough that the facts must shed at the floor
-/// width itself.
+/// facts; those facts without the free slots; the chips without their counts;
+/// the compact facts shed whole — generation, then date, then kitten count —
+/// never the mood word or the speed. No live chip is cut or dropped and no
+/// figure is cut at any width, which the exact line carries. Swept for all four
+/// chips live, for none, for two, for a clowder with no home yet, and for
+/// figures long enough that the facts must shed at the floor width itself.
 ///
 /// @spec TUI-NAV-086
 #[test]
@@ -1620,6 +1635,7 @@ fn the_header_draws_the_first_step_that_fits_at_every_width() {
         s.ticks = 1_234_567_890 * content::TICKS_PER_DAY;
         s.pending_sky_event = Some(s.ticks + 5);
         s.kittens.extend(employed(12_209));
+        s.structures[first_home().0.ix()] = 12_345;
         s.speed = 0.25;
         power_enough(&mut s);
         (s, v)
@@ -1635,19 +1651,25 @@ fn the_header_draws_the_first_step_that_fits_at_every_width() {
             "all four chips live",
             [true; 4],
             (12, 3),
-            live_chips_fixture([true; 4], 12, 3),
+            housed(live_chips_fixture([true; 4], 12, 3)),
         ),
         (
             "no chip live",
             [false; 4],
             (0, 0),
-            live_chips_fixture([false; 4], 0, 0),
+            housed(live_chips_fixture([false; 4], 0, 0)),
+        ),
+        (
+            "no home yet",
+            [true; 4],
+            (12, 3),
+            homeless(live_chips_fixture([true; 4], 12, 3)),
         ),
         (
             "idle and away live",
             [true, false, false, true],
             (7, 0),
-            live_chips_fixture([true, false, false, true], 7, 0),
+            housed(live_chips_fixture([true, false, false, true], 7, 0)),
         ),
         ("long figures, all four live", [true; 4], (20, 9), big),
     ];
@@ -1670,11 +1692,13 @@ fn the_header_draws_the_first_step_that_fits_at_every_width() {
                  expected: {expected:?}\n   drawn: {drawn:?}"
             );
         }
-        let wanted: BTreeSet<usize> = if live == [false; 4] {
-            [1, 2, 4].into()
-        } else {
-            [1, 2, 3, 4].into()
-        };
+        let mut wanted: BTreeSet<usize> = [1, 2, 5].into();
+        if state.housing_capacity() > 0 {
+            wanted.insert(3);
+        }
+        if live != [false; 4] {
+            wanted.insert(4);
+        }
         assert!(
             wanted.is_subset(&steps_seen),
             "fixture: {what} should sweep through steps {wanted:?}, swept {steps_seen:?}"
@@ -1686,11 +1710,177 @@ fn the_header_draws_the_first_step_that_fits_at_every_width() {
             let (step, _) = pinned_header(&state, live, counts, FLOOR_W as usize)
                 .expect("the floor width holds mood, speed and every chip");
             assert_eq!(
-                step, 4,
+                step, 5,
                 "fixture: long figures should shed facts at the floor width"
             );
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-202 — the kitten count and the clowder's room
+// ---------------------------------------------------------------------------
+
+/// Every structure that houses kittens, with the slots one gives, off the content
+/// table rather than from any query the header could be reading.
+fn homes() -> Vec<(StructureId, u32)> {
+    StructureId::ALL
+        .into_iter()
+        .map(|s| (s, content::structure_def(s).housing))
+        .filter(|(_, slots)| *slots > 0)
+        .collect()
+}
+
+fn first_home() -> (StructureId, u32) {
+    homes()[0]
+}
+
+/// The fixture with no structure standing at all.
+fn homeless((mut s, v): (GameState, ViewState)) -> (GameState, ViewState) {
+    s.structures.fill(0);
+    (s, v)
+}
+
+/// The fixture with room for far more kittens than it has.
+fn housed(fixture: (GameState, ViewState)) -> (GameState, ViewState) {
+    let (mut s, v) = homeless(fixture);
+    s.structures[first_home().0.ix()] = 40;
+    power_enough(&mut s);
+    (s, v)
+}
+
+/// The kitten count, the slots the clowder's homes hold, and the slots free, all
+/// on the line a glance reads. Every rostered kitten holds a slot, away or home
+/// (SIM-KIT-006), and every kind of home counts, so the player has nothing to add
+/// up or subtract. A full house and a roster above the room say so plainly.
+/// @spec TUI-NAV-019, TUI-NAV-202
+#[test]
+fn the_header_says_how_much_room_the_clowder_has_and_how_much_is_free() {
+    let (home, slots) = first_home();
+    let every_home: u32 = homes().iter().map(|(_, n)| n).sum();
+    assert!(slots > 0, "fixture: a home holds kittens");
+
+    let at_home = |n: u32| employed(n as usize);
+    let mixed = {
+        let mut r = at_home(1);
+        r.extend(idle_away(2));
+        r
+    };
+    type Case = (&'static str, Vec<(StructureId, u32)>, Vec<Kitten>, u32, u32);
+    let cases: Vec<Case> = vec![
+        (
+            "room to spare, two of the three away",
+            vec![(home, 4)],
+            mixed,
+            4 * slots,
+            4 * slots - 3,
+        ),
+        (
+            "one of every kind of home",
+            homes().iter().map(|(s, _)| (*s, 1)).collect(),
+            at_home(1),
+            every_home,
+            every_home - 1,
+        ),
+        (
+            "exactly full",
+            vec![(home, 2)],
+            at_home(2 * slots),
+            2 * slots,
+            0,
+        ),
+        (
+            "more kittens than room",
+            vec![(home, 1)],
+            at_home(slots + 2),
+            slots,
+            0,
+        ),
+    ];
+
+    for (what, owned, roster, room, free) in cases {
+        let (mut state, view) = homeless(live_chips_fixture([false; 4], 0, 0));
+        for (s, n) in owned {
+            state.structures[s.ix()] = n;
+        }
+        state.kittens = roster;
+        power_enough(&mut state);
+        let kittens = state.kittens.len();
+        let fact = format!("{kittens}/{room} kittens ({free} free)");
+
+        let line = header_line(&state, &view, WIDE_W);
+        assert!(
+            line.contains(&fact),
+            "{what}: the header should state {fact:?}, and it reads:\n{line}"
+        );
+
+        // A fact, not a chip: it wants nothing of the player, full or not, so it
+        // wears no colour of its own.
+        let at = line[..line.find(&fact).expect("found above")]
+            .chars()
+            .count() as u16;
+        let mut term = terminal(WIDE_W, 1);
+        term.draw(|f| {
+            let area = f.area();
+            chrome::header(f, area, &state, &view);
+        })
+        .expect("TestBackend is infallible");
+        for x in at..at + fact.chars().count() as u16 {
+            let cell = term.backend().buffer().cell((x, 0)).expect("header cell");
+            assert_eq!(
+                (cell.fg, cell.bg),
+                (ratatui::style::Color::Reset, ratatui::style::Color::Reset),
+                "{what}: column {x} of {fact:?} wears a colour of its own"
+            );
+        }
+    }
+}
+
+/// Before the first home there is no room to speak of, and the count stands
+/// alone rather than drawing a ratio of nothing.
+/// @spec TUI-NAV-202
+#[test]
+fn before_the_first_home_the_header_counts_kittens_alone() {
+    for roster in [0, 2] {
+        let (mut state, view) = homeless(live_chips_fixture([false; 4], 0, 0));
+        state.kittens = employed(roster);
+        power_enough(&mut state);
+        let line = header_line(&state, &view, WIDE_W);
+        assert!(
+            line.contains(&format!(" {roster} kittens ·")),
+            "with no home the count should stand alone, and the header reads:\n{line}"
+        );
+        assert!(
+            !line.contains('/') && !line.contains("free"),
+            "with no home there is no room to state, and the header reads:\n{line}"
+        );
+    }
+}
+
+/// Where the full fact no longer fits beside the chips' counts, the free slots
+/// give way first: the figures left beside them still say it, and no other fact
+/// or chip could claim as much.
+/// @spec TUI-NAV-086, TUI-NAV-202
+#[test]
+fn the_free_slots_give_way_before_a_chips_count() {
+    let (state, view) = housed(live_chips_fixture([true, false, true, false], 3, 2));
+    let chips = "◦3 idle  ★2 new";
+    let facts = compact_facts(&state, false).join(" ");
+    let width = (facts.chars().count() + 1 + chips.chars().count()) as u16;
+    let line = header_line(&state, &view, width);
+    assert_eq!(
+        line,
+        format!("{facts} {chips}"),
+        "the tightest line that keeps the chips' counts drops the free slots and nothing else"
+    );
+    assert!(
+        line.contains(&format!(
+            "{}/{} kittens",
+            state.kittens.len(),
+            state.housing_capacity()
+        )),
+        "the room stays when the free slots give way: {line}"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1743,6 +1933,7 @@ fn the_header_rule_underlines_every_header_cell_at_every_width_step_and_changes_
         s.ticks = 1_234_567_890 * content::TICKS_PER_DAY;
         s.pending_sky_event = Some(s.ticks + 5);
         s.kittens.extend(employed(12_209));
+        s.structures[first_home().0.ix()] = 12_345;
         s.speed = 0.25;
         power_enough(&mut s);
         (s, v)
@@ -1756,7 +1947,7 @@ fn the_header_rule_underlines_every_header_cell_at_every_width_step_and_changes_
                 if live[0] { idle } else { 0 },
                 if live[2] { new } else { 0 },
             );
-            cases.push((live, counts, live_chips_fixture(live, idle, new)));
+            cases.push((live, counts, housed(live_chips_fixture(live, idle, new))));
         }
     }
     cases.push(([true; 4], (20, 9), big));
@@ -1846,7 +2037,7 @@ fn the_header_rule_underlines_every_header_cell_at_every_width_step_and_changes_
 
     assert_eq!(
         steps_seen,
-        BTreeSet::from([1, 2, 3, 4]),
+        BTreeSet::from([1, 2, 3, 4, 5]),
         "fixture: the sweep should reach every width step the header takes inside a frame"
     );
 }
@@ -2211,7 +2402,7 @@ fn every_live_chip_keeps_its_glyph_and_word_at_every_header_width() {
         let live = [mask & 1 != 0, mask & 2 != 0, mask & 4 != 0, mask & 8 != 0];
         let (state, view) = live_chips_fixture(live, 3, 2);
         let floor_line = chip_cluster(live, None).chars().count()
-            + compact_facts(&state)[3..].join(" ").chars().count()
+            + compact_facts(&state, false)[3..].join(" ").chars().count()
             + 1;
         for w in floor_line..=(WIDE_W as usize) {
             let line = header_line(&state, &view, w as u16);
@@ -2273,7 +2464,7 @@ fn no_attention_channel_is_ever_the_affordable_or_partial_marker() {
         let live = [mask & 1 != 0, mask & 2 != 0, mask & 4 != 0, mask & 8 != 0];
         let (state, view) = live_chips_fixture(live, 3, 2);
         let floor_line = chip_cluster(live, None).chars().count()
-            + compact_facts(&state)[3..].join(" ").chars().count()
+            + compact_facts(&state, false)[3..].join(" ").chars().count()
             + 1;
         for w in floor_line..=(WIDE_W as usize) {
             let line = header_line(&state, &view, w as u16);
@@ -2663,7 +2854,7 @@ fn every_attention_chip_is_drawn_whole_in_attention_and_nothing_else_on_the_head
             let live = [mask & 1 != 0, mask & 2 != 0, mask & 4 != 0, mask & 8 != 0];
             let (state, view) = live_chips_fixture(live, idle, new);
             let floor_line = chip_cluster(live, None).chars().count()
-                + compact_facts(&state)[3..].join(" ").chars().count()
+                + compact_facts(&state, false)[3..].join(" ").chars().count()
                 + 1;
             for w in floor_line..=(WIDE_W as usize) {
                 let mut term = terminal(w as u16, 1);
