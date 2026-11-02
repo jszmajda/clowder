@@ -4,7 +4,7 @@ This leaf owns every colour decision in clowder: the palette, what each colour i
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-01 (commit `d6216cb1f0fa`). 31 of 31 active specs implemented, each cited by a test.
+**PARTIAL** — last audited 2026-11-01 (commit `89ce0039b606`). 33 of 33 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns every colour decision in clowder: the palette, what each colour i
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/theme/theme-specs.md` — 31 specs, prefix `TUI-THEME`
+- `docs/intent/tui/theme/theme-specs.md` — 33 specs, prefix `TUI-THEME`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/achievements.rs`
@@ -52,15 +52,14 @@ This leaf owns every colour decision in clowder: the palette, what each colour i
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-THEME-001 – TUI-THEME-031 | 31 | 0 | 0 |
+| All | TUI-THEME-001 – TUI-THEME-033 | 33 | 0 | 0 |
 
-**Summary:** 31 of 31 active specs implemented.
+**Summary:** 33 of 33 active specs implemented.
 
 ## Key Findings
 
-Audited 2026-11-01. First full audit, by the same method as render's. Every colour value in the design matches the code, and the band and clearance rules were recomputed and hold. It found the header's season word disagreeing with the accent while a season is held (fixed, TUI-THEME-008), a readout's sentence naming a store without its coat (fixed, TUI-THEME-022), lists of what wears `attention` that left items out (corrected), and specs tested only against local tables, four of them now read off whole drawn frames (TUI-THEME-001, TUI-THEME-004, TUI-THEME-005, TUI-THEME-006). Issue #2 added a store's drawing (TUI-THEME-031). A reader's pass is no proof: specs 001, 004, 009, 010, 012 to 014, 016, and 024 to 026 were read more lightly than the rest. Issue #19 settled how a focused row takes the reversal: it keeps its state colour as a bar, and TUI-THEME-006 and TUI-THEME-007 now say so, read off drawn frames at each state.
+Audited 2026-11-01. First full audit, by the same method as render's. Every colour value in the design matches the code, and the band and clearance rules were recomputed and hold. It found the header's season word disagreeing with the accent while a season is held (fixed, TUI-THEME-008), a readout's sentence naming a store without its coat (fixed, TUI-THEME-022), lists of what wears `attention` that left items out (corrected), and specs tested only against local tables, four of them now read off whole drawn frames (TUI-THEME-001, TUI-THEME-004, TUI-THEME-005, TUI-THEME-006). Issue #2 added a store's drawing (TUI-THEME-031). A reader's pass is no proof: specs 001, 004, 009, 010, 012 to 014, 016, and 024 to 026 were read more lightly than the rest. Issue #19 settled how a focused row takes the reversal: it keeps its state colour as a bar, and TUI-THEME-006 and TUI-THEME-007 now say so, read off drawn frames at each state. Issue #20 drew what the design promised: the star's colour on badges and event lines (TUI-THEME-032), flavour's dim in the Journal (TUI-THEME-033), and a coat on event words that name a store (TUI-THEME-024).
 
 ## Work Required
 
-- #20: three colours the design states that the frame does not draw.
 - #21: tests that assert less than their spec says (TUI-THEME-003, TUI-THEME-010, TUI-THEME-011, TUI-THEME-012, TUI-THEME-015, TUI-THEME-019, TUI-THEME-022).

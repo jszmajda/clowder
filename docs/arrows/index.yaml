@@ -182,7 +182,7 @@ arrows:
     parent: tui
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 3fb11a5d70996230468fe19e494c2d3a211cbbf4
+    audited_sha: 89ce0039b606002881fb2f91bc2efadb5c75dea4
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
@@ -237,11 +237,11 @@ arrows:
     parent: tui
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: d6216cb1f0fa7625af9cb479d90bd9c6c000c6e1
+    audited_sha: 89ce0039b606002881fb2f91bc2efadb5c75dea4
     blocks: [render]
     blockedBy: []
     detail: tui/theme/theme.md
-    next: "#20, #21: three undrawn colours, thin tests"
+    next: "#21: thin tests"
     drift: null
 
 unmapped:
