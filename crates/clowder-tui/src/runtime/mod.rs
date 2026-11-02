@@ -366,7 +366,7 @@ pub fn session<B: ratatui::backend::Backend>(
         return parting;
     };
 
-    // The only place real clocks are read. Both are sampled together so their
+    // The loop's own reading of both clocks, sampled together so their
     // difference is meaningful: the wall clock outrunning the monotonic one
     // is the machine having been suspended. @spec TUI-RUN-021, TUI-RUN-022
     let mut last_mono = crate::runtime::now::instant();
@@ -529,7 +529,7 @@ impl App {
     ///
     /// Generic over the backend so the ordering can be tested against an
     /// in-memory terminal; `reading` is passed in for the same reason, and
-    /// because `run` is the only thing that should be reading real clocks.
+    /// because `run` is what takes the loop's reading of the clocks.
     /// @spec TUI-RUN-014, TUI-RUN-015, TUI-RUN-016, TUI-RUN-017, TUI-RUN-026,
     /// TUI-RUN-065
     pub fn step<B: ratatui::backend::Backend>(
