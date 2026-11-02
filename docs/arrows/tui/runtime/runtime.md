@@ -4,7 +4,7 @@ This leaf owns the boundary between the operating system and the pure core: term
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-02 (commit `90c0684e119d`). 61 of 61 active specs implemented, each cited by a test; 3 deferred.
+**PARTIAL** — last audited 2026-11-02 (commit `968ae1882751`). 63 of 63 active specs implemented, each cited by a test; 1 deferred.
 
 ## References
 
@@ -45,9 +45,9 @@ This leaf owns the boundary between the operating system and the pure core: term
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-RUN-001 – TUI-RUN-075 | 61 | 3 | 0 |
+| All | TUI-RUN-001 – TUI-RUN-075 | 63 | 1 | 0 |
 
-**Summary:** 61 of 61 active specs implemented; 3 deferred.
+**Summary:** 63 of 63 active specs implemented; 1 deferred.
 
 ## Key Findings
 
@@ -57,8 +57,9 @@ Audited 2026-11-02, for what issue #26 changed. A holder now reads as running fr
 
 Audited 2026-11-02, for what issue #27 changed. A frame reads its clocks after its wait, each reading starting where the last ended across a wake and on into play (TUI-RUN-073, TUI-RUN-036), and every way out takes one last reading before it saves (TUI-RUN-074), each ending tested with the machine suspended just before it and the last reading checked by removing it. A reading past the absence cap retains a truncated report (TUI-RUN-024), with no gains, its ticks not having run; #33 holds what a suspend inside the cap shows. A wall clock a test can hold made the suspend testable (TUI-RUN-075). Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
+Audited 2026-11-02, for what issue #28 changed. A save is decoded strictly, so a bad byte makes it corrupt rather than letting it parse and be overwritten (TUI-RUN-012), and the whole of setting a damaged save aside, telling the player, and starting anew is now tested on a real terminal, for a bad byte and for an unparseable file. A fallback save path is stated before the terminal is taken (TUI-RUN-005). That branch cannot be reached by a real launch on a machine whose user has a home directory, so its choice of path and its statement are tested as functions, and the one line calling them is read rather than run. TUI-RUN-032 stays deferred on purpose, its reason in its spec. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
 ## Work Required
 
-- #28: a damaged save can be overwritten; a fallback path unstated (TUI-RUN-005, TUI-RUN-012, deferred).
 - #29: thin tests, stray annotations, and open questions.
 - #33: a suspend inside the absence cap leaves no report, where a restart would.
