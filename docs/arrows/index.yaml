@@ -182,7 +182,7 @@ arrows:
     parent: tui
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 89ce0039b606002881fb2f91bc2efadb5c75dea4
+    audited_sha: f36f4f91aa8e65a3b6ef0dfae70b6d44c0907f6c
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
@@ -215,22 +215,22 @@ arrows:
     parent: tui
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 3fd1386915362cf0e16ce5abc8de0ecc23321f4f
+    audited_sha: f36f4f91aa8e65a3b6ef0dfae70b6d44c0907f6c
     blocks: []
     blockedBy: [navigation, runtime, theme]
     detail: tui/render/render.md
     next: "#18, #21: the frame budget, one untested clause"
     drift: null
   runtime:
-    status: OK
+    status: PARTIAL
     parent: tui
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-11-01
+    audited: 2026-11-01
+    audited_sha: f36f4f91aa8e65a3b6ef0dfae70b6d44c0907f6c
     blocks: [render]
     blockedBy: [navigation, persistence]
     detail: tui/runtime/runtime.md
-    next: null
+    next: "#26, #27, #28, #29: the lock, a resume, a damaged save, thin tests"
     drift: null
   theme:
     status: PARTIAL
