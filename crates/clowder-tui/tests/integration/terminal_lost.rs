@@ -1921,34 +1921,43 @@ fn every_key_but_quitting() -> Vec<Vec<u8>> {
 /// @spec TUI-RUN-063
 #[test]
 fn no_key_turns_mouse_reporting_off_while_the_game_runs() {
-    for phase in [Phase::Play, Phase::Waking] {
-        let what = format!("every key pressed ({phase:?})");
-        let mut game = Game::launch(
-            "mouse-keys",
-            phase,
-            Terminal::Controlling,
-            Frames::ToTheTerminal,
-            Parting::ToAFile,
-        );
-        for key in every_key_but_quitting() {
-            game.send(&key);
-            std::thread::sleep(Duration::from_millis(15));
-            // Alone, so it is read as Esc and not as the start of a chord.
-            game.send(b"\x1b");
-            std::thread::sleep(Duration::from_millis(40));
-            game.drain();
-            assert!(
-                game.child.try_wait().expect("polling the child").is_none(),
-                "{what}: fixture — the game ended on {key:?}, which is not a quit key"
-            );
+    // Each phase is a real child with a clock of its own that no test can hold,
+    // and pressing every key takes it real time, so they run side by side.
+    std::thread::scope(|scope| {
+        for (phase, name) in [
+            (Phase::Play, "mouse-keys-play"),
+            (Phase::Waking, "mouse-keys-wake"),
+        ] {
+            scope.spawn(move || {
+                let what = format!("every key pressed ({phase:?})");
+                let mut game = Game::launch(
+                    name,
+                    phase,
+                    Terminal::Controlling,
+                    Frames::ToTheTerminal,
+                    Parting::ToAFile,
+                );
+                for key in every_key_but_quitting() {
+                    game.send(&key);
+                    std::thread::sleep(Duration::from_millis(15));
+                    // Alone, so it is read as Esc and not as the start of a chord.
+                    game.send(b"\x1b");
+                    std::thread::sleep(Duration::from_millis(40));
+                    game.drain();
+                    assert!(
+                        game.child.try_wait().expect("polling the child").is_none(),
+                        "{what}: fixture — the game ended on {key:?}, which is not a quit key"
+                    );
+                }
+                game.settle();
+                let from = game.drawn.len();
+                game.terminate();
+                game.expect_a_clean_ending(&what);
+                expect_reporting_turned_on(&game.drawn, &what);
+                expect_reporting_turned_off(&game.drawn, from, &what);
+            });
         }
-        game.settle();
-        let from = game.drawn.len();
-        game.terminate();
-        game.expect_a_clean_ending(&what);
-        expect_reporting_turned_on(&game.drawn, &what);
-        expect_reporting_turned_off(&game.drawn, from, &what);
-    }
+    });
 }
 
 /// Every file beneath `dir`, as paths relative to it.

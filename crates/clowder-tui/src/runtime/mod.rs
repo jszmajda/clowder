@@ -5,6 +5,7 @@
 
 pub mod clock;
 pub mod lock;
+pub mod now;
 pub mod persist;
 pub mod term;
 pub mod wake;
@@ -343,7 +344,7 @@ pub fn session<B: ratatui::backend::Backend>(
                 view,
                 clock: TickAccumulator::default(),
                 save_path,
-                last_save: Instant::now(),
+                last_save: crate::runtime::now::instant(),
                 prev_layout: None,
                 pointer_record: None,
                 quitting: false,
@@ -368,11 +369,11 @@ pub fn session<B: ratatui::backend::Backend>(
     // The only place real clocks are read. Both are sampled together so their
     // difference is meaningful: the wall clock outrunning the monotonic one
     // is the machine having been suspended. @spec TUI-RUN-021, TUI-RUN-022
-    let mut last_mono = Instant::now();
+    let mut last_mono = crate::runtime::now::instant();
     let mut last_wall = std::time::SystemTime::now();
 
     while !app.quitting && !terminated() {
-        let now_mono = Instant::now();
+        let now_mono = crate::runtime::now::instant();
         let now_wall = std::time::SystemTime::now();
         let reading = clock::Reading {
             monotonic: now_mono.duration_since(last_mono),
@@ -456,7 +457,7 @@ fn run_wake<B: ratatui::backend::Backend>(
             return None;
         }
     };
-    let mut last_mono = Instant::now();
+    let mut last_mono = crate::runtime::now::instant();
     let mut last_wall = std::time::SystemTime::now();
     loop {
         let w = match wake {
@@ -470,7 +471,7 @@ fn run_wake<B: ratatui::backend::Backend>(
             return None;
         }
 
-        let now_mono = Instant::now();
+        let now_mono = crate::runtime::now::instant();
         let now_wall = std::time::SystemTime::now();
         let reading = clock::Reading {
             monotonic: now_mono.duration_since(last_mono),
@@ -651,7 +652,8 @@ impl App {
                             Err(e) => {
                                 self.view.footer = Some((
                                     crate::nav::plain_rejection(&cmd, &e),
-                                    Instant::now() + std::time::Duration::from_secs(4),
+                                    crate::runtime::now::instant()
+                                        + std::time::Duration::from_secs(4),
                                 ));
                             }
                         },
@@ -686,7 +688,8 @@ impl App {
                                 };
                                 self.view.footer = Some((
                                     message,
-                                    Instant::now() + std::time::Duration::from_secs(4),
+                                    crate::runtime::now::instant()
+                                        + std::time::Duration::from_secs(4),
                                 ));
                             }
                         }
@@ -746,7 +749,7 @@ impl App {
 
         // ---- 4. autosave ----------------------------------------------------
         // @spec TUI-RUN-026, TUI-RUN-028
-        if persist::autosave_due(self.last_save.elapsed()) {
+        if persist::autosave_due(crate::runtime::now::since(self.last_save)) {
             match self.save() {
                 Ok(()) => self.save_failed = false,
                 Err(e) => {
@@ -757,12 +760,12 @@ impl App {
                         self.save_failed = true;
                         self.view.footer = Some((
                             format!("could not save: {e}"),
-                            Instant::now() + std::time::Duration::from_secs(6),
+                            crate::runtime::now::instant() + std::time::Duration::from_secs(6),
                         ));
                     }
                 }
             }
-            self.last_save = Instant::now();
+            self.last_save = crate::runtime::now::instant();
         }
 
         // ---- 5. render ------------------------------------------------------

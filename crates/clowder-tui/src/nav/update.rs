@@ -10,7 +10,7 @@
 //! TUI-NAV-112, TUI-NAV-113, TUI-NAV-114, TUI-NAV-116, TUI-NAV-118,
 //! TUI-NAV-120, TUI-NAV-121
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use clowder_core::{Command, GameState, LockReason};
 
@@ -531,7 +531,7 @@ fn handle_toggle_done(view: &mut ViewState, state: &GameState) -> Outcome {
     if !live {
         return Outcome::Handled;
     }
-    let now = Instant::now();
+    let now = crate::runtime::now::instant();
     let distinct = view
         .last_repeat
         .is_none_or(|last| now.duration_since(last) >= REPEAT_GATE);
@@ -614,7 +614,10 @@ fn owned_one_shot(state: &GameState, row: &Row) -> bool {
 }
 
 fn set_footer(view: &mut ViewState, message: impl Into<String>) {
-    view.footer = Some((message.into(), Instant::now() + FOOTER_DURATION));
+    view.footer = Some((
+        message.into(),
+        crate::runtime::now::instant() + FOOTER_DURATION,
+    ));
 }
 
 /// Enter, x, X, +/=, and -/Backspace all resolve to "the row under the
@@ -637,7 +640,7 @@ fn handle_activate(view: &mut ViewState, state: &GameState) -> Outcome {
     // guard renewing on every press so a continuous hold never wears it down.
     // @spec TUI-NAV-061
     if view.field_guard {
-        let now = Instant::now();
+        let now = crate::runtime::now::instant();
         let distinct = view
             .last_repeat
             .is_none_or(|last| now.duration_since(last) >= REPEAT_GATE);
@@ -739,7 +742,7 @@ fn handle_appoint_elder(view: &mut ViewState, state: &GameState) -> Outcome {
 /// cannot outrun the shell's own pace. The cursor never moves on action.
 /// @spec TUI-NAV-010
 fn fire_once(view: &mut ViewState, command: Command) -> Outcome {
-    let now = Instant::now();
+    let now = crate::runtime::now::instant();
     if let Some(last) = view.last_repeat {
         if now.duration_since(last) < REPEAT_GATE {
             // A press dropped while a fence stands renews the clock, so a
@@ -761,7 +764,7 @@ fn fire_once(view: &mut ViewState, command: Command) -> Outcome {
 /// gate has passed) commits, and a held/auto-repeating Enter can never widen
 /// that gap into a commit.
 fn activate_heavy(view: &mut ViewState, key: &RowKey, command: Command) -> Outcome {
-    let now = Instant::now();
+    let now = crate::runtime::now::instant();
 
     let already_armed_here = view
         .armed
@@ -830,9 +833,9 @@ fn accept_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
                     view.armed = Some(ArmedRow {
                         key: row.key.clone(),
                         command: counted,
-                        expires_at: Instant::now() + ARM_DURATION,
+                        expires_at: crate::runtime::now::instant() + ARM_DURATION,
                     });
-                    view.last_repeat = Some(Instant::now());
+                    view.last_repeat = Some(crate::runtime::now::instant());
                     Outcome::Handled
                 } else {
                     guard_after_field(view);
@@ -902,7 +905,7 @@ fn accept_palette(view: &mut ViewState, state: &GameState) -> Outcome {
 /// @spec TUI-NAV-061
 pub(super) fn guard_after_field(view: &mut ViewState) {
     view.field_guard = true;
-    view.last_repeat = Some(Instant::now());
+    view.last_repeat = Some(crate::runtime::now::instant());
 }
 
 /// Substitute a typed count into a count-taking command, keeping every other
@@ -971,7 +974,7 @@ fn handle_count_prompt(view: &mut ViewState, state: &GameState) -> Outcome {
 /// looked at, with no footer note of its own.
 /// @spec TUI-NAV-012
 fn handle_max_affordable(view: &mut ViewState, state: &GameState) -> Outcome {
-    let now = Instant::now();
+    let now = crate::runtime::now::instant();
     if let Some(last) = view.last_repeat {
         if now.duration_since(last) < REPEAT_GATE {
             // A press dropped while the fold's fence stands renews the clock,

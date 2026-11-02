@@ -15,6 +15,7 @@
 //! Enter would perform the heaviest action in the game in a tenth of a second.
 //! It is tested here the way an adversary would test it: by holding the key.
 
+use clowder_tui::runtime::now;
 use std::time::{Duration, Instant};
 
 use std::collections::BTreeSet;
@@ -37,6 +38,9 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
+
+/// A key held down as fast as anything could press it, on a clock moved by hand.
+const ONE_PRESS: Duration = Duration::from_millis(1);
 
 fn kitten(name: &str, job: Option<JobId>) -> Kitten {
     Kitten {
@@ -207,7 +211,7 @@ fn move_row(state: &GameState) -> (RowKey, Command) {
 /// things to disarm a row: about eight seconds passing, and navigation.
 fn commit_deliberately(view: &mut ViewState, state: &GameState) -> Outcome {
     for _ in 0..4 {
-        std::thread::sleep(Duration::from_millis(300));
+        now::advance(Duration::from_millis(300));
         let out = update(Action::Activate, view, state);
         if out != Outcome::Handled {
             return out;
@@ -249,6 +253,7 @@ fn would_fire(out: &Outcome, command: Command) -> bool {
 /// @spec TUI-NAV-015
 #[test]
 fn the_first_enter_on_a_heavy_row_arms_it_and_fires_nothing() {
+    let _clock = now::held();
     let state = rich();
     let (key, command) = move_row(&state);
     let mut view = focused(Section::Legacy, key.clone());
@@ -283,6 +288,7 @@ fn the_first_enter_on_a_heavy_row_arms_it_and_fires_nothing() {
 /// @spec TUI-NAV-015
 #[test]
 fn arming_expires_about_eight_seconds_out() {
+    let _clock = now::held();
     let state = rich();
     let (key, _) = move_row(&state);
     let mut view = focused(Section::Legacy, key);
@@ -290,7 +296,7 @@ fn arming_expires_about_eight_seconds_out() {
     update(Action::Activate, &mut view, &state);
     let armed = view.armed.as_ref().expect("nothing armed");
 
-    let left = armed.expires_at.saturating_duration_since(Instant::now());
+    let left = armed.expires_at.saturating_duration_since(now::instant());
     assert!(
         left >= Duration::from_secs(7) && left <= Duration::from_secs(9),
         "an armed row expires in {left:?}; TUI-NAV-015 says about eight seconds — long enough \
@@ -305,6 +311,7 @@ fn arming_expires_about_eight_seconds_out() {
 /// @spec TUI-NAV-015
 #[test]
 fn any_navigation_disarms_silently() {
+    let _clock = now::held();
     let state = rich();
     let (key, command) = move_row(&state);
 
@@ -343,15 +350,16 @@ fn any_navigation_disarms_silently() {
 /// @spec TUI-NAV-015
 #[test]
 fn an_expired_arming_never_commits() {
+    let _clock = now::held();
     let state = rich();
     let (key, command) = move_row(&state);
     let mut view = focused(Section::Legacy, key);
 
     update(Action::Activate, &mut view, &state);
     // Age the arming past its expiry without waiting eight real seconds.
-    view.armed.as_mut().expect("fixture: armed").expires_at = Instant::now();
+    view.armed.as_mut().expect("fixture: armed").expires_at = now::instant();
 
-    std::thread::sleep(Duration::from_millis(300));
+    now::advance(Duration::from_millis(300));
     let out = update(Action::Activate, &mut view, &state);
 
     assert!(
@@ -364,7 +372,7 @@ fn an_expired_arming_never_commits() {
         .as_ref()
         .expect("the expired row neither committed nor re-armed, so Enter did nothing at all");
     assert!(
-        armed.expires_at > Instant::now(),
+        armed.expires_at > now::instant(),
         "the re-armed row is still carrying its old, already-expired deadline"
     );
 }
@@ -375,6 +383,7 @@ fn an_expired_arming_never_commits() {
 /// @spec TUI-NAV-015, TUI-NAV-043
 #[test]
 fn a_distinct_second_enter_commits_the_heavy_action() {
+    let _clock = now::held();
     let state = rich();
     let (key, command) = move_row(&state);
     let mut view = focused(Section::Legacy, key);
@@ -408,13 +417,15 @@ fn a_distinct_second_enter_commits_the_heavy_action() {
 /// @spec TUI-NAV-051, TUI-NAV-010
 #[test]
 fn a_held_enter_arms_the_row_and_goes_no_further() {
+    let _clock = now::held();
     let state = rich();
     for (name, section, key, command) in heavy_rows(&state) {
         let mut view = focused(section, key);
 
-        let start = Instant::now();
+        let start = now::instant();
         let mut presses = 0u32;
-        while start.elapsed() < Duration::from_millis(400) {
+        while now::since(start) < Duration::from_millis(400) {
+            now::advance(ONE_PRESS);
             presses += 1;
             let out = update(Action::Activate, &mut view, &state);
             assert!(
@@ -422,7 +433,7 @@ fn a_held_enter_arms_the_row_and_goes_no_further() {
                 "holding Enter on the {name} row committed it after {presses} presses in \
                  {:?} — the heaviest actions in the game must not be reachable by leaning \
                  on a key",
-                start.elapsed()
+                now::since(start)
             );
         }
 
@@ -447,6 +458,7 @@ fn a_held_enter_arms_the_row_and_goes_no_further() {
 /// @spec TUI-NAV-051
 #[test]
 fn x_max_never_commits_a_heavy_action() {
+    let _clock = now::held();
     let state = rich();
     for (name, section, key, command) in heavy_rows(&state) {
         let mut fresh_view = focused(section, key.clone());
@@ -460,7 +472,7 @@ fn x_max_never_commits_a_heavy_action() {
         let mut armed_view = focused(section, key);
         update(Action::Activate, &mut armed_view, &state);
         assert!(armed_view.armed.is_some(), "fixture: {name} must arm first");
-        std::thread::sleep(Duration::from_millis(300));
+        now::advance(Duration::from_millis(300));
         let out = update(Action::MaxAffordable, &mut armed_view, &state);
         assert!(
             !would_fire(&out, command),
@@ -476,6 +488,7 @@ fn x_max_never_commits_a_heavy_action() {
 /// @spec TUI-NAV-015
 #[test]
 fn the_four_heavy_actions_are_the_ones_the_spec_names() {
+    let _clock = now::held();
     let state = rich();
 
     for (name, section, key, command) in heavy_rows(&state) {
@@ -522,6 +535,7 @@ fn the_four_heavy_actions_are_the_ones_the_spec_names() {
 /// @spec TUI-NAV-043
 #[test]
 fn arming_reserves_nothing() {
+    let _clock = now::held();
     let state = rich();
     let before = state.clone();
     let (key, command) = move_row(&state);
@@ -550,6 +564,7 @@ fn arming_reserves_nothing() {
 /// @spec TUI-NAV-043
 #[test]
 fn arming_a_heavy_row_disarms_any_row_already_armed() {
+    let _clock = now::held();
     let state = rich();
     let (move_key, move_command) = move_row(&state);
     let (pass_key, pass_command) = find_row(&state, Section::Legacy, |c| {
@@ -561,7 +576,7 @@ fn arming_a_heavy_row_disarms_any_row_already_armed() {
     view.armed = Some(ArmedRow {
         key: pass_key,
         command: pass_command,
-        expires_at: Instant::now() + Duration::from_secs(8),
+        expires_at: now::instant() + Duration::from_secs(8),
     });
 
     let out = update(Action::Activate, &mut view, &state);
@@ -594,6 +609,7 @@ fn arming_a_heavy_row_disarms_any_row_already_armed() {
 /// @spec TUI-NAV-043
 #[test]
 fn the_commit_re_runs_the_real_command_for_the_core_to_re_validate() {
+    let _clock = now::held();
     let state = rich();
     let (key, command) = move_row(&state);
     let mut view = focused(Section::Legacy, key);
@@ -633,6 +649,7 @@ fn the_commit_re_runs_the_real_command_for_the_core_to_re_validate() {
 /// @spec TUI-NAV-036
 #[test]
 fn the_deep_nap_count_prompts_enter_arms_and_a_second_enter_commits() {
+    let _clock = now::held();
     let state = rich();
     let (key, _) = find_row(&state, Section::Dreams, |c| {
         matches!(c, Command::DeepNap(_))
@@ -712,6 +729,7 @@ fn accept_count(digits: &str, view: &mut ViewState, state: &GameState) -> Outcom
 /// @spec TUI-NAV-036
 #[test]
 fn a_plain_enter_on_the_unarmed_counted_heavy_row_arms_one_unit() {
+    let _clock = now::held();
     let state = rich();
     let (key, mut view) = nap_view(&state);
 
@@ -745,6 +763,7 @@ fn a_plain_enter_on_the_unarmed_counted_heavy_row_arms_one_unit() {
 /// @spec TUI-NAV-036
 #[test]
 fn a_new_count_on_an_armed_counted_row_re_arms_it_with_that_count_and_a_fresh_expiry() {
+    let _clock = now::held();
     let state = rich();
     let (key, mut view) = nap_view(&state);
 
@@ -754,9 +773,9 @@ fn a_new_count_on_an_armed_counted_row_re_arms_it_with_that_count_and_a_fresh_ex
         Some(Command::DeepNap(3))
     );
     // Age the first arming so a renewed expiry is distinguishable from it.
-    view.armed.as_mut().expect("armed").expires_at = Instant::now() + Duration::from_secs(1);
+    view.armed.as_mut().expect("armed").expires_at = now::instant() + Duration::from_secs(1);
 
-    std::thread::sleep(Duration::from_millis(300));
+    now::advance(Duration::from_millis(300));
     let out = accept_count("7", &mut view, &state);
 
     assert_eq!(
@@ -775,7 +794,7 @@ fn a_new_count_on_an_armed_counted_row_re_arms_it_with_that_count_and_a_fresh_ex
         "the re-armed nap still carries the old count; the summary would describe a nap the \
          next Enter does not commit"
     );
-    let left = armed.expires_at.saturating_duration_since(Instant::now());
+    let left = armed.expires_at.saturating_duration_since(now::instant());
     assert!(
         left >= Duration::from_secs(7),
         "the re-armed nap kept its old expiry ({left:?} left); a re-arming starts a fresh one"
@@ -795,6 +814,7 @@ fn a_new_count_on_an_armed_counted_row_re_arms_it_with_that_count_and_a_fresh_ex
 /// @spec TUI-NAV-036
 #[test]
 fn an_empty_or_zero_count_arms_nothing_and_leaves_any_arming_as_it_stood() {
+    let _clock = now::held();
     let state = rich();
 
     for digits in ["", "0", "00"] {
@@ -812,7 +832,7 @@ fn an_empty_or_zero_count_arms_nothing_and_leaves_any_arming_as_it_stood() {
             .armed
             .clone()
             .expect("fixture: a count of 5 arms the nap");
-        std::thread::sleep(Duration::from_millis(20));
+        now::advance(Duration::from_millis(20));
 
         let out = accept_count(digits, &mut view, &state);
         assert_eq!(
@@ -836,6 +856,7 @@ fn an_empty_or_zero_count_arms_nothing_and_leaves_any_arming_as_it_stood() {
 /// @spec TUI-NAV-036
 #[test]
 fn the_counted_commit_re_runs_the_real_command_with_the_armed_count() {
+    let _clock = now::held();
     let state = rich();
     let (_, mut view) = nap_view(&state);
     assert_eq!(accept_count("4", &mut view, &state), Outcome::Handled);
@@ -865,6 +886,7 @@ fn the_counted_commit_re_runs_the_real_command_with_the_armed_count() {
 /// @spec TUI-NAV-076
 #[test]
 fn the_arming_expiry_is_wall_clock_time_at_every_game_speed() {
+    let _clock = now::held();
     for speed in [0.25, 0.5, 1.0, 2.0, 4.0, 8.0] {
         let mut state = rich();
         state.speed = speed;
@@ -875,7 +897,7 @@ fn the_arming_expiry_is_wall_clock_time_at_every_game_speed() {
                 .armed
                 .as_ref()
                 .unwrap_or_else(|| panic!("{name} did not arm"));
-            let left = armed.expires_at.saturating_duration_since(Instant::now());
+            let left = armed.expires_at.saturating_duration_since(now::instant());
             assert!(
                 left >= Duration::from_secs(7) && left <= Duration::from_secs(9),
                 "at speed ×{speed} the {name} arming expires in {left:?}; it is about eight \
@@ -893,6 +915,7 @@ fn the_arming_expiry_is_wall_clock_time_at_every_game_speed() {
 /// @spec TUI-NAV-076
 #[test]
 fn every_navigation_key_ends_an_arming_silently_whether_or_not_it_moves_anything() {
+    let _clock = now::held();
     let state = rich();
     let (row_key, command) = move_row(&state);
     assert_eq!(
@@ -960,6 +983,7 @@ fn every_navigation_key_ends_an_arming_silently_whether_or_not_it_moves_anything
 /// @spec TUI-NAV-076
 #[test]
 fn the_palettes_jump_ends_an_arming() {
+    let _clock = now::held();
     let state = rich();
     let (row_key, command) = move_row(&state);
     let mut view = focused(Section::Legacy, row_key);
@@ -1000,6 +1024,7 @@ fn the_palettes_jump_ends_an_arming() {
 /// @spec TUI-NAV-076
 #[test]
 fn esc_closing_an_arming_ends_it_silently() {
+    let _clock = now::held();
     let state = rich();
     for (name, section, row_key, command) in heavy_rows(&state) {
         let mut view = focused(section, row_key);
@@ -1026,6 +1051,7 @@ fn esc_closing_an_arming_ends_it_silently() {
 /// @spec TUI-NAV-076
 #[test]
 fn a_commit_ends_the_arming_whether_the_core_accepts_or_refuses_it() {
+    let _clock = now::held();
     let state = rich();
     let (key, command) = move_row(&state);
 
@@ -1051,7 +1077,7 @@ fn a_commit_ends_the_arming_whether_the_core_accepts_or_refuses_it() {
         );
         assert!(view.armed.is_none(), "an {which} commit left the row armed");
 
-        std::thread::sleep(Duration::from_millis(300));
+        now::advance(Duration::from_millis(300));
         let out = update(Action::Activate, &mut view, world);
         assert!(
             !would_fire(&out, command),
@@ -1070,6 +1096,7 @@ fn a_commit_ends_the_arming_whether_the_core_accepts_or_refuses_it() {
 /// @spec TUI-NAV-076
 #[test]
 fn arming_another_row_ends_the_first_arming() {
+    let _clock = now::held();
     let state = rich();
     let (move_key, move_command) = move_row(&state);
     let (nap_key, _) = find_row(&state, Section::Dreams, |c| {
@@ -1080,7 +1107,7 @@ fn arming_another_row_ends_the_first_arming() {
     view.armed = Some(ArmedRow {
         key: move_key,
         command: move_command,
-        expires_at: Instant::now() + Duration::from_secs(8),
+        expires_at: now::instant() + Duration::from_secs(8),
     });
     assert_eq!(accept_count("2", &mut view, &state), Outcome::Handled);
 
@@ -1103,6 +1130,7 @@ fn arming_another_row_ends_the_first_arming() {
 /// @spec TUI-NAV-076
 #[test]
 fn opening_things_and_the_speed_keys_leave_an_arming_running() {
+    let _clock = now::held();
     let state = rich();
     let (nap_key, _) = find_row(&state, Section::Dreams, |c| {
         matches!(c, Command::DeepNap(_))
@@ -1128,7 +1156,7 @@ fn opening_things_and_the_speed_keys_leave_an_arming_running() {
     ];
     for (c, then_esc) in openers {
         let (mut view, before) = armed_view();
-        std::thread::sleep(Duration::from_millis(5));
+        now::advance(Duration::from_millis(5));
 
         press_char(c, &mut view, &state);
         assert_eq!(
@@ -1167,6 +1195,7 @@ fn opening_things_and_the_speed_keys_leave_an_arming_running() {
 /// @spec TUI-NAV-076
 #[test]
 fn scrolling_an_open_journal_or_help_overlay_leaves_the_row_beneath_armed() {
+    let _clock = now::held();
     let state = rich();
     let (key_, _) = move_row(&state);
 
@@ -1208,16 +1237,18 @@ fn scrolling_an_open_journal_or_help_overlay_leaves_the_row_beneath_armed() {
 /// @spec TUI-NAV-010
 #[test]
 fn held_enter_fires_no_faster_than_ten_times_a_second() {
+    let _clock = now::held();
     let state = rich();
     let (key, command) = find_row(&state, Section::Meadow, |c| {
         matches!(c, Command::GatherCatnip)
     });
     let mut view = focused(Section::Meadow, key);
 
-    let start = Instant::now();
+    let start = now::instant();
     let mut fired = 0u32;
     let mut presses = 0u32;
-    while start.elapsed() < Duration::from_secs(1) {
+    while now::since(start) < Duration::from_secs(1) {
+        now::advance(ONE_PRESS);
         presses += 1;
         if would_fire(&update(Action::Activate, &mut view, &state), command) {
             fired += 1;
@@ -1248,6 +1279,7 @@ fn held_enter_fires_no_faster_than_ten_times_a_second() {
 /// @spec TUI-NAV-010
 #[test]
 fn the_cursor_does_not_move_on_action() {
+    let _clock = now::held();
     let state = rich();
     let (key, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
 
@@ -1451,6 +1483,7 @@ fn assert_mnemonic_fixture(state: &GameState) {
 /// @spec TUI-NAV-046
 #[test]
 fn a_letter_acts_exactly_where_it_is_a_live_mnemonic_and_is_silent_everywhere_else() {
+    let _clock = now::held();
     let mut live_seen = 0u32;
     for (label, state) in [("a meadow far along", rich()), ("a new meadow", fresh())] {
         if label == "a meadow far along" {
@@ -1533,6 +1566,7 @@ fn a_letter_acts_exactly_where_it_is_a_live_mnemonic_and_is_silent_everywhere_el
 /// @spec TUI-NAV-046
 #[test]
 fn a_mnemonic_never_acts_while_a_field_or_full_screen_overlay_holds_the_keyboard() {
+    let _clock = now::held();
     let state = rich();
     assert_mnemonic_fixture(&state);
     let (prompt_row, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
@@ -1605,6 +1639,7 @@ fn a_mnemonic_never_acts_while_a_field_or_full_screen_overlay_holds_the_keyboard
 /// @spec TUI-NAV-081
 #[test]
 fn a_mnemonic_press_acts_in_place_and_leaves_cursor_section_banner_and_layout_as_they_stood() {
+    let _clock = now::held();
     let state = rich();
     assert_mnemonic_fixture(&state);
 
@@ -1709,17 +1744,15 @@ fn hold_mnemonic(
     let (primary, _) = enter_on(&view, target, state);
     let primary =
         commands_of(&primary).expect("fixture: Enter on the mnemonic's row asks for a command");
-    let start = Instant::now();
+    let start = now::instant();
     let mut presses = 0u32;
     let mut fired = Vec::new();
-    while start.elapsed() < Duration::from_secs(1) {
+    while now::since(start) < Duration::from_secs(1) {
         presses += 1;
         if would_fire(&press_char(c, &mut view, state), primary) {
-            fired.push(Instant::now());
+            fired.push(now::instant());
         }
-        if let Some(p) = pace {
-            std::thread::sleep(p);
-        }
+        now::advance(pace.unwrap_or(ONE_PRESS));
     }
     (presses, fired)
 }
@@ -1754,6 +1787,7 @@ fn assert_no_faster_than_ten_a_second(fired: &[Instant], what: &str) {
 /// @spec TUI-NAV-081
 #[test]
 fn a_held_mnemonic_acts_no_more_than_ten_times_a_second() {
+    let _clock = now::held();
     let state = rich();
     assert_mnemonic_fixture(&state);
     for (c, section, focus, target) in one_context_per_mnemonic(&state) {
@@ -1777,6 +1811,7 @@ fn a_held_mnemonic_acts_no_more_than_ten_times_a_second() {
 /// @spec TUI-NAV-081
 #[test]
 fn a_held_mnemonics_pace_does_not_depend_on_the_key_repeat_rate() {
+    let _clock = now::held();
     let state = rich();
     assert_mnemonic_fixture(&state);
     let (c, section, focus, target) = one_context_per_mnemonic(&state)
@@ -1866,6 +1901,7 @@ fn small_clowder() -> GameState {
 /// @spec TUI-NAV-093
 #[test]
 fn every_kitten_rows_enter_promotes_it_and_the_clowder_p_answers_as_that_enter_does() {
+    let _clock = now::held();
     let mut checked = 0u32;
     for (label, state) in [
         ("a meadow far along", rich()),
@@ -1921,6 +1957,7 @@ fn every_kitten_rows_enter_promotes_it_and_the_clowder_p_answers_as_that_enter_d
 /// @spec TUI-NAV-094
 #[test]
 fn n_on_every_kitten_row_appoints_that_kitten_once_and_in_place() {
+    let _clock = now::held();
     let mut checked = 0u32;
     for (label, state) in [
         ("a meadow far along", rich()),
@@ -1988,20 +2025,18 @@ fn hold_n(
     pace: Option<Duration>,
 ) -> (u32, Vec<Instant>) {
     let mut view = focused(Section::Clowder, key.clone());
-    let start = Instant::now();
+    let start = now::instant();
     let mut presses = 0u32;
     let mut fired = Vec::new();
-    while start.elapsed() < Duration::from_secs(1) {
+    while now::since(start) < Duration::from_secs(1) {
         presses += 1;
         if would_fire(
             &press_char('n', &mut view, state),
             Command::AppointElder(ix),
         ) {
-            fired.push(Instant::now());
+            fired.push(now::instant());
         }
-        if let Some(p) = pace {
-            std::thread::sleep(p);
-        }
+        now::advance(pace.unwrap_or(ONE_PRESS));
     }
     (presses, fired)
 }
@@ -2014,6 +2049,7 @@ fn hold_n(
 /// @spec TUI-NAV-094
 #[test]
 fn a_held_n_acts_no_more_than_ten_times_a_second_whatever_the_repeat_rate() {
+    let _clock = now::held();
     let state = small_clowder();
     let (ix, key) = kitten_rows(&state)
         .into_iter()
@@ -2069,6 +2105,7 @@ fn a_held_n_acts_no_more_than_ten_times_a_second_whatever_the_repeat_rate() {
 /// @spec TUI-NAV-094
 #[test]
 fn n_never_acts_while_a_field_or_full_screen_overlay_holds_the_keyboard() {
+    let _clock = now::held();
     let state = small_clowder();
     let kittens = kitten_rows(&state);
     assert!(!kittens.is_empty(), "fixture: kitten rows are listed");
@@ -2130,6 +2167,7 @@ fn n_never_acts_while_a_field_or_full_screen_overlay_holds_the_keyboard() {
 /// @spec TUI-NAV-094
 #[test]
 fn n_is_an_unbound_key_everywhere_but_a_kitten_row_whose_gate_is_open() {
+    let _clock = now::held();
     let mut contexts: Vec<(String, GameState, ViewState)> = Vec::new();
     for (label, state) in [("a meadow far along", rich()), ("a new meadow", fresh())] {
         for (section, focus) in mnemonic_contexts(&state) {
@@ -2216,6 +2254,7 @@ fn n_is_an_unbound_key_everywhere_but_a_kitten_row_whose_gate_is_open() {
 /// @spec TUI-NAV-011
 #[test]
 fn x_opens_a_count_prompt_that_captures_digits() {
+    let _clock = now::held();
     let state = rich();
     let (key, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
     let mut view = focused(Section::Meadow, key);
@@ -2264,6 +2303,7 @@ fn x_opens_a_count_prompt_that_captures_digits() {
 /// @spec TUI-NAV-011, TUI-NAV-031
 #[test]
 fn the_count_prompts_enter_repeat_calls_a_repeat_n_command() {
+    let _clock = now::held();
     let state = rich();
     let (key, command) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
     let mut view = focused(Section::Meadow, key);
@@ -2291,6 +2331,7 @@ fn the_count_prompts_enter_repeat_calls_a_repeat_n_command() {
 /// @spec TUI-NAV-011, TUI-NAV-031
 #[test]
 fn the_count_prompts_enter_passes_the_count_to_a_count_taking_command() {
+    let _clock = now::held();
     let state = rich();
     let (key, _) = find_row(&state, Section::Clowder, |c| {
         matches!(c, Command::Pounce(_))
@@ -2318,6 +2359,7 @@ fn the_count_prompts_enter_passes_the_count_to_a_count_taking_command() {
 /// @spec TUI-NAV-011, TUI-NAV-031
 #[test]
 fn an_empty_or_zero_count_cancels() {
+    let _clock = now::held();
     let state = rich();
     let (key, command) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
 
@@ -2349,6 +2391,7 @@ fn an_empty_or_zero_count_cancels() {
 /// @spec TUI-NAV-031
 #[test]
 fn enter_on_every_unarmed_count_taking_row_takes_one_unit() {
+    let _clock = now::held();
     let state = rich();
     let (mut ordinary, mut heavy, mut trade) = (0, 0, 0);
 
@@ -2421,6 +2464,7 @@ fn enter_on_every_unarmed_count_taking_row_takes_one_unit() {
 /// @spec TUI-NAV-031
 #[test]
 fn an_empty_or_zero_count_closes_the_prompt_with_no_command_and_no_footer_on_every_row() {
+    let _clock = now::held();
     let state = rich();
     let gone = fresh();
     let (mut seen, mut armed_rows, mut vanished) = (0, 0, 0);
@@ -2522,6 +2566,7 @@ fn an_empty_or_zero_count_closes_the_prompt_with_no_command_and_no_footer_on_eve
 /// @spec TUI-NAV-011
 #[test]
 fn esc_cancels_the_count_prompt_with_no_effect() {
+    let _clock = now::held();
     let state = rich();
     let (key, command) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
     let mut view = focused(Section::Meadow, key.clone());
@@ -2550,6 +2595,7 @@ fn esc_cancels_the_count_prompt_with_no_effect() {
 /// @spec TUI-NAV-012
 #[test]
 fn x_max_repeats_under_a_shell_side_iteration_cap() {
+    let _clock = now::held();
     let state = rich();
     let (key, command) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
     let mut view = focused(Section::Meadow, key);
@@ -2584,6 +2630,7 @@ fn x_max_repeats_under_a_shell_side_iteration_cap() {
 /// @spec TUI-NAV-013
 #[test]
 fn a_count_row_assigns_on_plus_or_enter_and_unassigns_on_minus() {
+    let _clock = now::held();
     let state = rich();
     let (key, increment, decrement) = find_count_row(&state, Section::Clowder);
 
@@ -2615,6 +2662,7 @@ fn a_count_row_assigns_on_plus_or_enter_and_unassigns_on_minus() {
 /// @spec TUI-NAV-011, TUI-NAV-013
 #[test]
 fn x_scales_a_count_row_by_repeat_calling_its_assign() {
+    let _clock = now::held();
     let state = rich();
     let (key, increment, _) = find_count_row(&state, Section::Clowder);
     let mut view = focused(Section::Clowder, key);
@@ -2782,6 +2830,7 @@ fn rich_with_an_adopted_rule() -> GameState {
 /// @spec TUI-NAV-011
 #[test]
 fn x_opens_the_count_prompt_on_exactly_the_rows_that_take_a_count() {
+    let _clock = now::held();
     let state = rich_with_an_adopted_rule();
     let (mut repeat_n, mut count_taking, mut count_rows, mut heavy) = (0, 0, 0, 0);
 
@@ -2877,6 +2926,7 @@ fn x_opens_the_count_prompt_on_exactly_the_rows_that_take_a_count() {
 /// @spec TUI-NAV-070
 #[test]
 fn the_count_prompts_enter_does_what_each_row_takes_a_count_as() {
+    let _clock = now::held();
     let state = rich();
     let mut seen = 0;
 
@@ -2941,6 +2991,7 @@ fn the_count_prompts_enter_does_what_each_row_takes_a_count_as() {
 /// @spec TUI-NAV-071
 #[test]
 fn the_count_prompt_opens_and_attempts_on_rows_the_stock_cannot_cover() {
+    let _clock = now::held();
     let mut state = rich();
     for r in ResourceId::ALL {
         state.resources[r.ix()] = 0.0;
@@ -3004,6 +3055,7 @@ fn the_count_prompt_opens_and_attempts_on_rows_the_stock_cannot_cover() {
 /// @spec TUI-NAV-072
 #[test]
 fn an_open_count_prompt_acts_only_on_the_row_it_was_opened_on() {
+    let _clock = now::held();
     let state = rich();
     let mut seen = 0;
 
@@ -3065,6 +3117,7 @@ fn an_open_count_prompt_acts_only_on_the_row_it_was_opened_on() {
 /// @spec TUI-NAV-072
 #[test]
 fn a_count_prompt_whose_row_has_left_its_list_closes_with_no_effect_and_says_so() {
+    let _clock = now::held();
     let state = rich();
     let gone = fresh();
     let (mut repeat_n, mut count_taking, mut count_rows, mut heavy) = (0, 0, 0, 0);
@@ -3137,6 +3190,7 @@ fn a_count_prompt_whose_row_has_left_its_list_closes_with_no_effect_and_says_so(
 /// @spec TUI-NAV-012
 #[test]
 fn x_max_runs_every_row_that_takes_a_count_one_unit_per_call() {
+    let _clock = now::held();
     let state = rich();
     let (mut count_taking, mut seen) = (0, 0);
 
@@ -3190,6 +3244,7 @@ fn x_runs_on(state: &GameState, row: &Row) -> bool {
 /// @spec TUI-NAV-012
 #[test]
 fn x_max_asks_for_exactly_ten_thousand_calls_on_every_row_it_runs_on() {
+    let _clock = now::held();
     assert_eq!(
         MAX_AFFORDABLE_CAP, 10_000,
         "the shell-side cap is ten thousand calls"
@@ -3222,6 +3277,7 @@ fn x_max_asks_for_exactly_ten_thousand_calls_on_every_row_it_runs_on() {
 /// @spec TUI-NAV-012
 #[test]
 fn x_max_runs_on_rows_the_stock_cannot_cover() {
+    let _clock = now::held();
     let mut state = rich();
     for r in ResourceId::ALL {
         state.resources[r.ix()] = 0.0;
@@ -3307,10 +3363,10 @@ fn hold_x(
 ) -> (u32, Vec<Instant>) {
     let mut view = focused(section, row.key.clone());
     let whole = Outcome::Repeat(one_unit(row), MAX_AFFORDABLE_CAP);
-    let start = Instant::now();
+    let start = now::instant();
     let mut presses = 0u32;
     let mut ran = Vec::new();
-    while start.elapsed() < Duration::from_secs(1) {
+    while now::since(start) < Duration::from_secs(1) {
         presses += 1;
         let out = update(Action::MaxAffordable, &mut view, state);
         if commands_of(&out).is_some() {
@@ -3319,7 +3375,7 @@ fn hold_x(
                 "a held X on {:?} made a run that was not a whole run",
                 row.key
             );
-            ran.push(Instant::now());
+            ran.push(now::instant());
         } else {
             assert_eq!(
                 out,
@@ -3339,9 +3395,7 @@ fn hold_x(
             "a held X on {:?} opened or armed",
             row.key
         );
-        if let Some(p) = pace {
-            std::thread::sleep(p);
-        }
+        now::advance(pace.unwrap_or(ONE_PRESS));
     }
     (presses, ran)
 }
@@ -3376,6 +3430,7 @@ fn assert_x_no_faster_than_ten_a_second(ran: &[Instant], what: &str) {
 /// @spec TUI-NAV-012
 #[test]
 fn a_held_x_makes_no_more_than_ten_runs_a_second() {
+    let _clock = now::held();
     let state = rich();
     for (section, row) in one_x_row_of_each_kind(&state) {
         let (presses, ran) = hold_x(section, &row, None, &state);
@@ -3395,6 +3450,7 @@ fn a_held_x_makes_no_more_than_ten_runs_a_second() {
 /// @spec TUI-NAV-012
 #[test]
 fn a_held_xs_pace_does_not_depend_on_the_key_repeat_rate() {
+    let _clock = now::held();
     let state = rich();
     let (section, row) = one_x_row_of_each_kind(&state)
         .into_iter()
@@ -3429,6 +3485,7 @@ fn a_held_xs_pace_does_not_depend_on_the_key_repeat_rate() {
 /// @spec TUI-NAV-041
 #[test]
 fn enter_x_and_x_max_are_all_no_ops_on_an_owned_one_shot() {
+    let _clock = now::held();
     let state = rich();
     let owned = ContentId::Arch(ArchId::EverdreamArch);
     assert_eq!(
@@ -3474,6 +3531,7 @@ fn enter_x_and_x_max_are_all_no_ops_on_an_owned_one_shot() {
 /// @spec TUI-NAV-041
 #[test]
 fn x_and_x_max_are_no_ops_on_a_row_that_is_neither_counted_nor_repeatable() {
+    let _clock = now::held();
     let state = rich();
     let (key, command) = find_row(&state, Section::Meadow, |c| {
         matches!(c, Command::GatherCatnip)
@@ -3510,13 +3568,14 @@ fn x_and_x_max_are_no_ops_on_a_row_that_is_neither_counted_nor_repeatable() {
 /// @spec TUI-NAV-041, TUI-NAV-014
 #[test]
 fn a_footer_note_never_swallows_the_next_key() {
+    let _clock = now::held();
     let state = rich();
     let (build_key, build) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
 
     let mut view = focused(Section::Meadow, build_key);
     view.footer = Some((
         "not enough of something, said plainly".to_string(),
-        Instant::now() + Duration::from_secs(4),
+        now::instant() + Duration::from_secs(4),
     ));
 
     let out = update(Action::Activate, &mut view, &state);
@@ -3552,6 +3611,7 @@ fn a_footer_note_never_swallows_the_next_key() {
 /// @spec TUI-NAV-041
 #[test]
 fn x_and_x_max_say_why_on_every_row_they_do_not_act_on() {
+    let _clock = now::held();
     let state = rich_with_an_adopted_rule();
     let mut owned_notes: BTreeSet<String> = BTreeSet::new();
     let mut nothing_notes: BTreeSet<String> = BTreeSet::new();
@@ -3733,7 +3793,7 @@ fn assert_footer_says_something_plain(view: &ViewState, context: &str) {
              value rather than plain language"
         );
     }
-    let left = until.saturating_duration_since(Instant::now());
+    let left = until.saturating_duration_since(now::instant());
     assert!(
         left > Duration::from_millis(500) && left <= Duration::from_secs(10),
         "{context} left a footer note lasting {left:?}; TUI-NAV-014 asks for a few seconds — \
@@ -3806,6 +3866,7 @@ fn all_but_the_footer(view: &ViewState) -> String {
 /// @spec TUI-NAV-085
 #[test]
 fn with_nothing_listed_every_row_key_leaves_one_note_and_does_nothing_else() {
+    let _clock = now::held();
     let state = sky_emptied();
     let row_keys: [(&str, KeyEvent); 7] = [
         ("Enter", key(KeyCode::Enter)),
@@ -3860,6 +3921,7 @@ fn with_nothing_listed_every_row_key_leaves_one_note_and_does_nothing_else() {
 /// @spec TUI-NAV-085
 #[test]
 fn the_empty_focused_sections_own_digit_is_a_visit_not_a_refusal() {
+    let _clock = now::held();
     let state = sky_emptied();
     for (context, view) in standing_in_an_empty_sky() {
         let mut v = view.clone();
@@ -3909,6 +3971,7 @@ fn the_empty_focused_sections_own_digit_is_a_visit_not_a_refusal() {
 /// @spec TUI-NAV-016
 #[test]
 fn q_quits_at_once_from_anywhere_and_commits_nothing() {
+    let _clock = now::held();
     let state = rich();
     let (key, command) = move_row(&state);
 
@@ -3954,6 +4017,7 @@ fn q_quits_at_once_from_anywhere_and_commits_nothing() {
 /// @spec TUI-NAV-008
 #[test]
 fn returning_to_a_section_restores_the_item_even_after_reveals_insert_rows_above_it() {
+    let _clock = now::held();
     let landmark = ContentId::Structure(StructureId::ALL[5]);
 
     let mut before = fresh();
@@ -4006,6 +4070,7 @@ fn returning_to_a_section_restores_the_item_even_after_reveals_insert_rows_above
 /// @spec TUI-NAV-008
 #[test]
 fn every_selectable_row_in_a_section_carries_a_distinct_identity() {
+    let _clock = now::held();
     let state = rich();
 
     for section in Section::ALL {
@@ -4034,6 +4099,7 @@ fn every_selectable_row_in_a_section_carries_a_distinct_identity() {
 /// @spec TUI-NAV-032
 #[test]
 fn a_first_visit_lands_on_the_first_actionable_row() {
+    let _clock = now::held();
     // A meadow where the first thing on the Ideas list is revealed but not yet
     // affordable, and something further down is ready to go.
     let mut state = fresh();
@@ -4079,6 +4145,7 @@ fn a_first_visit_lands_on_the_first_actionable_row() {
 /// @spec TUI-NAV-032
 #[test]
 fn a_section_with_nothing_actionable_lands_on_its_first_row() {
+    let _clock = now::held();
     let state = fresh();
     // The first row is the first one the cursor can land on: a group header
     // above it is a signpost, not a row (TUI-NAV-099).
@@ -4105,6 +4172,7 @@ fn a_section_with_nothing_actionable_lands_on_its_first_row() {
 /// @spec TUI-NAV-032
 #[test]
 fn a_forgotten_item_falls_back_to_the_landing_rule() {
+    let _clock = now::held();
     let state = rich();
     let listed: Vec<RowKey> = rows(&state, Section::Ideas)
         .into_iter()
@@ -4134,6 +4202,7 @@ fn a_forgotten_item_falls_back_to_the_landing_rule() {
 /// @spec TUI-NAV-032
 #[test]
 fn the_cursor_never_lands_on_an_unselectable_row() {
+    let _clock = now::held();
     for (label, state) in [("a new meadow", fresh()), ("a maximal meadow", rich())] {
         for section in Section::ALL {
             let list = rows(&state, section);
@@ -4173,6 +4242,7 @@ fn the_cursor_never_lands_on_an_unselectable_row() {
 /// @spec TUI-NAV-099
 #[test]
 fn a_first_visit_lands_beneath_the_header_that_opens_a_sections_list() {
+    let _clock = now::held();
     let mut checked = 0;
     for (label, state) in [("a new meadow", fresh()), ("a maximal meadow", rich())] {
         for section in Section::ALL {
@@ -4389,9 +4459,10 @@ fn countable_rows(state: &GameState) -> Vec<Countable> {
 /// Hold Enter: a stream of presses far denser than any terminal's key repeat,
 /// every one of which must be spent on nothing.
 fn hold_enter(view: &mut ViewState, state: &GameState, what: &str) {
-    let start = Instant::now();
+    let start = now::instant();
     let mut presses = 0u32;
-    while start.elapsed() < Duration::from_millis(400) {
+    while now::since(start) < Duration::from_millis(400) {
+        now::advance(ONE_PRESS);
         presses += 1;
         let out = press(key(KeyCode::Enter), view, state);
         assert_eq!(
@@ -4401,7 +4472,7 @@ fn hold_enter(view: &mut ViewState, state: &GameState, what: &str) {
              {presses} ({:?} in) told the core {out:?}. Key-repeat is a machine typing, not a \
              player deciding — a held Enter after a field must not start acting on the row the \
              field returned to",
-            start.elapsed()
+            now::since(start)
         );
     }
     assert!(
@@ -4414,7 +4485,7 @@ fn hold_enter(view: &mut ViewState, state: &GameState, what: &str) {
 /// rather than guessing the threshold, as `commit_deliberately` does.
 fn act_deliberately(view: &mut ViewState, state: &GameState) -> Outcome {
     for _ in 0..4 {
-        std::thread::sleep(Duration::from_millis(300));
+        now::advance(Duration::from_millis(300));
         let out = press(key(KeyCode::Enter), view, state);
         if out != Outcome::Handled {
             return out;
@@ -4430,6 +4501,7 @@ fn act_deliberately(view: &mut ViewState, state: &GameState) -> Outcome {
 /// @spec TUI-NAV-037
 #[test]
 fn the_palette_takes_every_printable_character_into_its_query() {
+    let _clock = now::held();
     let state = rich();
     let (row, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
 
@@ -4498,6 +4570,7 @@ fn the_palette_takes_every_printable_character_into_its_query() {
 /// @spec TUI-NAV-037, TUI-NAV-068
 #[test]
 fn the_count_prompt_takes_the_digits_and_silently_ignores_every_other_printable() {
+    let _clock = now::held();
     let state = rich();
     for row in countable_rows(&state) {
         let mut view = focused(row.section, row.key.clone());
@@ -4587,6 +4660,7 @@ fn the_count_prompt_takes_the_digits_and_silently_ignores_every_other_printable(
 /// @spec TUI-NAV-037
 #[test]
 fn the_count_prompts_enter_reaches_the_row_only_as_its_count() {
+    let _clock = now::held();
     let state = rich();
     for row in countable_rows(&state) {
         for typed in ["", "0", "00", "3", "12"] {
@@ -4623,6 +4697,7 @@ fn the_count_prompts_enter_reaches_the_row_only_as_its_count() {
 /// @spec TUI-NAV-037
 #[test]
 fn enter_in_a_field_never_commits_an_armed_row_beneath_it() {
+    let _clock = now::held();
     let state = rich();
     let aimed = structure_name(0);
 
@@ -4688,6 +4763,7 @@ fn enter_in_a_field_never_commits_an_armed_row_beneath_it() {
 /// @spec TUI-NAV-037, TUI-NAV-038, TUI-NAV-030
 #[test]
 fn esc_closes_a_field_and_leaves_everything_as_it_was() {
+    let _clock = now::held();
     let state = rich();
     let (build, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
 
@@ -4767,6 +4843,7 @@ fn esc_closes_a_field_and_leaves_everything_as_it_was() {
 /// @spec TUI-NAV-058
 #[test]
 fn backspace_in_a_field_deletes_its_last_character_and_never_decrements() {
+    let _clock = now::held();
     let state = rich();
     let (count_key, _, decrement) = find_count_row(&state, Section::Clowder);
 
@@ -4846,6 +4923,7 @@ fn backspace_in_a_field_deletes_its_last_character_and_never_decrements() {
 /// @spec TUI-NAV-059
 #[test]
 fn arrows_tab_and_backtab_move_nothing_beneath_a_field() {
+    let _clock = now::held();
     let state = rich();
     let builds: Vec<RowKey> = rows(&state, Section::Meadow)
         .into_iter()
@@ -4918,6 +4996,7 @@ fn arrows_tab_and_backtab_move_nothing_beneath_a_field() {
 /// @spec TUI-NAV-060
 #[test]
 fn the_count_prompts_enter_always_closes_it() {
+    let _clock = now::held();
     let state = rich();
     for row in countable_rows(&state) {
         for typed in ["", "0", "00", "4", "12"] {
@@ -4941,6 +5020,7 @@ fn the_count_prompts_enter_always_closes_it() {
 /// @spec TUI-NAV-060, TUI-NAV-064
 #[test]
 fn the_palettes_enter_closes_it_only_when_there_is_a_result_to_jump_to() {
+    let _clock = now::held();
     let state = rich();
     let (build, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
 
@@ -4978,6 +5058,7 @@ fn the_palettes_enter_closes_it_only_when_there_is_a_result_to_jump_to() {
 /// @spec TUI-NAV-064
 #[test]
 fn the_palettes_enter_with_nothing_aimed_at_does_nothing() {
+    let _clock = now::held();
     let state = rich();
     let (build, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
     let (count_key, _, _) = find_count_row(&state, Section::Clowder);
@@ -5033,6 +5114,7 @@ fn the_palettes_enter_with_nothing_aimed_at_does_nothing() {
 /// @spec TUI-NAV-061
 #[test]
 fn a_held_enter_after_a_field_accepts_never_acts_on_the_row_beneath() {
+    let _clock = now::held();
     let state = rich();
 
     for row in countable_rows(&state) {
@@ -5109,6 +5191,7 @@ fn a_held_enter_after_a_field_accepts_never_acts_on_the_row_beneath() {
 /// @spec TUI-NAV-065
 #[test]
 fn the_palettes_jump_is_navigation_and_leaves_the_layout_alone() {
+    let _clock = now::held();
     let state = rich();
     let aimed = structure_name(2);
 
@@ -5174,6 +5257,7 @@ fn the_palettes_jump_is_navigation_and_leaves_the_layout_alone() {
 /// @spec TUI-NAV-038
 #[test]
 fn slash_opens_the_palette_only_where_no_prompt_or_overlay_is_open() {
+    let _clock = now::held();
     let state = rich();
     let (build, _) = find_row(&state, Section::Meadow, |c| matches!(c, Command::Build(_)));
 
@@ -5294,7 +5378,7 @@ fn ideas_cursor(view: &ViewState) -> Option<RowKey> {
 /// A pause long enough that the next press is a distinct one, by any reading
 /// of TUI-NAV-051's gate.
 fn gap() {
-    std::thread::sleep(Duration::from_millis(250));
+    now::advance(Duration::from_millis(250));
 }
 
 /// `d` pressed, then the repeat clock cleared, so an Enter right after it in
@@ -5560,7 +5644,7 @@ fn ideas_session(state: GameState, name: &str) -> (App, Terminal<TestBackend>) {
         view,
         clock: TickAccumulator::default(),
         save_path: dg_scratch(name),
-        last_save: Instant::now(),
+        last_save: now::instant(),
         prev_layout: None,
         pointer_record: None,
         quitting: false,
@@ -5593,6 +5677,7 @@ fn session_d(a: &mut App, t: &mut Terminal<TestBackend>) {
 /// @spec TUI-NAV-112
 #[test]
 fn every_sitting_opens_with_the_done_group_folded_and_the_save_holds_nothing_of_it() {
+    let _clock = now::held();
     let state = mid_game();
     let loaded = clowder_core::load_string(&clowder_core::save_string(&state, 0), 0)
         .expect("fixture: the meadow round-trips through a save")
@@ -5648,6 +5733,7 @@ fn every_sitting_opens_with_the_done_group_folded_and_the_save_holds_nothing_of_
 /// @spec TUI-NAV-112
 #[test]
 fn within_a_sitting_the_done_group_stays_as_the_player_left_it() {
+    let _clock = now::held();
     let (mut a, mut t) = ideas_session(mid_game(), "stays");
     for want_open in [true, false] {
         gap();
@@ -5708,6 +5794,7 @@ fn within_a_sitting_the_done_group_stays_as_the_player_left_it() {
 /// @spec TUI-NAV-112
 #[test]
 fn a_done_group_that_stops_being_listed_comes_back_folded() {
+    let _clock = now::held();
     for stay in [true, false] {
         let (mut a, mut t) = ideas_session(mid_game(), "relisted");
         session_d(&mut a, &mut t);
@@ -5785,6 +5872,7 @@ fn ready_rows_all_folded() -> GameState {
 /// @spec TUI-NAV-113
 #[test]
 fn the_cursor_never_lands_on_a_folded_row_and_reaches_every_open_one() {
+    let _clock = now::held();
     let state = mid_game();
     let v = in_ideas(&state);
     let folded = drawn_selectable(&state, &v);
@@ -5885,6 +5973,7 @@ fn the_cursor_never_lands_on_a_folded_row_and_reaches_every_open_one() {
 /// @spec TUI-NAV-113
 #[test]
 fn an_open_done_rows_keys_answer_as_any_owned_rows_do() {
+    let _clock = now::held();
     let state = mid_game();
     let (arch, _) = find_row(&state, Section::Wonders, |c| {
         matches!(c, Command::BuyArch(ArchId::EverdreamArch))
@@ -5939,6 +6028,7 @@ fn an_open_done_rows_keys_answer_as_any_owned_rows_do() {
 /// @spec TUI-NAV-115
 #[test]
 fn d_opens_and_folds_the_done_group_and_is_no_command_and_no_navigation() {
+    let _clock = now::held();
     let state = mid_game();
     let mut v = in_ideas(&state);
     let rule = drawn(&state, &v)
@@ -5989,12 +6079,13 @@ fn d_opens_and_folds_the_done_group_and_is_no_command_and_no_navigation() {
 /// @spec TUI-NAV-115
 #[test]
 fn a_held_d_changes_the_done_group_once() {
+    let _clock = now::held();
     let state = mid_game();
     let mut v = in_ideas(&state);
     for want_open in [true, false] {
         for _ in 0..12 {
             press_char('d', &mut v, &state);
-            std::thread::sleep(Duration::from_millis(30));
+            now::advance(Duration::from_millis(30));
         }
         assert_eq!(
             is_open(&state, &v),
@@ -6016,6 +6107,7 @@ fn a_held_d_changes_the_done_group_once() {
 /// @spec TUI-NAV-115
 #[test]
 fn d_is_ignored_wherever_it_is_not_live_and_held_by_whatever_holds_the_keyboard() {
+    let _clock = now::held();
     let state = mid_game();
     for section in Section::ALL.into_iter().filter(|s| *s != Section::Ideas) {
         let listed = rows(&state, section);
@@ -6148,6 +6240,7 @@ fn d_is_ignored_wherever_it_is_not_live_and_held_by_whatever_holds_the_keyboard(
 /// @spec TUI-NAV-116
 #[test]
 fn opening_the_done_group_leaves_the_cursor_on_its_row() {
+    let _clock = now::held();
     let state = mid_game();
     let v = in_ideas(&state);
     for start in drawn_selectable(&state, &v) {
@@ -6187,6 +6280,7 @@ fn opening_the_done_group_leaves_the_cursor_on_its_row() {
 /// @spec TUI-NAV-116
 #[test]
 fn folding_the_done_group_from_one_of_its_rows_moves_the_cursor_above_its_header() {
+    let _clock = now::held();
     for (label, state) in [
         ("mid-game", mid_game()),
         ("every row done", all_ideas_done()),
@@ -6243,6 +6337,7 @@ fn folding_the_done_group_from_one_of_its_rows_moves_the_cursor_above_its_header
 /// @spec TUI-NAV-117
 #[test]
 fn a_row_finishing_under_the_cursor_hands_it_to_the_row_that_closes_up() {
+    let _clock = now::held();
     let base = mid_game();
     let start = in_ideas(&base);
     let ready: Vec<Row> = drawn(&base, &start)
@@ -6343,6 +6438,7 @@ fn a_row_finishing_under_the_cursor_hands_it_to_the_row_that_closes_up() {
 /// @spec TUI-NAV-117
 #[test]
 fn returning_to_a_remembered_row_that_finished_meanwhile_places_the_cursor_where_it_closes_up() {
+    let _clock = now::held();
     let base = mid_game();
     let start = in_ideas(&base);
     let mut checked = 0;
@@ -6380,6 +6476,7 @@ fn returning_to_a_remembered_row_that_finished_meanwhile_places_the_cursor_where
 /// @spec TUI-NAV-118
 #[test]
 fn with_the_group_open_a_row_finishing_under_the_cursor_keeps_it() {
+    let _clock = now::held();
     let base = mid_game();
     let start = in_ideas(&base);
     let ready: Vec<Row> = drawn(&base, &start)
@@ -6426,7 +6523,7 @@ fn with_the_group_open_a_row_finishing_under_the_cursor_keeps_it() {
 fn hold_enter_steps(a: &mut App, t: &mut Terminal<TestBackend>, held: usize, pace: Duration) {
     for _ in 0..held {
         step(a, t, &[ev(KeyCode::Enter)]);
-        std::thread::sleep(pace);
+        now::advance(pace);
     }
 }
 
@@ -6438,6 +6535,7 @@ fn hold_enter_steps(a: &mut App, t: &mut Terminal<TestBackend>, held: usize, pac
 /// @spec TUI-NAV-119
 #[test]
 fn a_held_enter_never_acts_on_the_row_a_folded_row_hands_the_cursor_to() {
+    let _clock = now::held();
     let base = mid_game();
     let start = in_ideas(&base);
     let drawn_rows_now = drawn(&base, &start);
@@ -6500,6 +6598,7 @@ fn a_held_enter_never_acts_on_the_row_a_folded_row_hands_the_cursor_to() {
 /// @spec TUI-NAV-119
 #[test]
 fn a_held_x_never_acts_on_the_row_a_folded_row_hands_the_cursor_to() {
+    let _clock = now::held();
     let base = mid_game();
     let start = in_ideas(&base);
     let drawn_rows_now = drawn(&base, &start);
@@ -6526,7 +6625,7 @@ fn a_held_x_never_acts_on_the_row_a_folded_row_hands_the_cursor_to() {
             .expect("listed");
         for _ in 0..15 {
             step(&mut a, &mut t, &[ev(KeyCode::Char('X'))]);
-            std::thread::sleep(Duration::from_millis(30));
+            now::advance(Duration::from_millis(30));
         }
         assert!(
             !finished(&a.state, &next_row),
@@ -6547,6 +6646,7 @@ fn a_held_x_never_acts_on_the_row_a_folded_row_hands_the_cursor_to() {
 /// @spec TUI-NAV-120
 #[test]
 fn with_every_row_folded_the_header_stands_alone_and_every_row_key_finds_nothing() {
+    let _clock = now::held();
     let state = all_ideas_done();
     let v = in_ideas(&state);
     let list = drawn(&state, &v);
@@ -6604,6 +6704,7 @@ fn with_every_row_folded_the_header_stands_alone_and_every_row_key_finds_nothing
 /// @spec TUI-NAV-120
 #[test]
 fn when_a_row_is_next_drawn_the_cursor_lands_on_the_first_available_one() {
+    let _clock = now::held();
     use clowder_core::content::{idea_def, refinement_def};
     let (mut a, mut t) = ideas_session(all_ideas_done(), "next-drawn");
     assert!(
@@ -6656,6 +6757,7 @@ fn when_a_row_is_next_drawn_the_cursor_lands_on_the_first_available_one() {
 /// @spec TUI-NAV-121
 #[test]
 fn the_palettes_jump_to_a_folded_row_opens_the_done_group_and_focuses_it() {
+    let _clock = now::held();
     let state = mid_game();
     let finished_rows: Vec<RowKey> = rows(&state, Section::Ideas)
         .into_iter()
@@ -6743,6 +6845,7 @@ fn the_palettes_jump_to_a_folded_row_opens_the_done_group_and_focuses_it() {
 /// @spec TUI-NAV-123
 #[test]
 fn d_is_no_screens_mnemonic_nor_row_bound_key_and_asks_the_core_for_nothing() {
+    let _clock = now::held();
     use clowder_tui::nav::mnemonics;
     for section in Section::ALL {
         assert!(

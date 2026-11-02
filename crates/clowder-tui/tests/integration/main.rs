@@ -16,6 +16,7 @@ mod composed;
 mod count_prompt;
 mod fmt;
 mod frame;
+mod held_clock;
 mod inspector;
 mod inspector_reasons;
 mod keys;

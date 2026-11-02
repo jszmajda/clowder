@@ -21,6 +21,7 @@
 
 use clowder_tui::nav::ViewState;
 use clowder_tui::runtime::clock::Reading;
+use clowder_tui::runtime::now;
 use clowder_tui::runtime::{App, TickAccumulator};
 
 use clowder_core::{AchievementId, Earned, GameState};
@@ -334,6 +335,7 @@ fn a_flood_of_input_is_bounded_within_one_frame() {
 /// @spec TUI-NAV-060
 #[test]
 fn an_open_field_outlasts_every_timer_while_the_sim_runs_beneath_it() {
+    let _clock = now::held();
     use clowder_tui::nav::{CountPrompt, Overlay, Section};
 
     let fields: [(&str, ViewState); 2] = [
@@ -372,13 +374,13 @@ fn an_open_field_outlasts_every_timer_while_the_sim_runs_beneath_it() {
         .collect();
     let before: Vec<u64> = apps.iter().map(|(_, a, _)| a.state.ticks).collect();
 
-    let start = Instant::now();
-    while start.elapsed() < Duration::from_millis(9_000) {
+    let start = now::instant();
+    while now::since(start) < Duration::from_millis(9_000) {
         for (_, a, term) in apps.iter_mut() {
             a.step(term, elapsed(600.0), &[])
                 .expect("a step with a field open must not fail");
         }
-        std::thread::sleep(Duration::from_millis(250));
+        now::advance(Duration::from_millis(250));
     }
 
     for ((what, a, _), ticks_before) in apps.iter().zip(before) {
@@ -561,6 +563,7 @@ fn a_change_of_layout_leaves_an_arming_running() {
 /// @spec TUI-NAV-076
 #[test]
 fn an_armed_row_that_stops_being_listed_ends_its_arming_for_good() {
+    let _clock = now::held();
     use crossterm::event::KeyCode;
     let (mut a, mut term) = armed_on_the_nap("armed-unlisted");
     let before = a.view.armed.clone().expect("fixture: armed");
@@ -572,9 +575,9 @@ fn an_armed_row_that_stops_being_listed_ends_its_arming_for_good() {
     // ...and comes back, still well inside the old arming's eight seconds.
     a.state.ideas.insert(clowder_core::IdeaId::DeepNapTheory);
     a.view.focus[clowder_tui::nav::Section::Dreams.index()] = Some(before.key.clone());
-    std::thread::sleep(Duration::from_millis(300));
+    now::advance(Duration::from_millis(300));
     assert!(
-        Instant::now() < before.expires_at,
+        now::instant() < before.expires_at,
         "fixture: the old arming has not expired"
     );
 
@@ -989,6 +992,7 @@ fn an_n_that_appoints_is_announced_once_by_the_ticker_and_leaves_no_footer_note(
 /// @spec TUI-NAV-107
 #[test]
 fn n_on_the_elders_own_row_adds_nothing_to_the_screen() {
+    let _clock = now::held();
     use crossterm::event::KeyCode;
 
     let base = small_roster();
@@ -1028,7 +1032,7 @@ fn n_on_the_elders_own_row_adds_nothing_to_the_screen() {
 
                 for press in 1..=3 {
                     if press > 1 {
-                        std::thread::sleep(Duration::from_millis(120));
+                        now::advance(Duration::from_millis(120));
                     }
                     a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))])
                         .expect("a step with `n` does not fail");
@@ -1074,6 +1078,7 @@ fn n_on_the_elders_own_row_adds_nothing_to_the_screen() {
 /// @spec TUI-NAV-107
 #[test]
 fn a_held_or_alternated_n_leaves_no_note_and_never_grows_the_permanent_journal() {
+    let _clock = now::held();
     use clowder_tui::nav::Section;
     use crossterm::event::KeyCode;
 
@@ -1088,7 +1093,7 @@ fn a_held_or_alternated_n_leaves_no_note_and_never_grows_the_permanent_journal()
 
     // Held on one row: each press let through by the repeat gate.
     for press in 1..=5usize {
-        std::thread::sleep(Duration::from_millis(120));
+        now::advance(Duration::from_millis(120));
         a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))])
             .expect("a step with `n` does not fail");
         assert_eq!(
@@ -1115,7 +1120,7 @@ fn a_held_or_alternated_n_leaves_no_note_and_never_grows_the_permanent_journal()
             (first, &first_key)
         };
         a.view.focus[Section::Clowder.index()] = Some(row_key.clone());
-        std::thread::sleep(Duration::from_millis(120));
+        now::advance(Duration::from_millis(120));
         a.step(&mut term, elapsed(0.0), &[key(KeyCode::Char('n'))])
             .expect("a step with `n` does not fail");
         assert_eq!(

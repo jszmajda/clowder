@@ -575,7 +575,7 @@ fn humanize(tag: &str) -> String {
 /// it turns up in the section being iterated, so nothing beyond the clock is
 /// checked here. @spec TUI-NAV-076, TUI-NAV-077
 pub(crate) fn armed_is_live(armed: &ArmedRow) -> bool {
-    std::time::Instant::now() < armed.expires_at
+    crate::runtime::now::instant() < armed.expires_at
 }
 
 /// A figure the core reports, in the exact form — a summary is read, not
@@ -1376,7 +1376,7 @@ pub fn frame_recorded(
     match view
         .footer
         .as_ref()
-        .filter(|(_, until)| *until > std::time::Instant::now())
+        .filter(|(_, until)| *until > crate::runtime::now::instant())
     {
         Some((note, _)) => f.render_widget(
             Paragraph::new(line_from_pieces(

@@ -37,6 +37,7 @@
 //!   one crossterm mouse event resolved against the last frame's record at the
 //!   terminal's present size, answering with the same `Outcome` a key does.
 
+use clowder_tui::runtime::now;
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
@@ -2616,6 +2617,7 @@ fn a_pointer_move_ends_an_arming_and_an_event_that_moves_nothing_leaves_it() {
 /// @spec TUI-NAV-133
 #[test]
 fn no_held_press_acts_on_the_row_a_pointer_moved_the_cursor_to() {
+    let _clock = now::held();
     let state = mid_game();
     let acts = |out: &Outcome| matches!(out, Outcome::Apply(_) | Outcome::Repeat(..));
 
@@ -2703,7 +2705,7 @@ fn no_held_press_acts_on_the_row_a_pointer_moved_the_cursor_to() {
                 b.key
             );
             for _ in 0..16 {
-                std::thread::sleep(Duration::from_millis(30));
+                now::advance(Duration::from_millis(30));
                 let out = update(action.clone(), &mut v, &state);
                 assert!(!acts(&out), "at {size:?} a held {name} acted on {:?}, the row a click moved the cursor to: {out:?}", b.key);
                 assert!(
@@ -2712,7 +2714,7 @@ fn no_held_press_acts_on_the_row_a_pointer_moved_the_cursor_to() {
                     b.key
                 );
             }
-            std::thread::sleep(Duration::from_millis(300));
+            now::advance(Duration::from_millis(300));
             let out = update(action.clone(), &mut v, &state);
             let armed_b = v.armed.as_ref().is_some_and(|x| x.key == b.key);
             assert!(
@@ -2739,14 +2741,14 @@ fn no_held_press_acts_on_the_row_a_pointer_moved_the_cursor_to() {
             "fixture: the tab press went to the Clowder"
         );
         for _ in 0..16 {
-            std::thread::sleep(Duration::from_millis(30));
+            now::advance(Duration::from_millis(30));
             let out = update(Action::Activate, &mut v, &state);
             assert!(
                 !acts(&out) && v.armed.is_none(),
                 "at {size:?} a held Enter acted on the row a tab press landed on: {out:?}"
             );
         }
-        std::thread::sleep(Duration::from_millis(300));
+        now::advance(Duration::from_millis(300));
         let out = update(Action::Activate, &mut v, &state);
         assert!(
             acts(&out) || v.armed.is_some(),

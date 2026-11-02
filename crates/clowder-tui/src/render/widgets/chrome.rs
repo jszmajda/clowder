@@ -667,7 +667,8 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState, sto
     // the next Enter reaches while it is open. @spec TUI-NAV-077
     let armed_and_live = view.overlay.is_none()
         && view.armed.as_ref().is_some_and(|a| {
-            std::time::Instant::now() < a.expires_at && crate::nav::row_still_listed(state, &a.key)
+            crate::runtime::now::instant() < a.expires_at
+                && crate::nav::row_still_listed(state, &a.key)
         });
 
     let items: Vec<String> = if view.prompt.is_some() {

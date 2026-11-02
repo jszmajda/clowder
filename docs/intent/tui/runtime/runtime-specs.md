@@ -50,6 +50,8 @@
 
 ## Time & Ticks
 
+- [x] **TUI-RUN-066**: The system shall take every reading of the monotonic clock in the shell from one function, which shall read real time on a thread that holds no hold on it.
+- [x] **TUI-RUN-067**: While a thread holds the shell's clock, the system shall keep that thread's reading where the hold left it, moving it only as that thread advances it by hand, reaching no other thread, and returning it to what it was when the hold ends.
 - [x] **TUI-RUN-018**: The system shall convert elapsed real time into ticks as elapsed seconds × the core's ticks-per-second × the current speed, running only whole ticks and banking the fractional remainder across frames so no partial tick is lost or double-counted.
 - [x] **TUI-RUN-019**: The system shall count ticks owed as integers rather than floating-point, so a large backlog cannot lose whole ticks to precision.
 - [x] **TUI-RUN-020**: When the speed changes, the system shall apply the new speed only to time elapsing after the change and shall not rescale already-banked time.

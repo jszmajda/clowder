@@ -99,7 +99,7 @@ impl Wake {
             catch_up,
             clock: TickAccumulator::default(),
             save_path,
-            last_save: Instant::now(),
+            last_save: crate::runtime::now::instant(),
             quitting: false,
             bound,
         };
