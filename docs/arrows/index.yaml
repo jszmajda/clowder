@@ -182,7 +182,7 @@ arrows:
     parent: tui
     sampled: 2026-11-02
     audited: 2026-11-02
-    audited_sha: e7d7460542782a9d176cc82bd02d1ffe35ab6402
+    audited_sha: 5a7a5343c911dafa56d0638c9ceb6e6e81b62ea7
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
@@ -215,7 +215,7 @@ arrows:
     parent: tui
     sampled: 2026-11-02
     audited: 2026-11-02
-    audited_sha: e7d7460542782a9d176cc82bd02d1ffe35ab6402
+    audited_sha: 5a7a5343c911dafa56d0638c9ceb6e6e81b62ea7
     blocks: []
     blockedBy: [navigation, runtime, theme]
     detail: tui/render/render.md
