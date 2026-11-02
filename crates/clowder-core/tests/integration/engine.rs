@@ -776,6 +776,9 @@ fn no_rejected_command_of_any_kind_leaves_a_mark() {
 ///
 /// This pins the generator's position after a fixed run. An inserted draw, a
 /// reordered one, or a changed probability that gates a later draw all move it.
+/// The order itself is held by `draw_schedule`, which runs every time and doesn't
+/// mind a balance change; this asks the different question of whether a build
+/// plays a save's future out the same.
 ///
 /// **Ignored on purpose.** It fails for good reasons as well as bad ones: any
 /// balance change that alters how often a roll fires moves this number too, and

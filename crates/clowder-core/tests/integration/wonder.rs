@@ -728,7 +728,7 @@ fn the_rainbow_arch_ladder_matches_the_design_table() {
     );
 }
 
-// @spec SIM-UNI-006, SIM-ENG-018
+// @spec SIM-UNI-006
 #[test]
 fn prisms_descend_from_rainbow_arches_over_the_days() {
     // Effect view: each Rainbow Arch structure is +0.02%/day, plus Arch-upgrade
