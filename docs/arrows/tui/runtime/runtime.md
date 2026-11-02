@@ -4,7 +4,7 @@ This leaf owns the boundary between the operating system and the pure core: term
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-01 (commit `f36f4f91aa8e`). 49 of 49 active specs implemented, each cited by a test; 7 deferred.
+**PARTIAL** — last audited 2026-11-02 (commit `fbf98a4799fb`). 50 of 50 active specs implemented, each cited by a test; 7 deferred.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns the boundary between the operating system and the pure core: term
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/runtime/runtime-specs.md` — 56 specs, prefix `TUI-RUN`
+- `docs/intent/tui/runtime/runtime-specs.md` — 57 specs, prefix `TUI-RUN`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/clock.rs`
@@ -44,13 +44,13 @@ This leaf owns the boundary between the operating system and the pure core: term
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-RUN-001 – TUI-RUN-067 | 49 | 7 | 0 |
+| All | TUI-RUN-001 – TUI-RUN-068 | 50 | 7 | 0 |
 
-**Summary:** 49 of 49 active specs implemented; 7 deferred.
+**Summary:** 50 of 50 active specs implemented; 7 deferred.
 
 ## Key Findings
 
-Audited 2026-11-01. First full audit: every spec read against its code, its tests, and the design by a reader given only the arrow artifacts, its most serious findings then checked by hand. It found a lock that can be cleared under a live holder, time away going uncounted around a resume, a damaged save that can be overwritten, and a suspend tolerance in the design that the spec and code deny (corrected). Issue #10 routed every monotonic read through one holdable function (TUI-RUN-066, TUI-RUN-067). Specs 001 to 004, 010, 011, 013, 017, 060 to 063, and 065 were read more lightly than the rest.
+Audited 2026-11-01. First full audit: every spec read against its code, its tests, and the design by a reader given only the arrow artifacts, its most serious findings then checked by hand. It found a lock that can be cleared under a live holder, time away going uncounted around a resume, a damaged save that can be overwritten, and a suspend tolerance in the design that the spec and code deny (corrected). Issue #10 routed every monotonic read through one holdable function (TUI-RUN-066, TUI-RUN-067). Specs 001 to 004, 010, 011, 013, 017, 060 to 063, and 065 were read more lightly than the rest. A frame of play waits one tick at normal speed (TUI-RUN-068, #24): on one save copy in a 120×40 pane with no keys pressed, about 5.3% of a core became about 1.6%, with keys answered as quickly as before. The design records why a redraw-on-change check was not taken.
 
 ## Work Required
 

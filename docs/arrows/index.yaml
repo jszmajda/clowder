@@ -215,7 +215,7 @@ arrows:
     parent: tui
     sampled: 2026-11-02
     audited: 2026-11-02
-    audited_sha: 5a7a5343c911dafa56d0638c9ceb6e6e81b62ea7
+    audited_sha: fbf98a4799fb9d15059cbd4cd96ec67ffd8e49b2
     blocks: []
     blockedBy: [navigation, runtime, theme]
     detail: tui/render/render.md
@@ -224,9 +224,9 @@ arrows:
   runtime:
     status: PARTIAL
     parent: tui
-    sampled: 2026-11-01
-    audited: 2026-11-01
-    audited_sha: f36f4f91aa8e65a3b6ef0dfae70b6d44c0907f6c
+    sampled: 2026-11-02
+    audited: 2026-11-02
+    audited_sha: fbf98a4799fb9d15059cbd4cd96ec67ffd8e49b2
     blocks: [render]
     blockedBy: [navigation, persistence]
     detail: tui/runtime/runtime.md
