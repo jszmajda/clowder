@@ -68,15 +68,15 @@ arrows:
     next: null
     drift: null
   ceremonies:
-    status: PARTIAL
+    status: OK
     parent: sim
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 39585f101764bafc9ca082e35634a20dfb7c4263
+    audited_sha: c799869e32f728e9f9eba515c31e68d4287d230e
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/ceremonies/ceremonies.md
-    next: "#13: blurb truth"
+    next: null
     drift: null
   colonies:
     status: OK
@@ -101,26 +101,26 @@ arrows:
     next: "#25: an unbuilt storage bonus"
     drift: null
   curiosity:
-    status: OK
+    status: PARTIAL
     parent: sim
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-11-01
+    audited: 2026-11-01
+    audited_sha: c799869e32f728e9f9eba515c31e68d4287d230e
     blocks: [ceremonies, colonies, mystic]
     blockedBy: [economy]
     detail: sim/curiosity/curiosity.md
-    next: null
+    next: "#30, #31: ideas no rule reads, thin table tests"
     drift: null
   dreamtime:
     status: PARTIAL
     parent: sim
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
+    audited_sha: c799869e32f728e9f9eba515c31e68d4287d230e
     blocks: []
     blockedBy: [adventures, prestige]
     detail: sim/dreamtime/dreamtime.md
-    next: "#13, #14, #16: blurb truth, draw order, unpinned constants"
+    next: "#14, #16: draw order, unpinned constants"
     drift: null
   economy:
     status: OK
@@ -171,11 +171,11 @@ arrows:
     parent: sim
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
+    audited_sha: c799869e32f728e9f9eba515c31e68d4287d230e
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/mystic/mystic.md
-    next: "#13, #14, #15, #16: blurb truth, draw order, sourceless effect keys, unpinned constants"
+    next: "#14, #15, #16: draw order, sourceless effect keys, unpinned constant"
     drift: null
   navigation:
     status: PARTIAL
@@ -204,7 +204,7 @@ arrows:
     parent: sim
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
+    audited_sha: c799869e32f728e9f9eba515c31e68d4287d230e
     blocks: [cosmic, dreamtime]
     blockedBy: [ceremonies, colonies, mystic]
     detail: sim/prestige/prestige.md

@@ -4,7 +4,7 @@ Ceremonies are clowder's faith system, reimagined as warmth and devotion rather 
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-01 (commit `39585f101764`). 10 of 10 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-01 (commit `c799869e32f7`). 10 of 10 active specs implemented, each cited by a test.
 
 ## References
 
@@ -19,6 +19,7 @@ Ceremonies are clowder's faith system, reimagined as warmth and devotion rather 
 - `docs/intent/sim/ceremonies/ceremonies-specs.md` — 10 specs, prefix `SIM-SUN`
 
 ### Tests
+- `crates/clowder-core/tests/integration/blurb_truth.rs`
 - `crates/clowder-core/tests/integration/blurbs.rs`
 - `crates/clowder-core/tests/integration/legacy.rs`
 - `crates/clowder-core/tests/integration/structure_fields.rs`
@@ -41,8 +42,8 @@ Ceremonies are clowder's faith system, reimagined as warmth and devotion rather 
 
 ## Key Findings
 
-Audited 2026-11-01. First full audit, by the same route as the mystic leaf. It found a shortfall naming an unrelated resource (fixed, SIM-SUN-008), an absolute claim its sibling spec contradicted (corrected, SIM-SUN-003), a formula missing a term and a factor (corrected, SIM-SUN-004), and clauses no test exercised (tested). Issue #17 named the flat term the cap formula had left out (SIM-SUN-004), fed from the cosmic and adventures leaves.
+Audited 2026-11-01. First full audit, by the same route as the mystic leaf. It found a shortfall naming an unrelated resource (fixed, SIM-SUN-008), an absolute claim its sibling spec contradicted (corrected, SIM-SUN-003), a formula missing a term and a factor (corrected, SIM-SUN-004), and clauses no test exercised (tested). Issue #17 named the flat term the cap formula had left out (SIM-SUN-004), fed from the cosmic and adventures leaves. Issue #13 held every rite's figures to its rule (SIM-SUN-009).
 
 ## Work Required
 
-- #13: blurbs are tested for marks, not truth (SIM-SUN-009).
+None.

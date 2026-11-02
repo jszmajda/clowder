@@ -4,7 +4,7 @@ Curiosity is the game's research system: kittens investigate the world and their
 
 ## Status
 
-**OK** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 15 of 15 active specs implemented.
+**PARTIAL** — last audited 2026-11-01 (commit `c799869e32f7`). 15 of 15 active specs implemented, each cited by a test; 1 deferred.
 
 ## References
 
@@ -16,9 +16,10 @@ Curiosity is the game's research system: kittens investigate the world and their
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/curiosity/curiosity-specs.md` — 15 specs, prefix `SIM-CUR`
+- `docs/intent/sim/curiosity/curiosity-specs.md` — 16 specs, prefix `SIM-CUR`
 
 ### Tests
+- `crates/clowder-core/tests/integration/blurb_truth.rs`
 - `crates/clowder-core/tests/integration/curiosity.rs`
 - `crates/clowder-core/tests/integration/economy_depth.rs`
 - `crates/clowder-core/tests/integration/society.rs`
@@ -36,16 +37,15 @@ Curiosity is the game's research system: kittens investigate the world and their
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-CUR-001 – SIM-CUR-015 | 15 | 0 | 0 |
+| All | SIM-CUR-001 – SIM-CUR-016 | 15 | 1 | 0 |
 
-**Summary:** 15 of 15 active specs implemented.
+**Summary:** 15 of 15 active specs implemented; 1 deferred.
 
 ## Key Findings
 
-Bootstrapped from existing LID docs without an audit pass. Coverage above is
-read from the spec files' own markers, which record what the project believes;
-they have not been verified against the code by this overlay.
+Audited 2026-11-01. First full audit: every spec read against its code and tests, and the design's three tables read row by row, by a reader given only the arrow artifacts, its findings then checked by hand. All 59 idea, 35 refinement, and 8 rule rows match on every number. It found ideas whose named unlocks no rule reads (SIM-CUR-009, deferred), three blurbs leaving out figures their rules apply and one stating the wrong kind (fixed), a spec forbidding grants others require (SIM-CUR-006, corrected), and one claiming more permanence than a Move leaves (SIM-CUR-004, corrected). Issue #13 added SIM-CUR-016, holding every blurb's figures to their rule in both directions.
 
 ## Work Required
 
-None recorded — every active spec is marked implemented.
+- #30: some ideas buy nothing, because no rule reads them (SIM-CUR-009, deferred).
+- #31: thin table tests and stray annotations.

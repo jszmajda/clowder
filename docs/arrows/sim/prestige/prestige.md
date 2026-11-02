@@ -4,7 +4,7 @@ Prestige in clowder is **The Great Meadow Move**: when a clowder has grown as la
 
 ## Status
 
-**OK** — last audited 2026-11-01 (commit `7ad9e6ec6caa`). 16 of 16 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-01 (commit `c799869e32f7`). 16 of 16 active specs implemented, each cited by a test.
 
 ## References
 
@@ -20,6 +20,7 @@ Prestige in clowder is **The Great Meadow Move**: when a clowder has grown as la
 
 ### Tests
 - `crates/clowder-core/tests/integration/achievements.rs`
+- `crates/clowder-core/tests/integration/blurb_truth.rs`
 - `crates/clowder-core/tests/integration/blurbs.rs`
 - `crates/clowder-core/tests/integration/frontier.rs`
 - `crates/clowder-core/tests/integration/legacy.rs`
@@ -44,7 +45,7 @@ Prestige in clowder is **The Great Meadow Move**: when a clowder has grown as la
 
 ## Key Findings
 
-Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. SIM-MOVE-014 is a property of the content tables as a whole, so no code decides it, and its tests are its pins.
+Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. SIM-MOVE-014 is a property of the content tables as a whole, so no code decides it, and its tests are its pins. Issue #13 held every tradition's figures to its rule (SIM-MOVE-014).
 
 ## Work Required
 
