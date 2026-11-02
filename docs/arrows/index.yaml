@@ -79,22 +79,22 @@ arrows:
     next: null
     drift: null
   colonies:
-    status: OK
+    status: PARTIAL
     parent: sim
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-11-02
+    audited: 2026-11-02
+    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/colonies/colonies.md
-    next: null
+    next: "#34, #35: a nap's gift, thin tests"
     drift: null
   cosmic:
     status: OK
     parent: sim
     sampled: 2026-11-02
     audited: 2026-11-02
-    audited_sha: 781d15ccba654dfe29d112ee225ddf12669f21a6
+    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
     blocks: []
     blockedBy: [adventures, prestige]
     detail: sim/cosmic/cosmic.md
@@ -103,20 +103,20 @@ arrows:
   curiosity:
     status: PARTIAL
     parent: sim
-    sampled: 2026-11-01
-    audited: 2026-11-01
-    audited_sha: c799869e32f728e9f9eba515c31e68d4287d230e
+    sampled: 2026-11-02
+    audited: 2026-11-02
+    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
     blocks: [ceremonies, colonies, mystic]
     blockedBy: [economy]
     detail: sim/curiosity/curiosity.md
-    next: "#30, #31: ideas no rule reads, thin table tests"
+    next: "#31: thin table tests"
     drift: null
   dreamtime:
     status: OK
     parent: sim
-    sampled: 2026-11-01
-    audited: 2026-11-01
-    audited_sha: 5c5f7e08dc3252069302493d9a862ad18e3f2550
+    sampled: 2026-11-02
+    audited: 2026-11-02
+    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
     blocks: []
     blockedBy: [adventures, prestige]
     detail: sim/dreamtime/dreamtime.md
@@ -138,7 +138,7 @@ arrows:
     parent: sim
     sampled: 2026-11-02
     audited: 2026-11-02
-    audited_sha: 781d15ccba654dfe29d112ee225ddf12669f21a6
+    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
     blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md
@@ -169,9 +169,9 @@ arrows:
   mystic:
     status: PARTIAL
     parent: sim
-    sampled: 2026-11-01
-    audited: 2026-11-01
-    audited_sha: 5c5f7e08dc3252069302493d9a862ad18e3f2550
+    sampled: 2026-11-02
+    audited: 2026-11-02
+    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/mystic/mystic.md
@@ -182,22 +182,22 @@ arrows:
     parent: tui
     sampled: 2026-11-02
     audited: 2026-11-02
-    audited_sha: 90c0684e119dc66a90b0e1bf983aadfa65b0a9b4
+    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
     next: null
     drift: null
   persistence:
-    status: OK
+    status: PARTIAL
     parent: null
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-11-02
+    audited: 2026-11-02
+    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
     blocks: [runtime]
     blockedBy: [engine]
     detail: persistence/persistence.md
-    next: null
+    next: "#32, #36, #37: the catch-up bound, hand-edited counters, thin tests"
     drift: null
   prestige:
     status: OK

@@ -4,7 +4,7 @@ The cosmic leaf is clowder's late-game frontier: once the clowder has mastered i
 
 ## Status
 
-**OK** — last audited 2026-11-02 (commit `781d15ccba65`). 11 of 11 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-02 (commit `376d3e12c927`). 12 of 12 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,10 +16,11 @@ The cosmic leaf is clowder's late-game frontier: once the clowder has mastered i
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/cosmic/cosmic-specs.md` — 11 specs, prefix `SIM-SKY`
+- `docs/intent/sim/cosmic/cosmic-specs.md` — 12 specs, prefix `SIM-SKY`
 
 ### Tests
 - `crates/clowder-core/tests/integration/frontier.rs`
+- `crates/clowder-core/tests/integration/idea_unlocks.rs`
 - `crates/clowder-core/tests/integration/structure_fields.rs`
 - `crates/clowder-core/tests/integration/wonder.rs`
 
@@ -34,15 +35,17 @@ The cosmic leaf is clowder's late-game frontier: once the clowder has mastered i
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-SKY-001 – SIM-SKY-011 | 11 | 0 | 0 |
+| All | SIM-SKY-001 – SIM-SKY-012 | 12 | 0 | 0 |
 
-**Summary:** 11 of 11 active specs implemented.
+**Summary:** 12 of 12 active specs implemented.
 
 ## Key Findings
 
 Audited 2026-11-01. First full audit: every spec read by hand against its code and tests, and the design's site table read row by row against the definitions and pinned by tests over all thirteen sites. It found a bonus the design states citing an unrelated spec (now SIM-SKY-009, the issue that opened this audit), one outpost left out of the outdoor channel (fixed, SIM-SKY-004), a forecast in the table no rule gives (removed), a storage figure missing from a row (added), and clauses no test exercised (tested, SIM-SKY-003, SIM-SKY-007). Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-02. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Issue #25 built the one designed bonus the first audit found missing (SIM-SKY-011), with a test over every store's cap, the cap with a multiplier of its own, and how it stacks. The audit cited SIM-SKY-010 on the table that holds it, which had no annotation in code. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-02, for what issue #30 changed. The two hushfelt sources need Hushfelt Seeking as well as their sites (SIM-SKY-012), and every other outpost is tested to need its site alone. Nothing that reaching those sites or researching that idea needs depends on hushfelt, so the two gates cannot deadlock. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

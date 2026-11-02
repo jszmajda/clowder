@@ -4,7 +4,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 ## Status
 
-**OK** — last audited 2026-11-02 (commit `781d15ccba65`). 82 of 82 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-02 (commit `376d3e12c927`). 82 of 82 active specs implemented, each cited by a test.
 
 ## References
 
@@ -23,6 +23,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 - `crates/clowder-core/tests/integration/economy_depth.rs`
 - `crates/clowder-core/tests/integration/engine.rs`
 - `crates/clowder-core/tests/integration/frontier.rs`
+- `crates/clowder-core/tests/integration/idea_unlocks.rs`
 - `crates/clowder-core/tests/integration/journal.rs`
 - `crates/clowder-core/tests/integration/legacy.rs`
 - `crates/clowder-core/tests/integration/persistence.rs`
@@ -67,6 +68,8 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. SIM-ENG-076 is a property of the content tables as a whole, so no code decides it, and its tests are its pins. Issue #3 added the store-links query (SIM-ENG-079 to SIM-ENG-083), read by a reader given only the arrow artifacts, its findings then checked by hand: items growing a store the first draft missed, a recipe not yet learned leaking through a year-close craft, and a pounce reporting goods it would not bring were all fixed and tested, and a fixed act's links are held to what applying it moves. The sources query now takes each source's goods from one function, and lists a loom it had left out. Issue #14 pinned SIM-ENG-018's draw order with a test that walks a twin of the generator through the schedule on thousands of seeds, confirmed by mutating the real order; the golden test stays ignored, for the different question of whether a build plays a save's future out the same.
 
 Audited 2026-11-02, for what issue #25 changed. The effect sum gained one structure's share of a key every cap reads each tick, taken from its one holder behind the check for which keys carry a structure share. A scan for it, and then a check for it ahead of that one, each took the catch-up bound (SAVE-009) from about 4.8 s to about 5.0 s of its 5 s; read this way, alone and alternating against the previous build, it stands within about 1% of that build and passes. That bound's thin margin is #32. The audit cited SIM-ENG-083 on the line that decides it, which had no annotation in code. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-02, for what issue #30 changed. Which idea opens the loom and the picnics moved in the availability and command-gate answers, and the pen pal gate now says what its command says, where a row could offer a letter that refused (SIM-ENG-045). The reveal scan reads a structure's gate inline, since a call there, once the gate gained a kind, took the catch-up bound (SAVE-009) about 13% over the previous build and past its limit; measured alone and alternating, it now stands level with that build. That bound's thin margin is #32. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

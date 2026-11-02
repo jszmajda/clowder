@@ -12,6 +12,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 
 ### Changed
 
+- **Saves have moved up a version.** A save written by this version won't open in an older one. Older saves still open here.
 - **Drawing the sidebar costs less.** It does in one step what it used to repeat for every store, which matters most in a big clowder.
 - **Clowder sits lighter in its pane.** With nothing pressed, it now works out the screen about as often as something on it can change, rather than several times more. Keys answer as quickly as before; at faster speeds, figures move in slightly larger steps.
 - **Redrawing the screen costs less.** Each redraw works out what each tab lists once, rather than again for every part of the screen that asks.
@@ -22,6 +23,10 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 - **Kittens say their own things.** The little moments a kitten has were showing as a single placeholder word. They now appear in the ticker and the Journal as written.
 - **The Journal tells flavour from fact by colour too.** Quiet moments recede there as they do on the ticker, and stars wear their colour on tabs and event lines.
 - **A few more event lines name your stores in their colours.**
+- **Everything you research now does what it says.** A few things you could learn didn't open what they promised, and some of what they promised opened without them. Anything you could already reach stays yours: the research that now opens it is granted free when you load your save.
+- **Looking for new faces finds the ones you've earned first.** When you've met the conditions for someone special, they now come ahead of the usual crowd.
+- **An action no longer shows before it can be used.** One was listed early, and did nothing when chosen.
+- **Hand-edited saves are harder to hurt.** A few unusual edits could empty your stores on load or be misread. They no longer do.
 - **A damaged save is kept safe in one more case.** A single bad byte could slip through unnoticed and be saved over. Now that file is moved aside, you're told where it went, and a new meadow starts.
 - **If clowder can't find your system's data folder, it tells you where your save is.**
 - **Walking away counts right up to the moment you're back.** Quitting or changing speed just after your computer wakes no longer loses or misprices the time it slept, the first and last moments of waking up now count too, and a gap too long to count now says so.
