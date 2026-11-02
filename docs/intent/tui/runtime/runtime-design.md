@@ -30,7 +30,8 @@ wake (a load that owes catch-up)
 
 loop
   1. poll for input with a frame-budget timeout
-  2. drain the ready events; hand keys, pointer events, and resizes to the
+  2. drain the ready events; read both clocks, so this frame's interval runs
+     up to this input; hand keys, pointer events, and resizes to the
      navigation layer in the order they arrived — keys return commands to
      apply to the core, pointer events never do
   3. advance the sim: convert elapsed real time × speed into whole ticks
@@ -38,7 +39,8 @@ loop
   5. render one frame from the current snapshot, keeping its pointer record
 
 shutdown (any path)
-  save · restore terminal (mouse reporting, alternate screen, raw mode)
+  read both clocks · save · restore terminal (mouse reporting, alternate
+  screen, raw mode)
 ```
 
 Single-threaded and synchronous, per the shell sub-HLD. Nothing here needs concurrency: the sim is sequential, the save is a few tens of kilobytes of JSON, and a poll-with-timeout loop is the most trivially correct shape available.
@@ -82,7 +84,9 @@ That is what makes the rule simple enough to keep: **nothing banked is ever re-r
 
 Each frame compares the two. When wall-clock elapsed exceeds monotonic elapsed, the excess is real absence the monotonic clock did not see; it is converted to ticks through the same accumulator. When wall-clock elapsed is *less* (a backwards correction), the monotonic reading wins and the checkpoint re-bases silently. The sim only ever moves forward, and only ever through `tick()`.
 
-**One absence rule.** `load_string` caps catch-up at 365 days and sets `truncated` on the report. An in-process gap uses the same cap and the same flag, so a two-year suspend and a two-year closed save behave identically. There is one rule for absence; whether the process happened to be running across it is not something the player should be able to feel.
+**A frame reads its clocks after its wait.** A machine mostly sleeps during the wait for input, so the reading comes after it and holds everything up to the input the frame is about to apply. That input applies from there on: the interval is priced at the speed in force before it, so a speed key just after a resume cannot re-price the suspend. Each reading starts where the last one ended, across the whole session, from before a wake's first frame into the first frame of play. Every way out of a session takes one last reading before it saves, since the save stamps the present and a span not yet read by then would be lost.
+
+**One absence rule.** `load_string` caps catch-up at 365 days and sets `truncated` on the report. An in-process gap uses the same cap and the same flag: a reading past the cap retains a report through the journal's own retention, flagged truncated and stating the cap as its span, so a two-year suspend and a two-year closed save both say the meadow stopped counting there. Its ticks have not yet run when it is retained, so it states no gains (Open Questions: a suspend's report). There is one rule for how much an absence counts, whether or not the process stayed running across it.
 
 **Catch-up is paced, never dropped.** A long gap can owe millions of ticks, and running them all in one frame is indistinguishable from a hang. Each frame runs at most a bounded count of owed ticks and banks the rest, so a big catch-up drains over several frames while the UI stays alive. The bound is a count, not a slice of wall time: a time budget would read a clock inside the drain and buy more ticks on a fast machine than a slow one, making how far the meadow advances a property of the hardware. Ticks owed are counted in integers, never floats, so a large backlog cannot lose precision.
 
@@ -90,7 +94,7 @@ Each frame compares the two. When wall-clock elapsed exceeds monotonic elapsed, 
 
 The tempting alternative is to back-date the timestamp so the interval re-derives them, and it is wrong in a way that takes a while to see: the reload reconstructs ticks by multiplying an interval by whatever speed is persisted, so a backlog earned at one speed and saved at another is re-priced by the ratio between them. Earn fast, save slow, and most of it evaporates; the other way round, it multiplies. What the player earned is theirs, so it is stored as what it is.
 
-**One read of the monotonic clock.** Everything in the shell that paces or times out on real time, whether a held key's repeat, an arming's expiry, a footer note, or autosave, reads the monotonic clock through one function. A test can hold that clock for its own thread and move it by hand, so a test of a two-second behaviour advances two seconds and takes none, and a loaded machine can't make it fail. The hold is per thread because a crate's tests share a process and run side by side, and it ends with a guard so it can't outlive its test on a thread later tests share. A child process keeps its own clock, so a test driving a real game still waits in real time.
+**One read of each clock.** Everything in the shell that paces or times out on real time, whether a held key's repeat, an arming's expiry, a footer note, or autosave, reads the monotonic clock through one function, and everything that reads the wall clock reads it through another. A hold stops both, and moving the wall clock alone stands in for a suspend. A test can hold the clocks for its own thread and move them by hand, so a test of a two-second behaviour advances two seconds and takes none, and a loaded machine can't make it fail. The hold is per thread because a crate's tests share a process and run side by side, and it ends with a guard so it can't outlive its test on a thread later tests share. A child process keeps its own clock, so a test driving a real game still waits in real time.
 
 ## Waking Up
 
@@ -213,6 +217,8 @@ Two additions, for the same reason the navigation leaf needs its own: the rule b
 |---|---|---|---|
 | Testing what happens on real time | One function reads the monotonic clock, and a thread can hold it | A clock passed through every call or carried in the view state; one process-wide clock; tests that keep sleeping | Passing it through touches dozens of signatures for a seam only tests use, and carrying it in the view state means every helper reading the time needs the view. A process-wide clock would stop time under every other test in the binary. Sleeping set the suite's pace and made these the tests that failed under load. The cost accepted is a thread-local read on each call, which is negligible beside a frame |
 | Clock source | Monotonic for accumulation, wall-clock checkpoint for suspend detection | Wall clock alone; monotonic alone | Wall-alone lets NTP and DST inject or rewind game time; monotonic-alone silently loses a suspended laptop's hours, breaking tenet 2 |
+| When a frame reads its clocks | After its wait for input, before applying that input | Before the wait | A machine mostly sleeps during the wait, so a reading before it leaves a suspend unread until the next frame: a quit in that frame loses it, and a speed key re-prices it |
+| A capped gap's report | Retained by the shell through the journal's own retention, flagged truncated, stating no gains | A core call of its own; a footer note; nothing until a report can state gains | Only the shell sees a gap, and the journal's retention is already the one route a report takes. A footer note is gone before a returning player reads it and does not outlast a quit. Stating gains means following ticks across a drain that can take hours |
 | Long catch-up | A bounded count of ticks per frame, remainder banked | Run every owed tick in one frame; a wall-time budget per frame; cap and discard the excess | A multi-minute frozen frame reads as a hang; a time budget makes how far the meadow advances depend on the machine; discarding punishes absence |
 | A load's catch-up | Replayed after the terminal is taken, a bounded count per frame behind a waking screen | Replay it all before the first frame; replay it on a background thread; draw the game's frame live as the replay advances | Replaying first holds a blank terminal for up to the whole absence; a thread costs the single-threaded determinism story; a live game frame shows tabs and numbers racing through states the player cannot act on, and the opening would have to judge tabs it watched arrive |
 | Time spent waking | Banked at the save's speed and run as live ticks after the replay | Not counted; counted into the replay | Not counting it costs the player game time for the wait; folding it into the replay would change the replayed ticks and break bit-identity with a one-call load |
@@ -258,6 +264,7 @@ Two additions, for the same reason the navigation leaf needs its own: the rule b
 3. A terminal that is present but has stopped reading its output. It is not a lost terminal: a write to it blocks the loop until it reads again, and the operating system holds an exiting process until its terminal output has drained, so neither a frame nor a shutdown — a termination signal's included — finishes before then. A wait that ends with the terminal reading again costs no game time; the clocks bank it. Bounding it would take output the loop can abandon mid-write, which nothing here yet needs.
 4. A game whose frames go somewhere other than the terminal it reads — its output redirected — in a session that terminal does not control. Where the operating system reports a vanished terminal as an end of input, nothing then tells the loop: no hangup is delivered, no frame is refused, and the input source reports a quiet terminal while keeping the processor busy. The session is not stuck — it autosaves on its cadence, and a termination signal ends it as it ends any other — but it runs on, holding its lock, until one arrives. Closing this means the loop asking the operating system about the terminal itself, which a game drawn where no one can see it has not yet earned.
 5. How long a recorded local start time keeps counting. Only a session from a version that recorded local time writes one, and it ends when that session does, so the reading can go once such a session is no longer worth guarding.
+6. A suspend's report (#33). A suspend inside the cap leaves no report, where a restart of the same length would, and a capped one states no gains, its ticks not yet having run.
 
 ## References
 
