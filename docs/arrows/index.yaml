@@ -182,7 +182,7 @@ arrows:
     parent: tui
     sampled: 2026-11-02
     audited: 2026-11-02
-    audited_sha: 781d15ccba654dfe29d112ee225ddf12669f21a6
+    audited_sha: 90c0684e119dc66a90b0e1bf983aadfa65b0a9b4
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
@@ -226,11 +226,11 @@ arrows:
     parent: tui
     sampled: 2026-11-02
     audited: 2026-11-02
-    audited_sha: eb0b94ddad3fc7061a894159fb6146e7ade3e8fd
+    audited_sha: 90c0684e119dc66a90b0e1bf983aadfa65b0a9b4
     blocks: [render]
     blockedBy: [navigation, persistence]
     detail: tui/runtime/runtime.md
-    next: "#27, #28, #29: a resume, a damaged save, thin tests"
+    next: "#28, #29, #33: a damaged save, thin tests, a suspend's report"
     drift: null
   theme:
     status: PARTIAL

@@ -22,6 +22,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 - **Kittens say their own things.** The little moments a kitten has were showing as a single placeholder word. They now appear in the ticker and the Journal as written.
 - **The Journal tells flavour from fact by colour too.** Quiet moments recede there as they do on the ticker, and stars wear their colour on tabs and event lines.
 - **A few more event lines name your stores in their colours.**
+- **Walking away counts right up to the moment you're back.** Quitting or changing speed just after your computer wakes no longer loses or misprices the time it slept, the first and last moments of waking up now count too, and a gap too long to count now says so.
 - **Two sessions can't end up on one save in a few more ways.** Crossing a time zone no longer makes a running game look closed, a game you've taken over from no longer frees the save when it quits, and a lock that can't be cleared now says so rather than leaving the launch hanging.
 - **One of the last things you can build now does all it was meant to.** Part of what it was designed to do had never been hooked up, and its description now says that part too.
 - **A structure that was missed now takes the same bonuses as its neighbours.** It sat outside a production channel the others in its family all use.

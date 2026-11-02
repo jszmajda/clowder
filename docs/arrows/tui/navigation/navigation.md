@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-02 (commit `781d15ccba65`). 203 of 203 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-02 (commit `90c0684e119d`). 203 of 203 active specs implemented, each cited by a test.
 
 ## References
 
@@ -86,6 +86,8 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Issue #2 added what a store's card opens with (TUI-NAV-197). The audit found the persistent inspector repeating an arming's summary (fixed, TUI-NAV-077) and a placement helper no frame calls (annotation removed, the rest filed). Issue #3 added the sidebar's store-link marks (TUI-NAV-198, TUI-NAV-199, TUI-NAV-200), with marks read off drawn frames over every row of every section. Issue #20 found flavour events reaching the screen as a single placeholder word, because no line ever read their template; they now read as written, for every template (TUI-NAV-201). Issue #10 moved the held-key and arming tests onto a clock they control, so they take no real time and no longer fail under load. `nav::rows` serves a frame's row lists through one scoped build, held by a guard tied to the state's borrow (#18); outside a frame, every call still builds afresh. The inspector's place is decided by `render::layout::compute` and the frame's narrow body alone, and the tests read it off whole frames, through the dead-band in both directions (#22). The header's kitten fact states the clowder's room and free slots from the core's own queries (TUI-NAV-202, #23), and the design's list of chips and width budget match the code again.
 
 Audited 2026-11-02, for what issue #25 changed. It added a sentence for a new structure field (TUI-NAV-203), held word for word from the field and by the test that a statement is every field its definition sets. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-02, for what issue #27 changed. An in-process gap past the absence cap became a third route to a retained report (TUI-NAV-027), whose banner says more than the cap (TUI-NAV-055), read off a drawn frame. Which reports get a banner stays judged from the journal alone. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

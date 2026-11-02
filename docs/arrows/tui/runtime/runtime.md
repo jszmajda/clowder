@@ -4,7 +4,7 @@ This leaf owns the boundary between the operating system and the pure core: term
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-02 (commit `eb0b94ddad3f`). 55 of 55 active specs implemented, each cited by a test; 6 deferred.
+**PARTIAL** — last audited 2026-11-02 (commit `90c0684e119d`). 61 of 61 active specs implemented, each cited by a test; 3 deferred.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns the boundary between the operating system and the pure core: term
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/runtime/runtime-specs.md` — 61 specs, prefix `TUI-RUN`
+- `docs/intent/tui/runtime/runtime-specs.md` — 64 specs, prefix `TUI-RUN`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/clock.rs`
@@ -25,6 +25,7 @@ This leaf owns the boundary between the operating system and the pure core: term
 - `crates/clowder-tui/tests/integration/loop_body.rs`
 - `crates/clowder-tui/tests/integration/loop_order.rs`
 - `crates/clowder-tui/tests/integration/persist.rs`
+- `crates/clowder-tui/tests/integration/report_queue.rs`
 - `crates/clowder-tui/tests/integration/session.rs`
 - `crates/clowder-tui/tests/integration/terminal_lost.rs`
 - `crates/clowder-tui/tests/integration/waking.rs`
@@ -44,9 +45,9 @@ This leaf owns the boundary between the operating system and the pure core: term
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-RUN-001 – TUI-RUN-072 | 55 | 6 | 0 |
+| All | TUI-RUN-001 – TUI-RUN-075 | 61 | 3 | 0 |
 
-**Summary:** 55 of 55 active specs implemented; 6 deferred.
+**Summary:** 61 of 61 active specs implemented; 3 deferred.
 
 ## Key Findings
 
@@ -54,8 +55,10 @@ Audited 2026-11-01. First full audit: every spec read against its code, its test
 
 Audited 2026-11-02, for what issue #26 changed. A holder now reads as running from any time zone, since start times are recorded and compared in UTC, with a lock recorded in local time still counting in its own zone (TUI-RUN-069, TUI-RUN-070). A session releases only a lock that still names it (TUI-RUN-071), and a lock that cannot be removed stops the launch (TUI-RUN-072). The zone and read-only cases run the built game as a child. The audit moved two annotations off the types they sat on, onto what decides (TUI-RUN-006, TUI-RUN-007), added one where the refusal is worded, and cited TUI-RUN-063 on what turns mouse reporting on, which had none. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
+Audited 2026-11-02, for what issue #27 changed. A frame reads its clocks after its wait, each reading starting where the last ended across a wake and on into play (TUI-RUN-073, TUI-RUN-036), and every way out takes one last reading before it saves (TUI-RUN-074), each ending tested with the machine suspended just before it and the last reading checked by removing it. A reading past the absence cap retains a truncated report (TUI-RUN-024), with no gains, its ticks not having run; #33 holds what a suspend inside the cap shows. A wall clock a test can hold made the suspend testable (TUI-RUN-075). Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
 ## Work Required
 
-- #27: time away uncounted or mispriced around a resume (TUI-RUN-022, TUI-RUN-024, TUI-RUN-036, deferred).
 - #28: a damaged save can be overwritten; a fallback path unstated (TUI-RUN-005, TUI-RUN-012, deferred).
 - #29: thin tests, stray annotations, and open questions.
+- #33: a suspend inside the absence cap leaves no report, where a restart would.
