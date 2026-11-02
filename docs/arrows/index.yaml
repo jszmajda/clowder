@@ -59,7 +59,7 @@ arrows:
   adventures:
     status: OK
     parent: sim
-    sampled: 2026-10-29
+    sampled: 2026-11-01
     audited: 2026-10-29
     audited_sha: 8443eda1698c8df48efd2557f47f3f18455dcf5f
     blocks: [cosmic, dreamtime]
@@ -72,11 +72,11 @@ arrows:
     parent: sim
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 7ad9e6ec6caa13e1066a239673b88c0d076e1a80
+    audited_sha: 39585f101764bafc9ca082e35634a20dfb7c4263
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/ceremonies/ceremonies.md
-    next: "#13, #17: blurb truth, a citation from the cosmic side"
+    next: "#13: blurb truth"
     drift: null
   colonies:
     status: OK
@@ -90,15 +90,15 @@ arrows:
     next: null
     drift: null
   cosmic:
-    status: OK
+    status: PARTIAL
     parent: sim
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-11-01
+    audited: 2026-11-01
+    audited_sha: 39585f101764bafc9ca082e35634a20dfb7c4263
     blocks: []
     blockedBy: [adventures, prestige]
     detail: sim/cosmic/cosmic.md
-    next: null
+    next: "#25: an unbuilt storage bonus"
     drift: null
   curiosity:
     status: OK

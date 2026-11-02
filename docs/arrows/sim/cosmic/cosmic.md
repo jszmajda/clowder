@@ -4,7 +4,7 @@ The cosmic leaf is clowder's late-game frontier: once the clowder has mastered i
 
 ## Status
 
-**OK** — never audited (bootstrapped 2026-08-10 from existing LID docs; `audited_sha` null). 8 of 8 active specs implemented.
+**PARTIAL** — last audited 2026-11-01 (commit `39585f101764`). 10 of 10 active specs implemented, each cited by a test; 1 deferred.
 
 ## References
 
@@ -16,10 +16,11 @@ The cosmic leaf is clowder's late-game frontier: once the clowder has mastered i
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/cosmic/cosmic-specs.md` — 8 specs, prefix `SIM-SKY`
+- `docs/intent/sim/cosmic/cosmic-specs.md` — 11 specs, prefix `SIM-SKY`
 
 ### Tests
 - `crates/clowder-core/tests/integration/frontier.rs`
+- `crates/clowder-core/tests/integration/wonder.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`
@@ -32,16 +33,14 @@ The cosmic leaf is clowder's late-game frontier: once the clowder has mastered i
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-SKY-001 – SIM-SKY-008 | 8 | 0 | 0 |
+| All | SIM-SKY-001 – SIM-SKY-011 | 10 | 1 | 0 |
 
-**Summary:** 8 of 8 active specs implemented.
+**Summary:** 10 of 10 active specs implemented; 1 deferred.
 
 ## Key Findings
 
-Bootstrapped from existing LID docs without an audit pass. Coverage above is
-read from the spec files' own markers, which record what the project believes;
-they have not been verified against the code by this overlay.
+Audited 2026-11-01. First full audit: every spec read by hand against its code and tests, and the design's site table read row by row against the definitions and pinned by tests over all thirteen sites. It found a bonus the design states citing an unrelated spec (now SIM-SKY-009, the issue that opened this audit), one outpost left out of the outdoor channel (fixed, SIM-SKY-004), a forecast in the table no rule gives (removed), a storage figure missing from a row (added), and clauses no test exercised (tested, SIM-SKY-003, SIM-SKY-007). One designed bonus was never built (SIM-SKY-011, deferred). Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 
-None recorded — every active spec is marked implemented.
+- #25: a late outpost's storage bonus was never built (SIM-SKY-011, deferred).
