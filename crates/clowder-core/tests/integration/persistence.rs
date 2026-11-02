@@ -2432,3 +2432,66 @@ fn migration_judges_holdings_on_the_state_as_normalized() {
          negative stock nor the one its store had no room for"
     );
 }
+
+/// A save as text with one state field edited by hand.
+fn with_state_field(s: &GameState, key: &str, value: serde_json::Value) -> String {
+    let mut v: serde_json::Value = serde_json::from_str(&save_string(s, 1_000)).unwrap();
+    v["state"][key] = value;
+    v.to_string()
+}
+
+/// A hand-edited wisdom below zero is floored before any cap reads it. Read first,
+/// it would drive every cap negative and zero every stock, uncapped ones included.
+/// @spec SAVE-005
+#[test]
+fn a_negative_wisdom_is_floored_before_any_cap_reads_it() {
+    let mut s = GameState::new(30_032);
+    s.resources[ResourceId::Catnip.ix()] = 150.0;
+    s.resources[ResourceId::Feathers.ix()] = 7.0;
+    for key in ["elder_wisdom", "passed_down_wisdom"] {
+        let json = with_state_field(&s, key, serde_json::json!(-100_000.0));
+        let state = load_string(&json, 1_000).unwrap().state;
+        assert_eq!(state.stock(ResourceId::Catnip), 150.0, "{key}");
+        assert_eq!(state.stock(ResourceId::Feathers), 7.0, "{key}");
+    }
+}
+
+/// A version past 32 bits is newer than anything this binary knows, and can't wrap
+/// round to a version it does.
+/// @spec SAVE-002
+#[test]
+fn a_version_past_32_bits_is_too_new_rather_than_wrapped_round() {
+    let mut v: serde_json::Value =
+        serde_json::from_str(&save_string(&GameState::new(30_033), 1_000)).unwrap();
+    v["save_version"] = serde_json::json!((1u64 << 32) + SAVE_VERSION as u64);
+    assert!(
+        matches!(
+            load_string(&v.to_string(), 1_000),
+            Err(LoadError::TooNew { found: u32::MAX })
+        ),
+        "should read as too new"
+    );
+}
+
+/// A count too large to add to doesn't overflow.
+/// @spec SAVE-005
+#[test]
+fn an_owed_count_too_large_to_add_to_saturates() {
+    let mut v: serde_json::Value =
+        serde_json::from_str(&save_string(&GameState::new(30_034), 1_000)).unwrap();
+    v["owed_ticks"] = serde_json::json!(u64::MAX);
+    let catch_up = begin_load(&v.to_string(), 2_000).expect("it loads");
+    assert_eq!(catch_up.total_ticks(), u64::MAX);
+}
+
+/// A backwards clock replays nothing for the interval, and what the save owes was
+/// earned already, so it is still replayed.
+/// @spec SAVE-007, SAVE-017
+#[test]
+fn a_backwards_clock_still_replays_what_the_save_owes() {
+    let s = GameState::new(30_035);
+    let owed = save_string_owing(&s, 1_000, 123);
+    assert_eq!(begin_load(&owed, 500).unwrap().total_ticks(), 123);
+    let none = save_string(&s, 1_000);
+    assert_eq!(begin_load(&none, 500).unwrap().total_ticks(), 0);
+}

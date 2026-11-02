@@ -15,7 +15,7 @@ JSON via serde, pretty-printed (hand-rescuable with a text editor and `jq`):
 
 ```json
 {
-  "save_version": 1,
+  "save_version": 11,
   "saved_at_unix": 1751628800,
   "owed_ticks": 0,
   "report_so_far": null,
@@ -99,7 +99,7 @@ The finished report tells the absence an uninterrupted wake would have told, ext
 
 ## What Is Not Saved
 
-Derived values (happiness, rates, season) — recomputed from state. Event history — the shell's presentation concern. Anything about terminal or UI state.
+Derived values (happiness, rates, season) — recomputed from state. Events beyond what the journal keeps (SAVE-011) — the shell's presentation concern. Anything about terminal or UI state.
 
 ## Decisions & Alternatives
 
@@ -125,6 +125,7 @@ Derived values (happiness, rates, season) — recomputed from state. Event histo
 
 ### Deferred
 1. Save-file compression toggle if saves grow past ~1 MB with roadmap systems — measure first.
+2. Whether a hand-edited save's other integer fields should clamp rather than reject (SAVE-032, #36).
 
 ## References
 

@@ -148,7 +148,6 @@ pub fn save_string_carrying(
 }
 
 /// Atomic write: temp file in the same directory, fsync, rename.
-// @spec SAVE-003
 pub fn write_save(path: &Path, state: &GameState, saved_at_unix: u64) -> std::io::Result<()> {
     write_save_owing(path, state, saved_at_unix, 0)
 }
@@ -164,7 +163,8 @@ pub fn write_save_owing(
 }
 
 /// As [`write_save_owing`], additionally carrying the report so far of a
-/// catch-up set down before it finished (or `None`). @spec SAVE-020, SAVE-021
+/// catch-up set down before it finished (or `None`). Every save is written
+/// atomically here. @spec SAVE-003, SAVE-020, SAVE-021
 pub fn write_save_carrying(
     path: &Path,
     state: &GameState,
@@ -349,7 +349,7 @@ impl CatchUp {
 
 /// Parse, migrate, and normalize a save, and hand back its catch-up pending —
 /// the state as loaded, the ticks it owes in total, and the report folding so
-/// far — without replaying any of it. @spec SAVE-002, SAVE-005, SAVE-006,
+/// far — without replaying any of it. @spec SAVE-002, SAVE-004, SAVE-005, SAVE-006,
 /// SAVE-007, SAVE-018
 pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
     // Version-check on the loose parse first: a newer save may contain
@@ -363,10 +363,15 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
         .and_then(|v| v.as_u64())
         .ok_or_else(|| LoadError::Corrupt {
             detail: "missing save_version".into(),
-        })? as u32;
-    if found > SAVE_VERSION {
-        return Err(LoadError::TooNew { found });
+        })?;
+    // Judged wide, so a version past 32 bits can't wrap around to one this binary
+    // knows. @spec SAVE-002
+    if found > u64::from(SAVE_VERSION) {
+        return Err(LoadError::TooNew {
+            found: u32::try_from(found).unwrap_or(u32::MAX),
+        });
     }
+    let found = found as u32;
     // v8 -> v9: a v8 profile is set aside before the state is read, its fur
     // and eyes kept to be given back once the rest is drawn. @spec SAVE-029
     let kept_looks = if found == 8 {
@@ -397,6 +402,30 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
     if !state.kites_high_water.is_finite() || state.kites_high_water < 0.0 {
         state.kites_high_water = 0.0;
     }
+    // Wave-5 normalization: the legacy currencies and adventure reward pools are
+    // physics — floor at zero and stay finite. Generation, completions, and the
+    // armed/active adventure slots are valid by construction (their
+    // deserializers). @spec SAVE-013
+    for value in [
+        &mut state.elder_wisdom,
+        &mut state.warm_memories,
+        &mut state.passed_down_wisdom,
+        // Wave-6: stirred-dreams heat is physics too — floor at zero and stay
+        // finite. Sites, looms, whale counters, and deja_vu_until are valid by
+        // construction (their deserializers). @spec SAVE-013
+        &mut state.stirred_dreams,
+    ] {
+        if !value.is_finite() || *value < 0.0 {
+            *value = 0.0;
+        }
+    }
+    for reward in &mut state.adventure_rewards {
+        if !reward.is_finite() || *reward < 0.0 {
+            *reward = 0.0;
+        }
+    }
+
+    // Caps multiply by the wisdom just floored, so they are read only now.
     for r in ResourceId::ALL {
         let cap = state.cap(r);
         if state.resources[r.ix()] > cap {
@@ -445,29 +474,6 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
     }
     state.peak_devotion = state.peak_devotion.max(state.devotion);
 
-    // Wave-5 normalization: the legacy currencies and adventure reward pools are
-    // physics — floor at zero and stay finite. Generation, completions, and the
-    // armed/active adventure slots are valid by construction (their
-    // deserializers). @spec SAVE-013
-    for value in [
-        &mut state.elder_wisdom,
-        &mut state.warm_memories,
-        &mut state.passed_down_wisdom,
-        // Wave-6: stirred-dreams heat is physics too — floor at zero and stay
-        // finite. Sites, looms, whale counters, and deja_vu_until are valid by
-        // construction (their deserializers). @spec SAVE-013
-        &mut state.stirred_dreams,
-    ] {
-        if !value.is_finite() || *value < 0.0 {
-            *value = 0.0;
-        }
-    }
-    for reward in &mut state.adventure_rewards {
-        if !reward.is_finite() || *reward < 0.0 {
-            *reward = 0.0;
-        }
-    }
-
     // What a colony has shown the clowder is kept only for a discovered,
     // tradeable colony, and only of goods it offers: a stray entry is dropped
     // rather than the save refused. @spec SAVE-026
@@ -507,8 +513,8 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
     // Ticks the previous session had already earned are added as-is — they were
     // priced when they were earned, and re-deriving them from an interval would
     // re-price them at whatever speed is set now. @spec SAVE-017
-    let ticks_to_replay =
-        ((elapsed * TICKS_PER_SECOND) as f64 * state.speed).round() as u64 + file.owed_ticks;
+    let ticks_to_replay = (((elapsed * TICKS_PER_SECOND) as f64 * state.speed).round() as u64)
+        .saturating_add(file.owed_ticks);
     let before = state.resources;
     let earned_at_load = state.achievements.keys().copied().collect();
     Ok(CatchUp {
