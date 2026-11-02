@@ -170,7 +170,7 @@ The save a shutdown takes is tried once too, whatever began the shutdown: where 
 
 **Failure is not fatal.** A failed autosave (full disk, revoked permissions, a data directory that vanished) reports itself once and the game keeps running — the player keeps playing, and the next cadence retries. Killing a healthy session because a disk was briefly full would destroy more progress than the failed write did.
 
-**Save path.** `default_save_path()` returns an `Option`; a platform with no resolvable data directory falls back to a path beside the working directory, and the game says where it landed rather than refusing to start.
+**Save path.** `default_save_path()` returns an `Option`; a platform with no resolvable data directory falls back to a path beside the working directory, and the game says where it landed rather than refusing to start. It says so before it takes the terminal, as it does for anything else a player should still be able to read afterwards, so the statement stays on their scrollback when the alternate screen is given back.
 
 ## One Session Per Save
 
@@ -203,6 +203,8 @@ The core reports three distinct load failures and deliberately never rewrites th
 A save that cannot be *read* is not a save that is corrupt. A permission error, a path that is a directory, or a transient I/O failure means the file's contents are unknown — and moving aside or replacing a file we were merely unable to open would destroy a perfectly good save. Those failures stop startup with a plain explanation, leaving the file untouched.
 
 The `Corrupt` policy is the one that earns its keep. Saves are human-readable JSON specifically so a broken one can be hand-rescued (HLD decision 6); a shell that overwrites it with a fresh game destroys the only artifact that made that promise real. Moving it aside costs a rename and preserves every option.
+
+A save whose bytes are not valid UTF-8 is `Corrupt` too, whether or not the rest of it would parse. Its bytes are decoded strictly: a lossy decode turns a bad byte into a replacement character, the file then parses, and the next autosave writes over the only copy of what the byte was.
 
 ## Core API Dependencies (a cascade into `clowder-core`)
 
@@ -240,6 +242,7 @@ Two additions, for the same reason the navigation leaf needs its own: the rule b
 | Unreadable save | Stop with an explanation; leave the file untouched | Treat as corrupt and move aside | Unreadable is not unparseable — the contents are unknown, and touching the file could destroy a good save |
 | Concurrent sessions | Lock beside the save; live holder refuses, stale clears itself, override forces | Last-writer-wins; second instance read-only | Two sessions on one save is silent progress loss; read-only doubles the UX surface for a mistake, not a use case |
 | Simultaneous launches | The launch's decision is made under an advisory lock on the save's directory, held only for the decision | Hold an advisory lock on the lock file for the whole session, with no recorded holder; rely on exclusive creation of the lock file alone | A kernel lock held for the session cannot name its holder to the launch it refuses, and removing its file on exit reopens the race; exclusive creation makes taking a free save atomic but not clearing a stale one, where each launch clears what it read a moment ago and removes a lock another has just taken |
+| Bytes that are not valid UTF-8 | Corrupt: set aside, tell, and start fresh | Decode lossily and load; refuse to start | A lossy load looks fine and the next autosave destroys the original. Refusing leaves the player stuck on the damage the rescue policy exists to preserve, with the contents already known |
 | Stale-lock policy | Clear automatically, keyed on process id *and* start time | Require manual clearing; trust the id alone | A crash must not lock a player out of their own game; ids are recycled, so an id alone turns an unrelated process into a lockout |
 | A start time's zone | Recorded and compared in UTC | The launch's local zone; the process's elapsed time | Local time differs between launches in different zones and after a change of zone, so a running holder reads as stale. Elapsed time changes at every reading, so it can only be compared within a tolerance an unrelated process can fall inside |
 | A lock recorded in local time | Live where it matches the reading in the launch's own zone | Treat it as stale | A session left running across an upgrade would be cleared by the next launch, the silent two-session loss the lock exists to prevent. It costs a second `ps` only where the first reading disagreed, and a recycled id matching by chance only refuses a launch, which the override answers |
