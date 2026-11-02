@@ -542,6 +542,10 @@ fn a_gated_structure_reveals_when_its_gate_opens_whatever_the_stock() {
                 StructureGate::Site(site) => {
                     s.sites_reached.insert(site);
                 }
+                StructureGate::SiteAndIdea(site, i) => {
+                    s.sites_reached.insert(site);
+                    s.ideas.insert(i);
+                }
             }
             let id = ContentId::Structure(st);
             assert_eq!(

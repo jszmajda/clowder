@@ -1079,7 +1079,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         productions: &[(ResourceId::Hushfelt, 0.05)],
         cap_bonuses: &[(ResourceId::Hushfelt, 50.0)],
         energy_prod: 4.0,
-        gate: StructureGate::Site(SiteId::TheBrook),
+        gate: StructureGate::SiteAndIdea(SiteId::TheBrook, IdeaId::HushfeltSeeking),
         outdoor: true,
         ..BLD
     },
@@ -1090,7 +1090,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         productions: &[(ResourceId::Hushfelt, 0.03), (ResourceId::Echoes, 0.0001)],
         cap_bonuses: &[(ResourceId::Hushfelt, 50.0)],
         energy_cons: 2.0,
-        gate: StructureGate::Site(SiteId::WhisperingWoods),
+        gate: StructureGate::SiteAndIdea(SiteId::WhisperingWoods, IdeaId::HushfeltSeeking),
         outdoor: true,
         ..BLD
     },
@@ -1493,7 +1493,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Sun Salutations",
-        blurb: "Greet the beam; the beam greets back. Unlocks the Sun Room and {warmth|Warmth}.",
+        blurb: "Greet the beam; the beam greets back. Unlocks the Sun Room, {warmth|Warmth}, and ceremonies.",
         cost: 1500.0,
         gate: &[(ResourceId::Stories, 5.0)],
         prereqs: &[IdeaId::Storycraft],
@@ -1533,7 +1533,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Solar Devotion",
-        blurb: "Beyond basking lies belief. Unlocks the Sunbeam Altar, the Sunwarden job, and ceremonies.",
+        blurb: "Beyond basking lies belief. Unlocks the Sunbeam Altar and the Sunwarden job.",
         cost: 4500.0,
         gate: &[(ResourceId::Stories, 25.0)],
         prereqs: &[IdeaId::SunSalutations],
@@ -1712,7 +1712,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Dream Tending",
-        blurb: "Someone should water them. Unlocks the dreaming surface.",
+        blurb: "Someone should water them. Unlocks the Memory Arch and the Everdream Arch.",
         cost: 90000.0,
         gate: &[(ResourceId::Starshards, 3.0)],
         prereqs: &[IdeaId::ParadeRoutes],
@@ -4049,6 +4049,9 @@ pub struct ArchDef {
     /// (`blurb_parts`).
     pub blurb: &'static str,
     pub cost: &'static [(ResourceId, f64)],
+    /// The idea this upgrade waits on, beyond the Parade Routes idea every arch
+    /// upgrade waits on.
+    pub needs: Option<IdeaId>,
 }
 
 pub fn arch_def(a: ArchId) -> &'static ArchDef {
@@ -4059,21 +4062,25 @@ pub fn arch_def(a: ArchId) -> &'static ArchDef {
 static ARCHES: [ArchDef; 8] = [
     ArchDef {
         name: "Ribbon Arch",
+        needs: None,
         blurb: "Streamers in every colour. {unicorns|Unicorns} production +5%.",
         cost: &[(ResourceId::Rainbows, 500.0)],
     },
     ArchDef {
         name: "Crystal Arch",
+        needs: None,
         blurb: "It hums when the light hits it. {unicorns|Unicorns} production +10%; {prism|Prisms} descent chance +0.05% a day.",
         cost: &[(ResourceId::Rainbows, 25000.0), (ResourceId::Prisms, 25.0)],
     },
     ArchDef {
         name: "Prism Arch",
+        needs: None,
         blurb: "It throws colour on every wall. {unicorns|Unicorns} production +25%; chance of a shower of {rainbows|Rainbows} +0.05% a day.",
         cost: &[(ResourceId::Rainbows, 50000.0), (ResourceId::Prisms, 50.0)],
     },
     ArchDef {
         name: "Sky Arch",
+        needs: None,
         blurb: "Tall enough to tickle the clouds. {unicorns|Unicorns} production +50%; {prisms|Prisms} drift down, +0.00002/t.",
         cost: &[
             (ResourceId::Rainbows, 125000.0),
@@ -4082,6 +4089,7 @@ static ARCHES: [ArchDef; 8] = [
     },
     ArchDef {
         name: "Dreaming Arch",
+        needs: None,
         blurb: "{Unicorns} nap beneath it. {unicorns|Unicorns} production +250%; {starshard|Starshards} refining +5%.",
         cost: &[
             (ResourceId::Shinies, 500.0),
@@ -4091,6 +4099,7 @@ static ARCHES: [ArchDef; 8] = [
     },
     ArchDef {
         name: "Starlit Arch",
+        needs: None,
         blurb: "Lit from within, all night long. {unicorns|Unicorns} production +500%; {starshard|Starshards} refining +10%.",
         cost: &[
             (ResourceId::Shinies, 1250.0),
@@ -4100,6 +4109,7 @@ static ARCHES: [ArchDef; 8] = [
     },
     ArchDef {
         name: "Memory Arch",
+        needs: Some(IdeaId::DreamTending),
         blurb: "Every parade it has seen, remembered. Rainbow Arches begin to dream {dreamcorns|Dreamcorns}, faster the more are built.",
         cost: &[
             (ResourceId::Stardust, 2500.0),
@@ -4108,6 +4118,7 @@ static ARCHES: [ArchDef; 8] = [
     },
     ArchDef {
         name: "Everdream Arch",
+        needs: Some(IdeaId::DreamTending),
         blurb: "A doorway into the softest dream. Opens condensing {jars of purrs|JarsOfPurrs}, their cap +2, and three Promise slots.",
         cost: &[
             (ResourceId::Dreamcorns, 100.0),

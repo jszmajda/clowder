@@ -15,6 +15,7 @@ mod economy;
 mod economy_depth;
 mod engine;
 mod frontier;
+mod idea_unlocks;
 mod journal;
 mod kittens;
 mod legacy;

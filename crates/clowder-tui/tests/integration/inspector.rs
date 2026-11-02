@@ -2793,6 +2793,7 @@ fn rows_of_blurbed_kinds_state_their_blurb_and_no_stand_in() {
         let id = ContentId::Arch(a);
         let mut open = GameState::new(11);
         open.ideas.insert(IdeaId::ParadeRoutes);
+        open.ideas.insert(IdeaId::DreamTending);
         cover(&mut open, id);
         let mut held = open.clone();
         held.arches_bought.insert(a);
@@ -2812,7 +2813,7 @@ fn rows_of_blurbed_kinds_state_their_blurb_and_no_stand_in() {
     for l in DreamLoomId::ALL {
         let id = ContentId::DreamLoom(l);
         let mut open = GameState::new(11);
-        open.ideas.insert(IdeaId::DeepNapTheory);
+        open.ideas.insert(IdeaId::DreamLoomcraft);
         cover(&mut open, id);
         let mut held = open.clone();
         held.dream_looms.insert(l);

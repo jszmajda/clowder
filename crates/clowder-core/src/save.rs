@@ -22,9 +22,10 @@ use std::path::{Path, PathBuf};
 /// (SAVE-028). v9 gives profiles favourites of varied kinds and a pose; a v8
 /// profile keeps its fur and eyes and draws the rest (SAVE-029). v10 adds the
 /// achievement record (SAVE-030), arriving empty; the meadow's state checks
-/// credit what it has already done as it plays.
+/// credit what it has already done as it plays. v11 changes no field: it marks a
+/// save as written under the idea gates a prior save may be past (SAVE-031).
 /// @spec SAVE-013, SAVE-014, SAVE-021, SAVE-023, SAVE-026, SAVE-027, SAVE-029, SAVE-030
-pub const SAVE_VERSION: u32 = 10;
+pub const SAVE_VERSION: u32 = 11;
 /// The shortest absence worth reporting. Public for the same reason the cap
 /// is: a caller deciding whether to surface a report must use this value, not
 /// a copy of it. @spec SAVE-015
@@ -491,6 +492,12 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
         state.record_reveals();
     }
 
+    // v10 -> v11: a surface now gated on an idea stays open to a save that could
+    // already reach it. @spec SAVE-031
+    if found < 11 {
+        grant_ideas_for_surfaces_it_reached(&mut state);
+    }
+
     // Offline catch-up: same tick(), fast-forwarded at the save's own game
     // speed — away time accrues exactly as attended time would have. A
     // backwards clock is zero ticks, an absurd clock is capped and flagged.
@@ -515,6 +522,34 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
         partial: OfflineReport::default(),
         earned_at_load,
     })
+}
+
+/// Each idea that now gates a surface this save could already reach, held and
+/// revealed as researching it would leave it, no price paid and no event raised.
+/// @spec SAVE-031
+fn grant_ideas_for_surfaces_it_reached(state: &mut GameState) {
+    use crate::state::{ContentId, IdeaId, SiteId};
+    let reached = [
+        (
+            state.ideas.contains(&IdeaId::GiftEconomy),
+            IdeaId::ScoutPicnicking,
+        ),
+        (
+            state.ideas.contains(&IdeaId::ParadeRoutes),
+            IdeaId::DreamTending,
+        ),
+        (
+            state.sites_reached.contains(&SiteId::TheBrook),
+            IdeaId::HushfeltSeeking,
+        ),
+    ];
+    for (could_reach, idea) in reached {
+        if could_reach {
+            state.ideas.insert(idea);
+            state.revealed.insert(ContentId::Idea(idea));
+            state.unrevealed_ideas.retain(|i| *i != idea);
+        }
+    }
 }
 
 /// The fur and eyes of each v8 profile set aside, by roster and album

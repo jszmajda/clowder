@@ -1159,8 +1159,9 @@ fn sending_pen_pals_costs_ramping_charm_deepens_ties_and_whales_refuse() {
 // @spec SIM-TRADE-007
 #[test]
 fn scout_picnics_discover_the_next_colony_by_deterministic_priority() {
-    // Locked before the trade surface (the Gift Economy idea) opens.
+    // Locked before the Scout Picnicking idea, the trade surface open or not.
     let mut s = GameState::new(353);
+    s.ideas.insert(IdeaId::GiftEconomy);
     give(&mut s, ResourceId::Pep, 1000.0);
     assert_eq!(
         s.apply(Command::ScoutPicnic).unwrap_err(),
@@ -1171,7 +1172,7 @@ fn scout_picnics_discover_the_next_colony_by_deterministic_priority() {
     // 1000 pep spent) or comes home quiet (950 pep refunded — they mostly
     // stayed home).
     let mut s = GameState::new(354);
-    s.ideas.insert(IdeaId::GiftEconomy);
+    s.ideas.insert(IdeaId::ScoutPicnicking);
     give(&mut s, ResourceId::Pep, 1000.0);
     let before = s.discovered.len();
     s.apply(Command::ScoutPicnic).unwrap();
@@ -1192,7 +1193,7 @@ fn scout_picnics_discover_the_next_colony_by_deterministic_priority() {
     // eligible (charm ≥ 1500) and no Kites (Deer/Owls ineligible), any
     // successful picnic must find the Foxes.
     let mut s = GameState::new(355);
-    s.ideas.insert(IdeaId::GiftEconomy);
+    s.ideas.insert(IdeaId::ScoutPicnicking);
     for c in [
         ColonyId::Otters,
         ColonyId::Raccoons,

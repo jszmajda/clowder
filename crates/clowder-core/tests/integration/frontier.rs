@@ -919,6 +919,7 @@ fn reverie_is_monotone_except_for_a_loom_purchase() {
 
     // The only thing that lowers reverie is a player-chosen loom purchase.
     let mut buyer = GameState::new(544);
+    buyer.ideas.insert(IdeaId::DreamLoomcraft);
     give(&mut buyer, ResourceId::Reverie, 5.0);
     buyer
         .apply(Command::BuyDreamLoom(DreamLoomId::SoftPillow))
@@ -989,6 +990,7 @@ fn the_dream_loom_ladder_is_nine_with_costs_and_effects() {
 
     // Buyable once each; a second purchase does not spend again.
     let mut s = GameState::new(546);
+    s.ideas.insert(IdeaId::DreamLoomcraft);
     give(&mut s, ResourceId::Reverie, 5.0);
     let events = s
         .apply(Command::BuyDreamLoom(DreamLoomId::SoftPillow))
@@ -1011,6 +1013,7 @@ fn the_dream_loom_ladder_is_nine_with_costs_and_effects() {
 
     // Unaffordable rejects with InsufficientResources.
     let mut poor = GameState::new(547);
+    poor.ideas.insert(IdeaId::DreamLoomcraft);
     give(&mut poor, ResourceId::Reverie, 4.0);
     assert!(matches!(
         poor.apply(Command::BuyDreamLoom(DreamLoomId::SoftPillow))
@@ -1152,7 +1155,10 @@ fn the_structure_table_holds_site_gated_outposts() {
     for i in 40..53 {
         let st = StructureId::ALL[i];
         assert!(
-            matches!(content::structure_def(st).gate, StructureGate::Site(_)),
+            matches!(
+                content::structure_def(st).gate,
+                StructureGate::Site(_) | StructureGate::SiteAndIdea(..)
+            ),
             "{st:?} is Site-gated, not Idea/Always"
         );
     }

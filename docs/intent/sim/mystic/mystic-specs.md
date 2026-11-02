@@ -25,5 +25,5 @@
 - [x] **SIM-UNI-012**: The system shall give every Rainbow Arch upgrade a blurb — a short joke, then the upgrade's effect in plain words — marking each resource it names as SIM-CUR-014 marks them.
 - [x] **SIM-UNI-013**: The system shall give every structure definition the rainbows each copy brings to a Parade — 2500 for the Rainbow Arch and none for any other structure.
 - [x] **SIM-UNI-014**: The system shall give every structure definition the chance each copy adds to a day's prism descent — 0.02% for the Rainbow Arch and none for any other structure.
-- [ ] **SIM-UNI-016**: The system shall keep the Memory Arch and Everdream Arch upgrades closed until the Dream Tending idea is researched, BuyArch rejecting with Locked and the availability query reporting them absent, the other six needing Parade Routes alone.
+- [x] **SIM-UNI-016**: The system shall keep the Memory Arch and Everdream Arch upgrades closed until the Dream Tending idea is researched, BuyArch rejecting with Locked and the availability query reporting them absent, the other six needing Parade Routes alone.
 - [x] **SIM-UNI-015**: The system shall give every structure definition the dream-drift each copy accrues per tick — 0.000001 for the Rainbow Arch and none for any other structure.

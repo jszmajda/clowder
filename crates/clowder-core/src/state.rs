@@ -246,6 +246,8 @@ pub enum StructureGate {
     Always,
     Idea(IdeaId),
     Site(SiteId),
+    /// A site reached, and an idea researched as well.
+    SiteAndIdea(SiteId, IdeaId),
 }
 
 /// The thirteen cosmic expedition sites, in ladder order (a site is reachable
@@ -2079,13 +2081,34 @@ impl GameState {
     /// Whether a structure's gate is satisfied. A site-gated structure stays
     /// locked until its site is reached, and a site once reached is never
     /// un-reached — the field is only ever inserted into.
-    /// @spec SIM-SKY-003
+    /// @spec SIM-SKY-003, SIM-CUR-009
     pub fn structure_unlocked(&self, s: StructureId) -> bool {
-        match content::structure_def(s).gate {
+        self.gate_open(content::structure_def(s).gate)
+    }
+
+    /// Whether a gate stands open. Inlined: the reveal scan asks this of every
+    /// hidden structure every tick, which is what catch-up's bound has no room
+    /// to pay a call for.
+    #[inline(always)]
+    fn gate_open(&self, gate: StructureGate) -> bool {
+        match gate {
             StructureGate::Always => true,
             StructureGate::Idea(idea) => self.ideas.contains(&idea),
             StructureGate::Site(site) => self.sites_reached.contains(&site),
+            // @spec SIM-SKY-012
+            StructureGate::SiteAndIdea(site, idea) => {
+                self.sites_reached.contains(&site) && self.ideas.contains(&idea)
+            }
         }
+    }
+
+    /// Whether an arch upgrade can be had: the Parade Routes idea opens them, and
+    /// the upgrades that dream wait on Dream Tending too. @spec SIM-UNI-016
+    pub(crate) fn arch_open(&self, a: ArchId) -> bool {
+        self.ideas.contains(&IdeaId::ParadeRoutes)
+            && content::arch_def(a)
+                .needs
+                .is_none_or(|idea| self.ideas.contains(&idea))
     }
 
     // ---- Wave 6 derived queries (cosmic / dreamtime) ----
@@ -2541,7 +2564,7 @@ impl GameState {
                 let silent_sun = self.active_adventure == Some(AdventureId::SilentSun);
                 !silent_sun && self.peak_devotion + EPSILON >= content::rite_def(r).devotion_gate
             }
-            ContentId::Arch(_) => self.ideas.contains(&IdeaId::ParadeRoutes),
+            ContentId::Arch(a) => self.arch_open(a),
             ContentId::Refinement(r) => self.ideas.contains(&content::refinement_def(r).gate),
             // House rules are bought with curiosity and live beside the ideas,
             // so they appear on the same gate: once the meadow can hold what
@@ -2556,8 +2579,8 @@ impl GameState {
             // the reveal pacing every other kind honours. @spec SIM-ENG-032
             ContentId::Tradition(t) => self.generation >= 1 && self.tradition_open(t),
             // Likewise the loom ladder waits on the idea that introduces it.
-            // @spec SIM-ENG-032
-            ContentId::DreamLoom(_) => self.ideas.contains(&IdeaId::DeepNapTheory),
+            // @spec SIM-ENG-032, SIM-DREAM-006
+            ContentId::DreamLoom(_) => self.ideas.contains(&IdeaId::DreamLoomcraft),
         };
         if unlocked {
             Availability::Available
@@ -2578,8 +2601,8 @@ impl GameState {
                 // told the player it exists. Only the ungated climb the cost
                 // ladder. @spec SIM-ENG-060, SIM-ENG-061
                 let def = content::structure_def(s);
-                if def.gate != StructureGate::Always {
-                    return self.structure_unlocked(s);
+                if !matches!(def.gate, StructureGate::Always) {
+                    return self.gate_open(def.gate);
                 }
                 // Allocation-free next_cost: this runs in the per-tick scan.
                 let owned = self.structures[s.ix()] as i32;
@@ -2603,8 +2626,8 @@ impl GameState {
             ContentId::Structure(s) => {
                 // @spec SIM-ENG-060, SIM-ENG-061
                 let def = content::structure_def(s);
-                if def.gate != StructureGate::Always {
-                    return self.structure_unlocked(s);
+                if !matches!(def.gate, StructureGate::Always) {
+                    return self.gate_open(def.gate);
                 }
                 let owned = self.structures[s.ix()] as i32;
                 def.base_costs.iter().all(|(r, base)| {

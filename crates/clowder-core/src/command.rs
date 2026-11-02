@@ -798,10 +798,11 @@ impl GameState {
         Ok(vec![Event::ParadeHeld { rainbows }])
     }
 
-    /// Buy a Rainbow Arch upgrade (once each), gated by the Parade Routes idea.
-    // @spec SIM-UNI-005
+    /// Buy a Rainbow Arch upgrade (once each), gated by the Parade Routes idea
+    /// and, for those that dream, the Dream Tending idea.
+    // @spec SIM-UNI-005, SIM-UNI-016
     fn buy_arch(&mut self, a: ArchId) -> Result<Vec<Event>, CommandError> {
-        if !self.ideas.contains(&IdeaId::ParadeRoutes) {
+        if !self.arch_open(a) {
             return Err(CommandError::Locked);
         }
         if self.arches_bought.contains(&a) {
@@ -992,7 +993,7 @@ impl GameState {
     /// Spend 1000 pep to scout the next colony; a quiet day refunds 950.
     // @spec SIM-TRADE-007
     fn scout_picnic(&mut self) -> Result<Vec<Event>, CommandError> {
-        if !self.ideas.contains(&IdeaId::GiftEconomy) {
+        if !self.ideas.contains(&IdeaId::ScoutPicnicking) {
             return Err(CommandError::Locked);
         }
         self.spend(&[(ResourceId::Pep, content::SCOUT_PEP_COST)])?;
@@ -1416,6 +1417,9 @@ impl GameState {
     /// Weave a Dream Loom upgrade: reverie (and, for Distant Dawn, Jars) spent
     /// all-or-nothing, once each. @spec SIM-DREAM-006
     fn buy_dream_loom(&mut self, id: DreamLoomId) -> Result<Vec<Event>, CommandError> {
+        if !self.ideas.contains(&IdeaId::DreamLoomcraft) {
+            return Err(CommandError::Locked);
+        }
         if self.dream_looms.contains(&id) {
             return Err(CommandError::AlreadyResearched);
         }

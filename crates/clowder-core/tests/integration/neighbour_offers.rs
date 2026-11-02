@@ -327,6 +327,21 @@ fn a_good_for_closer_friends_is_offered_once_the_level_is_met() {
 
 const V6_FIXTURE: &str = include_str!("../fixtures/save_v6.json");
 
+/// This fixture holds Gift Economy, so it comes up holding Scout Picnicking too
+/// (SAVE-031). What these tests hold is everything else.
+fn take_granted_idea(resaved: &mut serde_json::Value) {
+    let state = &mut resaved["state"];
+    let ideas = state["ideas"].as_array_mut().unwrap();
+    let before = ideas.len();
+    ideas.retain(|i| i != "ScoutPicnicking");
+    assert_eq!(ideas.len(), before - 1, "fixture: the idea was granted");
+    let granted = serde_json::json!({ "Idea": "ScoutPicnicking" });
+    state["revealed"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|r| *r != granted);
+}
+
 /// Reach and learned goods survive a save and a load, under a version newer
 /// than v6.
 /// @spec SAVE-026
@@ -405,6 +420,7 @@ fn a_v6_save_migrates_with_everything_else_exact() {
     ))
     .unwrap();
     take_empty_record(&mut resaved);
+    take_granted_idea(&mut resaved);
     assert_eq!(resaved["save_version"], SAVE_VERSION);
     for (key, was) in before["state"].as_object().unwrap() {
         let now = &resaved["state"][key];

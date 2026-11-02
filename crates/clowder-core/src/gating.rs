@@ -326,7 +326,7 @@ impl GameState {
     ///
     /// Content-backed actions answer through `availability`; the ones below
     /// have no content id of their own. `true` for anything unlisted — an
-    /// action with no gate is simply always there. @spec SIM-ENG-045
+    /// action with no gate is simply always there. @spec SIM-ENG-045, SIM-CUR-009
     pub fn command_gate_open(&self, cmd: &crate::command::Command) -> bool {
         use crate::command::Command as C;
         use crate::state::{ArchId, IdeaId, StructureId};
@@ -346,7 +346,7 @@ impl GameState {
                 !self.kittens.is_empty()
             }
             C::HoldParade => self.ideas.contains(&IdeaId::ParadeRoutes),
-            C::ScoutPicnic => self.ideas.contains(&IdeaId::GiftEconomy),
+            C::ScoutPicnic => self.ideas.contains(&IdeaId::ScoutPicnicking),
             C::SummonStarWhale | C::FeedWhale => {
                 self.structures[StructureId::SkyDock.ix()] >= 1
                     && self.ideas.contains(&IdeaId::SkywardSong)

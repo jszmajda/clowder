@@ -19,7 +19,7 @@
 
 - [x] **SIM-CUR-007**: When an idea's cost includes a gate craft (stories, anthologies, schemes, starshards, echoes), ResearchIdea shall spend curiosity and the gate components together, all-or-nothing, under the same epsilon-tolerant affordability rule.
 - [x] **SIM-CUR-008**: The idea prerequisite graph shall be acyclic with every idea reachable from the roots (property-tested), and an idea listing multiple prerequisites shall require all of them. Mystic gate-craft costs (starshards, echoes) escalate steeply against their faucet rates by design; their absolute reachability is a balance concern verified at the integration wave, not a per-idea property.
-- [ ] **SIM-CUR-009**: The system shall expose idea-granted unlocks (structures, crafts, manual actions, jobs, and subsystem surfaces) as pure lookups consumed by the owning leaves, exactly as the tree tables assign them, with a rule reading each idea for each unlock its row names.
+- [x] **SIM-CUR-009**: The system shall expose idea-granted unlocks (structures, crafts, manual actions, jobs, and subsystem surfaces) as pure lookups consumed by the owning leaves, exactly as the tree tables assign them, with a rule reading each idea for each unlock its row names.
 
 ## Depth: Refinements & House Rules
 

@@ -14,7 +14,7 @@
 
 ## The Dream Loom
 
-- [ ] **SIM-DREAM-006**: The system shall define exactly the nine Dream Loom upgrades of the dreamtime design's ladder — reverie (and Jar) costs and effects — buyable once each via BuyDreamLoom (Locked before the Dream Loomcraft idea, InsufficientResources when unaffordable), their effects flowing through the effect-key system.
+- [x] **SIM-DREAM-006**: The system shall define exactly the nine Dream Loom upgrades of the dreamtime design's ladder — reverie (and Jar) costs and effects — buyable once each via BuyDreamLoom (Locked before the Dream Loomcraft idea, InsufficientResources when unaffordable), their effects flowing through the effect-key system.
 
 ## The Distant Dawn
 

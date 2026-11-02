@@ -1617,7 +1617,7 @@ fn a_command_that_opens_a_gate_reveals_the_prices_it_brings_into_view() {
 
     for seed in 0..64 {
         let mut scouting = GameState::new(seed);
-        scouting.ideas.insert(IdeaId::GiftEconomy);
+        scouting.ideas.insert(IdeaId::ScoutPicnicking);
         cases.push(("scouting a picnic", scouting, Command::ScoutPicnic));
     }
 
