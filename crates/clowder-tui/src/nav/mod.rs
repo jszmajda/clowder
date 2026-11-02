@@ -16,7 +16,7 @@ pub mod view;
 
 pub use action::{Action, CountSemantics};
 pub use pointer::{journal_key, pointer_event, sidebar_key, sidebar_step};
-pub use reports::{queue_command_reports, queue_load_report};
+pub use reports::{queue_capped_gap_report, queue_command_reports, queue_load_report};
 pub use rows::{row_still_listed, Row, RowKey, RowKind};
 pub use section::Section;
 pub use update::{

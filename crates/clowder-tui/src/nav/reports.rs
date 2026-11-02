@@ -54,6 +54,12 @@ pub fn queue_load_report(view: &mut ViewState, loaded: &LoadedGame) {
     queue(view, &loaded.state, &loaded.report, None);
 }
 
+/// Queue the report the runtime just retained for a gap past the absence cap,
+/// which also never runs through `update`. @spec TUI-NAV-027
+pub fn queue_capped_gap_report(view: &mut ViewState, state: &GameState, report: &OfflineReport) {
+    queue(view, state, report, None);
+}
+
 /// Queue a banner for whatever an applied command's own events say the core
 /// just retained. Only an accepted nap returns a report this way today — a
 /// load's report reaches the queue through `queue_load_report` instead, since

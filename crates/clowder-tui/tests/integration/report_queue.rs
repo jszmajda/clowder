@@ -1085,3 +1085,31 @@ fn the_simulation_advancing_leaves_the_banner_showing() {
     assert!(a.state.ticks > ticks, "fixture: the simulation advanced");
     assert_still_showing(&a, &two, "the simulation advancing");
 }
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-024 — a gap past the absence cap is told as a load's is
+// ---------------------------------------------------------------------------
+
+/// A suspend past the cap says the meadow stopped counting there, in the banner a
+/// report gets, once.
+/// @spec TUI-RUN-024, TUI-NAV-027, TUI-NAV-055
+#[test]
+fn a_gap_past_the_cap_shows_a_report_saying_more_than_the_cap() {
+    let mut app = app(GameState::new(24_024), ViewState::default(), "capped-gap");
+    let mut t = term(200, 40);
+    let past = Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::from_secs(2 * clowder_core::CATCHUP_CAP_SECONDS),
+    };
+    app.step(&mut t, past, &[]).unwrap();
+    assert_eq!(app.view.reports.len(), 1, "one gap, one banner");
+    let line = showing(&app).expect("the report's banner is showing");
+    assert!(line.contains("more than"), "said: {line}");
+
+    let still = Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::ZERO,
+    };
+    app.step(&mut t, still, &[]).unwrap();
+    assert_eq!(app.view.reports.len(), 1, "told once, and not again");
+}

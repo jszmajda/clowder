@@ -1,9 +1,9 @@
 //! The shell's one read of the monotonic clock: real time unless held, and held
 //! only for the thread that holds it, for as long as the hold lasts.
 //!
-//! @spec TUI-RUN-066, TUI-RUN-067
+//! @spec TUI-RUN-066, TUI-RUN-067, TUI-RUN-075
 
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use clowder_tui::runtime::now;
 
@@ -103,4 +103,49 @@ fn every_read_of_the_monotonic_clock_goes_through_the_one_function() {
             file.display()
         );
     }
+}
+
+/// With nothing holding it, the wall clock reads real time.
+/// @spec TUI-RUN-075
+#[test]
+fn an_unheld_wall_clock_reads_real_time() {
+    let (before, read, after) = (SystemTime::now(), now::wall(), SystemTime::now());
+    assert!(before <= read && read <= after);
+}
+
+/// A hold stops the wall clock too, and advancing moves both by the same amount.
+/// @spec TUI-RUN-075
+#[test]
+fn advancing_a_held_clock_moves_the_wall_clock_with_it() {
+    let _clock = now::held();
+    let (mono, wall) = (now::instant(), now::wall());
+    std::thread::sleep(Duration::from_millis(5));
+    assert_eq!(now::wall(), wall, "real time passing moves nothing");
+    now::advance(Duration::from_secs(9));
+    assert_eq!(now::since(mono), Duration::from_secs(9));
+    assert_eq!(now::wall(), wall + Duration::from_secs(9));
+}
+
+/// A suspend moves the wall clock alone, as a sleeping machine does.
+/// @spec TUI-RUN-075
+#[test]
+fn a_suspend_moves_the_wall_clock_alone() {
+    let _clock = now::held();
+    let (mono, wall) = (now::instant(), now::wall());
+    now::suspend(Duration::from_secs(3600));
+    assert_eq!(now::instant(), mono);
+    assert_eq!(now::wall(), wall + Duration::from_secs(3600));
+}
+
+/// A hold's end gives the wall clock back too.
+/// @spec TUI-RUN-075
+#[test]
+fn a_holds_end_gives_the_wall_clock_back() {
+    let before = SystemTime::now();
+    {
+        let _clock = now::held();
+        now::suspend(Duration::from_secs(3600 * 24 * 365));
+    }
+    let read = now::wall();
+    assert!(read >= before && read < before + Duration::from_secs(5));
 }

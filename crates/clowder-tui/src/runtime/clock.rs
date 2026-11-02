@@ -56,6 +56,8 @@ pub struct TickAccumulator {
     backlog: u64,
     /// Real time the unrun backlog represents, in seconds. @spec TUI-RUN-027
     unrun_seconds: f64,
+    /// A reading ran past the absence cap, and nothing has yet taken the news.
+    capped: bool,
 }
 
 impl TickAccumulator {
@@ -77,6 +79,7 @@ impl TickAccumulator {
         // TUI-RUN-024: one shared absence cap with the load path.
         if elapsed > CATCHUP_CAP_SECONDS_F {
             elapsed = CATCHUP_CAP_SECONDS_F;
+            self.capped = true;
         }
 
         // TUI-RUN-018/020/030: convert THIS interval at THIS speed, now. What
@@ -95,6 +98,12 @@ impl TickAccumulator {
             self.unrun_seconds += whole_ticks as f64 / (TICKS_PER_SECOND_F * speed);
             self.backlog += whole_ticks;
         }
+    }
+
+    /// Whether a reading has run past the absence cap since this was last
+    /// asked, so each capped gap is told once. @spec TUI-RUN-024
+    pub fn take_capped(&mut self) -> bool {
+        std::mem::take(&mut self.capped)
     }
 
     /// Draw down at most `max_ticks` from the backlog, so a long catch-up

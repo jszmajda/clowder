@@ -80,7 +80,7 @@ use clowder_core::{begin_load, save_string, Advance, GameState, SetDown};
 use clowder_tui::nav::{self, ViewState};
 use clowder_tui::runtime::clock::Reading;
 use clowder_tui::runtime::{
-    session, App, InputSource, Startup, TickAccumulator, WAKE_TICKS_PER_FRAME,
+    now, session, App, InputSource, Startup, TickAccumulator, WAKE_TICKS_PER_FRAME,
 };
 use crossterm::event::{
     Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -124,6 +124,10 @@ struct Cue {
     answer: Answer,
     signal: bool,
     screen_goes: bool,
+    /// The machine sleeps for this long during this wait.
+    suspend: Option<Duration>,
+    /// The next write to the screen after this wait takes this long.
+    next_write_takes: Option<Duration>,
 }
 
 fn quiet() -> Cue {
@@ -131,6 +135,8 @@ fn quiet() -> Cue {
         answer: Answer::Quiet,
         signal: false,
         screen_goes: false,
+        suspend: None,
+        next_write_takes: None,
     }
 }
 
@@ -167,6 +173,18 @@ impl Cue {
         self.screen_goes = true;
         self
     }
+
+    /// The machine sleeps during this wait. The caller holds the clock.
+    fn and_a_suspend(mut self, span: Duration) -> Cue {
+        self.suspend = Some(span);
+        self
+    }
+
+    /// The next write to the screen takes this long. The caller holds the clock.
+    fn and_the_next_write_takes(mut self, span: Duration) -> Cue {
+        self.next_write_takes = Some(span);
+        self
+    }
 }
 
 /// How far past its reason to stop a loop may go before the source refuses to
@@ -185,6 +203,8 @@ struct World {
     signalled_at: Option<usize>,
     waits_of_no_time: usize,
     waits_past_the_script: usize,
+    /// How long the next write to the screen takes.
+    next_write_takes: Option<Duration>,
 }
 
 struct Scripted(Rc<RefCell<World>>);
@@ -218,6 +238,12 @@ impl InputSource for Scripted {
             );
             return Ok(false);
         };
+        if let Some(span) = cue.suspend {
+            now::suspend(span);
+        }
+        if let Some(span) = cue.next_write_takes {
+            w.next_write_takes = Some(span);
+        }
         if cue.signal {
             w.signalled = true;
             w.signalled_at = Some(w.log.len() - 1);
@@ -259,6 +285,9 @@ struct Screen {
 impl Screen {
     fn write(&self) -> io::Result<()> {
         let mut w = self.world.borrow_mut();
+        if let Some(span) = w.next_write_takes.take() {
+            now::advance(span);
+        }
         let refused = w.screen_gone;
         w.log.push(Op::Write { refused });
         if refused {
@@ -371,9 +400,19 @@ struct Setup {
 }
 
 fn play_out(setup: Setup, cues: Vec<Cue>) -> Run {
+    play_out_with_a_slow_first_write(setup, cues, None)
+}
+
+/// As [`play_out`], the session's first write to the screen taking `first_write`.
+fn play_out_with_a_slow_first_write(
+    setup: Setup,
+    cues: Vec<Cue>,
+    first_write: Option<Duration>,
+) -> Run {
     let world = Rc::new(RefCell::new(World {
         script: cues.into(),
         screen_gone: setup.screen_gone,
+        next_write_takes: first_write,
         ..World::default()
     }));
     let backend = Screen {
@@ -1518,4 +1557,245 @@ fn a_key_behind_fewer_mouse_events_than_the_mouse_bound_is_taken_in_their_frame(
         "while waking: the quit key behind the burst should be taken in its frame"
     );
     run.expect_the_wake_set_down_after(2, "a burst then the quit key, while waking");
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-022, TUI-RUN-036, TUI-RUN-073, TUI-RUN-074 — every span read
+// ---------------------------------------------------------------------------
+
+const A_NIGHT: Duration = Duration::from_secs(8 * 3600);
+const A_MOMENT: Duration = Duration::from_secs(90);
+
+/// What the accumulator banks for these spans, each suspended over and priced
+/// at its speed: the figure a session has to arrive at, with no span left out.
+fn banked_for(spans: &[(Duration, f64)]) -> u64 {
+    let mut acc = TickAccumulator::default();
+    for (span, speed) in spans {
+        acc.observe(
+            Reading {
+                monotonic: Duration::ZERO,
+                wall: *span,
+            },
+            *speed,
+        );
+    }
+    acc.backlog()
+}
+
+impl Run {
+    /// The ticks a session of play lived and owes: all it counted.
+    fn counted(&self, what: &str) -> u64 {
+        let saved = self.saved(what);
+        saved.state.ticks + saved.owed_ticks
+    }
+}
+
+/// A machine usually sleeps during the wait for input, so the frame that wait
+/// ends holds the suspend, and a quit key in that frame doesn't lose it.
+/// @spec TUI-RUN-022, TUI-RUN-073
+#[test]
+fn a_suspend_during_the_wait_counts_when_a_quit_key_ends_that_frame() {
+    let (speed, _) = speeds();
+    let _clock = now::held();
+    let run = play_out(
+        play(scratch("suspend-quit")),
+        vec![ready(quit_key()).and_a_suspend(A_NIGHT)],
+    );
+    assert_eq!(
+        run.counted("a quit just after a resume"),
+        banked_for(&[(A_NIGHT, speed)]),
+        "the night the machine slept is the player's"
+    );
+}
+
+/// However a session ends just after a resume, the save counts the suspend.
+/// @spec TUI-RUN-022, TUI-RUN-074
+#[test]
+fn a_suspend_counts_whatever_ends_the_session_just_after_it() {
+    let (speed, _) = speeds();
+    let endings: [(&str, Cue); 4] = [
+        ("a signal", quiet().and_a_signal()),
+        ("a wait that fails", wait_fails(io::ErrorKind::Other)),
+        ("a read that fails", read_fails(io::ErrorKind::Other)),
+        ("the screen going", quiet().and_the_screen_goes()),
+    ];
+    for (what, ending) in endings {
+        let _clock = now::held();
+        let run = play_out(
+            play(scratch("suspend-ending")),
+            vec![ending.and_a_suspend(A_NIGHT)],
+        );
+        assert_eq!(
+            run.counted(what),
+            banked_for(&[(A_NIGHT, speed)]),
+            "{what} just after a resume should leave the night in the save"
+        );
+    }
+}
+
+/// A span since the last reading counts even where no frame follows to read it.
+/// @spec TUI-RUN-074
+#[test]
+fn the_time_a_last_frame_took_counts_where_no_frame_follows_it() {
+    let (speed, _) = speeds();
+    let _clock = now::held();
+    let run = play_out(
+        play(scratch("last-frame")),
+        vec![
+            quiet().and_the_next_write_takes(A_MOMENT),
+            wait_fails(io::ErrorKind::Other),
+        ],
+    );
+    assert_eq!(
+        run.counted("lost input after a slow frame"),
+        banked_for(&[(A_MOMENT, speed)])
+    );
+}
+
+/// A speed key pressed just after a resume applies from there on. The night was
+/// lived at the speed set before it.
+/// @spec TUI-RUN-020, TUI-RUN-073
+#[test]
+fn a_speed_key_just_after_a_resume_does_not_reprice_the_suspend() {
+    let (before, after) = speeds();
+    let _clock = now::held();
+    let run = play_out(
+        play(scratch("suspend-speed")),
+        vec![
+            ready(speed_key()).and_a_suspend(A_NIGHT),
+            // A wait with nothing ready ends the frame the key arrived in.
+            quiet(),
+            ready(quit_key()).and_a_suspend(A_MOMENT),
+        ],
+    );
+    assert_eq!(
+        run.counted("a speed key just after a resume"),
+        banked_for(&[(A_NIGHT, before), (A_MOMENT, after)]),
+        "each span at the speed in force while it passed"
+    );
+}
+
+/// A wake owing a bound and a half: its second frame finishes it.
+fn a_two_frame_wake(save_path: PathBuf) -> (Setup, u64, f64) {
+    let state = GameState::new(WAKE_SEED);
+    let speed = state.speed;
+    let json = save_string(&state, SAVED_AT);
+    let ticks_per_second = clowder_core::content::TICKS_PER_SECOND as f64;
+    let away = (WAKE_TICKS_PER_FRAME as f64 * 1.5 / (ticks_per_second * speed)) as u64;
+    let catch_up = begin_load(&json, SAVED_AT + away).expect("the fixture save loads");
+    let total = catch_up.total_ticks();
+    assert!(
+        total > WAKE_TICKS_PER_FRAME && total < 2 * WAKE_TICKS_PER_FRAME,
+        "fixture: the wake takes exactly two frames"
+    );
+    (
+        Setup {
+            startup: Startup::Loaded(Box::new(catch_up)),
+            size: WIDE,
+            screen_gone: false,
+            save_path,
+        },
+        total,
+        speed,
+    )
+}
+
+/// The time a wake's first frame takes counts: its reading starts before it.
+/// @spec TUI-RUN-036
+#[test]
+fn the_time_a_wakes_first_frame_takes_counts() {
+    let speed = GameState::new(WAKE_SEED).speed;
+    let _clock = now::held();
+    let run = play_out_with_a_slow_first_write(
+        waking(scratch("wake-first-frame")),
+        vec![wait_fails(io::ErrorKind::Other)],
+        Some(A_MOMENT),
+    );
+    let saved = run.saved("a wake whose first frame took a moment");
+    assert_eq!(
+        saved.owed_ticks,
+        reached(1).remaining + banked_for(&[(A_MOMENT, speed)]),
+        "what's left of the wake, and the moment its first frame took"
+    );
+}
+
+/// The time the frame that finishes a wake takes counts as well: play's first
+/// reading starts where the wake's last one ended.
+/// @spec TUI-RUN-036
+#[test]
+fn the_time_the_frame_that_finishes_a_wake_takes_counts() {
+    let _clock = now::held();
+    let (setup, total, speed) = a_two_frame_wake(scratch("wake-last-frame"));
+    let (w, h) = (WIDE.0, WIDE.1);
+    let run = play_out(
+        setup,
+        vec![
+            ready(Event::Resize(w, h)).and_the_next_write_takes(A_MOMENT),
+            // A wait with nothing ready ends the frame, which finishes the wake.
+            quiet(),
+            wait_fails(io::ErrorKind::Other),
+        ],
+    );
+    let saved = run.saved("a wake whose finishing frame took a moment");
+    assert_eq!(
+        saved.state.ticks + saved.owed_ticks,
+        total + banked_for(&[(A_MOMENT, speed)]),
+        "the whole replay, and the moment its finishing frame took"
+    );
+}
+
+/// However a wake ends just after a resume, the save owes the suspend as well as
+/// what's left of the wake.
+/// @spec TUI-RUN-036, TUI-RUN-073, TUI-RUN-074
+#[test]
+fn a_suspend_counts_whatever_ends_a_wake_just_after_it() {
+    let speed = GameState::new(WAKE_SEED).speed;
+    let banked = banked_for(&[(A_NIGHT, speed)]);
+    let endings: [(&str, Cue, usize); 4] = [
+        ("a quit key", ready(quit_key()), 2),
+        ("a signal", quiet().and_a_signal(), 2),
+        ("a wait that fails", wait_fails(io::ErrorKind::Other), 1),
+        ("a read that fails", read_fails(io::ErrorKind::Other), 1),
+    ];
+    for (what, ending, bounds) in endings {
+        let _clock = now::held();
+        let run = play_out(
+            waking(scratch("wake-ending")),
+            vec![ending.and_a_suspend(A_NIGHT)],
+        );
+        assert_eq!(
+            run.saved(what).owed_ticks,
+            reached(bounds).remaining + banked,
+            "{what} just after a resume, while waking"
+        );
+    }
+}
+
+/// A gap past the absence cap is told as a load's is, in what the save keeps.
+/// @spec TUI-RUN-024
+#[test]
+fn a_gap_past_the_cap_leaves_a_truncated_report_in_the_save() {
+    let _clock = now::held();
+    let two_years = Duration::from_secs(2 * clowder_core::CATCHUP_CAP_SECONDS);
+    let run = play_out(
+        play(scratch("capped-gap")),
+        vec![ready(quit_key()).and_a_suspend(two_years)],
+    );
+    let saved = run.saved("a quit just after a capped gap");
+    let reports: Vec<_> = saved
+        .state
+        .journal
+        .kept
+        .iter()
+        .filter_map(|e| match &e.item {
+            clowder_core::JournalItem::Away(r) => Some(r),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(reports.len(), 1, "one gap, one report");
+    assert!(reports[0].truncated, "flagged as the load path flags it");
+    assert_eq!(
+        reports[0].elapsed_seconds,
+        clowder_core::CATCHUP_CAP_SECONDS
+    );
 }

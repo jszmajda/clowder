@@ -156,18 +156,26 @@ impl Waking {
         // passing, and the ordinary accumulator observes it at the save's
         // speed — suspend excess and the absence cap included — banking it
         // to run as live ticks once the game opens.
-        let speed = self.catch_up.speed();
-        self.clock.observe(reading, speed);
+        self.observe(reading);
 
         self.advance_and_draw(terminal)
+    }
+
+    /// Bank an interval at the save's speed. @spec TUI-RUN-036
+    pub(crate) fn observe(&mut self, reading: Reading) {
+        let speed = self.catch_up.speed();
+        self.clock.observe(reading, speed);
     }
 
     /// Shutdown taken while waking: set the catch-up down and save promptly,
     /// the owed count carrying the catch-up's remaining ticks together with
     /// any live ticks banked while waking, and the save carrying the core's
-    /// report so far. @spec TUI-RUN-039
-    pub fn shut_down(self) -> io::Result<()> {
-        let sd = self.catch_up.set_down();
+    /// report so far, which also says where a gap past the absence cap has
+    /// not yet been told. @spec TUI-RUN-024, TUI-RUN-039
+    pub fn shut_down(mut self) -> io::Result<()> {
+        let capped = self.clock.take_capped();
+        let mut sd = self.catch_up.set_down();
+        sd.report_so_far.truncated |= capped;
         let owed = sd.owed_ticks + self.clock.backlog();
         clowder_core::write_save_carrying(
             &self.save_path,

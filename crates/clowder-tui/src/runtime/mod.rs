@@ -28,7 +28,7 @@ pub use wake::{Refused, Wake, Waking, WAKE_TICKS_PER_FRAME};
 /// The one place a save's timestamp is derived from the real clock, shared by
 /// a live session's save and a shutdown taken mid-wake. @spec TUI-RUN-027
 pub(crate) fn now_unix() -> u64 {
-    std::time::SystemTime::now()
+    crate::runtime::now::wall()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs()
@@ -115,10 +115,7 @@ pub fn run() -> ExitCode {
         }
     };
 
-    let load_now_unix = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+    let load_now_unix = now_unix();
 
     // A load never runs through a command, so whatever it found — a fresh
     // game, or a catch-up pending (SAVE-018) — is carried past the match to
@@ -317,6 +314,38 @@ fn take_input(
     Ok(events)
 }
 
+/// Where the session last read both clocks, sampled together so their
+/// difference is meaningful: the wall clock outrunning the monotonic one is the
+/// machine having been suspended. Each reading starts where the last one ended,
+/// so no span goes unread, through a wake and on into play.
+/// @spec TUI-RUN-021, TUI-RUN-022
+struct Checkpoint {
+    monotonic: Instant,
+    wall: std::time::SystemTime,
+}
+
+impl Checkpoint {
+    fn now() -> Self {
+        Checkpoint {
+            monotonic: crate::runtime::now::instant(),
+            wall: crate::runtime::now::wall(),
+        }
+    }
+
+    /// Everything since the last reading, which this one replaces.
+    fn read(&mut self) -> clock::Reading {
+        let now = Self::now();
+        let reading = clock::Reading {
+            monotonic: now.monotonic.duration_since(self.monotonic),
+            // A backwards correction reads as zero elapsed here; the
+            // accumulator keeps the monotonic figure. @spec TUI-RUN-023
+            wall: now.wall.duration_since(self.wall).unwrap_or_default(),
+        };
+        *self = now;
+        reading
+    }
+}
+
 /// Everything between taking the terminal and giving it back: the wake where
 /// the load owes one, then play, until a quit key, a recorded termination
 /// (`terminated()` turning true), or a lost terminal — the input failing or a
@@ -333,6 +362,7 @@ pub fn session<B: ratatui::backend::Backend>(
     terminated: &dyn Fn() -> bool,
 ) -> Vec<String> {
     let mut parting = Vec::new();
+    let mut checkpoint = Checkpoint::now();
     let opened = match startup {
         Startup::NewGame(state) => {
             let mut view = ViewState::default();
@@ -360,6 +390,7 @@ pub fn session<B: ratatui::backend::Backend>(
             terminal,
             input,
             terminated,
+            &mut checkpoint,
             &mut parting,
         ),
     };
@@ -367,24 +398,7 @@ pub fn session<B: ratatui::backend::Backend>(
         return parting;
     };
 
-    // The loop's own reading of both clocks, sampled together so their
-    // difference is meaningful: the wall clock outrunning the monotonic one
-    // is the machine having been suspended. @spec TUI-RUN-021, TUI-RUN-022
-    let mut last_mono = crate::runtime::now::instant();
-    let mut last_wall = std::time::SystemTime::now();
-
     while !app.quitting && !terminated() {
-        let now_mono = crate::runtime::now::instant();
-        let now_wall = std::time::SystemTime::now();
-        let reading = clock::Reading {
-            monotonic: now_mono.duration_since(last_mono),
-            // A backwards correction reads as zero elapsed here; the
-            // accumulator keeps the monotonic figure. @spec TUI-RUN-023
-            wall: now_wall.duration_since(last_wall).unwrap_or_default(),
-        };
-        last_mono = now_mono;
-        last_wall = now_wall;
-
         // The first wait IS the frame cadence; nothing to do means we wait
         // here. Bounded so a flood cannot starve the frame.
         let events = match take_input(input, app.poll_timeout()) {
@@ -396,6 +410,10 @@ pub fn session<B: ratatui::backend::Backend>(
                 break;
             }
         };
+
+        // After the wait, which is where a machine mostly sleeps, and before
+        // the frame applies what the wait brought. @spec TUI-RUN-073
+        let reading = checkpoint.read();
 
         // A refused frame has applied and ticked before its draw, and that
         // stands. @spec TUI-RUN-047
@@ -409,8 +427,11 @@ pub fn session<B: ratatui::backend::Backend>(
     // mid-catch-up costs nothing and waits for nothing. Tried once, whatever
     // began the shutdown. A failure does not change the exit code — the
     // session is ending either way, and the player is better served by being
-    // told than by a status nobody reads.
+    // told than by a status nobody reads. The stamp is the present, so whatever
+    // has passed since the last reading is counted first. @spec TUI-RUN-074
     // @spec TUI-RUN-026, TUI-RUN-031, TUI-RUN-057
+    let speed = app.state.speed;
+    app.observe(checkpoint.read(), speed);
     if let Err(e) = app.save() {
         parting.push(format!("clowder could not save on the way out: {e}"));
     }
@@ -435,7 +456,7 @@ pub enum Startup {
 /// the save's speed (TUI-RUN-036), taking no autosave (TUI-RUN-037) — until
 /// it finishes and the game opens (`Some`), or a quit key, a termination
 /// signal, or a lost terminal cuts it short: the catch-up is set down as it
-/// stands and saved once (`None`). @spec TUI-RUN-033, TUI-RUN-034,
+/// stands and saved once (`None`). @spec TUI-RUN-033, TUI-RUN-034, TUI-RUN-036,
 /// TUI-RUN-038, TUI-RUN-039, TUI-RUN-048, TUI-RUN-057
 fn run_wake<B: ratatui::backend::Backend>(
     catch_up: clowder_core::CatchUp,
@@ -443,9 +464,13 @@ fn run_wake<B: ratatui::backend::Backend>(
     terminal: &mut ratatui::Terminal<B>,
     input: &mut impl InputSource,
     terminated: &dyn Fn() -> bool,
+    checkpoint: &mut Checkpoint,
     parting: &mut Vec<String>,
 ) -> Option<Box<App>> {
-    let set_down = |w: Waking, parting: &mut Vec<String>| {
+    // The stamp is the present, so whatever has passed since the last reading
+    // is counted first. @spec TUI-RUN-074
+    let set_down = |mut w: Waking, reading: clock::Reading, parting: &mut Vec<String>| {
+        w.observe(reading);
         if let Err(e) = w.shut_down() {
             parting.push(format!("clowder could not save on the way out: {e}"));
         }
@@ -454,12 +479,10 @@ fn run_wake<B: ratatui::backend::Backend>(
         Ok(wake) => wake,
         Err(refused) => {
             parting.push(format!("clowder stopped while waking: {}", refused.error));
-            set_down(refused.waking, parting);
+            set_down(refused.waking, checkpoint.read(), parting);
             return None;
         }
     };
-    let mut last_mono = crate::runtime::now::instant();
-    let mut last_wall = std::time::SystemTime::now();
     loop {
         let w = match wake {
             Wake::Awake(app) => return Some(Box::new(app)),
@@ -468,18 +491,9 @@ fn run_wake<B: ratatui::backend::Backend>(
         // A termination signal mid-wake answers exactly as a quit key does:
         // set the catch-up down and save promptly. @spec TUI-RUN-039
         if terminated() {
-            set_down(w, parting);
+            set_down(w, checkpoint.read(), parting);
             return None;
         }
-
-        let now_mono = crate::runtime::now::instant();
-        let now_wall = std::time::SystemTime::now();
-        let reading = clock::Reading {
-            monotonic: now_mono.duration_since(last_mono),
-            wall: now_wall.duration_since(last_wall).unwrap_or_default(),
-        };
-        last_mono = now_mono;
-        last_wall = now_wall;
 
         // TUI-RUN-035: no waiting out the frame budget while waking — every
         // wait is the briefest.
@@ -488,20 +502,23 @@ fn run_wake<B: ratatui::backend::Backend>(
             Err(e) => {
                 // @spec TUI-RUN-048
                 parting.push(format!("clowder lost its input: {e}"));
-                set_down(w, parting);
+                set_down(w, checkpoint.read(), parting);
                 return None;
             }
         };
 
+        // After the wait, as in play. @spec TUI-RUN-073
+        let reading = checkpoint.read();
+
         match w.step(terminal, reading, &events) {
             Ok(Wake::Waking(next)) if next.quitting => {
-                set_down(next, parting);
+                set_down(next, checkpoint.read(), parting);
                 return None;
             }
             Ok(next) => wake = next,
             Err(refused) => {
                 parting.push(format!("clowder stopped while waking: {}", refused.error));
-                set_down(refused.waking, parting);
+                set_down(refused.waking, checkpoint.read(), parting);
                 return None;
             }
         }
@@ -731,7 +748,7 @@ impl App {
         // a pane nobody is looking at, a frame with nothing to redraw — none of
         // them stop the clock. Time never depends on what is on screen.
         // @spec TUI-RUN-017, TUI-RUN-025
-        self.clock.observe(reading, speed_for_this_interval);
+        self.observe(reading, speed_for_this_interval);
         let owed = self.clock.take(Self::MAX_TICKS_PER_FRAME);
         for _ in 0..owed {
             self.state.tick();
@@ -795,6 +812,23 @@ impl App {
 
     /// Save at the present instant, carrying the ticks banked but not yet run
     /// as an explicit count. @spec TUI-RUN-027, TUI-RUN-031, SAVE-017
+    /// Bank an interval at the speed in force while it passed. A reading past
+    /// the absence cap leaves the report a load's capped catch-up leaves: flagged
+    /// truncated, the cap its span. Only the shell ever sees such a gap, and its
+    /// ticks have not yet run, so the report states no gains. @spec TUI-RUN-024
+    fn observe(&mut self, reading: clock::Reading, speed: f64) {
+        self.clock.observe(reading, speed);
+        if self.clock.take_capped() {
+            let report = clowder_core::OfflineReport {
+                elapsed_seconds: clowder_core::CATCHUP_CAP_SECONDS,
+                truncated: true,
+                ..clowder_core::OfflineReport::default()
+            };
+            self.state.journal.record_away(self.state.ticks, &report);
+            crate::nav::queue_capped_gap_report(&mut self.view, &self.state, &report);
+        }
+    }
+
     pub fn save(&self) -> std::io::Result<()> {
         // The stamp is simply now, and the ticks this session banked but never
         // ran are written alongside it as a count.

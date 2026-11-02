@@ -433,6 +433,8 @@ fn an_in_process_gap_is_capped_at_the_cores_catch_up_limit() {
         CATCHUP_CAP_SECONDS as f64,
         "and banks only the capped span, so a back-dated save cannot reach past the cap",
     );
+    assert!(acc.take_capped(), "a gap past the cap is flagged");
+    assert!(!acc.take_capped(), "and told once");
 }
 
 /// The cap is a ceiling, not a rounding: a gap just under it is untouched.
@@ -453,6 +455,20 @@ fn a_gap_below_the_cap_is_not_truncated() {
         "an absence inside the cap is replayed in full"
     );
     assert_span(acc.unrun_span(), gap as f64, "and banks its whole span");
+    assert!(!acc.take_capped(), "and leaves no flag");
+}
+
+/// The load path flags what runs past the cap, and so does this: a gap of exactly
+/// the cap has lost nothing.
+/// @spec TUI-RUN-024
+#[test]
+fn a_gap_of_exactly_the_cap_is_not_flagged() {
+    let mut acc = TickAccumulator::default();
+    acc.observe(
+        reading(Duration::ZERO, Duration::from_secs(CATCHUP_CAP_SECONDS)),
+        1.0,
+    );
+    assert!(!acc.take_capped());
 }
 
 // ---------------------------------------------------------------------------

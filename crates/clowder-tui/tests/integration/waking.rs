@@ -1276,3 +1276,55 @@ fn every_mouse_event_is_discarded_while_waking_and_none_is_held_for_the_game() {
         "and draw as a load that never woke"
     );
 }
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-024 — a gap past the cap, while waking
+// ---------------------------------------------------------------------------
+
+fn past_the_cap() -> Reading {
+    Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::from_secs(2 * CATCHUP_CAP_SECONDS),
+    }
+}
+
+/// A gap past the cap while waking is told once the game opens.
+/// @spec TUI-RUN-024
+#[test]
+fn a_capped_gap_while_waking_is_told_once_the_game_opens() {
+    let json = save_of(&meadow(24_001, 1.0));
+    let mut t = term(100, 30);
+    let w = waking(begin(&json, SAVED_AT + 300, 10, &mut t, "capped-open"));
+    let mut w = waking(step(w, &mut t, past_the_cap(), &[]));
+    let mut app = loop {
+        match step(w, &mut t, still(), &[]) {
+            Wake::Waking(next) => w = next,
+            Wake::Awake(app) => break app,
+        }
+    };
+    app.step(&mut t, still(), &[]).unwrap();
+    let flagged = app
+        .state
+        .journal
+        .kept
+        .iter()
+        .filter(|e| matches!(&e.item, clowder_core::JournalItem::Away(r) if r.truncated))
+        .count();
+    assert_eq!(flagged, 1, "the capped gap leaves its one report");
+}
+
+/// A wake set down just after such a gap carries the flag in its report so far,
+/// so the load that wakes through the rest tells it.
+/// @spec TUI-RUN-024, TUI-RUN-039
+#[test]
+fn a_capped_gap_while_waking_carries_its_flag_through_a_set_down() {
+    let json = save_of(&meadow(24_002, 1.0));
+    let mut t = term(100, 30);
+    let w = waking(begin(&json, SAVED_AT + 300, 10, &mut t, "capped-set-down"));
+    let w = waking(step(w, &mut t, past_the_cap(), &[]));
+    let path = w.save_path.clone();
+    w.shut_down().unwrap();
+    let saved = std::fs::read_to_string(&path).unwrap();
+    let carried = begin_load(&saved, 0).unwrap().set_down().report_so_far;
+    assert!(carried.truncated, "the flag travels with the report so far");
+}
