@@ -35,6 +35,8 @@ One structure per site (the site's outpost), appended to the economy StructureId
 
 Site structures are `Build`-able like any structure (they'd be appended to the economy StructureId space, gated by their site) but contribute to a distinct **outdoor** production channel: outdoor materials take the global/wisdom/Long-Sun layers at a *reduced transfer* (the inspiration's space-production dilution — space gets only a fraction of the paragon/SR bonus). Outdoor structures are energy-hungry; the late meadow must over-provision its grid to run them.
 
+The Far Beacon's storage bonus reaches every store at once. Each copy adds its share to the cap-ratio term every cap is multiplied by, summed with the other cap-ratio effects, so caps compose as they do everywhere else: cap = (base + flat extensions) × (1 + cap-ratio effects). An uncapped store stays uncapped, and a store with a zero cap stays at zero, since a percentage of nothing opens no gate.
+
 ## The Skymap Economy
 
 Skymaps (transient, from Stargazing Ledges + the sky-event system, then Lookout Posts + Weather Vanes + Sky Docks) are the reaching fuel. Skymap *storage* is the reach gate: the Stargazing Ledge's +10 each bootstraps the first sites, then the outpost skymap caps (Lookout Post +500, Weather Vane +2000, Sky Dock +20000) carry the ladder outward. Reaching the outer sites is gated on skymap *storage* as much as production — the storage-cap-gating pattern, one last time, at cosmic scale.
@@ -57,13 +59,13 @@ Sky Dock (site 8) enables the **Skyward Song** ritual (`SummonStarWhale`, curios
 | Outdoor production channel | Diluted global/wisdom/Long-Sun transfer | Full transfer; no transfer | The inspiration's proven "space gets a fraction" — keeps outdoor structures meaningful without letting the meadow's multipliers trivialize them |
 | Hushfelt from The Brook onward | Cosmic-tier resource with cosmic cap extenders | Early hushfelt | Hushfelt gates the Memory Chest and Dreamweave — placing it here makes those late-game systems genuinely late |
 | Star Whale mechanics here | Summon + lullaby feeding at Sky Dock | Fully in colonies | The whale is a cosmic visitor; colonies reserved the slot, cosmic gives it a home |
+| How the Far Beacon's storage bonus stacks | A share per copy, summed into the cap-ratio term | Compounding per copy; a flat extension on each store | Summing keeps one composition rule for every cap, and its linear growth against the structure's escalating price keeps late copies from making storage meaningless. A flat figure could not suit stores whose caps differ by orders of magnitude |
 
 ## Open Questions & Future Decisions
 
 ### Deferred
 1. A per-site flavor-event pool (the lookout sees a shooting star) — a shell-era delight.
 2. Whether the Furthest Star unlocks a capstone Adventure or Tradition — decided after play.
-3. The Far Beacon's storage bonus (SIM-SKY-011, #25). The table states it, and no structure field or rule gives it yet.
 
 ## References
 
