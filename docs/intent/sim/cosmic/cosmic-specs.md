@@ -20,6 +20,7 @@
 - [x] **SIM-SKY-009**: The system shall extend the Long Sun cap (SIM-SUN-004) by 2 per copy of the Aurora Lantern.
 - [x] **SIM-SKY-010**: The system shall give each site's outpost the housing, productions, storage, outdoor ratio, energy, and global bonus the cosmic design's site table states for it.
 - [x] **SIM-SKY-011**: The system shall add 10% per copy of the Far Beacon to the cap-ratio term every storage cap is multiplied by, summed with the other cap-ratio effects rather than compounding on them, so that an uncapped resource stays uncapped and a zero cap stays zero.
+- [ ] **SIM-SKY-012**: The system shall keep the Hushfelt Grotto and the Whisper Post Locked until both the site hosting each is reached and the Hushfelt Seeking idea is researched.
 
 ## The Star Whale
 

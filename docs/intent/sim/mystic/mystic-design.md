@@ -38,6 +38,8 @@ Arches (economy structure, gated by the Parade Routes idea) are the Parade excha
 | 6 | Memory Arch | 2500 stardust, 50000 prisms | turns the clowder's Rainbow Arches into the dreamcorn engine (enables dream-drift; the rate scales with Rainbow Arch structures built) |
 | 7 | Everdream Arch | 100 dreamcorns, 1000 cairns | Jars of Purrs cap +2 each; unlocks Jar condensing |
 
+The two upgrades that dream, the Memory Arch and the Everdream Arch, also wait on the Dream Tending idea (curiosity leaf). The other six need Parade Routes alone.
+
 Each arch upgrade carries a **blurb**: a short joke and then its effect in plain words, marking each resource it names as the curiosity leaf's blurbs do (SIM-CUR-014). The shell shows it as what the arch upgrade does, so every one says why it is worth having before it is bought (Tenet 3).
 
 ## Dreaming & Dreamcorns

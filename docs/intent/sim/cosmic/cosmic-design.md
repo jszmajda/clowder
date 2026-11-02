@@ -41,6 +41,8 @@ The Far Beacon's storage bonus reaches every store at once. Each copy adds its s
 
 Skymaps (transient, from Stargazing Ledges + the sky-event system, then Lookout Posts + Weather Vanes + Sky Docks) are the reaching fuel. Skymap *storage* is the reach gate: the Stargazing Ledge's +10 each bootstraps the first sites, then the outpost skymap caps (Lookout Post +500, Weather Vane +2000, Sky Dock +20000) carry the ladder outward. Reaching the outer sites is gated on skymap *storage* as much as production — the storage-cap-gating pattern, one last time, at cosmic scale.
 
+The two hushfelt sources, the Hushfelt Grotto and the Whisper Post, need the Hushfelt Seeking idea (curiosity leaf) as well as their sites: reaching a place shows you where to look, and the idea is knowing what to listen for.
+
 ## The Star Whale Summon
 
 Sky Dock (site 8) enables the **Skyward Song** ritual (`SummonStarWhale`, curiosity + echo priced, needs the Skyward Song idea): it calls a Star Whale to visit (the colonies leaf reserved the slot). While visiting, the whale trades cosmic goods (skymaps, starshards, echoes) for hushfelt, its contentment (and visit length) raised by feeding it **lullabies** (a small dreamcorn offering, `FeedWhale`). A whale fed nothing drifts onward, content — the colonies leaf's cozy visitor, now given its mechanics.

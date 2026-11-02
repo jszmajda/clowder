@@ -47,12 +47,12 @@ The tree is a banded ladder with short forks — each band's gate craft requires
 |---|---|---|---|---|
 | 18 | Gift Economy | 1100 | Oral Tradition | Gift Stand; trade surface (colonies leaf) |
 | 19 | Storycraft | 1200 + 0 stories | Oral Tradition | Stories craft |
-| 20 | Sun Salutations | 1500 + 5 stories | Storycraft | Sun Room; warmth begins |
+| 20 | Sun Salutations | 1500 + 5 stories | Storycraft | Sun Room; warmth begins; the ceremonies surface, once a Sun Room gives warmth somewhere to be kept |
 | 21 | Excavation | 1800 + 8 stories | Storycraft | Gravel Pit; Brass craft |
 | 22 | Cogwheels | 2600 + 12 stories | Excavation | Cogworks; Cogs craft |
 | 23 | Treat Alchemy | 3200 + 15 stories | Excavation | Treat Bakery |
 | 24 | Tea Ceremonies | 3800 + 20 stories | Sun Salutations | Tea House; jamborees (kittens leaf) |
-| 25 | Solar Devotion | 4500 + 25 stories | Sun Salutations | Sunbeam Altar, Sunwarden job; ceremonies surface |
+| 25 | Solar Devotion | 4500 + 25 stories | Sun Salutations | Sunbeam Altar, Sunwarden job |
 | 26 | Sky Charts | 5200 + 30 stories | Cogwheels | Stargazing Ledge; sky events; skymaps begin |
 | 27 | Porch Logistics | 6000 + 35 stories | Sky Charts | Porch; Kites craft |
 
@@ -89,9 +89,9 @@ The tree is a banded ladder with short forks — each band's gate craft requires
 | 44 | Parade Routes | 30000 + 15 schemes | Unicorn Lore, Grand Schemes | Parades, Rainbow Arch structure, refining (mystic leaf) |
 | 45 | Pen Pal Networks | 26000 + 10 schemes | Gift Economy, Grand Schemes | Pen Pals (colonies leaf) |
 | 46 | Scout Picnicking | 20000 + 5 schemes | Gift Economy, Grand Schemes | Scout Picnics (colonies leaf) |
-| 47 | Dream Tending | 90000 + 3 starshards | Parade Routes | dreaming surface (mystic leaf) |
+| 47 | Dream Tending | 90000 + 3 starshards | Parade Routes | the arch upgrades that dream: Memory Arch, Everdream Arch (mystic leaf) |
 | 48 | Night Court Etiquette | 150000 + 5 echoes | Dream Tending | Promises (mystic leaf) |
-| 49 | Hushfelt Seeking | 80000 + 1 echo | Yarn Computing | hushfelt sources (cosmic leaf) |
+| 49 | Hushfelt Seeking | 80000 + 1 echo | Yarn Computing | hushfelt sources: Hushfelt Grotto, Whisper Post, each once its site is reached (cosmic leaf) |
 | 50 | Memory Weaving | 100000 + 3 starshards | Hushfelt Seeking | Memory Chest |
 | 51 | Skyward Longing | 90000 + 2 echoes | Yarn Computing, Porch Logistics | cosmic surface (cosmic leaf); Moonmilk craft |
 | 52 | Dreamweaving | 120000 + 5 echoes | Memory Weaving | Dreamweave craft |
@@ -183,18 +183,24 @@ Effects are **flags and modifier values exposed by pure lookup** (`ideas.has(Ide
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
+| An idea whose row named an unlock no rule read | Gate what it names, for Scout Picnicking, Dream Tending, Hushfelt Seeking, and Dream Loomcraft; correct the row and blurb for Solar Devotion | Correct every row to say the idea leads on and does nothing else; gate the ceremonies on Solar Devotion too | An idea that only leads on spends a hard-won currency on a promise of nothing. The ceremonies alone have their own reason to wait, recorded in the engine's gate: a section means something once the meadow can hold what it trades in |
 | Tree shape | Banded ladder with short forks — 59 ideas over five bands, each band gated by the previous band's crafted currency | Wide branching tree; flat shop | Bands make every idea a visible milestone while gate crafts turn research into an infrastructure problem, not a wait |
 | Effects as flags/lookups | Pure `has(idea)` + derived modifiers | Event-driven effect application, direct state mutation on research | Idempotent under save/load and catch-up; no ordering bugs; each owning leaf keeps its own math legible |
 | Ideas are permanent | No respec, no disable | Respec mechanic | Nothing the player earns is ever taken (Tenet 1); respec adds decision anxiety to a cozy game |
 | How a blurb names a resource | Marks in the blurb's text naming the resource's identifier | Plain prose, the frontend matching resource words by spelling; a blurb typed as a list of text and resource parts | Matching by spelling misses singulars and lower case, and catches words a resource shares with ordinary speech and with other things' names. A list of parts turns each blurb into a row of fragments in the table, where a whole sentence is easiest to write and review; the content tests hold every mark to a real identifier in place of the compiler's check |
 | Cost curve | 15 → 300,000 across bands, roughly ×1.4 steps within a band, gate crafts escalating between bands | Flat costs; steeper exponential | Within-band steps stay session-scale; between-band jumps are infrastructure projects |
 
+## What an Idea Unlocks
+
+An idea's row and its blurb state what it opens, and a rule reads the idea for each of them, so a player who pays for one gets what it promised. A surface that already has a reason to wait is not gated twice for the sake of the table: the ceremonies open with warmth's first store, the row that names them is the one that provides it, and a devotion that lies "beyond basking" comes after it.
+
+A save from a version that let a surface open before its idea keeps that surface. On loading, it is granted the idea that now gates it, free (persistence: A Prior Save's Surfaces). Taking away something a player could already do would cost more than the idea does, and the idea has nothing left to promise them.
+
 ## Open Questions & Future Decisions
 
 ### Deferred
 1. Tier-2 ideas that interact with roadmap systems (ceremonies, expeditions) — land with those segments.
 2. Whether Seasonal Awareness's forecast belongs in core state or as a pure derived flag the shell reads — trivially the latter in v1; revisit if forecasts gain mechanics.
-3. Ideas whose rows name unlocks no rule reads them for (SIM-CUR-009, #30). Each should either gate what it names or say what it really does, keeping what an existing save has already reached.
 
 ## References
 

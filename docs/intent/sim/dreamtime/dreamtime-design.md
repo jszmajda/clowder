@@ -27,7 +27,7 @@ Occasionally a nap (or a season boundary, at `deja_vu_chance` per season, a fiel
 
 ## The Dream Loom
 
-Reverie-priced upgrades (`BuyDreamLoom`, ~9) that make napping deeper and cooler:
+Reverie-priced upgrades (`BuyDreamLoom`, ~9), opened by the Dream Loomcraft idea, that make napping deeper and cooler:
 
 | # | Loom upgrade | Cost (reverie) | Effect |
 |---|---|---|---|

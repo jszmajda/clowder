@@ -56,7 +56,7 @@ The core reports a colony's correspondence as a frontend needs to show it, so a 
 
 ## Scout Picnics
 
-`ScoutPicnic` (the inspiration's "send explorers") spends 1000 pep to discover the next colony; on a quiet day the picnic finds nobody (950 pep refunded — they mostly stayed home). Discovery order is deterministic by prerequisite: Foxes need charm ≥ 1500; Deer need ≥ 1 Kite; Owls need ≥ 100 Kites and curiosity cap > 125000; otherwise a random pick among the first-tier colonies. The first colony arrives free once the trade surface (Gift Economy idea) opens.
+`ScoutPicnic` (the inspiration's "send explorers"), opened by the Scout Picnicking idea, spends 1000 pep to discover the next colony; on a quiet day the picnic finds nobody (950 pep refunded — they mostly stayed home). Discovery order is deterministic by prerequisite: Foxes need charm ≥ 1500; Deer need ≥ 1 Kite; Owls need ≥ 100 Kites and curiosity cap > 125000; otherwise a random pick among the first-tier colonies. The first colony arrives free once the trade surface (Gift Economy idea) opens.
 
 ## Star Whales
 
