@@ -7,11 +7,11 @@
 //! shell: no total for copies owned, no yield after mood, no coverage inferred
 //! from stock, no wait where the core reports no reason to wait, no flow
 //! credited to a source by the shell's own reckoning.
-//! Layout is not decided here. TUI-NAV-047's dead-band and TUI-NAV-048's
-//! three-column split are breakpoints, and live in `render::layout` beside the
-//! render specs that state them a second time.
-//! @spec TUI-NAV-017, TUI-NAV-018, TUI-NAV-029, TUI-NAV-078, TUI-NAV-079,
-//!       TUI-NAV-080, TUI-NAV-108, TUI-NAV-135, TUI-NAV-197
+//! Where the inspector goes is not decided here. `render::layout::compute` says
+//! what the body is, TUI-NAV-047's dead-band and TUI-NAV-048's three-column split
+//! among it, and the frame draws this into the rectangle that gives it.
+//! @spec TUI-NAV-017, TUI-NAV-018, TUI-NAV-078, TUI-NAV-079, TUI-NAV-080,
+//!       TUI-NAV-108, TUI-NAV-135, TUI-NAV-197
 
 use clowder_core::content::{self, TICKS_PER_SECOND};
 use clowder_core::{
@@ -1570,29 +1570,4 @@ pub fn draw(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
         view.armed.as_ref(),
         view.prompt.as_ref(),
     );
-}
-
-/// Where the inspector stops being a swap over the list and becomes a pane of
-/// its own. Mirrors `render::layout`'s own breakpoint exactly, because the
-/// placement and the layout the frame draws are the same decision.
-const PANE_BREAKPOINT: u16 = 100;
-
-/// Whether the inspector shows as a persistent pane, swaps in over the list, or
-/// is absent — a pure function of width and whether the player asked for it, so
-/// it cannot disagree with the layout after a resize.
-pub fn placement(width: u16, wanted: bool) -> Placement {
-    if width >= PANE_BREAKPOINT {
-        Placement::Pane
-    } else if wanted {
-        Placement::Swapped
-    } else {
-        Placement::Absent
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Placement {
-    Pane,
-    Swapped,
-    Absent,
 }

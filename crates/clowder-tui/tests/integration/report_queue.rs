@@ -38,7 +38,6 @@ use clowder_core::{
 use clowder_tui::nav::rows::{rows, RowKind};
 use clowder_tui::nav::{ArmedRow, RowKey, Section, ViewState};
 use clowder_tui::render;
-use clowder_tui::render::widgets::inspector::{placement, Placement};
 use clowder_tui::render::widgets::overlays;
 use clowder_tui::runtime::clock::Reading;
 use clowder_tui::runtime::{App, TickAccumulator};
@@ -931,16 +930,11 @@ fn with_the_narrow_swap_in_esc_returns_the_list_before_retiring_the_banner() {
     a.view.inspector_wanted = true;
     let mut t = term(80, 24);
     keys(&mut a, &mut t, &[]);
-    assert_eq!(
-        placement(80, a.view.inspector_wanted),
-        Placement::Swapped,
-        "fixture: the swap is in"
-    );
+    assert!(a.view.inspector_wanted, "fixture: the swap is in");
 
     keys(&mut a, &mut t, &[press(KeyCode::Esc)]);
-    assert_eq!(
-        placement(80, a.view.inspector_wanted),
-        Placement::Absent,
+    assert!(
+        !a.view.inspector_wanted,
         "Esc with the swap in did not return the list view"
     );
     assert_still_showing(&a, &two, "Esc returning the list view from the swap");

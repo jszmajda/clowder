@@ -144,7 +144,7 @@ const TICKER_ROWS: u16 = 1;
 /// asymmetric dead-band: a terminal sitting on a boundary must not flip back
 /// and forth as the pane wobbles by a column. @spec TUI-RENDER-008
 pub fn compute(area: Rect, prev: Option<&Layout>, banner: bool) -> Layout {
-    // @spec TUI-RENDER-004
+    // @spec TUI-RENDER-004, TUI-NAV-029
     if area.width < FLOOR_W || area.height < FLOOR_H {
         let zero = Rect::new(area.x, area.y, 0, 0);
         return Layout {
@@ -181,7 +181,7 @@ pub fn compute(area: Rect, prev: Option<&Layout>, banner: bool) -> Layout {
     let body_height = area.height - 2 - ticker_rows - 1 - banner_rows;
     let body_top = y + banner_rows;
 
-    // @spec TUI-RENDER-005, TUI-RENDER-006, TUI-RENDER-008
+    // @spec TUI-RENDER-005, TUI-RENDER-006, TUI-RENDER-008, TUI-NAV-017
     let prev_was_wide = matches!(prev.map(|p| &p.body), Some(Body::Wide { .. }));
     let pane_wide = w >= PANE_BREAKPOINT || (prev_was_wide && w >= PANE_BREAKPOINT - DEAD_BAND);
 

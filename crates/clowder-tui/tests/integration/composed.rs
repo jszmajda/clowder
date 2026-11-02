@@ -73,7 +73,6 @@ use clowder_tui::nav::{
 };
 use clowder_tui::render;
 use clowder_tui::render::layout::{Body, Layout};
-use clowder_tui::render::widgets::inspector::Placement;
 use clowder_tui::render::widgets::{chrome, inspector, overlays};
 
 // ---------------------------------------------------------------------------
@@ -676,17 +675,14 @@ fn asking_for_the_inspector_where_a_pane_exists_changes_nothing() {
     }
 }
 
-/// The frame and the inspector's own `placement` are the same decision, taken
-/// once. Whatever `placement` says at a width — a pane, a swap over the list,
-/// or nothing at all — is what the frame draws.
-///
-/// Only cold frames are asked, because `placement` takes a width and nothing
-/// else while `layout::compute` carries a dead-band across the same boundary
-/// (TUI-RENDER-008, TUI-NAV-047); inside the band the two cannot both be
-/// right, and that disagreement is reported rather than settled here.
+/// What a cold frame draws is the width's and the player's call to say: a pane
+/// of its own from the breakpoint up, whether or not anyone asked; below it, a
+/// swap over the list where the inspector is called for, and the list where it
+/// is not. What a frame does inside the breakpoint's dead-band is for the
+/// inspector's own tests (TUI-NAV-047).
 /// @spec TUI-NAV-017, TUI-NAV-035
 #[test]
-fn the_frame_places_the_inspector_where_its_widget_says_it_goes() {
+fn the_frame_places_the_inspector_by_the_width_and_the_players_call() {
     let state = settled();
 
     for size in SIZES {
@@ -700,37 +696,32 @@ fn the_frame_places_the_inspector_where_its_widget_says_it_goes() {
             let d = cold(&state, &view, w, h);
             let main = main_rect(&d.layout);
 
-            match inspector::placement(w, wanted) {
-                Placement::Pane => {
-                    let pane = pane_rect(&d.layout).unwrap_or_else(|| {
-                        panic!("at {w}x{h} placement says Pane, so the body must have one")
-                    });
-                    assert_region_is(&d, pane, size, "inspector pane", "inspector::draw", |f| {
-                        inspector::draw(f, pane, &state, &view)
-                    });
-                }
-                Placement::Swapped => {
-                    // The swap draws into the space the pane divider
-                    // (TUI-RENDER-016) leaves, not the full list rect.
-                    let space = left_by_dividers(&d.layout);
-                    assert_region_is(
-                        &d,
-                        space,
-                        size,
-                        "inspector swapped in over the list",
-                        "inspector::draw",
-                        |f| inspector::draw(f, space, &state, &view),
-                    );
-                }
-                Placement::Absent => {
-                    let alone = widget_alone(w, h, |f| inspector::draw(f, main, &state, &view));
-                    assert_ne!(
-                        region_text(&d.buffer, main),
-                        region_text(&alone, main),
-                        "at {w}x{h} nobody asked for the inspector and the width has no room for \
-                         a pane, yet the list's space is showing the inspector"
-                    );
-                }
+            if w > NARROW_W {
+                let pane = pane_rect(&d.layout)
+                    .unwrap_or_else(|| panic!("at {w}x{h} the body must have a pane"));
+                assert_region_is(&d, pane, size, "inspector pane", "inspector::draw", |f| {
+                    inspector::draw(f, pane, &state, &view)
+                });
+            } else if wanted {
+                // The swap draws into the space the pane divider
+                // (TUI-RENDER-016) leaves, not the full list rect.
+                let space = left_by_dividers(&d.layout);
+                assert_region_is(
+                    &d,
+                    space,
+                    size,
+                    "inspector swapped in over the list",
+                    "inspector::draw",
+                    |f| inspector::draw(f, space, &state, &view),
+                );
+            } else {
+                let alone = widget_alone(w, h, |f| inspector::draw(f, main, &state, &view));
+                assert_ne!(
+                    region_text(&d.buffer, main),
+                    region_text(&alone, main),
+                    "at {w}x{h} nobody asked for the inspector and the width has no room for \
+                     a pane, yet the list's space is showing the inspector"
+                );
             }
         }
     }

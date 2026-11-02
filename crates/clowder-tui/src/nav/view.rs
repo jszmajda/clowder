@@ -92,8 +92,8 @@ pub struct ViewState {
     /// `Section::index()`. @spec TUI-NAV-008
     pub focus: [Option<RowKey>; 10],
     /// Whether the player has called for the inspector. Whether that shows as
-    /// a pane or a swap is a pure function of width, derived by layout — not
-    /// stored, so it cannot disagree after a resize.
+    /// a pane or a swap is the layout's to say each frame — not stored, so it
+    /// cannot disagree after a resize.
     /// @spec TUI-NAV-017, TUI-NAV-029
     pub inspector_wanted: bool,
     pub overlay: Option<Overlay>,

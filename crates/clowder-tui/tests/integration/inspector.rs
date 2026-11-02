@@ -9,7 +9,7 @@
 //! and this game never stops the world. Which of the two it is must be derived
 //! from the width every frame rather than remembered, so it cannot disagree
 //! with the layout after a resize; that is why `ViewState` stores only whether
-//! the player *asked*, and `placement` takes the width.
+//! the player *asked*, and the layout takes the width.
 //!
 //! **What it says** (TUI-NAV-018). This is where tenet 3 is paid for: the row
 //! shows a flavour name, and the inspector states the plain mechanical fact
@@ -64,8 +64,9 @@ use ratatui::Terminal;
 use clowder_tui::nav::rows::rows;
 use clowder_tui::nav::{RowKey, Section, ViewState};
 use clowder_tui::render::fmt;
-use clowder_tui::render::layout::{compute, Body};
-use clowder_tui::render::widgets::inspector::{self, Placement};
+use clowder_tui::render::frame;
+use clowder_tui::render::layout::{compute, Body, Layout};
+use clowder_tui::render::widgets::inspector;
 
 // ---------------------------------------------------------------------------
 // Sizes
@@ -409,13 +410,57 @@ fn open_job(state: &GameState) -> JobId {
         .expect("fixture: a fresh meadow has at least one job open")
 }
 
+// ---------------------------------------------------------------------------
+// What a whole frame did with the inspector
+// ---------------------------------------------------------------------------
+
+/// Where a frame put the inspector, read off what it drew.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Placed {
+    Pane,
+    Swapped,
+    Absent,
+}
+
+/// Draw one whole frame after `prev`, as the loop does, with the player having
+/// called for the inspector or not, and read where the inspector went. Nothing
+/// here is told the rule: a rectangle holds the inspector only if it reads as
+/// the widget's own drawing does there.
+fn frame_after(prev: Option<&Layout>, w: u16, wanted: bool) -> (Placed, Layout) {
+    let s = multi_component_structure();
+    let state = meadow(&[s]);
+    let view = ViewState {
+        inspector_wanted: wanted,
+        ..looking_at(Section::Meadow, structure_row(s))
+    };
+    let mut term = terminal(w, TALL);
+    let mut layout = None;
+    term.draw(|f| layout = Some(frame(f, &state, &view, prev)))
+        .expect("TestBackend is infallible");
+    let layout = layout.expect("a frame was drawn");
+    let holds_it = |rect: Rect| {
+        text(term.backend().buffer(), rect) == text(&render(&state, &view, w, TALL, rect), rect)
+    };
+    let placed = match layout.body {
+        Body::Wide { inspector, .. } if holds_it(inspector) => Placed::Pane,
+        // The swap draws into what the pane divider leaves of the list's space.
+        Body::Narrow { main, .. }
+            if holds_it(Rect::new(main.x + 1, main.y, main.width - 1, main.height)) =>
+        {
+            Placed::Swapped
+        }
+        _ => Placed::Absent,
+    };
+    (placed, layout)
+}
+
 // ===========================================================================
 // TUI-NAV-017 — where the inspector goes, and that it never blocks
 // ===========================================================================
 
 /// Above the breakpoint the inspector is a *persistent* pane: the player never
 /// asks for it, because truth that costs a keypress is truth some players will
-/// not pay for. So `wanted` must make no difference at all up here.
+/// not pay for. So the call must make no difference at all up here.
 /// @spec TUI-NAV-017
 #[test]
 fn a_wide_terminal_shows_the_inspector_without_being_asked() {
@@ -428,14 +473,14 @@ fn a_wide_terminal_shows_the_inspector_without_being_asked() {
         WIDEST,
     ] {
         assert_eq!(
-            inspector::placement(w, false),
-            Placement::Pane,
+            frame_after(None, w, false).0,
+            Placed::Pane,
             "{w} columns is wide enough for a pane, and a pane is persistent: the player has \
              not pressed Space and must still be looking at the truth"
         );
         assert_eq!(
-            inspector::placement(w, true),
-            Placement::Pane,
+            frame_after(None, w, true).0,
+            Placed::Pane,
             "{w} columns: asking for the inspector where it is already on screen must not \
              change where it is"
         );
@@ -450,64 +495,31 @@ fn a_wide_terminal_shows_the_inspector_without_being_asked() {
 fn at_the_floor_the_inspector_is_a_swap_the_player_asks_for() {
     for w in FLOOR_W..PANE_BREAKPOINT {
         assert_eq!(
-            inspector::placement(w, true),
-            Placement::Swapped,
+            frame_after(None, w, true).0,
+            Placed::Swapped,
             "{w} columns has no room for a third column, so an inspector the player asked for \
              takes the list's place"
         );
         assert_eq!(
-            inspector::placement(w, false),
-            Placement::Absent,
+            frame_after(None, w, false).0,
+            Placed::Absent,
             "{w} columns: nobody asked for the inspector, so the body is the list"
         );
     }
 }
 
-/// The placement the inspector reports and the layout the frame draws are the
-/// same decision. If they could disagree, a resize would leave an inspector
-/// drawn into a rectangle the layout gave to something else.
-///
-/// Below the floor the frame is a too-small card (TUI-NAV-029) and no width
-/// under 80 columns could hold three of them, so the one thing the inspector may
-/// never claim down there is a pane.
+/// Below the floor the frame is a too-small card (TUI-NAV-029), and the layout
+/// has no rectangle to give the inspector whatever the player has called for.
 /// @spec TUI-NAV-017, TUI-NAV-029
 #[test]
-fn placement_agrees_with_the_layout_the_frame_will_use() {
-    for w in FLOOR_W..=WIDEST {
-        let body = compute(area(w, TALL), None, false).body;
-        for wanted in [false, true] {
-            let expected = match body {
-                Body::Wide { .. } => Placement::Pane,
-                Body::Narrow { .. } => {
-                    if wanted {
-                        Placement::Swapped
-                    } else {
-                        Placement::Absent
-                    }
-                }
-                Body::TooSmall(_) => {
-                    panic!("fixture: {w}x{TALL} is at or above the floor")
-                }
-            };
-            assert_eq!(
-                inspector::placement(w, wanted),
-                expected,
-                "{w} columns (asked: {wanted}): the layout drew {body:?}, so the inspector's \
-                 placement must be {expected:?} — a placement that can disagree with the layout \
-                 is a pane drawn over the list after a resize"
-            );
-        }
-    }
-
+fn below_the_floor_the_layout_has_no_place_for_the_inspector() {
     for w in 20..FLOOR_W {
-        for wanted in [false, true] {
-            assert_ne!(
-                inspector::placement(w, wanted),
-                Placement::Pane,
-                "{w} columns is below the floor, where the frame is a too-small card; there is \
-                 no pane to be had"
-            );
-        }
+        let body = compute(area(w, TALL), None, false).body;
+        assert!(
+            matches!(body, Body::TooSmall(_)),
+            "{w} columns is below the floor, where the frame is a too-small card, but the \
+             layout drew {body:?}"
+        );
     }
 }
 
@@ -605,100 +617,90 @@ fn the_inspector_follows_the_focused_row_and_the_moving_state() {
 // TUI-NAV-029 — the placement is derived, never remembered
 // ===========================================================================
 
-/// The placement is a pure function of the width and whether the player asked.
-/// That is the whole reason `ViewState` stores only the asking: a stored
-/// "pane or swap" would survive a resize and then be wrong, and the player's
-/// call for the inspector must survive the resize instead.
+/// Each frame places the inspector for its own width. That is the whole reason
+/// `ViewState` stores only the asking: a stored "pane or swap" would survive a
+/// resize and then be wrong, and the player's call for the inspector must
+/// survive the resize instead.
+///
+/// The walk hands each frame's layout to the next, as the loop does. Every step
+/// lands clear of the breakpoint's dead-band, which has its own test below, so
+/// nothing the walk has been through may show.
 /// @spec TUI-NAV-029
 #[test]
-fn placement_is_a_pure_function_of_width_and_asking() {
-    // A player who asked for the inspector at the floor, widened the terminal,
-    // and narrowed it again: the ask survives, and each width answers for
-    // itself.
+fn each_frame_places_the_inspector_for_its_own_width() {
     let walk = [FLOOR_W, WIDE, FLOOR_W, PANE_BREAKPOINT, 95, WIDEST, FLOOR_W];
+    let mut prev = None;
     for w in walk {
+        let (placed, layout) = frame_after(prev.as_ref(), w, true);
+        let expected = if w >= PANE_BREAKPOINT {
+            Placed::Pane
+        } else {
+            Placed::Swapped
+        };
         assert_eq!(
-            inspector::placement(w, true),
-            inspector::placement(w, true),
-            "{w} columns must answer the same every time it is asked"
+            placed, expected,
+            "{w} columns must give that width's answer; nothing about the placement is carried \
+             across a resize"
         );
-    }
-
-    assert_eq!(inspector::placement(FLOOR_W, true), Placement::Swapped);
-    assert_eq!(inspector::placement(WIDE, true), Placement::Pane);
-    assert_eq!(
-        inspector::placement(FLOOR_W, true),
-        Placement::Swapped,
-        "coming back to the floor from a wide terminal must give the floor's answer; nothing \
-         about the placement is carried across a resize"
-    );
-
-    // And the asking is the only other input: at one width, the two answers
-    // differ only where the width leaves a choice.
-    for w in [FLOOR_W, 90, PANE_BREAKPOINT - 1] {
-        assert_ne!(
-            inspector::placement(w, true),
-            inspector::placement(w, false),
-            "{w} columns: below the breakpoint the inspector is there only because the player \
-             asked, so the ask must matter"
-        );
+        prev = Some(layout);
     }
 }
 
 // ===========================================================================
-// TUI-NAV-047 — one breakpoint, not two
+// TUI-NAV-047 — the inspector goes where the dead-band's layout goes
 // ===========================================================================
 
 /// The dead-band itself belongs to `render::layout` (TUI-RENDER-008), which
 /// enters a layout at its boundary and leaves it a few columns below, and has
-/// its own tests. What this file must pin is that the inspector does not bring a
-/// *second* breakpoint of its own: two thresholds a few columns apart would put
-/// back exactly the flicker the dead-band exists to absorb — a one-column wobble
-/// landing between them would swap the body's meaning under the player.
+/// its own tests. What this file must pin is that the inspector goes with it:
+/// a threshold of its own a few columns away would put back exactly the flicker
+/// the dead-band exists to absorb, a one-column wobble landing between the two
+/// and changing what the body means under the player.
 ///
-/// So the inspector's transition must be the layout's transition: the same
-/// width, once, and monotone — once wide enough for a pane, wider is too.
+/// So the frames walk the width a column at a time in both directions: narrowing,
+/// the pane holds below the breakpoint; widening, it waits for the breakpoint;
+/// and at every step the inspector is drawn where that frame's layout says.
 /// @spec TUI-NAV-047
 #[test]
-fn the_inspector_shares_the_layouts_breakpoint_rather_than_keeping_its_own() {
-    let layout_breakpoint = (FLOOR_W..=WIDEST)
-        .find(|w| matches!(compute(area(*w, TALL), None, false).body, Body::Wide { .. }))
-        .expect("fixture: some width lays out three columns");
-    assert_eq!(
-        layout_breakpoint, PANE_BREAKPOINT,
-        "fixture: the pane breakpoint the specs describe"
-    );
+fn the_inspector_moves_with_the_layout_through_its_dead_band() {
+    let placed_by = |layout: &Layout| match layout.body {
+        Body::Wide { .. } => Placed::Pane,
+        _ => Placed::Swapped,
+    };
 
-    assert_ne!(
-        inspector::placement(layout_breakpoint - 1, true),
-        Placement::Pane,
-        "one column below the layout's breakpoint there is no third column to draw into"
-    );
-    assert_eq!(
-        inspector::placement(layout_breakpoint, false),
-        Placement::Pane,
-        "at the layout's breakpoint the pane appears — the inspector's threshold is the \
-         layout's, not one of its own a few columns away"
-    );
-
-    for wanted in [false, true] {
-        let mut seen_pane = false;
-        for w in FLOOR_W..=WIDEST {
-            let is_pane = inspector::placement(w, wanted) == Placement::Pane;
-            if is_pane {
-                seen_pane = true;
-            }
-            assert!(
-                is_pane || !seen_pane,
-                "{w} columns (asked: {wanted}) went back to a swap after a narrower width had \
-                 already earned a pane; a second threshold like that flickers on the very \
-                 one-column wobble the dead-band is for"
-            );
-        }
-        assert!(
-            seen_pane,
-            "some width in {FLOOR_W}..={WIDEST} must earn a pane"
+    let mut prev = None;
+    let mut lowest_pane = WIDEST;
+    for w in (FLOOR_W..=WIDEST).rev() {
+        let (placed, layout) = frame_after(prev.as_ref(), w, true);
+        assert_eq!(
+            placed,
+            placed_by(&layout),
+            "narrowing to {w} columns: the frame's inspector left the layout it drew"
         );
+        if placed == Placed::Pane {
+            lowest_pane = w;
+        }
+        prev = Some(layout);
+    }
+    assert!(
+        (FLOOR_W + 1..PANE_BREAKPOINT).contains(&lowest_pane),
+        "narrowing, the pane should hold a few columns below the breakpoint and give way above \
+         the floor, but it last stood at {lowest_pane} columns"
+    );
+
+    let mut prev = None;
+    for w in FLOOR_W..=WIDEST {
+        let (placed, layout) = frame_after(prev.as_ref(), w, true);
+        let expected = if w >= PANE_BREAKPOINT {
+            Placed::Pane
+        } else {
+            Placed::Swapped
+        };
+        assert_eq!(
+            placed, expected,
+            "widening to {w} columns: the pane appears at the breakpoint, and not before"
+        );
+        prev = Some(layout);
     }
 }
 
@@ -738,11 +740,6 @@ fn beyond_the_cap_the_surplus_width_is_the_inspectors_and_it_spends_it() {
             }
             other => panic!("fixture: {w} columns should lay out three panes, got {other:?}"),
         }
-        assert_eq!(
-            inspector::placement(w, false),
-            Placement::Pane,
-            "{w} columns lays out three columns, and the third one is the inspector's"
-        );
     }
 
     // And the inspector uses the room it was given.

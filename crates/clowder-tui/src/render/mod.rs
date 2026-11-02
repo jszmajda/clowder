@@ -1326,8 +1326,10 @@ pub fn frame_recorded(
             Body::Narrow { sidebar, main } => {
                 record.record_sidebar(widgets::chrome::sidebar(f, sidebar, state, view));
                 let space = left_of_divider(main);
-                // TUI-NAV-035: swapped in over the list, the inspector still
-                // follows the underlying cursor.
+                // Only the narrow body has a swap to draw, and the player's call
+                // alone brings it in; swapped in over the list, the inspector
+                // still follows the underlying cursor. @spec TUI-NAV-017,
+                // TUI-NAV-035
                 if view.inspector_wanted {
                     widgets::inspector::draw(f, space, state, view);
                 } else {
