@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-02 (commit `c7f20cac796e`). 201 of 201 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-02 (commit `e7d746054278`). 201 of 201 active specs implemented, each cited by a test.
 
 ## References
 
@@ -83,8 +83,8 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Key Findings
 
-Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Issue #2 added what a store's card opens with (TUI-NAV-197). The audit found the persistent inspector repeating an arming's summary (fixed, TUI-NAV-077) and a placement helper no frame calls (annotation removed, the rest filed). Issue #3 added the sidebar's store-link marks (TUI-NAV-198, TUI-NAV-199, TUI-NAV-200), with marks read off drawn frames over every row of every section. Issue #20 found flavour events reaching the screen as a single placeholder word, because no line ever read their template; they now read as written, for every template (TUI-NAV-201). Issue #10 moved the held-key and arming tests onto a clock they control, so they take no real time and no longer fail under load. `nav::rows` serves a frame's row lists through one scoped build, held by a guard tied to the state's borrow (#18); outside a frame, every call still builds afresh.
+Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Issue #2 added what a store's card opens with (TUI-NAV-197). The audit found the persistent inspector repeating an arming's summary (fixed, TUI-NAV-077) and a placement helper no frame calls (annotation removed, the rest filed). Issue #3 added the sidebar's store-link marks (TUI-NAV-198, TUI-NAV-199, TUI-NAV-200), with marks read off drawn frames over every row of every section. Issue #20 found flavour events reaching the screen as a single placeholder word, because no line ever read their template; they now read as written, for every template (TUI-NAV-201). Issue #10 moved the held-key and arming tests onto a clock they control, so they take no real time and no longer fail under load. `nav::rows` serves a frame's row lists through one scoped build, held by a guard tied to the state's borrow (#18); outside a frame, every call still builds afresh. The inspector's place is decided by `render::layout::compute` and the frame's narrow body alone, and the tests read it off whole frames, through the dead-band in both directions (#22).
 
 ## Work Required
 
-- #22: the inspector's placement helper is called by no frame, and some tests still exercise it (TUI-NAV-017, TUI-NAV-029).
+None.

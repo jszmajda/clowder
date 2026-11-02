@@ -178,15 +178,15 @@ arrows:
     next: "#15: sourceless effect keys"
     drift: null
   navigation:
-    status: PARTIAL
+    status: OK
     parent: tui
     sampled: 2026-11-02
     audited: 2026-11-02
-    audited_sha: c7f20cac796efe7a315038ace6f574231449663c
+    audited_sha: e7d7460542782a9d176cc82bd02d1ffe35ab6402
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
-    next: "#22: a placement helper no frame calls"
+    next: null
     drift: null
   persistence:
     status: OK
@@ -215,7 +215,7 @@ arrows:
     parent: tui
     sampled: 2026-11-02
     audited: 2026-11-02
-    audited_sha: c7f20cac796efe7a315038ace6f574231449663c
+    audited_sha: e7d7460542782a9d176cc82bd02d1ffe35ab6402
     blocks: []
     blockedBy: [navigation, runtime, theme]
     detail: tui/render/render.md
