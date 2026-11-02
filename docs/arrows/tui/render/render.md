@@ -4,7 +4,7 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-01 (commit `3fb11a5d7099`). 33 of 33 active specs implemented, each cited by a test; 1 deferred.
+**PARTIAL** — last audited 2026-11-01 (commit `3fd138691536`). 34 of 34 active specs implemented, each cited by a test; 1 deferred.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/render/render-specs.md` — 34 specs, prefix `TUI-RENDER`
+- `docs/intent/tui/render/render-specs.md` — 35 specs, prefix `TUI-RENDER`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/armed_summary.rs`
@@ -52,13 +52,13 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-RENDER-001 – TUI-RENDER-034 | 33 | 1 | 0 |
+| All | TUI-RENDER-001 – TUI-RENDER-035 | 34 | 1 | 0 |
 
-**Summary:** 33 of 33 active specs implemented; 1 deferred.
+**Summary:** 34 of 34 active specs implemented; 1 deferred.
 
 ## Key Findings
 
-Audited 2026-11-01. First full audit: every spec read against its code, its tests, and the design by a reader given only the arrow artifacts, its findings then checked by hand. It found an overflow note clipped with the cursor mid-list (fixed, TUI-RENDER-011), a rate that is not a number signed as a drain (fixed, TUI-RENDER-012), ties judged two ways in the compact form (fixed and pinned, TUI-RENDER-017), specs that left out what a frame really reads (corrected, TUI-RENDER-001), an inspector minimum the dead-band undercuts (stated and tested, TUI-RENDER-008), and annotations on shapes and helpers (moved). A reader's pass is no proof: specs 002 to 007, 010, 013, 014, and 023 were read more lightly than the rest. Issue #3 placed the store-link mark in the column every store keeps free (TUI-RENDER-034, TUI-RENDER-019).
+Audited 2026-11-01. First full audit: every spec read against its code, its tests, and the design by a reader given only the arrow artifacts, its findings then checked by hand. It found an overflow note clipped with the cursor mid-list (fixed, TUI-RENDER-011), a rate that is not a number signed as a drain (fixed, TUI-RENDER-012), ties judged two ways in the compact form (fixed and pinned, TUI-RENDER-017), specs that left out what a frame really reads (corrected, TUI-RENDER-001), an inspector minimum the dead-band undercuts (stated and tested, TUI-RENDER-008), and annotations on shapes and helpers (moved). A reader's pass is no proof: specs 002 to 007, 010, 013, 014, and 023 were read more lightly than the rest. Issue #3 placed the store-link mark in the column every store keeps free (TUI-RENDER-034, TUI-RENDER-019). Issue #12 moved the sidebar to one all-stores rate query a frame (TUI-RENDER-035), held by a timing test on a large roster, where one query outweighs the drawing; on a long-running save that took a game from about 7.7% of a core to about 4.4%.
 
 ## Work Required
 

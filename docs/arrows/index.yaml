@@ -215,7 +215,7 @@ arrows:
     parent: tui
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 3fb11a5d70996230468fe19e494c2d3a211cbbf4
+    audited_sha: 3fd1386915362cf0e16ce5abc8de0ecc23321f4f
     blocks: []
     blockedBy: [navigation, runtime, theme]
     detail: tui/render/render.md
