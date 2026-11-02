@@ -508,9 +508,14 @@ fn run_wake<B: ratatui::backend::Backend>(
 }
 
 impl App {
-    /// How long a frame waits for input before going round again. The poll
-    /// timeout IS the frame cadence: nothing to do means we wait here.
-    const FRAME_BUDGET: std::time::Duration = std::time::Duration::from_millis(60);
+    /// How long a frame of play waits for input before going round again: one
+    /// tick at normal speed. The poll timeout IS the frame cadence: nothing to
+    /// do means we wait here, and input ends the wait as soon as it is ready.
+    /// With no input, what is on screen changes only when a tick runs, so a
+    /// shorter wait works out frames with nothing new in them, and a longer one
+    /// lets a tick at normal speed go undrawn. @spec TUI-RUN-068
+    const FRAME_BUDGET: std::time::Duration =
+        std::time::Duration::from_millis(1000 / clowder_core::content::TICKS_PER_SECOND);
     /// TUI-RUN-016. A paste or a held key can deliver faster than frames
     /// retire; past this many the rest waits for the next frame, so a flood
     /// can never starve the simulation or the renderer.
@@ -807,7 +812,8 @@ impl App {
         )
     }
 
-    /// How long the awake game waits out its frame budget. @spec TUI-RUN-035
+    /// How long the awake game waits out its frame budget. @spec TUI-RUN-035,
+    /// TUI-RUN-068
     pub fn poll_timeout(&self) -> std::time::Duration {
         Self::FRAME_BUDGET
     }

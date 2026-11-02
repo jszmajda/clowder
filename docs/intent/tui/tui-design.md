@@ -63,7 +63,6 @@ The loop is the sim's clock at the boundary (the HLD's "shell drives ticks" deci
 
 ### Deferred
 1. Theme palette, render breakpoints, and runtime lifecycle — their own leaves when built.
-2. Whether the render loop needs a dirty-frame optimization (only redraw on change) or a fixed ~10–20 fps is fine — measure on a real pane.
 
 ## References
 

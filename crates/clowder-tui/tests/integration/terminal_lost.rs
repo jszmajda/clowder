@@ -1755,7 +1755,7 @@ fn mouse_reporting_is_turned_off_before_the_screen_is_handed_back_on_every_way_o
             // Frames go to a pipe that outlives the terminal, so what the
             // shutdown writes on its way out can be read. Only a controlling
             // terminal: a closed one the game does not control, with frames
-            // elsewhere, is not detected (Deferred 5 of the runtime LLD).
+            // elsewhere, is not detected (Deferred 4 of the runtime LLD).
             let what = format!("the terminal closed ({phase:?}, {terminal:?})");
             let mut game = Game::launch(
                 "mouse-off-lost",

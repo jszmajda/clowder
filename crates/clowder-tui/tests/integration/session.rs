@@ -708,8 +708,9 @@ const CAUSES: [io::ErrorKind; 8] = [
 /// A frame of play waits out the frame budget once, and every wait after that
 /// first is the briefest: longer than none, no longer than a millisecond. So
 /// a frame takes everything that is ready — ten events in one frame, and of a
-/// hundred its bound and then the rest — rather than one event a frame.
-/// @spec TUI-RUN-059, TUI-RUN-014, TUI-RUN-016
+/// hundred its bound and then the rest — rather than one event a frame. Input
+/// ready ends the frame's wait: what it reads, that same frame takes.
+/// @spec TUI-RUN-059, TUI-RUN-014, TUI-RUN-016, TUI-RUN-068
 #[test]
 fn a_frame_of_play_takes_all_the_input_that_is_ready_and_never_waits_no_time() {
     let mut cues = vec![quiet()];
@@ -1256,7 +1257,7 @@ fn a_shutdown_save_that_cannot_be_written_is_tried_once_whatever_began_the_shutd
 // ---------------------------------------------------------------------------
 //
 // The two bounds' values are not given to these tests: the pointer bound's
-// exact multiple is deferred to tuning (runtime design, Deferred 2). Each is
+// exact multiple is deferred to tuning (runtime design, Deferred 1). Each is
 // read off the loop instead, as the number of events a frame takes from a
 // flood of one kind far larger than any bound, and the claims are held
 // against what was read.

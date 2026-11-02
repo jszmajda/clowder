@@ -61,6 +61,67 @@ fn elapsed(secs: f64) -> Reading {
     }
 }
 
+/// A frame of play waits one tick at normal speed. With no input, what is on
+/// screen changes only when a tick runs, so a shorter wait computes frames with
+/// nothing new in them, and a longer one lets a tick go undrawn.
+/// @spec TUI-RUN-068
+#[test]
+fn at_normal_speed_each_frames_wait_brings_one_tick() {
+    let mut a = app(scratch("one-tick-a-wait"));
+    assert_eq!(
+        a.state.speed, 1.0,
+        "fixture: a new game runs at normal speed"
+    );
+    let wait = a.poll_timeout();
+    assert_eq!(
+        wait,
+        Duration::from_secs(1) / clowder_core::content::TICKS_PER_SECOND as u32,
+        "the wait is the length of one tick at normal speed"
+    );
+
+    let mut term = Terminal::new(TestBackend::new(120, 40)).expect("TestBackend is infallible");
+    let start = a.state.ticks;
+    let reading = Reading {
+        monotonic: wait,
+        wall: wait,
+    };
+    for frame in 1..=200u64 {
+        a.step(&mut term, reading, &[]).expect("frame");
+        assert_eq!(
+            a.state.ticks,
+            start + frame,
+            "frame {frame}: one wait at normal speed should run exactly one tick"
+        );
+    }
+}
+
+/// The wait changes how often the screen is worked out and nothing about time:
+/// at every speed a frame runs all the ticks its wait earned, banking any part
+/// of one, so slower frames lose none (TUI-RUN-017).
+/// @spec TUI-RUN-017, TUI-RUN-068
+#[test]
+fn a_frame_runs_every_tick_its_wait_earned_at_any_speed() {
+    for (speed, frames, ticks) in [(0.25, 40, 10), (1.0, 40, 40), (2.0, 40, 80), (8.0, 40, 320)] {
+        let mut a = app(scratch("every-tick"));
+        a.state.speed = speed;
+        let wait = a.poll_timeout();
+        let mut term = Terminal::new(TestBackend::new(120, 40)).expect("TestBackend is infallible");
+        let start = a.state.ticks;
+        for _ in 0..frames {
+            let reading = Reading {
+                monotonic: wait,
+                wall: wait,
+            };
+            a.step(&mut term, reading, &[]).expect("frame");
+        }
+        assert_eq!(
+            a.state.ticks - start,
+            ticks,
+            "at speed {speed}, {frames} waits earned {ticks} ticks"
+        );
+    }
+}
+
 /// The property most likely to be quietly broken later, and the one the design
 /// is most emphatic about: a terminal too small to draw does not stop the
 /// clock. Time never depends on what is on screen.

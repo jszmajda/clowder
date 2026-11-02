@@ -13,6 +13,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 ### Changed
 
 - **Drawing the sidebar costs less.** It does in one step what it used to repeat for every store, which matters most in a big clowder.
+- **Clowder sits lighter in its pane.** With nothing pressed, it now works out the screen about as often as something on it can change, rather than several times more. Keys answer as quickly as before; at faster speeds, figures move in slightly larger steps.
 - **Redrawing the screen costs less.** Each redraw works out what each tab lists once, rather than again for every part of the screen that asks.
 
 ### Fixed
