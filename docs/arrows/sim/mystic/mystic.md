@@ -4,7 +4,7 @@ The mystic leaf is the unicorn economy and everything glittering that follows fr
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-01 (commit `5a703541d866`). 15 of 15 active specs implemented, each cited by a test.
+**PARTIAL** — last audited 2026-11-01 (commit `5c5f7e08dc32`). 15 of 15 active specs implemented, each cited by a test.
 
 ## References
 
@@ -42,9 +42,8 @@ The mystic leaf is the unicorn economy and everything glittering that follows fr
 
 ## Key Findings
 
-Audited 2026-11-01. First full audit: every spec read against its rule, its tests, and the design by a reader given only the arrow artifacts, its findings then checked by hand. It found a spend with no room for the output (fixed, SIM-UNI-004), absolute claims and formulas contradicted by sibling specs (corrected), and clauses no test exercised (tested). What a Promise grants was narrowed in the design rather than built out, on Tenet 1 (Decisions & Alternatives). Issue #13 held every arch upgrade's figures to its rule (SIM-UNI-012), and the idea granting a free arch now says so (SIM-UNI-011). Issue #14 pinned the descent and shower rolls' place in the draw order (SIM-UNI-006).
+Audited 2026-11-01. First full audit: every spec read against its rule, its tests, and the design by a reader given only the arrow artifacts, its findings then checked by hand. It found a spend with no room for the output (fixed, SIM-UNI-004), absolute claims and formulas contradicted by sibling specs (corrected), and clauses no test exercised (tested). What a Promise grants was narrowed in the design rather than built out, on Tenet 1 (Decisions & Alternatives). Issue #13 held every arch upgrade's figures to its rule (SIM-UNI-012), and the idea granting a free arch now says so (SIM-UNI-011). Issue #14 pinned the descent and shower rolls' place in the draw order (SIM-UNI-006). Issue #16 stated and pinned a shower's windfall and the Sky Arch's drift (SIM-UNI-005).
 
 ## Work Required
 
 - #15: two effect keys no content feeds (SIM-UNI-001, SIM-UNI-003).
-- #16: unpinned constant (SIM-UNI-005).

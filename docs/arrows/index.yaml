@@ -112,15 +112,15 @@ arrows:
     next: "#30, #31: ideas no rule reads, thin table tests"
     drift: null
   dreamtime:
-    status: PARTIAL
+    status: OK
     parent: sim
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 5a703541d866341835d096f6194b53ea99c441ec
+    audited_sha: 5c5f7e08dc3252069302493d9a862ad18e3f2550
     blocks: []
     blockedBy: [adventures, prestige]
     detail: sim/dreamtime/dreamtime.md
-    next: "#16: unpinned constants"
+    next: null
     drift: null
   economy:
     status: OK
@@ -171,11 +171,11 @@ arrows:
     parent: sim
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 5a703541d866341835d096f6194b53ea99c441ec
+    audited_sha: 5c5f7e08dc3252069302493d9a862ad18e3f2550
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/mystic/mystic.md
-    next: "#15, #16: sourceless effect keys, unpinned constant"
+    next: "#15: sourceless effect keys"
     drift: null
   navigation:
     status: PARTIAL
