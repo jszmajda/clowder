@@ -123,7 +123,7 @@ fn walk(s: &GameState) -> (Pcg32, Expected) {
 fn boundary(seed: u64) -> GameState {
     let mut s = GameState::new(seed);
     let seasons = 4 + seed % 8;
-    let on_the_turn = seed % 3 != 0;
+    let on_the_turn = !seed.is_multiple_of(3);
     let day = seasons * content::DAYS_PER_SEASON + u64::from(!on_the_turn);
     s.ticks = day * content::TICKS_PER_DAY - 1;
     for r in [ResourceId::Catnip, ResourceId::Twigs] {
@@ -151,19 +151,19 @@ fn boundary(seed: u64) -> GameState {
             profile: None,
         })
         .collect();
-    if seed % 7 == 0 {
+    if seed.is_multiple_of(7) {
         s.pity = content::PITY_THRESHOLD;
     }
-    if seed % 11 == 0 {
+    if seed.is_multiple_of(11) {
         s.zoomies_until = s.ticks + 1000;
     }
-    if seed % 13 == 0 {
+    if seed.is_multiple_of(13) {
         s.pending_sky_event = Some(s.ticks + 1000);
     }
-    if seed % 17 == 0 {
+    if seed.is_multiple_of(17) {
         s.structures[StructureId::CozyCushion.ix()] = 0;
     }
-    if seed % 19 == 0 {
+    if seed.is_multiple_of(19) {
         s.structures[StructureId::StargazingLedge.ix()] = 0;
         s.structures[StructureId::RainbowArch.ix()] = 0;
         s.structures[StructureId::MemoryChest.ix()] = 0;

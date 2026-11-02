@@ -116,11 +116,11 @@ arrows:
     parent: sim
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: c799869e32f728e9f9eba515c31e68d4287d230e
+    audited_sha: 5a703541d866341835d096f6194b53ea99c441ec
     blocks: []
     blockedBy: [adventures, prestige]
     detail: sim/dreamtime/dreamtime.md
-    next: "#14, #16: draw order, unpinned constants"
+    next: "#16: unpinned constants"
     drift: null
   economy:
     status: OK
@@ -138,7 +138,7 @@ arrows:
     parent: sim
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: 3fb11a5d70996230468fe19e494c2d3a211cbbf4
+    audited_sha: 5a703541d866341835d096f6194b53ea99c441ec
     blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md
@@ -171,11 +171,11 @@ arrows:
     parent: sim
     sampled: 2026-11-01
     audited: 2026-11-01
-    audited_sha: c799869e32f728e9f9eba515c31e68d4287d230e
+    audited_sha: 5a703541d866341835d096f6194b53ea99c441ec
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/mystic/mystic.md
-    next: "#14, #15, #16: draw order, sourceless effect keys, unpinned constant"
+    next: "#15, #16: sourceless effect keys, unpinned constant"
     drift: null
   navigation:
     status: PARTIAL
