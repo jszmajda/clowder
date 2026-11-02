@@ -15,6 +15,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 
 ### Fixed
 
+- **One description now mentions what it gives you for free.**
 - **Kittens say their own things.** The little moments a kitten has were showing as a single placeholder word. They now appear in the ticker and the Journal as written.
 - **The Journal tells flavour from fact by colour too.** Quiet moments recede there as they do on the ticker, and stars wear their colour on tabs and event lines.
 - **A few more event lines name your stores in their colours.**

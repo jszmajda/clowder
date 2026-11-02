@@ -1683,7 +1683,7 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     // ---- Band 4: curiosity + mystic currencies (content lands waves 4–6) ----
     IdeaDef {
         name: "Parade Routes",
-        blurb: "Glitter needs an itinerary. Unlocks Unicorn Parades.",
+        blurb: "Glitter needs an itinerary. Unlocks Unicorn Parades, and raises a first Rainbow Arch for free.",
         cost: 30000.0,
         gate: &[(ResourceId::Schemes, 15.0)],
         prereqs: &[IdeaId::UnicornLore, IdeaId::GrandSchemes],
@@ -4103,7 +4103,7 @@ static ARCHES: [ArchDef; 8] = [
     },
     ArchDef {
         name: "Everdream Arch",
-        blurb: "A doorway into the softest dream. {jars of purrs|JarsOfPurrs} cap +2; opens condensing {jars|JarsOfPurrs} and three Promise slots.",
+        blurb: "A doorway into the softest dream. Opens condensing {jars of purrs|JarsOfPurrs}, their cap +2, and three Promise slots.",
         cost: &[
             (ResourceId::Dreamcorns, 100.0),
             (ResourceId::Cairns, 1000.0),
@@ -4383,7 +4383,7 @@ static TRADITIONS: [TraditionDef; 31] = [
     }, // NineLivesIV
     TraditionDef {
         cost_wisdom: 2500.0,
-        blurb: "Six lives, and the stories are long now. Elder Wisdom's production bonus, and its cap, +5%.",
+        blurb: "Six lives, and the tales are long now. Elder Wisdom's production bonus, and its cap, +5%.",
     }, // NineLivesV
     TraditionDef {
         cost_wisdom: 5000.0,
@@ -4411,7 +4411,7 @@ static TRADITIONS: [TraditionDef; 31] = [
     TraditionDef { cost_wisdom: 25.0, blurb: "Why stop? A jamboree hosted while one runs adds its 100 days to the party." },  // FestivalSpirit
     TraditionDef { cost_wisdom: 50.0, blurb: "Some cats bring their work home. On a Move, one carried kitten keeps its job." },  // SecondWind
     TraditionDef { cost_wisdom: 25.0, blurb: "Whiskers that twitch before the weather turns. The coming season is always shown, no idea needed." },  // Forecaster
-    TraditionDef { cost_wisdom: 125.0, blurb: "Eyes for sparkle. Prism descents and showers of {rainbows|Rainbows} are 10% likelier." }, // PrismSight
+    TraditionDef { cost_wisdom: 125.0, blurb: "Eyes for sparkle. {Prism|Prisms} descents and showers of {rainbows|Rainbows} are 10% likelier." }, // PrismSight
     TraditionDef { cost_wisdom: 40.0, blurb: "What's past the fence? Opens Adventures." },  // AdventurousSpirit
     TraditionDef { cost_wisdom: 50.0, blurb: "Paws wiped at the door, every time. Buildings make 10% less mess." }, // TidyPaws
 ];

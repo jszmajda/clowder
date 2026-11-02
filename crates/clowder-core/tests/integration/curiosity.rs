@@ -163,6 +163,18 @@ fn every_blurb() -> Vec<&'static str> {
             .map(|r| content::refinement_def(*r).blurb),
     );
     out.extend(RuleId::ALL.iter().map(|r| content::rule_def(*r).blurb));
+    out.extend(RiteId::ALL.iter().map(|r| content::rite_def(*r).blurb));
+    out.extend(ArchId::ALL.iter().map(|a| content::arch_def(*a).blurb));
+    out.extend(
+        TraditionId::ALL
+            .iter()
+            .map(|t| content::tradition_def(*t).blurb),
+    );
+    out.extend(
+        DreamLoomId::ALL
+            .iter()
+            .map(|l| content::dream_loom_def(*l).blurb),
+    );
     out
 }
 
@@ -191,10 +203,13 @@ fn singular(name: &str) -> String {
     }
 }
 
-/// A name made plural: a final "y" read as "ies", otherwise an "s" added.
+/// A name made plural: a final "y" read as "ies", an "es" after a hissing end,
+/// otherwise an "s" added.
 fn plural(name: &str) -> String {
     if let Some(stem) = name.strip_suffix('y') {
         format!("{stem}ies")
+    } else if ["ch", "sh", "x", "z"].iter().any(|e| name.ends_with(e)) {
+        format!("{name}es")
     } else {
         format!("{name}s")
     }

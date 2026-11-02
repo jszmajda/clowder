@@ -6,6 +6,7 @@
 mod common;
 
 mod achievements;
+mod blurb_truth;
 mod blurbs;
 mod bulktime;
 mod curiosity;
