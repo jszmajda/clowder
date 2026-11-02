@@ -1603,3 +1603,90 @@ fn an_unfed_whale_simply_leaves_and_takes_nothing() {
         assert!(s.stock(r) >= before[r.ix()], "{r:?} wasn't taken");
     }
 }
+
+// =====================================================================
+// SIM-DREAM-001 to -004 — pacing, by the numbers the specs state
+//
+// Written as literals, not the constants: a test reading the constant moves with
+// it, and the point here is that a changed value fails.
+// =====================================================================
+
+/// A nap's price follows the curve the spec states, heat included.
+// @spec SIM-DREAM-001, SIM-DREAM-002
+#[test]
+fn the_nap_curve_holds_its_stated_values() {
+    let curve = |years: f64, stirred: f64| {
+        (5.0 * (1.08f64.powf(years) - 1.0) / 0.08 * (1.0 + 0.01 * stirred)).ceil()
+    };
+    let mut s = GameState::new(1401);
+    assert_eq!(s.starshard_cost(1), 5.0, "the first year's price");
+    assert_eq!(s.starshard_cost(10), curve(10.0, 0.0));
+    assert_eq!(s.starshard_cost(100), curve(100.0, 0.0));
+    s.stirred_dreams = 100.0;
+    assert_eq!(s.starshard_cost(10), curve(10.0, 100.0), "heat raises it");
+    assert!(s.starshard_cost(10) > GameState::new(1401).starshard_cost(10));
+
+    let fresh = GameState::new(1401);
+    assert_eq!(fresh.max_nap_length(), 100, "a nap's base length");
+    let mut slumber = fresh.clone();
+    slumber.dream_looms.insert(DreamLoomId::LongSlumber);
+    assert_eq!(slumber.max_nap_length(), 500, "the Long Slumber adds 400");
+}
+
+/// Each year napped stirs one heat, before efficiency.
+// @spec SIM-DREAM-002
+#[test]
+fn a_nap_stirs_one_heat_a_year() {
+    let mut s = GameState::new(1402);
+    s.ideas.insert(IdeaId::DeepNapTheory);
+    give(&mut s, ResourceId::Starshards, 1e6);
+    s.apply(Command::DeepNap(3)).unwrap();
+    assert!((s.stirred_dreams - 3.0).abs() < TOL, "{}", s.stirred_dreams);
+}
+
+/// Stirred dreams cool by half a heat a tick, faster with a blanket.
+// @spec SIM-DREAM-003
+#[test]
+fn stirred_dreams_cool_by_half_a_heat_a_tick() {
+    let mut s = GameState::new(1403);
+    s.stirred_dreams = 10.0;
+    s.tick();
+    assert!((s.stirred_dreams - 9.5).abs() < TOL, "{}", s.stirred_dreams);
+
+    let mut s = GameState::new(1403);
+    s.dream_looms.insert(DreamLoomId::WarmBlanket);
+    s.stirred_dreams = 10.0;
+    s.tick();
+    assert!(
+        (s.stirred_dreams - (10.0 - 0.5 * 1.2)).abs() < TOL,
+        "{}",
+        s.stirred_dreams
+    );
+}
+
+/// A déjà-vu day's reverie lands in its stated band, on the draw the schedule
+/// gives it, and Distant Dawn stands at its stated year.
+// @spec SIM-DREAM-004, SIM-DREAM-007
+#[test]
+fn a_deja_vu_day_gathers_reverie_in_its_stated_band() {
+    assert_eq!(content::DEJA_VU_REVERIE_BASE, 0.5);
+    assert_eq!(content::DEJA_VU_REVERIE_SPREAD, 1.5);
+    assert_eq!(content::DISTANT_DAWN_YEAR, 40000);
+
+    let mut seen = 0;
+    for seed in 0..400 {
+        let mut s = GameState::new(seed);
+        s.structures[StructureId::MemoryChest.ix()] = 100;
+        s.ticks = 4 * content::DAYS_PER_SEASON * content::TICKS_PER_DAY - 1;
+        s.tick();
+        let gained = s.stock(ResourceId::Reverie);
+        if s.deja_vu_until != 0 {
+            seen += 1;
+            assert!(
+                (0.5..2.0).contains(&gained),
+                "seed {seed}: gathered {gained}"
+            );
+        }
+    }
+    assert!(seen > 0, "fixture: a déjà-vu day landed");
+}

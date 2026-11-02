@@ -1742,3 +1742,12 @@ fn the_rites_outside_the_stack_stay_single_purchase_under_enlightenment() {
         );
     }
 }
+
+/// A shower brings its stated windfall and the Sky Arch its stated drift, written
+/// as literals so a changed value fails.
+// @spec SIM-UNI-005
+#[test]
+fn a_shower_and_the_sky_drift_hold_their_stated_values() {
+    assert_eq!(content::RAINBOW_SHOWER_AMOUNT, 5000.0);
+    assert_eq!(content::SKY_ARCH_PRISM_DRIFT, 0.00002);
+}

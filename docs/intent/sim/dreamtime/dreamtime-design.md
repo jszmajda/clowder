@@ -15,15 +15,15 @@ The leaf owns the starshard-fueled Deep Nap (year-skipping), the stirred-dreams 
 
 `DeepNap(years)` (needs the Deep Nap Theory idea) spends starshards to skip the meadow forward `years` game-years instantly — the meadow accrues exactly what it would have accrued awake (the same `tick()`, fast-forwarded, like offline catch-up, so no shadow math — the advancing tick counter alone delivers the next Move's millennium trickle, nothing is added). Each nap is bounded to `max_nap_length` game-years (base 100, raised by the Long Slumber loom) so a single command never freezes the game; the Distant Dawn (meadow-year 40000) is reached by repeated naps in one un-Moved meadow. Each nap:
 
-- spends `starshard_cost(years)` starshards (escalating),
-- accrues **stirred dreams** (heat): `+= years × heat_per_year × (1 − heat_efficiency)` — the more you nap, the warmer the dream-space gets,
+- spends `starshard_cost(years)` starshards, escalating: `⌈5 × (1.08^years − 1) / 0.08 × (1 + 0.01 × stirred_dreams) × the looms' discounts⌉`,
+- accrues **stirred dreams** (heat): `+= years × 1 × (1 − heat_efficiency)`, a heat per year of 1 — the more you nap, the warmer the dream-space gets,
 - yields the fast-forwarded meadow state.
 
-**Stirred dreams must cool** before more napping is comfortable: while stirred_dreams is high, the starshard cost of napping rises (the inspiration's heat-raises-shatter-cost). Stirred dreams dissipate passively (`−= dissipation/tick`, faster with Dream Loom cooling upgrades) — a slowdown on napping cadence, never a loss of anything.
+**Stirred dreams must cool** before more napping is comfortable: while stirred_dreams is high, the starshard cost of napping rises (the inspiration's heat-raises-shatter-cost). Stirred dreams dissipate passively (`−= 0.5/tick`, faster with Dream Loom cooling upgrades) — a slowdown on napping cadence, never a loss of anything.
 
 ## Déjà-Vu Days
 
-Occasionally a nap (or a season boundary, at `deja_vu_chance` per season, a field of each structure's definition that the Memory Chest sets) produces a **déjà-vu day**: a strange, half-remembered day where ordinary production pauses and the clowder gathers **reverie** instead (`+rand-ish reverie/day`, deterministic from the RNG). Reverie is the dreamtime currency — earned only in these uncanny days, spent on the Deep-Nap infrastructure.
+Occasionally a nap (or a season boundary, at `deja_vu_chance` per season, a field of each structure's definition that the Memory Chest sets) produces a **déjà-vu day**: a strange, half-remembered day where ordinary production pauses and the clowder gathers **reverie** instead (`(0.5 + a uniform draw × 1.5)` reverie, raised by reverie-yield effects and deterministic from the RNG). Reverie is the dreamtime currency — earned only in these uncanny days, spent on the Deep-Nap infrastructure.
 
 ## The Dream Loom
 
@@ -37,7 +37,7 @@ Reverie-priced upgrades (`BuyDreamLoom`, ~9) that make napping deeper and cooler
 | 3 | Deep Cushion | 100 | a nap's starshard cost −5% |
 | 4 | Lucid Nap | 250 | each nap brings 0.1 reverie per year napped |
 | 5 | Cozy Cave | 500 | heat efficiency +15% |
-| 6 | Long Slumber | 1000 | max nap length +; starshard cost −10% |
+| 6 | Long Slumber | 1000 | max nap length +400 years; starshard cost −10% |
 | 7 | Reverie Net | 2500 | déjà-vu days yield +50% reverie |
 | 8 | The Distant Dawn | 10000 reverie, 100 Jars | unlocks the Distant Dawn era (below) |
 

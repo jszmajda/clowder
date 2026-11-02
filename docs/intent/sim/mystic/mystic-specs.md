@@ -9,7 +9,7 @@
 
 ## Rainbow Arches
 
-- [x] **SIM-UNI-005**: The system shall define exactly the eight Rainbow Arch upgrades of the mystic design's ladder — rainbow/prism/other costs and effects — buyable once each via BuyArch (Locked before the Parade Routes idea, InsufficientResources when unaffordable), their effects flowing through the effect-key system save the Sky Arch's steady prism drift and the Memory Arch's enabling of dreaming, which the dreaming rule reads directly.
+- [x] **SIM-UNI-005**: The system shall define exactly the eight Rainbow Arch upgrades of the mystic design's ladder — rainbow/prism/other costs and effects — buyable once each via BuyArch (Locked before the Parade Routes idea, InsufficientResources when unaffordable), their effects flowing through the effect-key system save the Sky Arch's steady prism drift and the Memory Arch's enabling of dreaming, which the dreaming rule reads directly; a rainbow shower brings 5000 rainbows.
 
 ## Prisms, Dreaming & Dreamcorns
 

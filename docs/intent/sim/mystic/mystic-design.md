@@ -31,7 +31,7 @@ Arches (economy structure, gated by the Parade Routes idea) are the Parade excha
 |---|---|---|---|
 | 0 | Ribbon Arch | 500 rainbows | unicorns +5% (the Rainbow Arch *structure* already grants +0.02%/day base prism descent per copy) |
 | 1 | Crystal Arch | 25000 rainbows, 25 prisms | unicorns +10%; +0.05%/day prism descent |
-| 2 | Prism Arch | 50000 rainbows, 50 prisms | unicorns +25%; +0.05%/day rainbow shower (a windfall) |
+| 2 | Prism Arch | 50000 rainbows, 50 prisms | unicorns +25%; +0.05%/day rainbow shower (a windfall of 5000 rainbows) |
 | 3 | Sky Arch | 125000 rainbows, 500 prisms | unicorns +50%; +0.00002 prism/t (a steady drift) |
 | 4 | Dreaming Arch | 500 shinies, 1M rainbows, 5000 prisms | unicorns +250%; starshard refine +5% |
 | 5 | Starlit Arch | 1250 shinies, 750k rainbows, 25000 prisms | unicorns +500%; starshard refine +10% |
