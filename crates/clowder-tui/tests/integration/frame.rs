@@ -4230,3 +4230,59 @@ fn a_sidebar_asks_for_its_rates_once_however_many_stores_it_draws() {
          query, past the bound of {bound:?}: it is asking store by store"
     );
 }
+
+/// However many parts of the frame ask, each section's rows are built once, on
+/// every section and at every width step, with an arming and a swap in the mix.
+/// @spec TUI-RENDER-015
+#[test]
+fn a_frame_builds_each_sections_rows_at_most_once() {
+    use clowder_tui::nav::rows::row_builds;
+    let state = long_meadow();
+    for section in Section::ALL {
+        for (w, h) in [(FLOOR_W, FLOOR_H), (WIDE, TALL)] {
+            for wanted in [false, true] {
+                let view = ViewState {
+                    section: Some(section),
+                    inspector_wanted: wanted,
+                    ..Default::default()
+                };
+                let mut term = terminal(w, h);
+                let before = row_builds();
+                draw(&mut term, &state, &view, None);
+                let built = row_builds() - before;
+                assert!(
+                    built <= Section::ALL.len() as u64,
+                    "{section:?} at {w}x{h}: a frame built {built} row lists"
+                );
+            }
+        }
+    }
+}
+
+/// What a frame built goes with it: nothing outside a frame reads what one kept,
+/// and the next frame draws the state as it now is.
+/// @spec TUI-RENDER-001, TUI-RENDER-015
+#[test]
+fn a_frame_keeps_no_rows_for_the_next_one() {
+    use clowder_tui::nav::rows::row_builds;
+    let mut state = short_meadow();
+    state.ideas = clowder_core::IdeaId::ALL.into_iter().collect();
+    let view = looking_at(RowKey::Fixed("GatherCatnip"));
+    let mut term = terminal(WIDE, TALL);
+    let new_row = StructureId::ALL[3];
+    let name = needle(clowder_core::content::structure_def(new_row).name);
+    let first = draw(&mut term, &state, &view, None);
+    assert!(!drawn_anywhere(&first, &name), "fixture: not yet revealed");
+
+    let before = row_builds();
+    rows(&state, Section::Meadow);
+    assert_eq!(row_builds(), before + 1, "outside a frame, rows are built");
+
+    state.revealed.insert(ContentId::Structure(new_row));
+    state.resources[ResourceId::Catnip.ix()] = 1.0e9;
+    let next = draw(&mut term, &state, &view, None);
+    assert!(
+        drawn_anywhere(&next, &name),
+        "the next frame drew the rows the state now lists"
+    );
+}

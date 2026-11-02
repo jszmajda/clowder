@@ -12,6 +12,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 ### Changed
 
 - **Drawing the sidebar costs less.** It does in one step what it used to repeat for every store, which matters most in a big clowder.
+- **Redrawing the screen costs less.** Each redraw works out what each tab lists once, rather than again for every part of the screen that asks.
 
 ### Fixed
 

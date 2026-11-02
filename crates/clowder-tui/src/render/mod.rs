@@ -1254,6 +1254,9 @@ pub fn frame_recorded(
     view: &ViewState,
     prev: Option<&Layout>,
 ) -> (Layout, PointerRecord) {
+    // However many parts of the frame ask, each section's rows are built once.
+    // @spec TUI-RENDER-015
+    let _rows = crate::nav::rows::one_frame(state);
     let area = f.area();
     let mut record = PointerRecord::blank((area.width, area.height));
     // TUI-NAV-050: an unread report is what puts the banner on screen.

@@ -158,10 +158,82 @@ fn headed_group(state: &GameState, title: &'static str, rows: Vec<Row>) -> Vec<R
 }
 
 pub fn rows(state: &GameState, section: Section) -> Vec<Row> {
+    with_rows(state, section, <[Row]>::to_vec)
+}
+
+/// Reads a section's rows: built once while a frame is being drawn, however many
+/// parts of the frame ask, and built afresh on every call otherwise. @spec
+/// TUI-RENDER-015
+fn with_rows<T>(state: &GameState, section: Section, read: impl FnOnce(&[Row]) -> T) -> T {
+    let key: *const GameState = state;
+    let kept = FRAME_ROWS.with(|f| {
+        let mut f = f.borrow_mut();
+        let frame = f.as_mut().filter(|frame| frame.state == key)?;
+        frame.built[section.index()].take()
+    });
+    let list = kept.unwrap_or_else(|| build_rows(state, section));
+    let out = read(&list);
+    FRAME_ROWS.with(|f| {
+        if let Some(frame) = f.borrow_mut().as_mut().filter(|frame| frame.state == key) {
+            frame.built[section.index()] = Some(list);
+        }
+    });
+    out
+}
+
+fn build_rows(state: &GameState, section: Section) -> Vec<Row> {
+    BUILDS.with(|b| b.set(b.get() + 1));
     rows_ungated(state, section)
         .into_iter()
         .filter_map(|r| gated(state, r))
         .collect()
+}
+
+/// The row lists one frame has built, for the one state it is drawing.
+struct FrameRows {
+    state: *const GameState,
+    built: [Option<Vec<Row>>; Section::ALL.len()],
+}
+
+thread_local! {
+    static FRAME_ROWS: std::cell::RefCell<Option<FrameRows>> =
+        const { std::cell::RefCell::new(None) };
+    static BUILDS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// While this lives, a section's rows for `state` are built once. A frame holds
+/// one for exactly as long as it draws, and the lists go with it, so nothing is
+/// kept between frames (TUI-RENDER-001). It holds the state's shared borrow, so
+/// the state can't change while the lists stand.
+#[must_use = "rows are built afresh as soon as this is dropped"]
+pub struct OneFrame<'state> {
+    previous: Option<FrameRows>,
+    _state: std::marker::PhantomData<&'state GameState>,
+}
+
+/// Build each section's rows once for `state`, until the result is dropped.
+/// @spec TUI-RENDER-015
+pub fn one_frame(state: &GameState) -> OneFrame<'_> {
+    let fresh = FrameRows {
+        state,
+        built: std::array::from_fn(|_| None),
+    };
+    OneFrame {
+        previous: FRAME_ROWS.with(|f| f.replace(Some(fresh))),
+        _state: std::marker::PhantomData,
+    }
+}
+
+impl Drop for OneFrame<'_> {
+    fn drop(&mut self) {
+        FRAME_ROWS.with(|f| *f.borrow_mut() = self.previous.take());
+    }
+}
+
+/// How many section row lists this thread has built, for measuring what a frame
+/// asks for.
+pub fn row_builds() -> u64 {
+    BUILDS.with(std::cell::Cell::get)
 }
 
 fn rows_ungated(state: &GameState, section: Section) -> Vec<Row> {
@@ -715,7 +787,7 @@ pub fn revealed_sections(state: &GameState) -> Vec<Section> {
 /// section its tab: a section that lists only headers has nothing in it for
 /// the player to do yet. @spec TUI-NAV-006
 pub fn lists_selectable(state: &GameState, section: Section) -> bool {
-    rows(state, section).iter().any(|r| r.selectable())
+    with_rows(state, section, |list| list.iter().any(Row::selectable))
 }
 
 /// Whether `section` currently wears a tab: it lists a selectable row, or it
