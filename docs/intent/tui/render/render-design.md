@@ -213,7 +213,7 @@ Blank cells stay blank, and each row is drawn whole from the inspector's left ed
 
 The loop gives render a slice of each frame after input and ticks have taken theirs, and rendering must fit in it. Nothing here should come close: a terminal frame is a few thousand cells, and the expensive-looking parts (46 resources, long lists) are bounded by the viewport, which never exceeds the body's rows.
 
-The two things that could get expensive are worth naming so they are not discovered later. Deriving the sidebar's rates asks the core for a value per revealed resource every frame, and the palette's per-cell work is proportional to what is drawn rather than what exists. Both are bounded, neither is obviously a problem, and both are cheap to measure once there is something to measure — which is the honest state of every frame-cost question at this point.
+The two things that could get expensive are worth naming so they are not discovered later. The sidebar's rates cost one run of the core's all-stores query a frame, however many stores it draws, since asking store by store would run that whole query once per line; and the palette's per-cell work is proportional to what is drawn rather than what exists. Both are bounded, neither is a problem so far, and both are cheap to measure once there is something to measure — which is the honest state of every frame-cost question at this point.
 
 Whether frames run at a fixed cadence or only when something changed is deferred jointly with `runtime`, whose loop owns the timing. The pure-function property makes the dirty-frame optimisation available later without restructuring: if a frame is a function of its inputs, then "did the inputs change" is a well-formed question.
 

@@ -4175,3 +4175,58 @@ fn a_cursor_mid_list_says_what_lies_above_and_what_lies_below() {
         lines.join("\n")
     );
 }
+
+/// The sidebar reads every store's rate from one run of the core's all-stores
+/// query. Each run clones the whole state, so on a large roster one run outweighs
+/// the drawing and a sidebar asking store by store costs dozens of them. The bound
+/// sits far from both, so a loaded machine taking the best of many draws doesn't
+/// reach it.
+/// @spec TUI-RENDER-035
+#[test]
+fn a_sidebar_asks_for_its_rates_once_however_many_stores_it_draws() {
+    let mut state = long_meadow();
+    state.kittens = roster(5000);
+    let (w, h) = (30u16, 110u16);
+    let view = ViewState {
+        section: Some(Section::Meadow),
+        ..Default::default()
+    };
+    let mut term = terminal(w, h);
+    let listed = term
+        .draw(|f| {
+            let record = clowder_tui::render::widgets::chrome::sidebar(
+                f,
+                Rect::new(0, 0, w, h),
+                &state,
+                &view,
+            );
+            assert_eq!(record.drawn, ResourceId::ALL.len(), "fixture: all drawn");
+        })
+        .map(|_| ResourceId::ALL.len())
+        .expect("TestBackend is infallible");
+
+    let best = |mut run: Box<dyn FnMut() + '_>| -> Duration {
+        let mut best = Duration::MAX;
+        for _ in 0..60 {
+            let start = Instant::now();
+            run();
+            best = best.min(start.elapsed());
+        }
+        best
+    };
+    let one_query = best(Box::new(|| {
+        std::hint::black_box(state.net_rates());
+    }));
+    let sidebar = best(Box::new(|| {
+        term.draw(|f| {
+            clowder_tui::render::widgets::chrome::sidebar(f, Rect::new(0, 0, w, h), &state, &view);
+        })
+        .expect("TestBackend is infallible");
+    }));
+    let bound = one_query * (listed as u32 / 3);
+    assert!(
+        sidebar < bound,
+        "a sidebar of {listed} stores cost {sidebar:?} against {one_query:?} for one all-stores \
+         query, past the bound of {bound:?}: it is asking store by store"
+    );
+}

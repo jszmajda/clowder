@@ -447,6 +447,7 @@ fn listed_stores(state: &GameState) -> Vec<ResourceId> {
 fn store_lines(
     state: &GameState,
     r: ResourceId,
+    net_rate: f64,
     name_col: usize,
     width: usize,
     mark: char,
@@ -480,7 +481,7 @@ fn store_lines(
     );
 
     let bar = fill_bar(stock, cap);
-    let rate = fmt::rate(state.net_rate(r));
+    let rate = fmt::rate(net_rate);
     let body = format!("{bar} {rate:>7}");
     let capped = wears_full(state, r);
     let mut spans = vec![Span::raw(body.clone())];
@@ -605,12 +606,15 @@ pub fn sidebar(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) -
         lines.push(sidebar_note('▴', start, full_in(0..start), width));
     }
     let links = row_links(state, view);
+    // One all-stores query for the whole sidebar: asking store by store would
+    // run it once per line. @spec TUI-RENDER-035
+    let rates = state.net_rates();
     for r in &listed[start..start + drawn] {
         let mark = links
             .iter()
             .find(|(x, _)| x == r)
             .map_or(' ', |(_, link)| link_mark(*link));
-        lines.extend(store_lines(state, *r, name_col, width, mark));
+        lines.extend(store_lines(state, *r, rates[r.ix()], name_col, width, mark));
     }
     let below = k - start - drawn;
     if below > 0 {

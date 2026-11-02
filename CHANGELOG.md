@@ -9,6 +9,10 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 - **The sidebar shows what the row under the cursor does to your stores.** A small mark beside a store says whether the row would raise it, lower it, or both, so there's no more matching names by eye. The help screen explains the marks.
 - **Stores say what they are.** With the cursor on a store, the info pane now opens with a little drawing in that store's colours and a line about what it is. In a pane too short to hold everything, these step aside so the figures stay.
 
+### Changed
+
+- **Drawing the sidebar costs less.** It does in one step what it used to repeat for every store, which matters most in a big clowder.
+
 ### Fixed
 
 - **The header's season always matches the rest of the screen.** At wide widths its word could disagree with the colours beside it.
