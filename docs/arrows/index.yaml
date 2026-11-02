@@ -90,15 +90,15 @@ arrows:
     next: null
     drift: null
   cosmic:
-    status: PARTIAL
+    status: OK
     parent: sim
-    sampled: 2026-11-01
-    audited: 2026-11-01
-    audited_sha: 39585f101764bafc9ca082e35634a20dfb7c4263
+    sampled: 2026-11-02
+    audited: 2026-11-02
+    audited_sha: 781d15ccba654dfe29d112ee225ddf12669f21a6
     blocks: []
     blockedBy: [adventures, prestige]
     detail: sim/cosmic/cosmic.md
-    next: "#25: an unbuilt storage bonus"
+    next: null
     drift: null
   curiosity:
     status: PARTIAL
@@ -136,9 +136,9 @@ arrows:
   engine:
     status: OK
     parent: sim
-    sampled: 2026-11-01
-    audited: 2026-11-01
-    audited_sha: 5a703541d866341835d096f6194b53ea99c441ec
+    sampled: 2026-11-02
+    audited: 2026-11-02
+    audited_sha: 781d15ccba654dfe29d112ee225ddf12669f21a6
     blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md
@@ -182,7 +182,7 @@ arrows:
     parent: tui
     sampled: 2026-11-02
     audited: 2026-11-02
-    audited_sha: 5a7a5343c911dafa56d0638c9ceb6e6e81b62ea7
+    audited_sha: 781d15ccba654dfe29d112ee225ddf12669f21a6
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md

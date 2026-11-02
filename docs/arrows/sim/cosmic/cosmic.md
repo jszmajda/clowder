@@ -4,7 +4,7 @@ The cosmic leaf is clowder's late-game frontier: once the clowder has mastered i
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-01 (commit `39585f101764`). 10 of 10 active specs implemented, each cited by a test; 1 deferred.
+**OK** — last audited 2026-11-02 (commit `781d15ccba65`). 11 of 11 active specs implemented, each cited by a test.
 
 ## References
 
@@ -20,6 +20,7 @@ The cosmic leaf is clowder's late-game frontier: once the clowder has mastered i
 
 ### Tests
 - `crates/clowder-core/tests/integration/frontier.rs`
+- `crates/clowder-core/tests/integration/structure_fields.rs`
 - `crates/clowder-core/tests/integration/wonder.rs`
 
 ### Code
@@ -33,14 +34,16 @@ The cosmic leaf is clowder's late-game frontier: once the clowder has mastered i
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-SKY-001 – SIM-SKY-011 | 10 | 1 | 0 |
+| All | SIM-SKY-001 – SIM-SKY-011 | 11 | 0 | 0 |
 
-**Summary:** 10 of 10 active specs implemented; 1 deferred.
+**Summary:** 11 of 11 active specs implemented.
 
 ## Key Findings
 
-Audited 2026-11-01. First full audit: every spec read by hand against its code and tests, and the design's site table read row by row against the definitions and pinned by tests over all thirteen sites. It found a bonus the design states citing an unrelated spec (now SIM-SKY-009, the issue that opened this audit), one outpost left out of the outdoor channel (fixed, SIM-SKY-004), a forecast in the table no rule gives (removed), a storage figure missing from a row (added), and clauses no test exercised (tested, SIM-SKY-003, SIM-SKY-007). One designed bonus was never built (SIM-SKY-011, deferred). Hand-read by the agent that made these changes, with no second reader.
+Audited 2026-11-01. First full audit: every spec read by hand against its code and tests, and the design's site table read row by row against the definitions and pinned by tests over all thirteen sites. It found a bonus the design states citing an unrelated spec (now SIM-SKY-009, the issue that opened this audit), one outpost left out of the outdoor channel (fixed, SIM-SKY-004), a forecast in the table no rule gives (removed), a storage figure missing from a row (added), and clauses no test exercised (tested, SIM-SKY-003, SIM-SKY-007). Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-02. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Issue #25 built the one designed bonus the first audit found missing (SIM-SKY-011), with a test over every store's cap, the cap with a multiplier of its own, and how it stacks. The audit cited SIM-SKY-010 on the table that holds it, which had no annotation in code. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 
-- #25: a late outpost's storage bonus was never built (SIM-SKY-011, deferred).
+None.

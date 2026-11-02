@@ -22,6 +22,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 - **Kittens say their own things.** The little moments a kitten has were showing as a single placeholder word. They now appear in the ticker and the Journal as written.
 - **The Journal tells flavour from fact by colour too.** Quiet moments recede there as they do on the ticker, and stars wear their colour on tabs and event lines.
 - **A few more event lines name your stores in their colours.**
+- **One of the last things you can build now does all it was meant to.** Part of what it was designed to do had never been hooked up, and its description now says that part too.
 - **A structure that was missed now takes the same bonuses as its neighbours.** It sat outside a production channel the others in its family all use.
 - **The header's season always matches the rest of the screen.** At wide widths its word could disagree with the colours beside it.
 - **The info pane no longer repeats a confirmation.** At wide widths, a summary the list already shows was drawn a second time beside it.
