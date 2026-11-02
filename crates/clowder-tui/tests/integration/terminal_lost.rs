@@ -349,7 +349,50 @@ enum Phase {
     /// screen holds, stamped as the launch begins: it opens at once, with a
     /// long list under the cursor for the pointer to move through.
     Lively,
+    /// A save that holds a byte that is not valid UTF-8, inside a string, the
+    /// rest of it sound.
+    BadByte,
+    /// A save that is not a save at all.
+    Unparseable,
 }
+
+/// A sound save with one byte of a string no longer valid UTF-8. Read past that
+/// byte with a lossy decode, it parses, which is what makes the damage dangerous.
+fn save_with_a_bad_byte() -> Vec<u8> {
+    const NAME: &str = "Damaged";
+    let mut state = clowder_core::GameState::new(46_049);
+    state.kittens.push(clowder_core::Kitten {
+        name: NAME.to_string(),
+        job: None,
+        location: clowder_core::Location::Home,
+        arrived_day: 0,
+        job_seq: None,
+        away_seq: None,
+        skills: [0.0; 8],
+        exp: 0.0,
+        rank: 0,
+        trait_id: clowder_core::KittenTrait::None,
+        tinkering: None,
+        profile: None,
+    });
+    let json = clowder_core::save_string(&state, 1);
+    let at = json
+        .find(&format!("\"{NAME}\""))
+        .expect("fixture: the name stands in the save as itself");
+    let mut bytes = json.into_bytes();
+    bytes[at + 2] = 0xFF;
+    assert!(
+        String::from_utf8(bytes.clone()).is_err(),
+        "fixture: the save holds an undecodable byte"
+    );
+    assert!(
+        clowder_core::begin_load(&String::from_utf8_lossy(&bytes), 1).is_ok(),
+        "fixture: a lossy decode of it parses"
+    );
+    bytes
+}
+
+const NOT_A_SAVE: &[u8] = b"{ this was never a save";
 
 /// The meadow `Phase::Lively` saves: every structure on show and the means
 /// to take any of them, so its first section lists a hundred rows and more.
@@ -420,6 +463,15 @@ impl Game {
                 let json = clowder_core::save_string(&lively(), now);
                 fs::write(&save, &json).expect("writing the fixture save");
                 Some(json)
+            }
+            Phase::BadByte | Phase::Unparseable => {
+                fs::create_dir_all(save.parent().unwrap()).unwrap();
+                let bytes = match phase {
+                    Phase::BadByte => save_with_a_bad_byte(),
+                    _ => NOT_A_SAVE.to_vec(),
+                };
+                fs::write(&save, bytes).expect("writing the fixture save");
+                None
             }
         };
 
@@ -695,7 +747,7 @@ impl Game {
             .unwrap_or_else(|e| panic!("{what}: the game left no save behind ({e})"));
         let owed = owed_by(&contents);
         match self.phase {
-            Phase::Play | Phase::Lively => {}
+            Phase::Play | Phase::Lively | Phase::BadByte | Phase::Unparseable => {}
             Phase::Waking => {
                 let fixture = self.fixture.as_ref().unwrap();
                 assert!(
@@ -2139,5 +2191,74 @@ fn a_burst_of_wheel_reports_does_not_hold_back_the_key_behind_it() {
          list ({} cursor draws away from the first row), so the key behind the burst waited for a \
          later frame",
         drawn_elsewhere.len()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-012 — a damaged save is set aside, the player told, a new game started
+// ---------------------------------------------------------------------------
+
+/// The whole of it on a real terminal: the damaged file moved aside with every
+/// byte as it was, the player told where, a new meadow opened, and that meadow's
+/// own save leaving the old one alone.
+fn expect_it_set_aside_and_started_anew(phase: Phase, original: &[u8], what: &str) {
+    let mut game = Game::launch(
+        "damaged",
+        phase,
+        Terminal::Controlling,
+        Frames::ToTheTerminal,
+        Parting::ToAFile,
+    );
+    let moved = game.save_path().with_file_name("save.json.broken");
+    assert_eq!(
+        fs::read(&moved).unwrap_or_else(|e| panic!("{what}: nothing at {moved:?} ({e})")),
+        original,
+        "{what}: every byte set aside as it was"
+    );
+    let said = game.stderr();
+    assert!(
+        said.contains(&moved.display().to_string()),
+        "{what}: the player is told where it went, and was told: {said}"
+    );
+    game.press(b"q");
+    game.expect_a_clean_ending(what);
+
+    let fresh = fs::read_to_string(game.save_path())
+        .unwrap_or_else(|e| panic!("{what}: the new meadow left no save ({e})"));
+    let fresh = clowder_core::begin_load(&fresh, 0)
+        .unwrap_or_else(|_| panic!("{what}: the new meadow's save loads"))
+        .set_down()
+        .state;
+    let new_game = clowder_core::GameState::new(0);
+    assert_eq!(
+        fresh.structures, new_game.structures,
+        "{what}: the meadow that opened is a new one"
+    );
+    assert_eq!(
+        fs::read(&moved).unwrap(),
+        original,
+        "{what}: and its save left the old one alone"
+    );
+}
+
+/// A bad byte inside a string is the case a lossy decode lets through: the file
+/// parses, and the next autosave writes over the only copy of what the byte was.
+/// @spec TUI-RUN-012
+#[test]
+fn a_save_holding_an_undecodable_byte_is_set_aside_and_a_new_game_starts() {
+    expect_it_set_aside_and_started_anew(
+        Phase::BadByte,
+        &save_with_a_bad_byte(),
+        "a save with an undecodable byte",
+    );
+}
+
+/// @spec TUI-RUN-012
+#[test]
+fn an_unparseable_save_is_set_aside_and_a_new_game_starts() {
+    expect_it_set_aside_and_started_anew(
+        Phase::Unparseable,
+        NOT_A_SAVE,
+        "a save that is not a save",
     );
 }

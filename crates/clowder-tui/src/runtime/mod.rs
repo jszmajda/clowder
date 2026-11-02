@@ -99,11 +99,7 @@ pub fn run() -> ExitCode {
     // destroy a save whose contents were never even seen. Unreadable is not
     // unparseable: if we could not read it, we do not touch it.
     let contents = match std::fs::read(&save_path) {
-        // Bytes we could read but not decode are *corrupt*, not unreadable —
-        // the contents are known, which is the case the rescue policy exists
-        // for. Refusing here would leave the player hard-stuck on exactly the
-        // damage TUI-RUN-012 promises to preserve.
-        Ok(bytes) => Some(String::from_utf8_lossy(&bytes).into_owned()),
+        Ok(bytes) => Some(bytes),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
         Err(e) => {
             eprintln!(
@@ -123,7 +119,16 @@ pub fn run() -> ExitCode {
     let startup = match contents {
         // TUI-RUN-010: an ordinary first run, not an error.
         None => Startup::NewGame(GameState::new(load_now_unix)),
-        Some(c) => match clowder_core::begin_load(&c, load_now_unix) {
+        // Bytes we could read but not decode are *corrupt*, not unreadable: the
+        // contents are known, which is the case the rescue policy exists for.
+        // A lossy decode would let such a file parse, and the next autosave
+        // would write over the only copy of what the byte was. @spec TUI-RUN-012
+        Some(bytes) => match String::from_utf8(bytes)
+            .map_err(|e| clowder_core::LoadError::Corrupt {
+                detail: e.to_string(),
+            })
+            .and_then(|text| clowder_core::begin_load(&text, load_now_unix))
+        {
             Ok(catch_up) => Startup::Loaded(Box::new(catch_up)),
             // TUI-RUN-011: never guess forward over a save that is currently fine.
             Err(clowder_core::LoadError::TooNew { found }) => {
@@ -165,6 +170,14 @@ pub fn run() -> ExitCode {
             }
         },
     };
+
+    // Said before the handover, as what follows is, so it stays on the player's
+    // own scrollback. @spec TUI-RUN-005
+    if let Some(notice) =
+        persist::fallback_notice(clowder_core::default_save_path().is_some(), &save_path)
+    {
+        eprintln!("{notice}");
+    }
 
     // Said before the handover, so it survives on the player's own scrollback
     // instead of being wiped with the alternate screen. Rendering is unchanged

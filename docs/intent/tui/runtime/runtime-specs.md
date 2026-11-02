@@ -10,7 +10,7 @@
 - [x] **TUI-RUN-061**: The system shall turn mouse reporting off by writing `CSI ? 1006 l` then `CSI ? 1000 l`, before leaving the alternate screen and raw mode, on every exit path on which it restores them (TUI-RUN-002) — normal quit, error return, panic (before the panic message, TUI-RUN-003), and termination signal — and as part of the restoration attempted once over a lost terminal (TUI-RUN-052), so the shell the terminal returns to is sent no mouse report; it shall turn off no mouse mode it did not turn on.
 - [x] **TUI-RUN-062**: Where entering the terminal fails partway — raw mode, the alternate screen, or mouse reporting — the system shall turn off mouse reporting, leave the alternate screen, and undo raw mode before reporting the failure on the ordinary terminal and refusing to start.
 - [x] **TUI-RUN-063**: The system shall keep mouse reporting on from startup until shutdown, waking included, offering no key, launch option, or stored setting that turns it off while the game runs.
-- [ ] **TUI-RUN-005**: Where no platform data directory resolves, the system shall fall back to a save path beside the working directory and, before it takes the terminal, state where the save landed, rather than refusing to start.
+- [x] **TUI-RUN-005**: Where no platform data directory resolves, the system shall fall back to a save path beside the working directory and, before it takes the terminal, state where the save landed, rather than refusing to start.
 
 ## One Session Per Save
 
@@ -28,7 +28,7 @@
 
 - [x] **TUI-RUN-010**: When no save file exists, the system shall start a new game without reporting an error.
 - [x] **TUI-RUN-011**: When the save was written by a newer version, the system shall refuse to start and explain plainly, and shall not modify or overwrite the file.
-- [ ] **TUI-RUN-012**: When the save file is present but unparseable, or holds bytes that are not valid UTF-8 whether or not the rest would parse, the system shall move it aside under a suffixed name, tell the player where it went, and then start a new game; it shall never overwrite such a file in place.
+- [x] **TUI-RUN-012**: When the save file is present but unparseable, or holds bytes that are not valid UTF-8 whether or not the rest would parse, the system shall move it aside under a suffixed name, tell the player where it went, and then start a new game; it shall never overwrite such a file in place.
 - [x] **TUI-RUN-013**: When the save file cannot be read at all — a permission error, a path that is not a file, or an I/O failure — the system shall stop with a plain explanation and leave the file untouched.
 
 ## The Event Loop

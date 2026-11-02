@@ -48,7 +48,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use clowder_core::GameState;
 
 use runtime::clock::Reading;
-use runtime::persist::{resolve_save_path, set_aside};
+use runtime::persist::{fallback_notice, resolve_save_path, save_path_given, set_aside};
 use runtime::{App, TickAccumulator};
 
 // ---------------------------------------------------------------------------
@@ -161,9 +161,9 @@ const UNPARSEABLE: &[u8] = b"{ \"save_version\": 3, \"state\": { oops I edited t
 ///
 /// The fallback arm cannot be *forced* on a normal host — `default_save_path`
 /// resolves through `dirs_sys::home_dir`, which falls back to `getpwuid` when
-/// `HOME` is unset, so there is no environment a test can construct in-process
-/// that makes it `None`. See the open question about giving `resolve_save_path`
-/// an injectable input.
+/// `HOME` is unset, so there is no environment a test can construct that makes
+/// it `None`. `save_path_given` is that arm with its inputs handed in, and the
+/// tests below hold it.
 ///
 /// @spec TUI-RUN-005
 #[test]
@@ -185,6 +185,42 @@ fn the_save_path_follows_the_platform_data_directory_or_falls_back_beside_the_cw
             );
         }
     }
+}
+
+/// With nothing from the platform, the save sits beside the working directory,
+/// named so the player can be told where it is.
+/// @spec TUI-RUN-005
+#[test]
+fn with_no_platform_directory_the_save_falls_back_beside_the_working_directory() {
+    let dir = PathBuf::from("/somewhere/the/game/was/started");
+    let path = save_path_given(None, Some(dir.clone()));
+    assert_eq!(path.parent(), Some(dir.as_path()));
+    assert!(path.file_name().is_some(), "it names a file: {path:?}");
+}
+
+/// What the platform offers always wins over the working directory.
+/// @spec TUI-RUN-005
+#[test]
+fn a_platform_directory_wins_over_the_working_directory() {
+    let platform = PathBuf::from("/data/clowder/save.json");
+    assert_eq!(
+        save_path_given(Some(platform.clone()), Some(PathBuf::from("/elsewhere"))),
+        platform
+    );
+}
+
+/// A fallback is stated, naming the whole path, and a platform's home for the save
+/// is not worth a word.
+/// @spec TUI-RUN-005
+#[test]
+fn a_fallback_is_stated_with_its_whole_path_and_a_platform_home_is_not() {
+    let path = save_path_given(None, Some(PathBuf::from("/somewhere/started")));
+    let said = fallback_notice(false, &path).expect("a fallback is stated");
+    assert!(
+        said.contains(&path.display().to_string()),
+        "the player is told where it landed, and was told: {said}"
+    );
+    assert_eq!(fallback_notice(true, &path), None);
 }
 
 /// Startup loads from this path and every later autosave writes to it. A path
