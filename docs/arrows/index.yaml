@@ -226,11 +226,11 @@ arrows:
     parent: tui
     sampled: 2026-11-02
     audited: 2026-11-02
-    audited_sha: fbf98a4799fb9d15059cbd4cd96ec67ffd8e49b2
+    audited_sha: eb0b94ddad3fc7061a894159fb6146e7ade3e8fd
     blocks: [render]
     blockedBy: [navigation, persistence]
     detail: tui/runtime/runtime.md
-    next: "#26, #27, #28, #29: the lock, a resume, a damaged save, thin tests"
+    next: "#27, #28, #29: a resume, a damaged save, thin tests"
     drift: null
   theme:
     status: PARTIAL

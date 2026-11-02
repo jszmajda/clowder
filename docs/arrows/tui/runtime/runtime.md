@@ -4,7 +4,7 @@ This leaf owns the boundary between the operating system and the pure core: term
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-02 (commit `fbf98a4799fb`). 50 of 50 active specs implemented, each cited by a test; 7 deferred.
+**PARTIAL** — last audited 2026-11-02 (commit `eb0b94ddad3f`). 55 of 55 active specs implemented, each cited by a test; 6 deferred.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns the boundary between the operating system and the pure core: term
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/runtime/runtime-specs.md` — 57 specs, prefix `TUI-RUN`
+- `docs/intent/tui/runtime/runtime-specs.md` — 61 specs, prefix `TUI-RUN`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/clock.rs`
@@ -44,17 +44,18 @@ This leaf owns the boundary between the operating system and the pure core: term
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-RUN-001 – TUI-RUN-068 | 50 | 7 | 0 |
+| All | TUI-RUN-001 – TUI-RUN-072 | 55 | 6 | 0 |
 
-**Summary:** 50 of 50 active specs implemented; 7 deferred.
+**Summary:** 55 of 55 active specs implemented; 6 deferred.
 
 ## Key Findings
 
 Audited 2026-11-01. First full audit: every spec read against its code, its tests, and the design by a reader given only the arrow artifacts, its most serious findings then checked by hand. It found a lock that can be cleared under a live holder, time away going uncounted around a resume, a damaged save that can be overwritten, and a suspend tolerance in the design that the spec and code deny (corrected). Issue #10 routed every monotonic read through one holdable function (TUI-RUN-066, TUI-RUN-067). Specs 001 to 004, 010, 011, 013, 017, 060 to 063, and 065 were read more lightly than the rest. A frame of play waits one tick at normal speed (TUI-RUN-068, #24): on one save copy in a 120×40 pane with no keys pressed, about 5.3% of a core became about 1.6%, with keys answered as quickly as before. The design records why a redraw-on-change check was not taken.
 
+Audited 2026-11-02, for what issue #26 changed. A holder now reads as running from any time zone, since start times are recorded and compared in UTC, with a lock recorded in local time still counting in its own zone (TUI-RUN-069, TUI-RUN-070). A session releases only a lock that still names it (TUI-RUN-071), and a lock that cannot be removed stops the launch (TUI-RUN-072). The zone and read-only cases run the built game as a child. The audit moved two annotations off the types they sat on, onto what decides (TUI-RUN-006, TUI-RUN-007), added one where the refusal is worded, and cited TUI-RUN-063 on what turns mouse reporting on, which had none. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
 ## Work Required
 
-- #26: a session's lock can be cleared while its holder runs (TUI-RUN-007, deferred).
 - #27: time away uncounted or mispriced around a resume (TUI-RUN-022, TUI-RUN-024, TUI-RUN-036, deferred).
 - #28: a damaged save can be overwritten; a fallback path unstated (TUI-RUN-005, TUI-RUN-012, deferred).
 - #29: thin tests, stray annotations, and open questions.
