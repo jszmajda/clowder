@@ -15,6 +15,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 
 ### Fixed
 
+- **A structure that was missed now takes the same bonuses as its neighbours.** It sat outside a production channel the others in its family all use.
 - **The header's season always matches the rest of the screen.** At wide widths its word could disagree with the colours beside it.
 - **The info pane no longer repeats a confirmation.** At wide widths, a summary the list already shows was drawn a second time beside it.
 - **A store named in one more sentence wears its colours.**

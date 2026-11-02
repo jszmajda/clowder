@@ -1084,7 +1084,7 @@ fn reaching_year_forty_thousand_with_the_loom_lights_the_distant_dawn() {
 // SIM-MOVE-004 — cosmic/dreamtime legacies across the Great Meadow Move
 // =====================================================================
 
-// @spec SIM-MOVE-004
+// @spec SIM-MOVE-004, SIM-SKY-003
 #[test]
 fn a_move_keeps_the_cosmic_dreamtime_legacies_and_resets_the_rest() {
     let mut s = meadow_with(551, 71);
@@ -1414,4 +1414,192 @@ fn the_deep_cushion_discount_multiplies_with_long_slumbers() {
     let discount =
         (1.0 - content::LONG_SLUMBER_COST_DISCOUNT) * (1.0 - content::DEEP_CUSHION_COST_DISCOUNT);
     assert_eq!(s.starshard_cost(50), (raw * discount).ceil());
+}
+
+// =====================================================================
+// SIM-SKY-002, SIM-SKY-004, SIM-SKY-009, SIM-SKY-010 — the site table, row by row
+// =====================================================================
+
+/// Each site's mission fuel, as the cosmic design's table heads it.
+// @spec SIM-SKY-002
+#[test]
+fn every_site_asks_the_fuel_its_row_states() {
+    use ResourceId::{
+        Balloons, Cometsilk, Curiosity, Dreamweave, Echoes, JarsOfPurrs, Moonmilk, Skymaps,
+    };
+    let rows: [(SiteId, &[(ResourceId, f64)]); 13] = [
+        (SiteId::FenceTop, &[(Curiosity, 5000.0), (Skymaps, 50.0)]),
+        (SiteId::OldOak, &[(Curiosity, 25000.0), (Skymaps, 200.0)]),
+        (
+            SiteId::Rooftops,
+            &[(Moonmilk, 50.0), (Skymaps, 500.0), (Balloons, 2.0)],
+        ),
+        (
+            SiteId::SunnyHill,
+            &[(Moonmilk, 150.0), (Skymaps, 2000.0), (Balloons, 5.0)],
+        ),
+        (SiteId::MeadowsEdge, &[(Moonmilk, 400.0), (Cometsilk, 25.0)]),
+        (SiteId::TheBrook, &[(Moonmilk, 1000.0), (Cometsilk, 75.0)]),
+        (SiteId::WhisperingWoods, &[(Cometsilk, 60.0), (Echoes, 5.0)]),
+        (SiteId::TheFoothills, &[(Cometsilk, 200.0), (Echoes, 25.0)]),
+        (
+            SiteId::CloudNine,
+            &[(Cometsilk, 500.0), (Echoes, 100.0), (Balloons, 20.0)],
+        ),
+        (
+            SiteId::TheAurora,
+            &[(JarsOfPurrs, 5.0), (Echoes, 250.0), (Dreamweave, 5.0)],
+        ),
+        (
+            SiteId::TheMilkyWay,
+            &[(JarsOfPurrs, 25.0), (Echoes, 1000.0), (Dreamweave, 15.0)],
+        ),
+        (
+            SiteId::TheFarShore,
+            &[(JarsOfPurrs, 100.0), (Echoes, 4000.0), (Dreamweave, 40.0)],
+        ),
+        (
+            SiteId::TheFurthestStar,
+            &[(JarsOfPurrs, 500.0), (Echoes, 16000.0), (Dreamweave, 100.0)],
+        ),
+    ];
+    for (site, fuel) in rows {
+        let held = content::site_def(site).mission_fuel;
+        for (r, amount) in fuel {
+            assert!(
+                fuel_has(held, *r, *amount),
+                "{site:?} asks {amount} {r:?}: {held:?}"
+            );
+        }
+    }
+}
+
+/// Every outpost routes its output through the outdoor channel.
+// @spec SIM-SKY-004
+#[test]
+fn every_outpost_stands_in_the_outdoor_channel() {
+    for s in &StructureId::ALL[40..53] {
+        assert!(content::structure_def(*s).outdoor, "{s:?}");
+    }
+}
+
+/// What the site table states for each outpost, row by row.
+// @spec SIM-SKY-009, SIM-SKY-010
+#[test]
+fn every_outpost_holds_what_the_site_table_states() {
+    use ResourceId::{Catnip, Echoes, Hushfelt, JarsOfPurrs, Prisms, Skymaps, Unicorns};
+    use StructureId as S;
+    let rate = |s: S, r: ResourceId| -> f64 {
+        content::structure_def(s)
+            .productions
+            .iter()
+            .find(|(x, _)| *x == r)
+            .map_or(0.0, |(_, v)| *v)
+    };
+    let room = |s: S, r: ResourceId| -> f64 {
+        content::structure_def(s)
+            .cap_bonuses
+            .iter()
+            .find(|(x, _)| *x == r)
+            .map_or(0.0, |(_, v)| *v)
+    };
+    let d = content::structure_def;
+
+    assert_eq!(rate(S::LookoutPost, Skymaps), 0.02);
+    assert_eq!(room(S::LookoutPost, Skymaps), 500.0);
+
+    assert_eq!(d(S::Treehouse).housing, 5);
+    assert!(rate(S::Treehouse, Catnip) > 0.0);
+
+    assert_eq!(rate(S::WeatherVane, Skymaps), 0.05);
+    assert_eq!(room(S::WeatherVane, Skymaps), 2000.0);
+    assert_eq!(d(S::WeatherVane).energy_cons, 1.0);
+
+    assert_eq!(d(S::SolarArray).energy_prod, 12.0);
+    assert!(d(S::SolarArray).energy_seasonal);
+
+    assert_eq!(d(S::RangerStation).outdoor_ratio, 0.08);
+    assert_eq!(d(S::RangerStation).energy_cons, 2.0);
+
+    assert!(rate(S::HushfeltGrotto, Hushfelt) > 0.0);
+    assert!(room(S::HushfeltGrotto, Hushfelt) > 0.0);
+    assert_eq!(d(S::HushfeltGrotto).energy_prod, 4.0);
+
+    assert!(rate(S::WhisperPost, Hushfelt) > 0.0);
+    assert!(rate(S::WhisperPost, Echoes) > 0.0);
+    assert!(room(S::WhisperPost, Hushfelt) > 0.0);
+    assert_eq!(d(S::WhisperPost).energy_cons, 2.0);
+
+    assert_eq!(d(S::CairnCircle).outdoor_ratio, 0.12);
+
+    assert_eq!(rate(S::SkyDock, Skymaps), 0.2);
+    assert_eq!(room(S::SkyDock, Skymaps), 20000.0);
+    assert_eq!(d(S::SkyDock).energy_cons, 5.0);
+
+    assert_eq!(d(S::AuroraLantern).outdoor_ratio, 0.25);
+    assert_eq!(d(S::AuroraLantern).long_sun_cap, 2.0);
+    assert_eq!(room(S::AuroraLantern, JarsOfPurrs), 50.0);
+    assert_eq!(d(S::AuroraLantern).energy_cons, 10.0);
+
+    assert!(rate(S::StarNursery, Unicorns) > 0.0);
+    assert!(rate(S::StarNursery, Prisms) > 0.0);
+    assert_eq!(room(S::StarNursery, JarsOfPurrs), 100.0);
+    assert_eq!(d(S::StarNursery).energy_cons, 10.0);
+
+    assert_eq!(d(S::FarBeacon).outdoor_ratio, 0.50);
+    assert_eq!(room(S::FarBeacon, JarsOfPurrs), 500.0);
+    assert_eq!(d(S::FarBeacon).energy_cons, 20.0);
+
+    assert_eq!(d(S::WishingStar).outdoor_ratio, 2.0);
+    assert!(d(S::WishingStar).global_ratio > 0.0);
+    assert_eq!(d(S::WishingStar).energy_cons, 40.0);
+
+    // Only the Aurora Lantern carries a flat Long Sun extension.
+    for s in StructureId::ALL {
+        if s != S::AuroraLantern {
+            assert_eq!(d(s).long_sun_cap, 0.0, "{s:?}");
+        }
+    }
+}
+
+/// A fed whale trades better: the same exchange brings home more at higher
+/// contentment.
+// @spec SIM-SKY-007
+#[test]
+fn a_contented_whale_trades_for_more() {
+    let trade = |contentment: u32| -> f64 {
+        let mut s = meadow_with(811, 1);
+        s.whale_visit_years = 5;
+        s.whale_contentment = contentment;
+        give(&mut s, ResourceId::Hushfelt, 1.0e6);
+        let before = s.stock(ResourceId::Starshards);
+        s.apply(Command::Trade(ColonyId::StarWhales, 1))
+            .expect("the whale trades while it visits");
+        s.stock(ResourceId::Starshards) - before
+    };
+    assert!(trade(0) > 0.0, "fixture: the exchange brings starshards");
+    assert!(trade(5) > trade(0), "contentment improves the trade");
+}
+
+/// A whale fed nothing departs when its visit ends, with nothing taken.
+// @spec SIM-SKY-007
+#[test]
+fn an_unfed_whale_simply_leaves_and_takes_nothing() {
+    let mut s = meadow_with(812, 1);
+    s.whale_visit_years = 1;
+    let before = s.resources;
+    let mut last = s.whale_visit_years;
+    for _ in 0..(content::DAYS_PER_YEAR * content::TICKS_PER_DAY * 2) {
+        s.tick();
+        assert!(s.whale_visit_years <= last, "a visit only runs down");
+        last = s.whale_visit_years;
+    }
+    assert_eq!(s.whale_visit_years, 0, "the visit ended");
+    for r in [
+        ResourceId::Dreamcorns,
+        ResourceId::Hushfelt,
+        ResourceId::Skymaps,
+    ] {
+        assert!(s.stock(r) >= before[r.ix()], "{r:?} wasn't taken");
+    }
 }

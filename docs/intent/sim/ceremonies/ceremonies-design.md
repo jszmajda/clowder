@@ -29,7 +29,7 @@ The ceremonies' production bonus, applied multiplicatively at production-stack l
 long_sun = limited_dr( unlimited_dr(devotion, 1000) / 100 , cap )
 ```
 
-`cap = 10` (a +1000% ceiling) base, extended by Enlightenment content (Black-Obelisk analog: **Sunstones**, +0.05 per tier per Sunstone, a field of the structure's definition). The Long Sun is why devotion matters: it turns accumulated quiet gratitude into the meadow's brightest multiplier.
+`cap = 10` (a +1000% ceiling) base, extended by Enlightenment content (Black-Obelisk analog: **Sunstones**, +0.05 per tier per Sunstone, a field of the structure's definition), and by a flat extension other leaves feed through the effect stack (cosmic leaf: the Aurora Lantern; adventures leaf: the Silent Sun's reward). The Long Sun is why devotion matters: it turns accumulated quiet gratitude into the meadow's brightest multiplier.
 
 ## Sunbeam Rites
 

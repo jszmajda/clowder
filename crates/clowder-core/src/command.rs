@@ -86,11 +86,11 @@ pub enum Command {
     /// Arm (or, with None, disarm) an Adventure for the next Move. @spec SIM-ADV-001
     DeclareAdventure(Option<AdventureId>),
     // ---- Wave 6: cosmic (SIM-SKY) / dreamtime (SIM-DREAM) ----
-    /// Reach the next cosmic site, spending its mission fuel. @spec SIM-SKY-001
+    /// Reach the next cosmic site, spending its mission fuel.
     LaunchExpedition(SiteId),
-    /// Call a Star Whale to visit (Sky Dock + Skyward Song). @spec SIM-SKY-006
+    /// Call a Star Whale to visit (Sky Dock + Skyward Song).
     SummonStarWhale,
-    /// Feed the visiting whale a dreamcorn lullaby. @spec SIM-SKY-007
+    /// Feed the visiting whale a dreamcorn lullaby.
     FeedWhale,
     /// Skip the meadow forward `years` game-years. @spec SIM-DREAM-001
     DeepNap(u32),

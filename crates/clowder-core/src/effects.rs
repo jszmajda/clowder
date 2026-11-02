@@ -106,9 +106,9 @@ pub enum Effect {
     SeasonResourceRatio(Season, ResourceId),
     // ---- Wave 6 (cosmic / dreamtime) ----
     /// +% on the outdoor production channel (Ranger Station, Cairn Circle,
-    /// Aurora Lantern, Far Beacon, Wishing Star). @spec SIM-SKY-004
+    /// Aurora Lantern, Far Beacon, Wishing Star).
     OutdoorProductionRatio,
-    /// Flat Long Sun cap extension (Aurora Lantern). @spec SIM-SKY-005
+    /// Flat Long Sun cap extension (Aurora Lantern).
     LongSunCapBonus,
     /// Per-season déjà-vu day chance (Memory Chests + the Dream Catcher loom).
     /// @spec SIM-DREAM-004
@@ -232,7 +232,7 @@ impl GameState {
                     sum += value;
                 }
                 // ---- Wave 6: cosmic outposts ----
-                // @spec SIM-SKY-004, SIM-SKY-005
+                // @spec SIM-SKY-004, SIM-SKY-009
                 Effect::OutdoorProductionRatio => sum += def.outdoor_ratio * count,
                 Effect::LongSunCapBonus => sum += def.long_sun_cap * count,
                 // @spec SIM-DREAM-004, SIM-DREAM-013

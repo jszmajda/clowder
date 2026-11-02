@@ -468,12 +468,12 @@ pub struct StructureDef {
     pub sky_auto_observe: f64,
     pub gate: StructureGate,
     /// A cosmic outpost: its raw material output routes through the outdoor
-    /// channel (the global layers at a reduced transfer). @spec SIM-SKY-004
+    /// channel (the global layers at a reduced transfer).
     pub outdoor: bool,
     /// Per-copy outdoor-production ratio contribution (Ranger Station, Cairn
-    /// Circle, Aurora Lantern, Far Beacon, Wishing Star). @spec SIM-SKY-004
+    /// Circle, Aurora Lantern, Far Beacon, Wishing Star).
     pub outdoor_ratio: f64,
-    /// Per-copy Long Sun cap extension (Aurora Lantern). @spec SIM-SKY-005
+    /// Per-copy Long Sun cap extension (Aurora Lantern).
     pub long_sun_cap: f64,
     /// Tinkerer seats per copy (Toy Workshop). @spec SIM-ECO-045
     pub tinkerer_seats: u32,
@@ -1024,6 +1024,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         productions: &[(ResourceId::Skymaps, 0.02)],
         cap_bonuses: &[(ResourceId::Skymaps, 500.0)],
         gate: StructureGate::Site(SiteId::FenceTop),
+        outdoor: true,
         ..BLD
     },
     // 41: Treehouse — houses 5; outdoor catnip.
@@ -4481,7 +4482,7 @@ static ADVENTURES: [AdventureDef; 7] = [
     // SilentSun: Move with a Memory Chest built → +10% Long Sun effectiveness
     // and +cap (cap ×4). The reward raises the Long Sun cap through the real
     // LongSunCapBonus key (the "+cap" half; the effectiveness half rides the
-    // same raised cap). @spec SIM-ADV-005, SIM-SKY-005
+    // same raised cap). @spec SIM-ADV-005
     AdventureDef {
         reward_per: 0.10,
         reward_cap: 0.4,

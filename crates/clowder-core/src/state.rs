@@ -250,7 +250,7 @@ pub enum StructureGate {
 
 /// The thirteen cosmic expedition sites, in ladder order (a site is reachable
 /// only once its predecessor is reached). Copy + Ord so a `BTreeSet<SiteId>`
-/// records reached sites in canonical order. @spec SIM-SKY-002
+/// records reached sites in canonical order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SiteId {
     FenceTop,
@@ -1589,7 +1589,7 @@ pub struct GameState {
     /// @spec SIM-SKY-006
     #[serde(default)]
     pub whale_visit_years: u32,
-    /// The visiting whale's contentment, raised by feeding. @spec SIM-SKY-007
+    /// The visiting whale's contentment, raised by feeding.
     #[serde(default)]
     pub whale_contentment: u32,
     /// Tick until which a déjà-vu day pauses production and consumption.
@@ -2023,13 +2023,12 @@ impl GameState {
     /// The Long Sun production bonus (layer 8), 0 without the Long Sun rite;
     /// else limited_dr(unlimited_dr(devotion, 1000) / 100, cap), where
     /// cap = 10 + each structure's cap per enlightenment tier × the tier × its
-    /// copies. @spec SIM-SUN-004
+    /// copies + the flat extension the effect stack holds. @spec SIM-SUN-004
     pub fn long_sun_bonus(&self) -> f64 {
         if !self.rites.contains(&RiteId::TheLongSun) {
             return 0.0;
         }
         let tier = self.enlightenment_tier as f64;
-        // Aurora Lanterns extend the Long Sun cap (+2 each). @spec SIM-SUN-004
         let cap = 10.0
             + self.structure_sum(|d| d.long_sun_tier_cap * tier)
             + self.effect(crate::effects::Effect::LongSunCapBonus);

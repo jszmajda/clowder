@@ -1615,7 +1615,7 @@ fn a_promise_needs_its_idea_a_free_slot_and_an_echo() {
     assert_eq!(s.stock(ResourceId::Echoes), 10.0 - spent);
 }
 
-// @spec SIM-SUN-004, SIM-SUN-010
+// @spec SIM-SUN-004, SIM-SUN-010, SIM-SKY-009
 #[test]
 fn each_copy_and_tier_widens_the_long_sun_cap() {
     let per_tier = content::structure_def(StructureId::Sunstone).long_sun_tier_cap;

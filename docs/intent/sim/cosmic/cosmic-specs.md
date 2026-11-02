@@ -15,6 +15,12 @@
 - [x] **SIM-SKY-005**: The system shall produce skymaps from Lookout Posts, Weather Vanes, and Sky Docks (in addition to the wave-2 Stargazing Ledge and sky events) and grant skymap storage (Lookout Post +500, Weather Vane +2000, Sky Dock +20000) so the mission ladder's skymap costs are holdable; and produce hushfelt from the Hushfelt Grotto and Whisper Post, each granting hushfelt storage so the Memory Chest (700 hushfelt) and Dreamweave become buildable.
 - [x] **SIM-SKY-008**: The system shall grant Jars-of-Purrs storage from the outer outposts (Aurora Lantern +50, Star Nursery +100, Far Beacon +500 each) so the Jar-priced sites and the Distant Dawn loom are reachable — the cap raiser the mystic leaf deferred to this wave.
 
+## The Outposts
+
+- [x] **SIM-SKY-009**: The system shall extend the Long Sun cap (SIM-SUN-004) by 2 per copy of the Aurora Lantern.
+- [x] **SIM-SKY-010**: The system shall give each site's outpost the housing, productions, storage, outdoor ratio, energy, and global bonus the cosmic design's site table states for it.
+- [D] **SIM-SKY-011**: The system shall grow every storage cap by 10% per copy of the Far Beacon. Deferred to #25: no structure field or rule gives this bonus yet.
+
 ## The Star Whale
 
 - [x] **SIM-SKY-006**: When SummonStarWhale is applied after the Sky Dock is built and the Skyward Song idea is researched, with its curiosity + echo cost affordable, the system shall spend the cost and begin a Star Whale visit lasting 5 years plus 1 per contentment point; before those prerequisites it rejects with Locked.

@@ -21,11 +21,11 @@ One structure per site (the site's outpost), appended to the economy StructureId
 |---|---|---|---|
 | 0 | **Fence Top** | 5000 curiosity, 50 skymaps | Lookout Post (40) — +0.02 skymap/t; +500 skymap cap |
 | 1 | **Old Oak** | 25000 curiosity, 200 skymaps | Treehouse (41) — houses 5; +outdoor catnip/t |
-| 2 | **Rooftops** | 50 moonmilk, 500 skymaps, 2 balloons | Weather Vane (42) — +0.05 skymap/t; +2000 skymap cap; forecast; energy −1 |
+| 2 | **Rooftops** | 50 moonmilk, 500 skymaps, 2 balloons | Weather Vane (42) — +0.05 skymap/t; +2000 skymap cap; energy −1 |
 | 3 | **Sunny Hill** | 150 moonmilk, 2000 skymaps, 5 balloons | Solar Array (43) — energy +12 (seasonal) |
 | 4 | **Meadow's Edge** | 400 moonmilk, 25 cometsilk | Ranger Station (44) — outdoor production +8%/bld; energy −2 |
 | 5 | **The Brook** | 1000 moonmilk, 75 cometsilk | Hushfelt Grotto (45) — +hushfelt/t; +hushfelt cap; energy +4 |
-| 6 | **Whispering Woods** | 60 cometsilk, 5 echoes | Whisper Post (46) — +hushfelt/t; +echo/t trickle; energy −2 |
+| 6 | **Whispering Woods** | 60 cometsilk, 5 echoes | Whisper Post (46) — +hushfelt/t; +echo/t trickle; +hushfelt cap; energy −2 |
 | 7 | **The Foothills** | 200 cometsilk, 25 echoes | Cairn Circle (47) — outdoor production +12%/bld |
 | 8 | **Cloud Nine** | 500 cometsilk, 100 echoes, 20 balloons | Sky Dock (48) — +0.2 skymap/t; +20000 skymap cap; enables the Star Whale summon; energy −5 |
 | 9 | **The Aurora** | 5 Jars of Purrs, 250 echoes, 5 dreamweave | Aurora Lantern (49) — outdoor +25%/bld; +2 Long Sun cap each; +50 Jar cap; energy −10 |
@@ -63,6 +63,7 @@ Sky Dock (site 8) enables the **Skyward Song** ritual (`SummonStarWhale`, curios
 ### Deferred
 1. A per-site flavor-event pool (the lookout sees a shooting star) — a shell-era delight.
 2. Whether the Furthest Star unlocks a capstone Adventure or Tradition — decided after play.
+3. The Far Beacon's storage bonus (SIM-SKY-011, #25). The table states it, and no structure field or rule gives it yet.
 
 ## References
 

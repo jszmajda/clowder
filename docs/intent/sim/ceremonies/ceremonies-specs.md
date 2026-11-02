@@ -8,7 +8,7 @@
 
 ## The Long Sun
 
-- [x] **SIM-SUN-004**: While the Long Sun rite is bought, the system shall contribute a production multiplier of limited_dr(unlimited_dr(devotion, 1000) / 100, cap) at production-stack layer 8 to material flows only, where cap = 10 + the sum, over every structure, of its Long Sun cap per enlightenment tier (SIM-SUN-010) × enlightenment_tier × copies; before the rite the contribution is 1.0 (no bonus).
+- [x] **SIM-SUN-004**: While the Long Sun rite is bought, the system shall contribute a production multiplier of limited_dr(unlimited_dr(devotion, 1000) / 100, cap) at production-stack layer 8 to material flows only, where cap = 10 + the sum, over every structure, of its Long Sun cap per enlightenment tier (SIM-SUN-010) × enlightenment_tier × copies + the flat Long Sun cap extension the effect stack holds (SIM-SKY-009, SIM-ADV-005); before the rite the contribution is 1.0 (no bonus).
 - [x] **SIM-SUN-010**: The system shall give every structure definition the Long Sun cap each copy adds per enlightenment tier — 0.05 for the Sunstone and none for any other structure.
 
 ## Rites
