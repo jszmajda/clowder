@@ -28,7 +28,7 @@ pub enum Effect {
     HappinessPoints,
     /// Delta on the per-kitten luxury drain (Gift Stands ease it).
     LuxuryDemandRatio,
-    /// % cap extension applied to every cap (Personal Stashes).
+    /// % cap extension applied to every cap (Personal Stashes, Far Beacon).
     CapRatio,
     /// Craft output bonus on one recipe (Brassy/Alchemical Elders, bindings).
     CraftRatioFor(CraftId),
@@ -175,10 +175,21 @@ impl GameState {
                 | Effect::GlobalProductionRatio
                 | Effect::OutdoorProductionRatio
                 | Effect::LongSunCapBonus
+                | Effect::CapRatio
                 | Effect::DejaVuChance
         );
         for (ix, &raw_count) in self.structures.iter().enumerate() {
             if !structures_carry {
+                break;
+            }
+            // Every cap reads this key, every tick, and one structure alone sets
+            // its field (a table test holds that), so it takes that structure's
+            // share rather than scan for it: catch-up's bound has no room for
+            // the scan. @spec SIM-SKY-011
+            if let Effect::CapRatio = key {
+                let beacon = StructureId::FarBeacon;
+                sum +=
+                    content::structure_def(beacon).cap_ratio * self.structures[beacon.ix()] as f64;
                 break;
             }
             if raw_count == 0 {

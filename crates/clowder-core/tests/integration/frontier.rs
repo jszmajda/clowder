@@ -496,8 +496,10 @@ fn the_outer_outposts_raise_the_jar_cap_past_two() {
         let bare = GameState::new(515).cap(ResourceId::JarsOfPurrs);
         let mut s = GameState::new(515);
         grant(&mut s, st, 1);
+        // The extension takes whatever share of every cap the structure adds.
+        let term = 1.0 + s.effect(Effect::CapRatio);
         assert!(
-            (s.cap(ResourceId::JarsOfPurrs) - bare - bonus).abs() < 1e-6,
+            (s.cap(ResourceId::JarsOfPurrs) - (bare + bonus) * term).abs() < 1e-6,
             "{st:?} grants +{bonus} Jar storage"
         );
     }
@@ -1547,6 +1549,7 @@ fn every_outpost_holds_what_the_site_table_states() {
     assert_eq!(d(S::StarNursery).energy_cons, 10.0);
 
     assert_eq!(d(S::FarBeacon).outdoor_ratio, 0.50);
+    assert_eq!(d(S::FarBeacon).cap_ratio, 0.10);
     assert_eq!(room(S::FarBeacon, JarsOfPurrs), 500.0);
     assert_eq!(d(S::FarBeacon).energy_cons, 20.0);
 

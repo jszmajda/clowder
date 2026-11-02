@@ -322,8 +322,8 @@ fn every_tabled_effect_links_the_store_it_grows_or_shrinks() {
 }
 
 /// An effect on every store at once names none: the rule that grows every cap
-/// marks only what it costs, and a structure multiplying all production names
-/// no store for that.
+/// marks only what it costs, and a structure multiplying all production or
+/// growing every cap names no store for that.
 /// @spec SIM-ENG-081
 #[test]
 fn an_effect_on_every_store_names_none() {
@@ -358,6 +358,20 @@ fn an_effect_on_every_store_names_none() {
         }
     }
     assert!(seen > 0, "fixture: a structure multiplies all production");
+    let mut seen = 0;
+    for b in StructureId::ALL {
+        let d = content::structure_def(b);
+        if d.cap_ratio != 0.0 {
+            seen += 1;
+            for (r, l) in s.store_links(&Command::Build(b)) {
+                assert!(
+                    l == StoreLink::Lowers || d.cap_bonuses.iter().any(|(x, _)| *x == r),
+                    "{b:?} names {r:?}: {l:?}"
+                );
+            }
+        }
+    }
+    assert!(seen > 0, "fixture: a structure grows every cap");
 }
 
 /// A year-close craft links only the recipes it can run now, so a recipe not

@@ -475,6 +475,9 @@ pub struct StructureDef {
     pub outdoor_ratio: f64,
     /// Per-copy Long Sun cap extension (Aurora Lantern).
     pub long_sun_cap: f64,
+    /// Per-copy share added to the term every storage cap is multiplied by. Only
+    /// the Far Beacon sets it, and the effect sum reads it from there alone.
+    pub cap_ratio: f64,
     /// Tinkerer seats per copy (Toy Workshop). @spec SIM-ECO-045
     pub tinkerer_seats: u32,
 }
@@ -521,6 +524,7 @@ const BLD: StructureDef = StructureDef {
     outdoor: false,
     outdoor_ratio: 0.0,
     long_sun_cap: 0.0,
+    cap_ratio: 0.0,
     tinkerer_seats: 0,
 };
 
@@ -1133,7 +1137,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         outdoor: true,
         ..BLD
     },
-    // 51: Far Beacon — outdoor +50%/bld; +500 Jar cap; energy −20.
+    // 51: Far Beacon — outdoor +50%/bld; storage +10%/bld; +500 Jar cap; energy −20.
     StructureDef {
         name: "Far Beacon",
         base_costs: &[(ResourceId::Echoes, 500.0), (ResourceId::JarsOfPurrs, 10.0)],
@@ -1142,6 +1146,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         gate: StructureGate::Site(SiteId::TheFarShore),
         outdoor: true,
         outdoor_ratio: 0.50,
+        cap_ratio: 0.10,
         ..BLD
     },
     // 52: Wishing Star — the capstone: outdoor +200%; a large global bonus; energy −40.

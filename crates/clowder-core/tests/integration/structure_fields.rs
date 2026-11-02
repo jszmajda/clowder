@@ -83,6 +83,17 @@ fn only_the_sunstone_adds_long_sun_cap_per_enlightenment_tier() {
     );
 }
 
+/// The effect sum reads this field from the Far Beacon alone, rather than scan
+/// every structure each tick, so a second holder would have to change that read.
+/// @spec SIM-SKY-011
+#[test]
+fn only_the_far_beacon_grows_every_storage_cap() {
+    assert_eq!(
+        holders(|d| d.cap_ratio),
+        vec![(StructureId::FarBeacon, 0.10)]
+    );
+}
+
 /// @spec SIM-ENG-077
 #[test]
 fn only_the_stargazing_ledge_adds_to_a_days_sky_event() {
@@ -314,4 +325,106 @@ fn a_fuel_scaled_structures_figures_follow_the_throttle_of_its_inputs() {
         s.effect(Effect::GlobalProductionRatio),
         d.global_ratio * 2.0 * fraction
     );
+}
+
+/// Each copy's share joins the term every cap is multiplied by, whatever that
+/// cap is made of: its base alone, a flat extension, or the structure's own.
+/// @spec SIM-SKY-011
+#[test]
+fn each_copy_of_the_far_beacon_grows_every_storage_cap_by_its_share() {
+    let beacon = StructureId::FarBeacon;
+    let share = structure_def(beacon).cap_ratio;
+    assert!(share > 0.0, "fixture: the field is set");
+    let copies = 3;
+
+    let mut before = GameState::new(8);
+    grant(&mut before, StructureId::Pantry, 1);
+    let mut after = before.clone();
+    grant(&mut after, beacon, copies);
+
+    let term = 1.0 + share * copies as f64;
+    for r in ResourceId::ALL {
+        let flat = clowder_core::content::BASE_CAPS[r.ix()] + after.effect(Effect::MaxCap(r));
+        assert_eq!(after.cap(r), flat * term, "{r:?}");
+    }
+    // A base with a flat extension on it, and a base alone.
+    let catnip = before.cap(ResourceId::Catnip);
+    assert!(catnip > clowder_core::content::BASE_CAPS[ResourceId::Catnip.ix()]);
+    assert_eq!(after.cap(ResourceId::Catnip), catnip * term);
+    assert_eq!(
+        after.cap(ResourceId::Twigs),
+        before.cap(ResourceId::Twigs) * term
+    );
+    // The structure's own extension is grown with the rest.
+    let own = structure_def(beacon)
+        .cap_bonuses
+        .iter()
+        .find(|(r, _)| *r == ResourceId::JarsOfPurrs)
+        .unwrap()
+        .1;
+    assert_eq!(
+        after.cap(ResourceId::JarsOfPurrs),
+        (clowder_core::content::BASE_CAPS[ResourceId::JarsOfPurrs.ix()] + own * copies as f64)
+            * term
+    );
+}
+
+/// A percentage of nothing opens no gate, and a percentage of no limit sets none.
+/// @spec SIM-SKY-011
+#[test]
+fn the_far_beacons_share_leaves_zero_and_infinite_caps_as_they_are() {
+    let mut s = GameState::new(8);
+    grant(&mut s, StructureId::FarBeacon, 5);
+    assert!(
+        s.effect(Effect::CapRatio) > 0.0,
+        "fixture: the share counts"
+    );
+    assert_eq!(s.cap(ResourceId::Curiosity), 0.0);
+    assert!(s.cap(ResourceId::Feathers).is_infinite());
+}
+
+/// The share sums with the other cap-ratio effects: it does not compound on
+/// them, or on itself.
+/// @spec SIM-SKY-011
+#[test]
+fn the_far_beacons_share_sums_with_the_other_cap_ratio_effects() {
+    let beacon = StructureId::FarBeacon;
+    let share = structure_def(beacon).cap_ratio;
+    let rule = RuleId::PersonalStashes;
+    let other = clowder_core::content::rule_def(rule)
+        .effects
+        .iter()
+        .find(|(k, _)| matches!(k, Effect::CapRatio))
+        .unwrap()
+        .1;
+    let mut s = GameState::new(8);
+    grant(&mut s, beacon, 2);
+    s.rules.insert(rule);
+    assert_eq!(s.effect(Effect::CapRatio), share * 2.0 + other);
+    let base = clowder_core::content::BASE_CAPS[ResourceId::Twigs.ix()];
+    let summed = base * (1.0 + share * 2.0 + other);
+    let compounded = base * (1.0 + share).powi(2) * (1.0 + other);
+    assert!(share > 0.0 && (summed - compounded).abs() > 1e-6, "fixture");
+    assert!((s.cap(ResourceId::Twigs) - summed).abs() < 1e-9);
+}
+
+/// The wider cap is the one the clamp holds a stock to.
+/// @spec SIM-SKY-011
+#[test]
+fn a_stock_the_far_beacon_makes_room_for_stands_through_the_clamp() {
+    let r = ResourceId::Twigs;
+    let base = clowder_core::content::BASE_CAPS[r.ix()];
+    let over = base * (1.0 + structure_def(StructureId::FarBeacon).cap_ratio);
+    assert!(over > base, "fixture: the field is set");
+
+    let mut without = GameState::new(8);
+    without.resources[r.ix()] = over;
+    run_ticks(&mut without, 1);
+    assert_eq!(without.stock(r), base);
+
+    let mut with = GameState::new(8);
+    grant(&mut with, StructureId::FarBeacon, 1);
+    with.resources[r.ix()] = over;
+    run_ticks(&mut with, 1);
+    assert_eq!(with.stock(r), over);
 }

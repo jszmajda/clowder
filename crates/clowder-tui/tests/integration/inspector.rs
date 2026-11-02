@@ -1921,6 +1921,9 @@ fn structure_fields(s: StructureId) -> Vec<(String, Vec<String>)> {
     if d.long_sun_cap != 0.0 {
         out.push(("long sun extension".into(), vec![bare(d.long_sun_cap)]));
     }
+    if d.cap_ratio != 0.0 {
+        out.push(("share of every cap".into(), vec![percent(d.cap_ratio)]));
+    }
     if d.long_sun_tier_cap != 0.0 {
         out.push(("long sun per tier".into(), vec![bare(d.long_sun_tier_cap)]));
     }
@@ -2163,10 +2166,11 @@ fn a_structures_mess_is_stated_as_made_or_tidied_by_its_sign() {
 /// field departs from its baseline, on every structure the tables define.
 /// @spec TUI-NAV-181, TUI-NAV-182, TUI-NAV-183, TUI-NAV-184, TUI-NAV-185
 /// @spec TUI-NAV-186, TUI-NAV-187, TUI-NAV-189, TUI-NAV-191, TUI-NAV-196
+/// @spec TUI-NAV-203
 #[test]
 fn a_structures_rule_held_rates_are_stated_word_for_word_from_its_fields() {
     type Sentence = (fn(&tables::StructureDef) -> f64, fn(f64) -> String);
-    let sentences: [Sentence; 10] = [
+    let sentences: [Sentence; 11] = [
         (
             |d| d.parade_rainbows,
             |v| format!("Brings {} Rainbows per parade.", bare(v)),
@@ -2242,6 +2246,10 @@ fn a_structures_rule_held_rates_are_stated_word_for_word_from_its_fields() {
         (
             |d| d.trade_ratio,
             |v| format!("Raises trade yields by {}%.", percent(v)),
+        ),
+        (
+            |d| d.cap_ratio,
+            |v| format!("Raises every storage cap by {}%.", percent(v)),
         ),
     ];
     for (field, words) in sentences {
