@@ -7,14 +7,14 @@ prefix: SIM-TRADE
 
 ## Context and Design Philosophy
 
-Colonies are clowder's trade and diplomacy: eight neighbouring animal colonies the clowder sends caravans to, exchanging surplus for goods it can't make yet. This is the inspiration's race/trade/embassy system with the hostility removed — no colony is an enemy, a failed trade means the caravan found them napping (goods spent, sometimes a courtesy gift returned), and standing only ever warms. The leaf owns the colony table, standing/shyness, Pen Pals (embassies), Scout Picnics (exploration), seasonal trade rates, the kite-scaled goods, and the Star Whale visitor arc. It consumes pep (caravan cost) and trade goods, and contributes trade/standing effects through the effect-key system.
+Colonies are clowder's trade and diplomacy: eight neighbouring animal colonies the clowder sends caravans to, exchanging surplus for goods it can't make yet. This is the inspiration's race/trade/embassy system with the hostility removed — no colony is an enemy, a failed trade means the caravan found them napping (goods spent, sometimes a courtesy gift returned), and standing only ever warms. The leaf owns the colony table, standing/shyness, Pen Pals (embassies), Scout Picnics (exploration), seasonal trade rates, the kite-scaled goods, and the Star Whale's visitor slot. It consumes pep (caravan cost) and trade goods, and contributes trade/standing effects through the effect-key system.
 
 ## Trade
 
 `Trade(colony, count)` sends `count` caravans, each costing 50 pep + 15 shinies + the colony's buy-resource. Each caravan returns the colony's sell-basket:
 
 ```
-sold = base × (1 + trade_ratio effects) × (1 + season_bonus if in season) ± width fuzz
+sold = base × (1 + trade_ratio effects) × (1 + season_bonus if in season) ± up to 15% fuzz
 ```
 
 A caravan **succeeds** with probability based on standing (below); on a *nap* (failure) the pep/shinies/buy-resource are still spent (the caravan travelled) and a small courtesy gift may return. A bonus outcome (positive standing) yields ×1.25.
@@ -36,7 +36,7 @@ Buy → sell [amount @ base-chance, in-season]. Standings warm from their start 
 | 6 | **Owls** | −0.10 (shy) | mint ×50 | curiosity 2500 @ 100% (a scholarly colony) |
 | 7 | **Star Whales** | visitor (no Pen Pal) | — | see Star Whale arc |
 
-Foxes' moonstone (the inspiration's ship-scaled titanium): chance `0.15 + 0.0035 × Kites`, amount `(1.5 + 0.03 × Kites) × (1 + fox_standing_bonus)` — Kites (crafted) scale the pre-Kiln moonstone supply, making trade the early metal path (the economy leaf's cross-wave obligation).
+Foxes' moonstone (the inspiration's ship-scaled titanium): chance `0.15 + 0.0035 × Kites`, amount `(1.5 + 0.03 × Kites) × (1 + the Foxes' standing)` — Kites (crafted) scale the pre-Kiln moonstone supply, making trade the early metal path (the economy leaf's cross-wave obligation).
 
 ## What a Neighbour Has Shown You
 
@@ -46,11 +46,11 @@ What a colony offers, in full, is its sell basket in the table's order, then Fox
 
 ## Standing & Shyness
 
-`standing = start + Σ standing effects (Pen Pal levels, and any dedicated per-colony standing effects)`. The Charming Elder and Gift Stands raise the *trade ratio* (yield), not standing — distinct knobs. Below zero (shy): the colony can only warm to neutral, and each caravan has a nap chance proportional to −standing. At zero: neutral, base chances. Above zero (warm): a bonus-trade chance proportional to standing. A nap is never punished beyond the caravan's cost — colonies are shy, not hostile.
+`standing = start + Σ standing effects (Pen Pal levels, and any dedicated per-colony standing effects)`. The Charming Elder and Gift Stands raise the *trade ratio* (yield), not standing — distinct knobs. Below zero (shy): the colony can only warm to neutral, and each caravan has a nap chance proportional to −standing. At zero: neutral, base chances. Above zero (warm): a bonus-trade chance proportional to standing. A nap is never punished beyond the caravan's cost — colonies are shy, not hostile. A global standing ratio (prestige leaf: Good Neighbours) warms every colony: it multiplies the standing of one that starts at or above zero, and lifts a shy one by that share of how far it starts below zero, never past neutral.
 
 ## Pen Pals
 
-`SendPenPal(colony)` establishes or deepens a correspondence (the inspiration's embassies), charm-priced at `base × 1.15^level`. Each level warms the colony's standing by 0.01, the warmth letters add soft-capped at 0.75 in all, so a shy colony naps through fewer caravans and a warm one sends more bonus trips (Standing, above). A colony keeps some goods for closer friends, each opening at the Pen Pal level its sell row names. Star Whales take no Pen Pals.
+`SendPenPal(colony)` establishes or deepens a correspondence (the inspiration's embassies), charm-priced at `100 × 1.15^level`. Each level warms the colony's standing by 0.01, the warmth letters add soft-capped at 0.75 in all, so a shy colony naps through fewer caravans and a warm one sends more bonus trips (Standing, above). A colony keeps some goods for closer friends, each opening at the Pen Pal level its sell row names. Star Whales take no Pen Pals.
 
 The core reports a colony's correspondence as a frontend needs to show it, so a letter's effect is never invisible: the level; the next letter's charm price; the colony's standing now and the part of it the letters have added; how much one more letter would warm it, which is nothing once the warmth is capped or a shy colony has warmed all the way to neutral; and the next level at which a good it keeps for closer friends opens, if any (SIM-TRADE-013).
 
@@ -60,7 +60,7 @@ The core reports a colony's correspondence as a frontend needs to show it, so a 
 
 ## Star Whales
 
-The gentle-giant visitor arc (the inspiration's leviathans, de-fanged): Star Whales drift by when summoned by a Skyward Song (a late ritual), staying 5 years + 1 per contentment. They take no Pen Pal; the clowder feeds them **lullabies** (a small dreamcorn offering) to raise contentment, which lengthens the visit and improves their trades. A whale fed nothing simply drifts onward, content — never angry. They trade rare cosmic goods (skymaps, starshards, echoes) for hushfelt. Full mechanics land with the cosmic wave; this leaf reserves the visitor slot and the contentment currency.
+The gentle-giant visitor arc (the inspiration's leviathans, de-fanged): Star Whales drift by when summoned by a Skyward Song (a late ritual), staying 5 years + 1 per contentment. They take no Pen Pal; the clowder feeds them **lullabies** (a small dreamcorn offering) to raise contentment, which lengthens the visit and improves their trades. A whale fed nothing simply drifts onward, content — never angry. They trade rare cosmic goods (skymaps, starshards, echoes) for hushfelt. The mechanics are the cosmic leaf's (SIM-SKY-006, SIM-SKY-007); this leaf holds the visitor's slot among the colonies.
 
 ## Decisions & Alternatives
 
@@ -80,7 +80,7 @@ The gentle-giant visitor arc (the inspiration's leviathans, de-fanged): Star Wha
 ## Open Questions & Future Decisions
 
 ### Deferred
-1. Star Whale full trade table and the Skyward Song ritual — cosmic wave.
+1. A nap's courtesy gift (SIM-TRADE-014, #34). The design promises one, and neither its size nor its chance is decided.
 2. Whether a blackcoin-analog speculation mini-market rides the Star Whale visit (the inspiration's leviathan blackcoin) — probably a post-TUI content pass; noted, not committed.
 
 ## References

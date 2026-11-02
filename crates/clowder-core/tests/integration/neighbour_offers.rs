@@ -77,7 +77,13 @@ fn a_reaching_caravan_teaches_exactly_what_it_brings_home() {
     ] {
         let mut s = trading_meadow(1010 + c as u64, &[c]);
         assert!(s.neighbour_offers(c).learned.is_empty());
-        assert!(!s.neighbour_offers(c).reached);
+        let unmet = s.neighbour_offers(c);
+        assert!(!unmet.reached);
+        assert!(unmet.learned.is_empty() && unmet.unseen.is_empty());
+        assert!(
+            !unmet.tells_by_name,
+            "{c:?}: however warm, it tells of nothing yet"
+        );
         let mut seen: BTreeSet<ResourceId> = BTreeSet::new();
         for _ in 0..40 {
             refill(&mut s);

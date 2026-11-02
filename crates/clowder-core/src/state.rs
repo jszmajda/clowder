@@ -1020,7 +1020,7 @@ impl RuleId {
 
 /// The eight neighbouring colonies the clowder trades with. Copy + Ord so a
 /// `BTreeSet<ColonyId>` records discoveries in canonical order; `as usize`
-/// indexes the per-colony pen-pal array. @spec SIM-TRADE-003
+/// indexes the per-colony pen-pal array.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ColonyId {
     Otters,
@@ -1514,7 +1514,7 @@ pub struct GameState {
     /// Per-colony Pen Pal level, ColonyId-indexed. @spec SIM-TRADE-006
     #[serde(default)]
     pub penpal: [u32; 8],
-    /// Discovered colonies — permanent. @spec SIM-TRADE-008
+    /// Discovered colonies, kept until a Great Meadow Move forgets them.
     #[serde(default)]
     pub discovered: BTreeSet<ColonyId>,
     /// What each colony has shown the clowder: a key for every colony a

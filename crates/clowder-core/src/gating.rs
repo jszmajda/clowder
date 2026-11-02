@@ -346,7 +346,14 @@ impl GameState {
                 !self.kittens.is_empty()
             }
             C::HoldParade => self.ideas.contains(&IdeaId::ParadeRoutes),
+            // @spec SIM-TRADE-007
             C::ScoutPicnic => self.ideas.contains(&IdeaId::ScoutPicnicking),
+            // @spec SIM-TRADE-006
+            C::SendPenPal(colony) => {
+                *colony != crate::state::ColonyId::StarWhales
+                    && self.ideas.contains(&IdeaId::PenPalNetworks)
+                    && self.discovered.contains(colony)
+            }
             C::SummonStarWhale | C::FeedWhale => {
                 self.structures[StructureId::SkyDock.ix()] >= 1
                     && self.ideas.contains(&IdeaId::SkywardSong)
@@ -397,12 +404,7 @@ impl GameState {
 
             // Actions with no gate at all: the meadow can always do these, or
             // the command layer refuses them for its own reasons.
-            C::GatherCatnip
-            | C::Forage
-            | C::ObserveSky
-            | C::SetSpeed(_)
-            | C::Trade(..)
-            | C::SendPenPal(_) => true,
+            C::GatherCatnip | C::Forage | C::ObserveSky | C::SetSpeed(_) | C::Trade(..) => true,
         }
     }
 }

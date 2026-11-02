@@ -919,6 +919,7 @@ impl GameState {
                 1.0
             };
             for sell in def.sells {
+                // @spec SIM-TRADE-006
                 if penpal < sell.min_penpal || !self.rng.chance(sell.chance) {
                     continue;
                 }
@@ -1016,8 +1017,8 @@ impl GameState {
     }
 
     /// The next colony a successful picnic discovers, by deterministic
-    /// prerequisite priority: a random undiscovered first-tier colony, else the
-    /// eligible Foxes, Deer, then Owls. @spec SIM-TRADE-007
+    /// prerequisite priority: the eligible Foxes, Deer, then Owls, else a random
+    /// undiscovered first-tier colony. @spec SIM-TRADE-007
     fn scout_target(&mut self) -> Option<ColonyId> {
         let first_tier: Vec<ColonyId> = [
             ColonyId::Otters,
@@ -1028,9 +1029,6 @@ impl GameState {
         .into_iter()
         .filter(|c| !self.discovered.contains(c))
         .collect();
-        if !first_tier.is_empty() {
-            return Some(first_tier[self.rng.index(first_tier.len())]);
-        }
         let charm = self.stock(ResourceId::Charm);
         let kites = self.stock(ResourceId::Kites);
         let curiosity_cap = self.cap(ResourceId::Curiosity);
@@ -1047,6 +1045,9 @@ impl GameState {
             && curiosity_cap > content::SCOUT_OWL_CURIOSITY_CAP
         {
             return Some(ColonyId::Owls);
+        }
+        if !first_tier.is_empty() {
+            return Some(first_tier[self.rng.index(first_tier.len())]);
         }
         None
     }

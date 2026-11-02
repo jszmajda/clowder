@@ -1053,8 +1053,8 @@ fn the_seven_tradeable_colonies_match_the_design_table() {
         );
     }
 
-    // The Star Whale (colony 7) reserves a visitor slot only — its basket is
-    // deferred [D] to the cosmic wave.
+    // The Star Whale (colony 7) reserves a visitor slot only: its exchange is
+    // the cosmic leaf's (SIM-SKY-007).
     assert!(
         content::colony_def(ColonyId::StarWhales).sells.is_empty(),
         "the Star Whale's trade table is deferred"
@@ -1220,6 +1220,128 @@ fn scout_picnics_discover_the_next_colony_by_deterministic_priority() {
     assert!(
         found,
         "a successful picnic deterministically discovers the Foxes"
+    );
+}
+
+/// What a successful picnic finds in this meadow, on the first seed that finds
+/// anyone.
+fn what_a_picnic_finds(meadow: impl Fn(&mut GameState)) -> ColonyId {
+    for seed in 0..200 {
+        let mut s = GameState::new(seed);
+        s.ideas.insert(IdeaId::ScoutPicnicking);
+        meadow(&mut s);
+        give(&mut s, ResourceId::Pep, 1000.0);
+        let before = s.discovered.clone();
+        s.apply(Command::ScoutPicnic).unwrap();
+        if let Some(found) = s.discovered.difference(&before).next() {
+            return *found;
+        }
+    }
+    panic!("no seed's picnic found anyone");
+}
+
+/// A colony whose prerequisite is met comes ahead of the first tier, which is
+/// what a picnic finds otherwise, and the three are tried in the stated order.
+// @spec SIM-TRADE-007
+#[test]
+fn a_picnic_finds_a_colony_whose_prerequisite_is_met_ahead_of_the_first_tier() {
+    let charm = |s: &mut GameState| give(s, ResourceId::Charm, 1500.0);
+    let kite = |s: &mut GameState| give(s, ResourceId::Kites, 1.0);
+    assert_eq!(what_a_picnic_finds(charm), ColonyId::Foxes);
+    assert_eq!(what_a_picnic_finds(kite), ColonyId::Deer);
+    assert_eq!(
+        what_a_picnic_finds(|s| {
+            charm(s);
+            kite(s);
+        }),
+        ColonyId::Foxes,
+        "the Foxes before the Deer"
+    );
+    let owls = |s: &mut GameState| {
+        s.discovered.insert(ColonyId::Deer);
+        give(s, ResourceId::Kites, 100.0);
+        grant(s, StructureId::CardboardBox, 3000);
+        assert!(s.cap(ResourceId::Curiosity) > 125_000.0, "fixture");
+    };
+    assert_eq!(what_a_picnic_finds(owls), ColonyId::Owls);
+
+    let first_tier = [
+        ColonyId::Otters,
+        ColonyId::Raccoons,
+        ColonyId::Hedgehogs,
+        ColonyId::Rabbits,
+    ];
+    assert!(
+        first_tier.contains(&what_a_picnic_finds(|_| {})),
+        "with no prerequisite met, a first-tier colony"
+    );
+}
+
+/// Half of picnics find someone, while there is anyone to find.
+// @spec SIM-TRADE-007
+#[test]
+fn a_picnic_finds_someone_half_the_time() {
+    let tries = 2000;
+    let found = (0..tries)
+        .filter(|seed| {
+            let mut s = GameState::new(*seed);
+            s.ideas.insert(IdeaId::ScoutPicnicking);
+            give(&mut s, ResourceId::Pep, 1000.0);
+            s.apply(Command::ScoutPicnic).unwrap();
+            !s.discovered.is_empty()
+        })
+        .count() as f64;
+    let rate = found / tries as f64;
+    assert!((rate - 0.5).abs() < 0.05, "found on {rate} of picnics");
+}
+
+/// The gate says what the command says, so no row offers a letter that refuses.
+// @spec SIM-TRADE-006, SIM-ENG-045
+#[test]
+fn a_pen_pal_gate_says_what_the_command_says() {
+    let otters = Command::SendPenPal(ColonyId::Otters);
+    let mut s = GameState::new(357);
+    give(&mut s, ResourceId::Charm, 1.0e6);
+    s.discovered.insert(ColonyId::Otters);
+    assert!(!s.command_gate_open(&otters), "before the idea");
+    assert_eq!(s.apply(otters).unwrap_err(), CommandError::Locked);
+
+    s.ideas.insert(IdeaId::PenPalNetworks);
+    assert!(s.command_gate_open(&otters));
+    let foxes = Command::SendPenPal(ColonyId::Foxes);
+    assert!(!s.command_gate_open(&foxes), "a colony not yet found");
+    assert_eq!(s.apply(foxes).unwrap_err(), CommandError::Locked);
+    s.discovered.insert(ColonyId::StarWhales);
+    let whales = Command::SendPenPal(ColonyId::StarWhales);
+    assert!(!s.command_gate_open(&whales), "Star Whales take no letters");
+    assert_eq!(s.apply(whales).unwrap_err(), CommandError::Locked);
+    s.apply(otters).expect("the letter goes");
+}
+
+/// A warm colony's standing is multiplied by the global ratio, and a shy one's is
+/// lifted by that share of how far it starts below zero, never past neutral.
+// @spec SIM-TRADE-005
+#[test]
+fn the_global_standing_ratio_warms_warm_and_shy_colonies_each_their_own_way() {
+    let plain = GameState::new(358);
+    let mut warmed = GameState::new(358);
+    warmed.traditions.insert(TraditionId::GoodNeighbours);
+    let ratio = warmed.effect(Effect::StandingRatio);
+    assert!(ratio > 0.0, "fixture");
+
+    let otters = plain.standing(ColonyId::Otters);
+    assert!(otters > 0.0, "fixture: warm");
+    assert!((warmed.standing(ColonyId::Otters) - otters * (1.0 + ratio)).abs() < 1e-12);
+
+    let foxes = plain.standing(ColonyId::Foxes);
+    assert!(foxes < 0.0, "fixture: shy");
+    assert!((warmed.standing(ColonyId::Foxes) - (foxes + ratio * -foxes)).abs() < 1e-12);
+
+    warmed.penpal[ColonyId::Foxes.ix()] = 1000;
+    assert_eq!(
+        warmed.standing(ColonyId::Foxes),
+        0.0,
+        "letters and the ratio together warm a shy colony to neutral and no further"
     );
 }
 

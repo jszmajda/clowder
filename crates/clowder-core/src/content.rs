@@ -4131,7 +4131,7 @@ static ARCHES: [ArchDef; 8] = [
 
 /// One item in a colony's sell basket: `amount` of `resource` at probability
 /// `chance` per successful caravan, plus `season_bonus` when in `season`, only
-/// once the Pen Pal level reaches `min_penpal`. @spec SIM-TRADE-003
+/// once the Pen Pal level reaches `min_penpal`.
 #[derive(Debug, Clone, Copy)]
 pub struct ColonySell {
     pub resource: ResourceId,
@@ -4153,7 +4153,6 @@ const SELL: ColonySell = ColonySell {
 
 /// A tradeable colony: start standing, the buy-resource each caravan spends,
 /// and the sell basket. The Star Whale reserves a visitor slot only.
-/// @spec SIM-TRADE-003
 pub struct ColonyDef {
     pub name: &'static str,
     pub start_standing: f64,
@@ -4181,6 +4180,7 @@ pub fn colony_goods(c: ColonyId) -> Vec<(ResourceId, u32)> {
     out
 }
 
+// @spec SIM-TRADE-003
 #[allow(clippy::needless_update)]
 static COLONIES: [ColonyDef; 8] = [
     ColonyDef {
@@ -4344,7 +4344,7 @@ static COLONIES: [ColonyDef; 8] = [
         name: "Star Whales",
         start_standing: 0.0,
         buy: (ResourceId::Hushfelt, 0.0),
-        sells: &[], // [D] the visitor slot; basket deferred to the cosmic wave
+        sells: &[], // a visitor's slot; its exchange is the cosmic leaf's (SIM-SKY-007)
     },
 ];
 
