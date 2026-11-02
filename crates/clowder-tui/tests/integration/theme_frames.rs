@@ -2,14 +2,15 @@
 //! drawn frame may wear, and what the frame's header and focused row wear.
 //!
 //! @spec TUI-THEME-001, TUI-THEME-004, TUI-THEME-005, TUI-THEME-006,
-//! TUI-THEME-008
+//! TUI-THEME-007, TUI-THEME-008
 
 use std::collections::HashSet;
 
 use clowder_core::content;
 use clowder_core::{
-    AdventureId, EyeColour, EyeLook, Fur, FurColour, FurPattern, GameState, Kitten, KittenTrait,
-    Location, Pose, Profile, ResourceId, Season, StructureId,
+    AdventureId, Availability, ContentId, EyeColour, EyeLook, Fur, FurColour, FurPattern,
+    GameState, IdeaId, Kitten, KittenTrait, Location, Pose, Profile, ResourceId, Season,
+    StructureId,
 };
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
@@ -197,4 +198,78 @@ fn the_headers_season_word_follows_the_season_the_meadow_is_in() {
         assert!(header.contains("Win"), "at {w} columns: {header:?}");
         assert!(!header.contains("Spr"), "at {w} columns: {header:?}");
     }
+}
+
+/// A focused row keeps the state colour it wears: the reversal is the only thing
+/// focus adds, so the bar is that colour, nothing paints a ground, and the row
+/// looks the same under the cursor at every state save for being reversed.
+/// @spec TUI-THEME-006, TUI-THEME-007
+#[test]
+fn a_focused_row_keeps_its_state_colour_under_the_reversal() {
+    let mut s = world();
+    // Some prices met, some half met, some not at all, so every marker stands.
+    for r in ResourceId::ALL {
+        s.resources[r.ix()] = 0.0;
+    }
+    s.resources[ResourceId::Catnip.ix()] = 40.0;
+    s.resources[ResourceId::Twigs.ix()] = 1.0;
+    s.ideas = IdeaId::ALL.into_iter().collect();
+    s.revealed = StructureId::ALL
+        .into_iter()
+        .map(ContentId::Structure)
+        .collect();
+    let (w, h) = (130u16, 60u16);
+    let mut seen: HashSet<Color> = HashSet::new();
+    // A kind with no reveal ladder is never teased, so `partial` shows on those
+    // rows: walk every section, not only the one with the structures.
+    let every_row: Vec<(Section, clowder_tui::nav::rows::Row)> = Section::ALL
+        .into_iter()
+        .flat_map(|section| {
+            clowder_tui::nav::rows::rows(&s, section)
+                .into_iter()
+                .map(move |row| (section, row))
+        })
+        .collect();
+    for (section, row) in every_row {
+        if !row.selectable() {
+            continue;
+        }
+        let mut view = ViewState {
+            section: Some(section),
+            ..ViewState::default()
+        };
+        view.focus[section.index()] = Some(row.key.clone());
+        let buf = drawn(&s, &view, (w, h));
+        let Some(y) = (2..h - 2).find(|y| line(&buf, *y).contains('\u{25b8}')) else {
+            continue;
+        };
+        let text: Vec<char> = line(&buf, y).chars().collect();
+        let at = text.iter().position(|c| *c == '\u{25b8}').unwrap();
+        let marker = text[at + 2];
+        // A teased row recedes whatever its glyph (TUI-NAV-009), and keeps that
+        // dim under the cursor as any row keeps its colour.
+        let teased = matches!(
+            row.key,
+            RowKey::Content(id, _) if s.availability(id) == Availability::Teased
+        );
+        let want = match marker {
+            '\u{25cf}' => Role::Ready,
+            '\u{25d0}' if !teased => Role::Partial,
+            '\u{25d0}' | '\u{25cb}' => Role::Dim,
+            _ => continue,
+        }
+        .color()
+        .expect("a state colour");
+        seen.insert(want);
+        for x in at..at + 2 + 2 + 3 {
+            let cell = buf.cell((x as u16, y)).unwrap();
+            assert!(
+                cell.modifier.contains(Modifier::REVERSED),
+                "column {x} of the row with {marker:?} is reversed"
+            );
+            assert_eq!(cell.fg, want, "column {x} of the row with {marker:?}");
+            assert_eq!(cell.bg, Color::Reset, "column {x}: no ground of its own");
+        }
+    }
+    assert_eq!(seen.len(), 3, "fixture: every state's colour met: {seen:?}");
 }

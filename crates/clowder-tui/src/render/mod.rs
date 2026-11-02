@@ -815,8 +815,9 @@ fn row_line(
 
     let mut style = style_for(role);
     if focused {
-        // Reverse the terminal's own pair — works in either polarity, and
-        // needs no colour of its own. @spec TUI-THEME-007
+        // The reverse attribute on the row's own colours: its state colour, if
+        // it wears one, becomes the bar. Works in either polarity, and focus
+        // adds no colour of its own. @spec TUI-THEME-006, TUI-THEME-007
         style = style.add_modifier(Modifier::REVERSED);
     }
     // A coat is worn where the line is inherited, ready, or partial; a dim or
