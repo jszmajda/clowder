@@ -180,9 +180,9 @@ arrows:
   navigation:
     status: PARTIAL
     parent: tui
-    sampled: 2026-11-01
-    audited: 2026-11-01
-    audited_sha: f36f4f91aa8e65a3b6ef0dfae70b6d44c0907f6c
+    sampled: 2026-11-02
+    audited: 2026-11-02
+    audited_sha: c7f20cac796efe7a315038ace6f574231449663c
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
@@ -213,13 +213,13 @@ arrows:
   render:
     status: PARTIAL
     parent: tui
-    sampled: 2026-11-01
-    audited: 2026-11-01
-    audited_sha: f36f4f91aa8e65a3b6ef0dfae70b6d44c0907f6c
+    sampled: 2026-11-02
+    audited: 2026-11-02
+    audited_sha: c7f20cac796efe7a315038ace6f574231449663c
     blocks: []
     blockedBy: [navigation, runtime, theme]
     detail: tui/render/render.md
-    next: "#18, #21: the frame budget, one untested clause"
+    next: "#21: one untested clause"
     drift: null
   runtime:
     status: PARTIAL
