@@ -115,6 +115,7 @@ The sentences:
 - the inspector's description of a row — each resource named in the mechanical statement (TUI-NAV-018), whether the statement is stated from the definition's fields or is a blurb, whose marks say which of its words name a resource (curiosity leaf: Blurbs), and each resource named in the plain reason an item is held back (TUI-NAV-079);
 - the ticker, where its line names a resource — the gains of a time away, or what an act brought home;
 - the Journal, where its lines name one — each changed store in a pinned or kept away report, and each store an act brought home;
+- an event's own words on either, where they name one, as a refining's line names what it refined;
 - a footer note, where it names one — the store a refused command is short of (TUI-NAV-014);
 - and any line added later that names a resource: the rule is the name, not the surface.
 
@@ -146,7 +147,7 @@ Where a name is shortened with an ellipsis (TUI-RENDER-014), each character kept
 
 ## The Ticker
 
-The ticker's line is read at a glance, so it is drawn plainly. Its newest event is in the inherited foreground, and only a flavor event, which changes nothing, recedes into `dim`, as flavor does in the Journal. No faint attribute is laid over either: `dim` already sits at the contrast floor, and a faint attribute over it sinks below the floor on many terminals, leaving a line the player has to lean in to read. The names in it wear their coats (Where a coat is worn).
+The ticker's line is read at a glance, so it is drawn plainly. Its newest event is in the inherited foreground, and only a flavor event, which changes nothing, recedes into `dim`, as flavor does in the Journal. A milestone's `★` wears `milestone` here and in the Journal, as it does on a tab's badge, and the rest of its line keeps the line's colour. No faint attribute is laid over either: `dim` already sits at the contrast floor, and a faint attribute over it sinks below the floor on many terminals, leaving a line the player has to lean in to read. The names in it wear their coats (Where a coat is worn).
 
 The lights at the line's right end say what runs on a clock (navigation leaf: The ticker's line). The sky's light wears `attention` whole, being its chip's clock (What wears `attention`). Every other light is a running effect that wants nothing of the player: its glyph and word are in the inherited foreground, and its clock in `dim`, the words saying what runs and the clock being the detail. A running light never takes a colour of its own: that would be a sixth state colour to learn for something its glyph and word already say, and the glance contract needs every colour that appears in the chrome to be either a coat, the season's accent, or one of the five states.
 
@@ -311,7 +312,6 @@ Both rules hold whatever values the palette settles on (Deferred 1). Retuning th
 1. The exact hex values want checking against real terminals — several popular themes use low-contrast backgrounds that a mid-luminance palette could sit too close to. The *roles* and their separation, and the ring and its clearance, are the design; the five state values, the seven ring values, and the four seasonal accents are a starting point to verify on a real pane, alongside the render leaf's other measurements.
 2. Whether `●` and `◐` stay distinct enough. They are the affordable/partial pair, whose colours are the ones a red-green deficiency compresses hardest, so the whole distinction falls to the glyph — and the two differ only by fill. That is a real difference rather than a colour one, but half-filled glyphs render unevenly across fonts, and this wants checking on a real pane before it is trusted. The glyphs belong to the navigation leaf; changing them is a cascade there, not a decision here.
 3. Whether `dim` needs to be a true colour at all, or whether the terminal's own dim attribute serves better. The attribute inherits the user's theme and is arguably more native; it is also inconsistently implemented across terminals, which is what makes this worth testing rather than deciding now.
-4. Three colours this design states that the frame does not yet draw, and no spec holds (#20): `★` in `milestone` on a tab's badge and an event line, a Journal flavour line in `dim`, and a coat on the few event words that contain a store's name.
 
 ## References
 

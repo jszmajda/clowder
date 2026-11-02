@@ -300,6 +300,11 @@ fn tab_spans(
                 label.clone(),
                 Style::default().add_modifier(Modifier::REVERSED),
             ));
+        } else if let Some(rest) = label.strip_prefix('\u{2605}') {
+            // The badge's star wears `milestone`, that glyph alone.
+            // @spec TUI-THEME-032
+            spans.push(Span::styled("\u{2605}", style_for(Role::Milestone)));
+            spans.push(Span::raw(rest.to_string()));
         } else {
             spans.push(Span::raw(label.clone()));
         }

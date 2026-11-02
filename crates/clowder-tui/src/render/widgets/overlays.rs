@@ -35,8 +35,32 @@ fn tier_mark(class: EventClass) -> &'static str {
 /// brought home, the line names each store, in its coat, with its amount.
 /// @spec TUI-NAV-147, TUI-THEME-024
 pub(crate) fn event_line(event: &Event) -> Vec<Piece> {
-    let mut out = vec![Piece::plain(format!("{} ", tier_mark(event.class())))];
+    // A milestone's star wears `milestone`, that glyph alone. @spec TUI-THEME-032
+    let mark = tier_mark(event.class());
+    let mut out = if event.class() == EventClass::Milestone {
+        vec![Piece::role(mark, Role::Milestone), Piece::plain(" ")]
+    } else {
+        vec![Piece::plain(format!("{mark} "))]
+    };
     match event {
+        // An event whose own words name a store names it in its coat.
+        // @spec TUI-THEME-024
+        Event::StarshardRefined => {
+            out.extend(crate::render::marked_pieces(
+                "a {starshard|Starshards} refined",
+            ));
+        }
+        Event::EchoRefined => {
+            out.extend(crate::render::marked_pieces("an {echo|Echoes} refined"));
+        }
+        Event::JarCondensed => {
+            out.extend(crate::render::marked_pieces(
+                "a {jar of purrs|JarsOfPurrs} condensed",
+            ));
+        }
+        Event::PrismDescended => {
+            out.extend(crate::render::marked_pieces("a {prism|Prisms} descended"));
+        }
         Event::PounceReturned {
             feathers,
             bells,
@@ -142,6 +166,14 @@ fn goods_pieces(goods: &[(ResourceId, f64)]) -> Vec<Piece> {
 fn event_words(event: &Event) -> String {
     use Event as E;
     match event {
+        // A flavour event says its template's words, the featured kitten by
+        // name. @spec TUI-NAV-201
+        E::Flavor { template, kitten } => clowder_core::content::FLAVOR_TEMPLATES
+            .get(*template)
+            .map_or_else(String::new, |t| {
+                t.text
+                    .replace("{name}", kitten.as_deref().unwrap_or("A kitten"))
+            }),
         E::KittenArrived { name } => format!("{name} wandered in"),
         E::KittenWanderedOff { name } => format!("{name} is visiting the neighbour's yard"),
         E::KittenReturned { name } => format!("{name} came home"),
@@ -236,6 +268,17 @@ fn line_of(pieces: &[Piece], base: Style) -> Line<'static> {
 /// As `line_of`, fitted to `width` with an ellipsis (TUI-RENDER-014).
 fn line_of_width(pieces: &[Piece], base: Style, width: usize) -> Line<'static> {
     line_from_pieces(pieces, base, true, width)
+}
+
+/// The colour an event's line takes, ticker and Journal alike: flavour recedes
+/// into `dim`, and everything else is the inherited foreground.
+/// @spec TUI-THEME-025, TUI-THEME-033
+fn event_style(event: &Event) -> Style {
+    if event.class() == EventClass::Flavor {
+        crate::render::style_for(Role::Dim)
+    } else {
+        Style::default()
+    }
 }
 
 /// A wall-clock span, humanized coarsely enough that two spans differing by
@@ -349,19 +392,15 @@ pub fn too_small(f: &mut Frame, area: Rect) {
 pub fn ticker(f: &mut Frame, area: Rect, state: &GameState) {
     let entries = state.journal.iter_chronological();
     let (pieces, base): (Vec<Piece>, Style) = match entries.last().map(|e| &e.item) {
-        Some(JournalItem::Happened(event)) => {
-            let base = if event.class() == EventClass::Flavor {
-                crate::render::style_for(Role::Dim)
-            } else {
-                Style::default()
-            };
-            (event_line(event), base)
-        }
+        Some(JournalItem::Happened(event)) => (event_line(event), event_style(event)),
         Some(JournalItem::Away(report)) => {
-            let mut out = vec![Piece::plain(format!(
-                "\u{2605} while you were away ({}): ",
-                format_span(report.elapsed_seconds)
-            ))];
+            let mut out = vec![
+                Piece::role("\u{2605}", Role::Milestone),
+                Piece::plain(format!(
+                    " while you were away ({}): ",
+                    format_span(report.elapsed_seconds)
+                )),
+            ];
             out.extend(gains_pieces(report));
             (out, Style::default())
         }
@@ -515,7 +554,7 @@ fn journal_lines(state: &GameState, view: &ViewState) -> Vec<Line<'static>> {
         }
         match &entry.item {
             JournalItem::Happened(event) => {
-                lines.push(line_of(&event_line(event), Style::default()))
+                lines.push(line_of(&event_line(event), event_style(event)))
             }
             JournalItem::Away(report) => lines.extend(away_report_lines(report)),
         }
@@ -532,12 +571,19 @@ fn journal_lines(state: &GameState, view: &ViewState) -> Vec<Line<'static>> {
 /// store is named in its coat.
 /// @spec TUI-NAV-027, TUI-NAV-056, TUI-THEME-024
 fn away_report_lines(report: &OfflineReport) -> Vec<Line<'static>> {
-    let mut header = format!("\u{2605} away for {}", span_clause(report));
+    let mut header = format!(" away for {}", span_clause(report));
     if let Some(note) = truncated_note(report) {
         header.push_str(note);
     }
     header.push('.');
-    let mut lines = vec![Line::raw(header)];
+    // @spec TUI-THEME-032
+    let mut lines = vec![line_of(
+        &[
+            Piece::role("\u{2605}", Role::Milestone),
+            Piece::plain(header),
+        ],
+        Style::default(),
+    )];
 
     // Every changed stock, one to a line — never joined onto the header's
     // own line, which a report touching every resource would run well past

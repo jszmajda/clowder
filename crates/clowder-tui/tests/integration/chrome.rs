@@ -6510,3 +6510,35 @@ fn a_refusal_short_of_a_store_names_it_in_words_and_in_its_coat() {
         }
     }
 }
+
+/// A tab's badge wears `milestone`, the star alone, in the full form and the
+/// compact strip alike.
+/// @spec TUI-THEME-032
+#[test]
+fn a_tabs_badge_wears_milestone_and_its_label_does_not() {
+    use clowder_tui::theme::Role;
+    let milestone = Role::Milestone.color().expect("milestone has a colour");
+    let (state, view) = all_four_live();
+    let mut stars = 0;
+    for w in [FLOOR_W, WIDE_W] {
+        let mut term = terminal(w, 1);
+        term.draw(|f| {
+            let area = f.area();
+            chrome::tabs(f, area, &state, &view);
+        })
+        .expect("TestBackend is infallible");
+        let buf = term.backend().buffer().clone();
+        for x in 0..w {
+            if buf.cell((x, 0)).unwrap().symbol() == "\u{2605}" {
+                stars += 1;
+                assert_eq!(buf.cell((x, 0)).unwrap().fg, milestone, "column {x} at {w}");
+                assert_eq!(
+                    buf.cell((x + 1, 0)).unwrap().fg,
+                    ratatui::style::Color::Reset,
+                    "the digit after it, at {w}"
+                );
+            }
+        }
+    }
+    assert!(stars > 0, "fixture: a tab wears its badge");
+}

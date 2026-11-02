@@ -2320,6 +2320,16 @@ fn coats_on_names(what: &str, buf: &Buffer, rect: Rect, rest: impl Fn(&Cell) -> 
             }
         }
         for (x, (c, cell)) in row.iter().enumerate() {
+            // A report's star wears `milestone`, the one mark on these lines
+            // that isn't a name (TUI-THEME-032).
+            if *c == '\u{2605}' {
+                assert_eq!(
+                    cell.fg,
+                    clowder_tui::theme::Role::Milestone.color().unwrap(),
+                    "{what}, row {y}: the star"
+                );
+                continue;
+            }
             if !in_name[x] && !c.is_whitespace() {
                 assert!(
                     rest(cell),
@@ -2452,4 +2462,139 @@ fn a_stores_result_in_the_palette_wears_its_coat() {
         checked >= stores.len(),
         "fixture: each store has a result ({checked})"
     );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-032, TUI-THEME-033, TUI-THEME-024, TUI-NAV-201 — an event's line
+// ---------------------------------------------------------------------------
+
+/// The row holding `needle` and its first cell's column, read cell by cell.
+fn locate(buf: &Buffer, needle: &str) -> (u16, u16) {
+    let want: Vec<char> = needle.chars().collect();
+    for y in 0..buf.area.height {
+        let cells: Vec<char> = (0..buf.area.width)
+            .map(|x| {
+                buf.cell((x, y))
+                    .and_then(|c| c.symbol().chars().next())
+                    .unwrap_or(' ')
+            })
+            .collect();
+        if let Some(x) = cells.windows(want.len()).position(|w| w == want.as_slice()) {
+            return (x as u16, y);
+        }
+    }
+    panic!("{needle:?} isn't drawn");
+}
+
+/// In the Journal, a flavour line recedes into `dim` and its neighbours don't.
+/// @spec TUI-THEME-033
+#[test]
+fn a_flavour_line_in_the_journal_is_dim_and_a_mechanical_one_is_not() {
+    use clowder_tui::theme::Role;
+    let words = clowder_core::content::FLAVOR_TEMPLATES[0]
+        .text
+        .replace("{name}", "Pip");
+    let state = journaled(&[
+        (
+            1,
+            Event::Flavor {
+                template: 0,
+                kitten: Some("Pip".to_string()),
+            },
+        ),
+        (
+            2,
+            Event::SeasonChanged {
+                season: Season::Winter,
+            },
+        ),
+    ]);
+    let buf = journal(&state, 0);
+    let dim = Role::Dim.color().expect("dim has a colour");
+    let (x, y) = locate(&buf, &words[..12]);
+    for i in 0..12 {
+        let cell = buf.cell((x + i, y)).unwrap();
+        assert_eq!(cell.fg, dim, "column {} of the flavour line", x + i);
+        assert!(
+            !cell.modifier.contains(ratatui::style::Modifier::DIM),
+            "no faint attribute"
+        );
+    }
+    let (x, y) = locate(&buf, "winter arrived");
+    assert_eq!(
+        buf.cell((x, y)).unwrap().fg,
+        ratatui::style::Color::Reset,
+        "a mechanical line keeps the inherited foreground"
+    );
+}
+
+/// A milestone's star wears `milestone`, that glyph alone, on the ticker and in
+/// the Journal, and so does a retained report's.
+/// @spec TUI-THEME-032
+#[test]
+fn a_milestones_star_wears_milestone_and_the_rest_of_its_line_does_not() {
+    use clowder_tui::theme::Role;
+    let milestone = Role::Milestone.color().expect("milestone has a colour");
+    let event = Event::WhaleSummoned;
+    assert_eq!(event.class(), EventClass::Milestone, "fixture");
+    let state = journaled(&[(1, event)]);
+    for (what, buf) in [("ticker", ticker(&state)), ("journal", journal(&state, 0))] {
+        let (x, y) = locate(&buf, "\u{2605} ");
+        assert_eq!(buf.cell((x, y)).unwrap().fg, milestone, "{what}: the star");
+        assert_eq!(
+            buf.cell((x + 2, y)).unwrap().fg,
+            ratatui::style::Color::Reset,
+            "{what}: the words after it"
+        );
+    }
+}
+
+/// An event's own words naming a store name it in its coat.
+/// @spec TUI-THEME-024
+#[test]
+fn an_events_own_words_name_a_store_in_its_coat() {
+    use clowder_tui::theme::{coat, coat_colours};
+    for (event, words, store) in [
+        (Event::StarshardRefined, "starshard", ResourceId::Starshards),
+        (Event::EchoRefined, "echo", ResourceId::Echoes),
+        (Event::JarCondensed, "jar of purrs", ResourceId::JarsOfPurrs),
+        (Event::PrismDescended, "prism", ResourceId::Prisms),
+    ] {
+        let state = journaled(&[(1, event)]);
+        let buf = journal(&state, 0);
+        let (x, y) = locate(&buf, words);
+        let colours = coat_colours(coat(store), words.chars().count());
+        for (i, want) in colours.iter().enumerate() {
+            assert_eq!(
+                buf.cell((x + i as u16, y)).unwrap().fg,
+                *want,
+                "{store:?}, character {i} of {words:?}"
+            );
+        }
+    }
+}
+
+/// A flavour event says its template's words, the featured kitten by name, on
+/// the ticker and in the Journal: for every template the content tables hold.
+/// @spec TUI-NAV-201
+#[test]
+fn every_flavour_template_reaches_the_screen_in_its_own_words() {
+    for (template, t) in clowder_core::content::FLAVOR_TEMPLATES.iter().enumerate() {
+        let state = journaled(&[(
+            1,
+            Event::Flavor {
+                template,
+                kitten: t.needs_kitten.then(|| "Pip".to_string()),
+            },
+        )]);
+        let want = t.text.replace("{name}", "Pip");
+        let shown: String = want.chars().take(30).collect();
+        let text = journal_text(&state, 0);
+        assert!(text.contains(&shown), "template {template}: {text}");
+        assert!(
+            !text.contains("{name}"),
+            "template {template}: the placeholder stands in the line"
+        );
+        locate(&ticker(&state), &shown);
+    }
 }
