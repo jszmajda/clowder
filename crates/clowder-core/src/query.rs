@@ -587,6 +587,7 @@ impl GameState {
             }
             C::Pounce(_) => {
                 // Under this adventure the squads come home with nothing.
+                // @spec SIM-ENG-083
                 if self.active_adventure != Some(crate::state::AdventureId::GentlePaws) {
                     source = Some(Source::Act(Act::Pounce));
                 }

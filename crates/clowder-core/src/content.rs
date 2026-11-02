@@ -1020,7 +1020,7 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
         ..BLD
     },
     // ---- Wave 6: cosmic outposts (ids 40..=52), each Site-gated ----
-    // @spec SIM-ECO-028, SIM-SKY-002, SIM-SKY-005, SIM-SKY-008
+    // @spec SIM-ECO-028, SIM-SKY-002, SIM-SKY-005, SIM-SKY-008, SIM-SKY-010
     // 40: Lookout Post — skymap trickle + storage.
     StructureDef {
         name: "Lookout Post",

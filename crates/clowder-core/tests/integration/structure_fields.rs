@@ -369,6 +369,23 @@ fn each_copy_of_the_far_beacon_grows_every_storage_cap_by_its_share() {
     );
 }
 
+/// The one cap with a multiplier of its own takes the share as well.
+/// @spec SIM-SKY-011
+#[test]
+fn the_far_beacons_share_reaches_a_cap_with_its_own_multiplier() {
+    let rite = RiteId::GoldenHour;
+    let mut s = GameState::new(8);
+    grant(&mut s, StructureId::SunRoom, 2);
+    s.rites.insert(rite);
+    s.rite_counts[rite.ix()] = 1;
+    let without = s.cap(ResourceId::Warmth);
+    assert!(without > 0.0, "fixture: the cap has something to grow");
+    grant(&mut s, StructureId::FarBeacon, 2);
+    let share = structure_def(StructureId::FarBeacon).cap_ratio;
+    let want = without * (1.0 + share * 2.0);
+    assert!((s.cap(ResourceId::Warmth) - want).abs() < 1e-9);
+}
+
 /// A percentage of nothing opens no gate, and a percentage of no limit sets none.
 /// @spec SIM-SKY-011
 #[test]
