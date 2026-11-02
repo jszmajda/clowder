@@ -11,9 +11,10 @@ fn plain(v: f64) -> String {
     format!("{}", (v.abs() * 1.0e7).round() / 1.0e7)
 }
 
-/// A ratio as a blurb writes it: a share as its percentage.
+/// A ratio as a blurb writes it: a share as its percentage, the sign included,
+/// so a flat amount can't pass as a percentage or the other way round.
 fn percent(v: f64) -> String {
-    plain(v * 100.0)
+    format!("{}%", plain(v * 100.0))
 }
 
 /// The numbers a blurb states, in order.
@@ -24,7 +25,11 @@ fn numbers(text: &str) -> Vec<String> {
         if c.is_ascii_digit() || (c == '.' && !cur.is_empty()) {
             cur.push(c);
         } else if !cur.is_empty() {
-            out.push(cur.trim_end_matches('.').to_string());
+            let mut token = cur.trim_end_matches('.').to_string();
+            if c == '%' {
+                token.push('%');
+            }
+            out.push(token);
             cur.clear();
         }
     }
@@ -330,16 +335,28 @@ fn a_trait_states_what_it_brings_as_the_elder() {
     }
 }
 
-/// An idea's unlocks are words, so only the ideas with a number to state state
-/// one, and a figure in a joke isn't a claim about the rule.
+/// An idea's unlocks are words, so only the ideas whose rule applies a flat
+/// number state one, and a figure in a joke isn't a claim about the rule.
 /// @spec SIM-CUR-016
 #[test]
-fn an_idea_states_only_the_figures_its_rule_applies() {
+fn an_idea_states_the_figures_its_rule_applies() {
+    let seconds = |ticks: u64| plain((ticks / content::TICKS_PER_SECOND) as f64);
     for i in IdeaId::ALL {
         let figures: Vec<String> = match i {
             IdeaId::BiscuitMaking => vec![plain(content::BISCUIT_POINTS)],
-            // "the 3 a.m. energy": the joke, not the rule.
-            IdeaId::ZoomieChanneling => vec!["3".to_string()],
+            IdeaId::SeasonalAwareness => vec![
+                plain(content::season_patch_modifier(Season::Winter, true)),
+                plain(content::season_patch_modifier(Season::Winter, false)),
+            ],
+            IdeaId::ZoomieChanneling => vec![
+                // "the 3 a.m. energy": the joke, not the rule.
+                "3".to_string(),
+                plain(content::ZOOMIES_CHANNELED_MULT),
+                plain(content::ZOOMIES_MULT),
+                seconds(content::ZOOMIES_CHANNELED_TICKS),
+                seconds(content::ZOOMIES_TICKS),
+            ],
+            IdeaId::NeighborhoodWatch => vec![percent(content::ARRIVAL_WATCH_BONUS)],
             _ => Vec::new(),
         };
         holds(&format!("{i:?}"), content::idea_def(i).blurb, &figures);

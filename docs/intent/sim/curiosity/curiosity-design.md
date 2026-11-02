@@ -52,7 +52,7 @@ The tree is a banded ladder with short forks — each band's gate craft requires
 | 22 | Cogwheels | 2600 + 12 stories | Excavation | Cogworks; Cogs craft |
 | 23 | Treat Alchemy | 3200 + 15 stories | Excavation | Treat Bakery |
 | 24 | Tea Ceremonies | 3800 + 20 stories | Sun Salutations | Tea House; jamborees (kittens leaf) |
-| 25 | Solar Devotion | 4500 + 25 stories | Sun Salutations | Sunbeam Altar; ceremonies surface |
+| 25 | Solar Devotion | 4500 + 25 stories | Sun Salutations | Sunbeam Altar, Sunwarden job; ceremonies surface |
 | 26 | Sky Charts | 5200 + 30 stories | Cogwheels | Stargazing Ledge; sky events; skymaps begin |
 | 27 | Porch Logistics | 6000 + 35 stories | Sky Charts | Porch; Kites craft |
 
@@ -194,6 +194,7 @@ Effects are **flags and modifier values exposed by pure lookup** (`ideas.has(Ide
 ### Deferred
 1. Tier-2 ideas that interact with roadmap systems (ceremonies, expeditions) — land with those segments.
 2. Whether Seasonal Awareness's forecast belongs in core state or as a pure derived flag the shell reads — trivially the latter in v1; revisit if forecasts gain mechanics.
+3. Ideas whose rows name unlocks no rule reads them for (SIM-CUR-009, #30). Each should either gate what it names or say what it really does, keeping what an existing save has already reached.
 
 ## References
 

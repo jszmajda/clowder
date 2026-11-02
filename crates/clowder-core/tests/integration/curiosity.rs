@@ -175,6 +175,16 @@ fn every_blurb() -> Vec<&'static str> {
             .iter()
             .map(|l| content::dream_loom_def(*l).blurb),
     );
+    out.extend(
+        KittenTrait::ALL
+            .iter()
+            .map(|t| content::trait_def(*t).blurb),
+    );
+    out.extend(
+        AdventureId::ALL
+            .iter()
+            .map(|a| content::adventure_def(*a).blurb),
+    );
     out
 }
 

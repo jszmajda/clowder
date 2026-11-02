@@ -1381,28 +1381,28 @@ static IDEAS: [IdeaDef; IDEA_COUNT] = [
     },
     IdeaDef {
         name: "Biscuit Making",
-        blurb: "Rhythmic paw-kneading raises everyone's spirits. +10% happiness.",
+        blurb: "Rhythmic paw-kneading raises everyone's spirits. +10 happiness points.",
         cost: 120.0,
         prereqs: &[IdeaId::GroomedToPurrfection],
         ..IDEA
     },
     IdeaDef {
         name: "Seasonal Awareness",
-        blurb: "Thick coats and forward planning. Softer winters, visible forecast.",
+        blurb: "Thick coats and forward planning. Catnip Patches in winter ×0.4, not ×0.25; the coming season is shown.",
         cost: 150.0,
         prereqs: &[IdeaId::TwigArchitecture],
         ..IDEA
     },
     IdeaDef {
         name: "Zoomie Channeling",
-        blurb: "Harness the 3 a.m. energy. Zoomies run stronger and longer.",
+        blurb: "Harness the 3 a.m. energy. Zoomies ×1.5, not ×1.25, for 60 seconds, not 30.",
         cost: 200.0,
         prereqs: &[IdeaId::BiscuitMaking],
         ..IDEA
     },
     IdeaDef {
         name: "Neighborhood Watch",
-        blurb: "Word gets around about this place. Kittens arrive more often.",
+        blurb: "Word gets around about this place. Arrival chance +15% (on top of the cap).",
         cost: 250.0,
         prereqs: &[IdeaId::SeasonalAwareness],
         ..IDEA
