@@ -328,7 +328,11 @@ pub const TRADE_PEP_PER_CARAVAN: f64 = 50.0;
 pub const TRADE_SHINIES_PER_CARAVAN: f64 = 15.0;
 pub const TRADE_FUZZ_WIDTH: f64 = 0.15; // ± width on the basket
 pub const TRADE_BONUS_MULT: f64 = 1.25; // a bonus (warm) outcome
-                                        // @spec SIM-TRADE-005, SIM-TRADE-006
+/// The chance a napping caravan comes home with a courtesy gift. @spec SIM-TRADE-014
+pub const NAP_GIFT_CHANCE: f64 = 0.25;
+/// A courtesy gift's share of the good's amount in the sell basket. @spec SIM-TRADE-014
+pub const NAP_GIFT_SHARE: f64 = 0.1;
+// @spec SIM-TRADE-005, SIM-TRADE-006
 pub const PENPAL_STANDING_PER: f64 = 0.01; // standing warmed per Pen Pal level
 pub const PENPAL_STANDING_CAP: f64 = 0.75; // soft cap on Pen Pal warming
 pub const PENPAL_BASE_CHARM: f64 = 100.0; // × 1.15^level

@@ -1363,7 +1363,10 @@ fn pen_pal_lines(c: clowder_core::ColonyId, r: &clowder_core::PenPalReport) -> V
     out.push(plain(if pct(r.standing) > 0 {
         format!("About {odds}% of caravans come home with a bonus.")
     } else if pct(r.standing) < 0 {
-        format!("About {odds}% of caravans find them napping.")
+        format!(
+            "About {odds}% of caravans find them napping, and {}% of those bring home a small gift.",
+            pct(content::NAP_GIFT_CHANCE)
+        )
     } else {
         "Caravans trade at the usual odds.".to_string()
     }));

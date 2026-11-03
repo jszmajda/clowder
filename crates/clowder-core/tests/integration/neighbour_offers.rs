@@ -141,8 +141,10 @@ fn a_napping_caravan_and_the_whale_teach_nothing() {
         let mut s = trading_meadow(3000 + seed, &[ColonyId::Foxes]);
         refill(&mut s);
         let events = s.apply(Command::Trade(ColonyId::Foxes, 1)).unwrap();
-        let (_, napped, _) = goods_of(&events);
-        if napped == 1 {
+        let (_, napped, goods) = goods_of(&events);
+        // A nap that brought a gift says hello (SIM-TRADE-014); one that did not
+        // is what stays silent here.
+        if napped == 1 && goods.is_empty() {
             napped_alone = true;
             let offers = s.neighbour_offers(ColonyId::Foxes);
             assert!(!offers.reached, "seed {seed}: a nap reaches no one");

@@ -125,3 +125,141 @@ fn a_trade_entry_written_before_its_goods_loads_with_none() {
         }
     );
 }
+
+// =====================================================================
+// SIM-TRADE-014 — a napping colony's courtesy gift
+// =====================================================================
+
+/// A caravan at a time, over enough meadows to see every outcome: a nap brings
+/// home nothing, or a tenth of the colony's first good and the hello it counts
+/// as; and about one nap in four does the latter.
+// @spec SIM-TRADE-010, SIM-TRADE-014
+#[test]
+fn a_napping_caravan_sometimes_brings_home_a_tenth_of_the_first_good() {
+    for (colony, good, amount) in [
+        (ColonyId::Owls, ResourceId::Curiosity, 250.0),
+        (ColonyId::Foxes, ResourceId::Buttons, 25.0),
+    ] {
+        let (mut gifts, mut naps) = (0, 0);
+        for seed in 0..6_000 {
+            let mut s = trader(seed, colony, 1);
+            let events = s.apply(Command::Trade(colony, 1)).unwrap();
+            let (_, _, napped, goods) = goods_of(&events);
+            if napped == 0 {
+                continue;
+            }
+            naps += 1;
+            let offers = s.neighbour_offers(colony);
+            if goods.is_empty() {
+                assert!(!offers.reached, "no gift: a napping colony said nothing");
+                assert!(offers.learned.is_empty());
+            } else {
+                gifts += 1;
+                assert_eq!(
+                    goods,
+                    [(good, amount)],
+                    "a tenth of the first good, no more"
+                );
+                assert!(
+                    offers.reached,
+                    "a colony that left a gift out has said hello"
+                );
+                assert_eq!(
+                    offers.learned,
+                    [good],
+                    "and what it left is a good brought home"
+                );
+            }
+        }
+        let rate = gifts as f64 / naps as f64;
+        assert!(naps > 300, "fixture: enough naps to judge, had {naps}");
+        assert!(
+            (0.2..0.3).contains(&rate),
+            "about one nap in four, measured {gifts} of {naps}"
+        );
+    }
+}
+
+/// The gift's draw comes directly after the nap's own, and only on a nap: a twin
+/// of the generator, walking the rule's own draws, ends where the trade does and
+/// comes to the same stock.
+// @spec SIM-TRADE-002, SIM-TRADE-014
+#[test]
+fn a_gifts_draw_follows_the_naps_own() {
+    let colony = ColonyId::Owls;
+    let mut s = trader(904, colony, 2_000);
+    let def = content::colony_def(colony);
+    let standing = s.standing(colony);
+    assert!(standing < 0.0, "fixture: a shy colony");
+    let mut twin = s.rng.clone();
+    let mut expected = 0.0;
+    for _ in 0..2_000 {
+        if !twin.chance(1.0 + standing) {
+            if twin.chance(content::NAP_GIFT_CHANCE) {
+                expected += def.sells[0].amount * content::NAP_GIFT_SHARE;
+            }
+            continue;
+        }
+        for sell in def.sells {
+            if twin.chance(sell.chance) {
+                let fuzz = 1.0 + (twin.uniform() * 2.0 - 1.0) * content::TRADE_FUZZ_WIDTH;
+                expected += sell.amount * fuzz;
+            }
+        }
+    }
+    let before = s.stock(def.sells[0].resource);
+    s.apply(Command::Trade(colony, 2_000)).unwrap();
+    assert_eq!(s.rng, twin, "the same draws, in the same order");
+    let rose = s.stock(def.sells[0].resource) - before;
+    assert!(
+        (rose - expected).abs() < 1e-6,
+        "{rose} where the rule makes {expected}"
+    );
+}
+
+/// A gift is no trade: what raises a trade's goods leaves it where it is.
+// @spec SIM-TRADE-014
+#[test]
+fn a_gift_takes_nothing_that_raises_a_trade() {
+    let raiser = StructureId::ALL
+        .into_iter()
+        .find(|s| content::structure_def(*s).trade_ratio > 0.0)
+        .expect("fixture: something raises the trade ratio");
+    let mut seen = false;
+    for seed in 0..6_000 {
+        let mut s = trader(seed, ColonyId::Owls, 1);
+        grant(&mut s, raiser, 5);
+        let events = s.apply(Command::Trade(ColonyId::Owls, 1)).unwrap();
+        let (_, _, napped, goods) = goods_of(&events);
+        if napped == 1 && !goods.is_empty() {
+            assert_eq!(goods, [(ResourceId::Curiosity, 250.0)]);
+            seen = true;
+        }
+    }
+    assert!(seen, "fixture: some nap brought a gift");
+}
+
+/// The chance and the share the design states.
+// @spec SIM-TRADE-014
+#[test]
+fn a_gift_is_a_tenth_at_one_nap_in_four() {
+    assert_eq!(content::NAP_GIFT_CHANCE, 0.25);
+    assert_eq!(content::NAP_GIFT_SHARE, 0.1);
+}
+
+/// A gift comes from what a colony's Pen Pal level opens: every colony that can
+/// nap has a good open from the first letter, so a gift always has something to
+/// be. Standing never falls below where a colony starts.
+// @spec SIM-TRADE-014
+#[test]
+fn every_colony_that_can_nap_has_a_good_to_give() {
+    for colony in ColonyId::ALL {
+        let def = content::colony_def(colony);
+        if colony != ColonyId::StarWhales && def.start_standing < 0.0 {
+            assert!(
+                def.sells.iter().any(|sell| sell.min_penpal == 0),
+                "{colony:?} can nap with nothing open to give"
+            );
+        }
+    }
+}

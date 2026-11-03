@@ -907,7 +907,19 @@ impl GameState {
             let traded = st >= 0.0 || self.rng.chance(1.0 + st);
             if !traded {
                 napped += 1;
-                continue; // a nap: the caravan travelled, cost already paid
+                // A nap: the caravan travelled, cost already paid. A colony that
+                // left a gift out has said hello, and what it left is a good
+                // brought home. @spec SIM-TRADE-010, SIM-TRADE-014
+                if self.rng.chance(content::NAP_GIFT_CHANCE) {
+                    if let Some(gift) = def.sells.iter().find(|sell| penpal >= sell.min_penpal) {
+                        self.resources[gift.resource.ix()] += gift.amount * content::NAP_GIFT_SHARE;
+                        self.learned_goods
+                            .entry(colony)
+                            .or_default()
+                            .insert(gift.resource);
+                    }
+                }
+                continue;
             }
             // Met, whatever the draws bring: a colony that had nothing to
             // spare has still been reached. @spec SIM-TRADE-010

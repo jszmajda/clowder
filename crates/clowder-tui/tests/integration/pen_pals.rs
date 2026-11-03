@@ -96,7 +96,8 @@ fn the_pen_pal_row_says_what_letters_have_done() {
     let text = pen_pal_text(&s, ColonyId::Foxes);
     for want in [
         format!("The {foxes} are shy of you: −10%. Your letters added +5%."),
-        "About 10% of caravans find them napping.".to_string(),
+        "About 10% of caravans find them napping, and 25% of those bring home a small gift."
+            .to_string(),
     ] {
         assert!(text.contains(&want), "missing {want:?} in: {text}");
     }
