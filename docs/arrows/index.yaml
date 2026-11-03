@@ -192,9 +192,9 @@ arrows:
   navigation:
     status: OK
     parent: tui
-    sampled: 2026-11-02
-    audited: 2026-11-02
-    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 3adc81459fdce7396c685942380e0a19cd5a3ca4
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
@@ -205,7 +205,7 @@ arrows:
     parent: null
     sampled: 2026-11-03
     audited: 2026-11-03
-    audited_sha: 3c6da3bc5aaecb24296fbf5feda3ff7936345a7f
+    audited_sha: 3adc81459fdce7396c685942380e0a19cd5a3ca4
     blocks: [runtime]
     blockedBy: [engine]
     detail: persistence/persistence.md
@@ -236,13 +236,13 @@ arrows:
   runtime:
     status: PARTIAL
     parent: tui
-    sampled: 2026-11-02
-    audited: 2026-11-02
-    audited_sha: 968ae1882751c7a567d88ee26e460afd1df04420
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 3adc81459fdce7396c685942380e0a19cd5a3ca4
     blocks: [render]
     blockedBy: [navigation, persistence]
     detail: tui/runtime/runtime.md
-    next: "#29, #33: thin tests, a suspend's report"
+    next: "#29: thin tests"
     drift: null
   theme:
     status: PARTIAL

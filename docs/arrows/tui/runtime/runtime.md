@@ -4,7 +4,7 @@ This leaf owns the boundary between the operating system and the pure core: term
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-02 (commit `968ae1882751`). 63 of 63 active specs implemented, each cited by a test; 1 deferred.
+**PARTIAL** — last audited 2026-11-03 (commit `3adc81459fdc`). 68 of 68 active specs implemented, each cited by a test; 1 deferred.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns the boundary between the operating system and the pure core: term
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/runtime/runtime-specs.md` — 64 specs, prefix `TUI-RUN`
+- `docs/intent/tui/runtime/runtime-specs.md` — 69 specs, prefix `TUI-RUN`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/clock.rs`
@@ -45,9 +45,9 @@ This leaf owns the boundary between the operating system and the pure core: term
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-RUN-001 – TUI-RUN-075 | 63 | 1 | 0 |
+| All | TUI-RUN-001 – TUI-RUN-080 | 68 | 1 | 0 |
 
-**Summary:** 63 of 63 active specs implemented; 1 deferred.
+**Summary:** 68 of 68 active specs implemented; 1 deferred.
 
 ## Key Findings
 
@@ -59,7 +59,8 @@ Audited 2026-11-02, for what issue #27 changed. A frame reads its clocks after i
 
 Audited 2026-11-02, for what issue #28 changed. A save is decoded strictly, so a bad byte makes it corrupt rather than letting it parse and be overwritten (TUI-RUN-012), and the whole of setting a damaged save aside, telling the player, and starting anew is now tested on a real terminal, for a bad byte and for an unparseable file. A fallback save path is stated before the terminal is taken (TUI-RUN-005). That branch cannot be reached by a real launch on a machine whose user has a home directory, so its choice of path and its statement are tested as functions, and the one line calling them is read rather than run. TUI-RUN-032 stays deferred on purpose, its reason in its spec. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
+Audited 2026-11-03, for what issue #33 changed. A reading spanning the core's minimum reportable absence now wakes the running game as a load does, keeping the player's place (TUI-RUN-076 to TUI-RUN-078), a second long gap joins the first (TUI-RUN-079), and a session ending on one saves it as a wake set down (TUI-RUN-080). This replaces the report a capped gap retained with no gains, and the hours a capped gap took to drain at live play's bound. A long gap in play and a load of the same absence were shown to end in the same bytes, and each new test was checked by breaking what it guards, eleven ways. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
 ## Work Required
 
 - #29: thin tests, stray annotations, and open questions.
-- #33: a suspend inside the absence cap leaves no report, where a restart would.

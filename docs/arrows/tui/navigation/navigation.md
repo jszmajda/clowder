@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-02 (commit `376d3e12c927`). 203 of 203 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-03 (commit `3adc81459fdc`). 203 of 203 active specs implemented, each cited by a test.
 
 ## References
 
@@ -90,6 +90,8 @@ Audited 2026-11-02, for what issue #25 changed. It added a sentence for a new st
 Audited 2026-11-02, for what issue #27 changed. An in-process gap past the absence cap became a third route to a retained report (TUI-NAV-027), whose banner says more than the cap (TUI-NAV-055), read off a drawn frame. Which reports get a banner stays judged from the journal alone. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-02, for what issue #30 changed. No rule of this segment changed: its rows read the core's gates, so what they list moved with them, and one inspector fixture named the new idea. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-03, for what issue #33 changed. The waking screen and the report's banner now also serve a catch-up begun in play (TUI-NAV-027, TUI-NAV-102, TUI-NAV-103), and the capped gap's own queueing went with its report. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 
