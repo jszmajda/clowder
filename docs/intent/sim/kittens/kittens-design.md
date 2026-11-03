@@ -25,7 +25,8 @@ pub struct Kitten {
     pub exp: f64,              // lifetime pool, spent on promotions
     pub rank: u8,              // promoted with exp + shinies
     pub trait_id: KittenTrait, // rolled at arrival; active only while Elder
-    pub profile: Profile,      // drawn at arrival; what it looks like and loves (§ Profiles)
+    pub tinkering: Option<CraftId>, // the recipe a Tinkerer is bound to, if any
+    pub profile: Option<Profile>,   // drawn at arrival; what it looks like and loves (§ Profiles); none only in a save from before profiles
 }
 ```
 
@@ -39,7 +40,7 @@ Every name in the pool:
 
 - is different from every other name in the pool by more than one letter — one letter changed, added, or removed, ignoring case — so no two names in a roster read alike at a glance;
 - is at most 16 characters, ASCII letters with single spaces between words and a capital at the start of each word, so it is single-width and short enough to stand whole in the roster's name column at the 80-column floor (render leaf);
-- is not the name of any other thing in the game, ignoring case: not a resource (as the stores spell it, or that spelling without its final "s"), and not a structure, job, idea, craft, refinement, house rule, rite, arch, tradition, dream loom, colony, site, adventure, season, or kitten trait. Events name kittens in sentences (`{name} became a Gardener`), and a kitten that shared a store's or a building's name would make such a line read as being about that thing.
+- is not the name of any other thing in the game, ignoring case: not a resource (as the stores spell it, or that spelling with its last word made singular, a final "s" dropped or a final "ies" read as "y"), and not a structure, job, idea, craft, refinement, house rule, rite, arch, tradition, dream loom, colony, site, adventure, season, or kitten trait. Events name kittens in sentences (`{name} became a Gardener`), and a kitten that shared a store's or a building's name would make such a line read as being about that thing.
 
 Names are drawn without replacement via RNG; when the pool exhausts, reuse begins with Roman-numeral suffixes (Biscuit II) — the clowder can always outgrow the pool. The remaining pool is *derived from the roster*, never stored: the current cycle is the smallest suffix count at which some base name is unused, and the draw is a uniform RNG index over the remaining names in content-table order, each cycle drawn without replacement in turn.
 
@@ -116,7 +117,7 @@ A few things the simulation holds about a kitten bear on play and are stated on 
 
 Checked once per day (engine day boundary), when there is at least one free housing slot **and** catnip stock ≥ 50:
 
-- Base chance 15%, +5% per full 100 catnip in stock, capped at 60%; one idea then adds +15% *on top of the cap* (effective maximum 75% — the idea's bonus is always real).
+- Base chance 15%, +5% per full 100 catnip in stock, plus any inside-cap arrival effects, capped at 60%; one idea then adds +15% *on top of the cap*, so the idea's bonus is always real. Mess, a running jamboree, and arrival-speed traditions multiply the result, clamped to 100%.
 - **Pity counter:** after 4 consecutive failed eligible checks, the next eligible check succeeds automatically. Ineligible days (no free slot, or stock < 50) *pause* the counter — they neither extend nor reset it. Dry streaks are frustration, not drama.
 - On success: a kitten joins (Home, loafing), gets a name, a trait, and a profile (§ Profiles), resets the pity counter, and emits `KittenArrived`.
 
@@ -133,7 +134,7 @@ Effective workers per job = count of Home kittens holding that job. Away kittens
 
 **Skills.** A working Home kitten gains 0.01 skill XP/tick in its current job × (1 + skill-XP effects), mirrored into its lifetime `exp` pool; every *other* job's skill decays 0.001/tick (floor 0) — switching jobs means retraining, specialization is rewarded (a refinement later removes the decay). Skill tiers multiply that kitten's own yield: <100 +0%, ≥100 +1.25%, ≥500 +2.5%, ≥1200 +4.5%, ≥2500 +7.5%, ≥5000 +12.5%, ≥9000 +18.75%. Production therefore resolves per kitten, in roster order (determinism).
 
-**Ranks.** `Promote(kitten_index)` spends 500 × 1.75^rank exp (from that kitten's pool) plus 25 × (rank+1) shinies, incrementing `rank`. Rank scales the Elder's leadership and a Tinkerer's ability to work high-tier recipes without penalty (each tier above rank: −15% effectiveness, floor 25%).
+**Ranks.** `Promote(kitten_index)` spends 500 × 1.75^rank exp (from that kitten's pool) plus 25 × (rank+1) shinies, incrementing `rank`. Rank scales the Elder's leadership and a Tinkerer's ability to work high-tier recipes without penalty (each tier above rank + 1: −15% effectiveness, floor 25%).
 
 **The Elder.** `AppointElder(kitten_index)` names one kitten (replaceable anytime, never removable by the game). The Elder's own-job yield ×(rank+1)/1.4 (min ×1.0), and its birth trait activates clowder-wide: Crafty +5% craft ratio; Brassy +10% metal crafts (badges/brass/cogs/moonsteel); Alchemical +7.5% process crafts (pavers/moonmilk/dreamweave/cometsilk); Charming +3% trade ratio; Bold +0.5 pounce ratio; Curious −5% idea curiosity costs; Serene −9% rite costs; None — nothing (some cats simply are). Traits are rolled uniformly at arrival (one RNG draw after the name draw, appended to the fixed schedule).
 
@@ -141,7 +142,7 @@ Each trait has a name the player reads it by and a blurb stating its effect plai
 
 ## Jamborees
 
-Jamborees unlock in band 1 but their charm bill (1500) is deliberately a band-2 project — the idea researches early and the ambition teases (the silhouette philosophy, applied to a command). `HostJamboree` spends 800 pep + 1500 charm + 40 quills and sets a 100-day (one game year) jamboree: +30 happiness points × (1 + jamboree-ratio effects), arrival chance × (2 + jamboree-arrival effects), luxury drain ×1.2 (celebrations consume). One jamboree at a time; hosting while one runs is rejected with Locked (the shell's hint should read "already celebrating") — except under the Festival Spirit tradition (prestige leaf), where hosting while one runs pays the bill again and adds its 100 days to the jamboree running, so the festivities stack end to end. Ends silently; the shell may celebrate.
+Jamborees unlock in band 1 but their charm bill (1500) is deliberately a band-2 project — the idea researches early and the ambition teases (the silhouette philosophy, applied to a command). `HostJamboree` spends 800 pep + 1500 charm + 40 quills and sets a 100-day (one game year) jamboree: +30 happiness points × (1 + jamboree-ratio effects), arrival chance × (2 + jamboree-arrival effects), luxury drain ×1.2 (celebrations consume). One jamboree at a time; hosting while one runs is rejected with Locked (the shell's hint should read "already celebrating") — except under the Festival Spirit tradition (prestige leaf), where hosting while one runs pays the bill again and adds its 100 days to the jamboree running, so the festivities stack end to end. Its end is only an event, `JamboreeEnded`; the shell may celebrate.
 
 ## Happiness (Mood)
 
@@ -155,6 +156,7 @@ happiness = 100%
           + 1% × min(loafers, 5)                  (a loafing cat improves any room)
           + 10% per distinct stocked luxury (feathers, bells, mint — dust guard applies)
           + 30% × (1 + jamboree ratio) while a jamboree runs
+          + unlimited_dr(Warm Memories, 5)        (the prestige leaf's happiness legacy)
           − mess penalty (economy leaf, level ≥ 2)
 ```
 
@@ -202,9 +204,7 @@ The wander threshold (3 days ≈ 7.5 real seconds per day of famine at live spee
 1. ✅ Whether wandered kittens can wander *while some are already away*: yes, one per famine day — but never the last Home kitten. A floor of one keeps the meadow warm, keeps absence legible ("a few may wander," per the HLD), and keeps consumption nonzero so an abandoned pantry can never masquerade as recovery.
 
 ### Deferred
-1. Kitten skills/experience per job — roadmap (sim sub-HLD).
-1a. Society-wave happiness obligations from the economy leaf: the +10-points-per-distinct-stocked-luxury term and the crowding-relief term crowding × (1 − limited_dr(0.048·StoryCircles + 0.075·MoonlightStages, 0.9)) enter the happiness formula when this leaf's society wave revises SIM-KIT-011.
-2. Whether crowding should ease with a later structure — decide with the housing tier of the crafting segment.
+1. Whether crowding should ease with a later structure — decide with the housing tier of the crafting segment.
 
 ## References
 

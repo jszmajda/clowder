@@ -48,7 +48,7 @@ In table order. A *state* condition reads the meadow as it stands; a *moment* co
 | 13 | Moving Up | state | a kitten holds rank 1 |  |
 | 14 | Senior Purrsonnel | state | a kitten holds rank 5 |  |
 | 15 | Paws of Experience | state | a kitten holds 9000 skill in a job |  |
-| 16 | Everyone's on Break | state | at least 10 kittens are at home and none holds a job | secret |
+| 16 | Everyone's on Break | state | at least 10 kittens are at home and none on the roster holds a job | secret |
 | 17 | Visiting the Neighbours | moment | a kitten wanders to the neighbour's yard |  |
 | 18 | Home Again | moment | a kitten comes home |  |
 | 19 | Pure Bliss | state | the clowder's mood is Blissful |  |
@@ -101,9 +101,9 @@ An achievement is earned the first time its condition holds, and never un-earned
 - **A state condition** — something the meadow now is or holds (a roster this large, a kitten of this kind in it, a building count, a standing, a generation). These are checked at every day close and after every applied command that tells of something happening — one that emits an event, a speed change aside — save those that read individual kittens (their looks, favourites, names, ranks, skills, jobs, and whereabouts), which a day close checks only when that day saw a kitten arrive or a new year begin. What such a condition reads changes only then or by a command that emits an event, except a kitten's skill, which grows a little every tick, and its whereabouts, which a lean pantry and a full one change as often as every day; both are noticed at the year's turn at the latest. A condition changed by a command that emits nothing — a craft, a tinkerer bound to a recipe — reads no individual kitten's looks or standing, and is noticed at the day's close. Because state conditions read the meadow as it stands, a meadow that already meets one is credited at its next check, which is how a save from before achievements earns everything it has already done.
 - **A moment condition** — something that just happened (a kitten wandered off, a caravan napped, the zoomies started). These are checked against the events of each tick and of each applied command.
 
-Earning one records it with the generation and the meadow's day it was earned on, and emits `AchievementEarned`, a milestone event, so it is journaled permanently and celebrated where milestones are. Checking takes no draw from the state RNG and changes nothing else.
+Earning one records it with the generation and the meadow's day it was earned on, and emits `AchievementEarned`, a milestone event, so one earned in play is journaled permanently and celebrated where milestones are. One earned during a catch-up or a deep nap is folded away with the rest of that replay's events (engine leaf: The Journal); the record keeps it, and a catch-up answers which achievements the record held before it began, so a frontend can tell what the absence earned. Checking takes no draw from the state RNG and changes nothing else.
 
-Checks skip what is already earned. The daily checks read only small summaries of the meadow (counts, sets, flags, the clowder's mood and energy), and the checks that walk the roster run only on the few days a kitten arrives or a year turns, so a long catch-up stays well inside its bounds (SAVE-009, SAVE-033).
+Checks skip what is already earned. The daily checks read only small summaries of the meadow (counts, sets, flags, the clowder's mood and energy), and the checks that walk the roster run only on the few days a kitten arrives or a year turns, save the one looking for a bound tinkerer, which stops at the first it finds, so a long catch-up stays well inside its bounds (SAVE-009, SAVE-033).
 
 ## The Record
 
