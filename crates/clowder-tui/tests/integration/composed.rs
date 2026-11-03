@@ -772,7 +772,15 @@ fn the_swapped_inspector_takes_the_lists_space_and_nothing_else() {
 
     // A row that the list was showing, and that the inspector has no reason to
     // mention, is gone from the frame entirely — the list really was replaced.
-    let neighbour = probe(StructureId::ALL[5]);
+    // The cursor's own family's other copies are its neighbours in the list.
+    let family = clowder_core::content::structure_family(StructureId::ALL[4]);
+    let neighbour = StructureId::ALL
+        .into_iter()
+        .find(|s| {
+            *s != StructureId::ALL[4] && clowder_core::content::structure_family(*s) == family
+        })
+        .map(probe)
+        .expect("fixture: another of the family");
     assert!(
         drawn_anywhere(&listing, &neighbour),
         "fixture: the list should be showing the row next to the cursor"

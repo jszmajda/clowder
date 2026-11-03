@@ -4,7 +4,7 @@
 //! TUI-NAV-169, TUI-NAV-170, TUI-THEME-015, TUI-RENDER-030
 
 use clowder_core::content::structure_def;
-use clowder_core::{GameState, StructureId};
+use clowder_core::{ContentId, GameState, StructureId};
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -129,7 +129,7 @@ fn the_energy_row_is_listed_once_anything_makes_or_uses_energy() {
     assert_eq!(header.key, RowKey::Fixed("energy & mess"));
     let structures = all
         .iter()
-        .position(|r| r.key == RowKey::Fixed("structures"));
+        .rposition(|r| matches!(r.key, RowKey::Content(ContentId::Structure(_), _)));
     let stores = all.iter().position(|r| r.key == RowKey::Fixed("stores"));
     if let Some(st) = structures {
         assert!(st < at, "structures above");

@@ -99,4 +99,4 @@ Job yields are per effective worker (SIM-KIT: Home kittens holding the job) per 
 - [x] **SIM-ECO-058**: The system shall mark on every structure definition whether its cap extensions are kite-ratcheted — the Porch alone.
 - [x] **SIM-ECO-059**: The system shall mark on every structure definition whether it is fuel-scaled — the Dynamo Wheel alone — and shall take a structure's fuel fraction as the throttle fraction of its converter's inputs over its copies held.
 - [x] **SIM-ECO-060**: The system shall mark on every structure definition whether its energy made is seasonal — the Sunning Deck and the Solar Array alone.
-- [ ] **SIM-ECO-063**: The system shall give every structure exactly one family as the economy design's family table states it, through a rule exhaustive over the structures, and shall list the families in the order that table gives them.
+- [x] **SIM-ECO-063**: The system shall give every structure exactly one family as the economy design's family table states it, through a rule exhaustive over the structures, and shall list the families in the order that table gives them.

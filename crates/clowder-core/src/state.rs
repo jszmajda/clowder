@@ -707,6 +707,37 @@ pub struct Fur {
     pub colours: Vec<FurColour>,
 }
 
+/// What a structure is for, in the order a list of them stands: every structure
+/// is in exactly one. @spec SIM-ECO-063
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum StructureFamily {
+    Homes,
+    Gardens,
+    Storerooms,
+    Studies,
+    Workshops,
+    Comforts,
+    Power,
+    Tidiers,
+    Marvels,
+    Outposts,
+}
+
+impl StructureFamily {
+    pub const ALL: [StructureFamily; 10] = [
+        StructureFamily::Homes,
+        StructureFamily::Gardens,
+        StructureFamily::Storerooms,
+        StructureFamily::Studies,
+        StructureFamily::Workshops,
+        StructureFamily::Comforts,
+        StructureFamily::Power,
+        StructureFamily::Tidiers,
+        StructureFamily::Marvels,
+        StructureFamily::Outposts,
+    ];
+}
+
 /// The kinds of favourite a kitten can be known for. Ids are append-only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum FavouriteKind {

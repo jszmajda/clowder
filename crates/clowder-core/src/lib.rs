@@ -39,6 +39,6 @@ pub use state::{
     AchievementId, AdventureId, ArchId, ArchivedKitten, Availability, ColonyId, ContentId, CraftId,
     DreamLoomId, Earned, EyeColour, EyeLook, Favourite, FavouriteKind, Fur, FurColour, FurPattern,
     GameState, IdeaId, JobId, Kitten, KittenTrait, Location, MoodTier, Pose, Profile, Promise,
-    RefinementId, ResourceId, RiteId, RuleId, Season, SiteId, StructureGate, StructureId,
-    TraditionId,
+    RefinementId, ResourceId, RiteId, RuleId, Season, SiteId, StructureFamily, StructureGate,
+    StructureId, TraditionId,
 };

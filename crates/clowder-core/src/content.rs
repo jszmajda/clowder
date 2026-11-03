@@ -537,6 +537,51 @@ pub fn structure_def(s: StructureId) -> &'static StructureDef {
     &STRUCTURES[s.ix()]
 }
 
+/// The one family a structure belongs to, by what the player comes to it for.
+/// Exhaustive, so a new structure cannot compile without one. @spec SIM-ECO-063
+pub fn structure_family(s: StructureId) -> crate::state::StructureFamily {
+    use crate::state::StructureFamily::*;
+    use StructureId as S;
+    match s {
+        S::CozyCushion | S::CatTree | S::WindowPerch => Homes,
+        S::CatnipPatch | S::HerbGarden | S::CouchMine | S::GravelPit | S::DewCollector => Gardens,
+        S::Pantry | S::TwigPile | S::Shed | S::Porch => Storerooms,
+        S::CardboardBox
+        | S::StudyNook
+        | S::StargazingLedge
+        | S::WhiskerLab
+        | S::BoxLabyrinth
+        | S::YarnComputer => Studies,
+        S::Kiln | S::CraftCorner | S::ToyWorkshop | S::TreatBakery => Workshops,
+        S::ScratchingPost
+        | S::Hearth
+        | S::GiftStand
+        | S::StoryCircle
+        | S::SunRoom
+        | S::SunbeamAltar
+        | S::TeaHouse
+        | S::MoonlightStage => Comforts,
+        S::Cogworks | S::DynamoWheel | S::SunningDeck | S::StreamWheel | S::StarBasin => Power,
+        S::BroomCupboard | S::ClockworkBroom => Tidiers,
+        S::PrismSpinner | S::MemoryChest | S::UnicornMeadow | S::RainbowArch | S::Sunstone => {
+            Marvels
+        }
+        S::LookoutPost
+        | S::Treehouse
+        | S::WeatherVane
+        | S::SolarArray
+        | S::RangerStation
+        | S::HushfeltGrotto
+        | S::WhisperPost
+        | S::CairnCircle
+        | S::SkyDock
+        | S::AuroraLantern
+        | S::StarNursery
+        | S::FarBeacon
+        | S::WishingStar => Outposts,
+    }
+}
+
 static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
     StructureDef {
         name: "Catnip Patch",

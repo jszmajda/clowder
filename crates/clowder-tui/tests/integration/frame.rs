@@ -58,7 +58,8 @@ use std::time::{Duration, Instant};
 
 use clowder_core::content::structure_def;
 use clowder_core::{
-    save_string, ContentId, GameState, Kitten, KittenTrait, Location, ResourceId, StructureId,
+    content, save_string, ContentId, GameState, Kitten, KittenTrait, Location, ResourceId,
+    StructureFamily, StructureId,
 };
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
@@ -869,13 +870,29 @@ fn every_group_listed() -> GameState {
     s
 }
 
+/// The words the design gives each structure family's header.
+fn family_words(family: StructureFamily) -> &'static str {
+    match family {
+        StructureFamily::Homes => "homes",
+        StructureFamily::Gardens => "gardens & diggings",
+        StructureFamily::Storerooms => "storerooms",
+        StructureFamily::Studies => "studies",
+        StructureFamily::Workshops => "workshops",
+        StructureFamily::Comforts => "comforts",
+        StructureFamily::Power => "power sources",
+        StructureFamily::Tidiers => "tidiers",
+        StructureFamily::Marvels => "marvels",
+        StructureFamily::Outposts => "outposts",
+    }
+}
+
 /// The words the design gives the header of the group `row` stands in: the
 /// plain plural of what the row is about, `stores` for resources, and
 /// `things to do` for a section's own verbs.
 fn header_words_for(row: &Row) -> &'static str {
     match &row.key {
         RowKey::Fixed(_) => "things to do",
-        RowKey::Content(ContentId::Structure(_), _) => "structures",
+        RowKey::Content(ContentId::Structure(s), _) => family_words(content::structure_family(*s)),
         RowKey::Content(ContentId::Job(_), _) => "jobs",
         RowKey::Content(ContentId::Idea(_), _) => "ideas",
         RowKey::Content(ContentId::Refinement(_), _) => "refinements",
@@ -900,7 +917,21 @@ fn designed_headers() -> BTreeSet<(usize, &'static str)> {
     let table: [(Section, &[&str]); 10] = [
         (
             Section::Meadow,
-            &["things to do", "structures", "energy & mess", "stores"],
+            &[
+                "things to do",
+                "homes",
+                "gardens & diggings",
+                "storerooms",
+                "studies",
+                "workshops",
+                "comforts",
+                "power sources",
+                "tidiers",
+                "marvels",
+                "outposts",
+                "energy & mess",
+                "stores",
+            ],
         ),
         (Section::Clowder, &["jobs", "things to do", "kittens"]),
         (Section::Ideas, &["ideas", "refinements", "rules"]),
@@ -4284,5 +4315,96 @@ fn a_frame_keeps_no_rows_for_the_next_one() {
     assert!(
         drawn_anywhere(&next, &name),
         "the next frame drew the rows the state now lists"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-097..100, SIM-ECO-063 — the Meadow's structures, by family
+// ---------------------------------------------------------------------------
+
+/// The Meadow's headers, in order.
+fn meadow_headers(s: &GameState) -> Vec<&'static str> {
+    rows(s, Section::Meadow)
+        .into_iter()
+        .filter_map(|r| match (r.kind, r.key) {
+            (RowKind::Group, RowKey::Fixed(words)) => Some(words),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Every revealed structure stands under its family's one header, the families
+/// in the core's order and each family's rows in the order the core lists
+/// structures, so one family never splits and no structure wanders.
+/// @spec TUI-NAV-097, TUI-NAV-098, TUI-NAV-100, SIM-ECO-063
+#[test]
+fn the_meadows_structures_stand_by_family_each_in_the_core_order() {
+    let mut s = GameState::new(38_001);
+    s.revealed = StructureId::ALL
+        .map(ContentId::Structure)
+        .into_iter()
+        .collect();
+    let mut under: Vec<(&'static str, Vec<StructureId>)> = Vec::new();
+    for row in rows(&s, Section::Meadow) {
+        match (&row.kind, &row.key) {
+            (RowKind::Group, RowKey::Fixed(words)) => under.push((words, Vec::new())),
+            (_, RowKey::Content(ContentId::Structure(id), _)) => {
+                under.last_mut().expect("a header above").1.push(*id);
+            }
+            _ => {}
+        }
+    }
+    under.retain(|(_, ids)| !ids.is_empty());
+    let want: Vec<&'static str> = StructureFamily::ALL.map(family_words).to_vec();
+    assert_eq!(
+        under.iter().map(|(words, _)| *words).collect::<Vec<_>>(),
+        want,
+        "every family once, in the core's order, with everything revealed"
+    );
+    for (family, (_, ids)) in StructureFamily::ALL.into_iter().zip(&under) {
+        let in_order: Vec<StructureId> = StructureId::ALL
+            .into_iter()
+            .filter(|id| content::structure_family(*id) == family)
+            .collect();
+        assert_eq!(ids, &in_order, "{family:?}: every one, in the core's order");
+    }
+}
+
+/// A header says nothing of what the player has not met: a new meadow lists a
+/// family's header only for what it lists, and one arrives with its first row.
+/// @spec TUI-NAV-099
+#[test]
+fn a_family_header_stands_only_over_a_listed_row() {
+    let mut s = GameState::new(38_002);
+    let fresh = meadow_headers(&s);
+    assert!(
+        !fresh.contains(&"outposts")
+            && !fresh.contains(&"marvels")
+            && !fresh.contains(&"power sources"),
+        "nothing of those listed, so no word of them: {fresh:?}"
+    );
+    let listed: BTreeSet<&'static str> = rows(&s, Section::Meadow)
+        .into_iter()
+        .filter_map(|r| match r.key {
+            RowKey::Content(ContentId::Structure(id), _) => {
+                Some(family_words(content::structure_family(id)))
+            }
+            _ => None,
+        })
+        .collect();
+    for family in StructureFamily::ALL.map(family_words) {
+        assert_eq!(
+            fresh.contains(&family),
+            listed.contains(family),
+            "{family}: a header exactly while it heads a listed row"
+        );
+    }
+
+    assert!(!fresh.contains(&"storerooms"), "fixture: none met yet");
+    s.ideas.insert(IdeaId::PantryOrganization);
+    s.tick();
+    assert!(
+        meadow_headers(&s).contains(&"storerooms"),
+        "a family's first row brings its header"
     );
 }

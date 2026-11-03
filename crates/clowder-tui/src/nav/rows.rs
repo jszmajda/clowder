@@ -4,7 +4,8 @@
 
 use clowder_core::{
     AdventureId, ArchId, ColonyId, Command, ContentId, CraftId, DreamLoomId, GameState, IdeaId,
-    JobId, LockReason, RefinementId, ResourceId, RiteId, RuleId, SiteId, StructureId, TraditionId,
+    JobId, LockReason, RefinementId, ResourceId, RiteId, RuleId, SiteId, StructureFamily,
+    StructureId, TraditionId,
 };
 
 use super::action::CountSemantics;
@@ -251,6 +252,22 @@ fn rows_ungated(state: &GameState, section: Section) -> Vec<Row> {
     }
 }
 
+/// The words of a structure family's group header. @spec TUI-NAV-100
+fn family_header(family: StructureFamily) -> &'static str {
+    match family {
+        StructureFamily::Homes => "homes",
+        StructureFamily::Gardens => "gardens & diggings",
+        StructureFamily::Storerooms => "storerooms",
+        StructureFamily::Studies => "studies",
+        StructureFamily::Workshops => "workshops",
+        StructureFamily::Comforts => "comforts",
+        StructureFamily::Power => "power sources",
+        StructureFamily::Tidiers => "tidiers",
+        StructureFamily::Marvels => "marvels",
+        StructureFamily::Outposts => "outposts",
+    }
+}
+
 fn meadow_rows(state: &GameState) -> Vec<Row> {
     let mut verbs = vec![
         Row {
@@ -275,18 +292,22 @@ fn meadow_rows(state: &GameState) -> Vec<Row> {
     }
     let mut out = headed_group(state, "things to do", verbs);
 
-    let mut structures = Vec::new();
-    for s in StructureId::ALL {
-        let id = ContentId::Structure(s);
-        if revealed(state, id) {
-            structures.push(Row {
-                key: RowKey::Content(id, ""),
-                kind: act(Command::Build(s), CountSemantics::RepeatN),
-                heavy: false,
-            });
+    // Each structure in the group of its family, the core saying which, so the
+    // long list has landmarks and `[`/`]` have stops. @spec TUI-NAV-097, TUI-NAV-098
+    for family in StructureFamily::ALL {
+        let mut structures = Vec::new();
+        for s in StructureId::ALL {
+            let id = ContentId::Structure(s);
+            if clowder_core::content::structure_family(s) == family && revealed(state, id) {
+                structures.push(Row {
+                    key: RowKey::Content(id, ""),
+                    kind: act(Command::Build(s), CountSemantics::RepeatN),
+                    heavy: false,
+                });
+            }
         }
+        out.extend(headed_group(state, family_header(family), structures));
     }
-    out.extend(headed_group(state, "structures", structures));
 
     // The readouts: energy while anything built makes or uses it, mess while
     // anything built makes it or any is held. @spec TUI-NAV-167, TUI-NAV-098

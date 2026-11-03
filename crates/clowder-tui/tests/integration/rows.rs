@@ -2626,7 +2626,8 @@ fn a_store_a_stated_price_names_is_listed_before_any_is_held() {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum GroupKind {
     ThingsToDo,
-    Structures,
+    /// A structure family's group (SIM-ECO-063).
+    Structures(clowder_core::StructureFamily),
     Stores,
     Jobs,
     Kittens,
@@ -2667,7 +2668,9 @@ fn group_kind(row: &Row) -> Option<GroupKind> {
     }
     Some(match &row.key {
         RowKey::Fixed(_) => GroupKind::ThingsToDo,
-        RowKey::Content(ContentId::Structure(_), _) => GroupKind::Structures,
+        RowKey::Content(ContentId::Structure(s), _) => {
+            GroupKind::Structures(clowder_core::content::structure_family(*s))
+        }
         RowKey::Content(ContentId::Job(_), _) => GroupKind::Jobs,
         RowKey::Content(ContentId::Idea(_), _) => GroupKind::Ideas,
         RowKey::Content(ContentId::Refinement(_), _) => GroupKind::Refinements,
@@ -2691,7 +2694,11 @@ fn group_kind(row: &Row) -> Option<GroupKind> {
 fn design_groups(section: Section) -> Vec<GroupKind> {
     use GroupKind::*;
     match section {
-        Section::Meadow => vec![ThingsToDo, Structures, EnergyMess, Stores],
+        Section::Meadow => [ThingsToDo]
+            .into_iter()
+            .chain(clowder_core::StructureFamily::ALL.map(Structures))
+            .chain([EnergyMess, Stores])
+            .collect(),
         Section::Clowder => vec![Jobs, ThingsToDo, Kittens],
         Section::Ideas => vec![Ideas, Refinements, Rules, Done],
         Section::Crafts => vec![Tinkerers, Crafts],

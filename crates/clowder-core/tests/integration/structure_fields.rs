@@ -445,3 +445,158 @@ fn a_stock_the_far_beacon_makes_room_for_stands_through_the_clamp() {
     run_ticks(&mut with, 1);
     assert_eq!(with.stock(r), over);
 }
+
+// ---------------------------------------------------------------------------
+// SIM-ECO-063 — every structure has one family, and each family means its name
+// ---------------------------------------------------------------------------
+
+/// The family table, as the design states it.
+/// @spec SIM-ECO-063
+#[test]
+fn every_structure_stands_in_the_family_the_design_gives_it() {
+    use StructureFamily as F;
+    let table: [(F, &[&str]); 10] = [
+        (F::Homes, &["Cozy Cushion", "Cat Tree", "Window Perch"]),
+        (
+            F::Gardens,
+            &[
+                "Catnip Patch",
+                "Herb Garden",
+                "Couch Mine",
+                "Gravel Pit",
+                "Dew Collector",
+            ],
+        ),
+        (F::Storerooms, &["Pantry", "Twig Pile", "Shed", "Porch"]),
+        (
+            F::Studies,
+            &[
+                "Cardboard Box",
+                "Study Nook",
+                "Stargazing Ledge",
+                "Whisker Lab",
+                "Box Labyrinth",
+                "Yarn Computer",
+            ],
+        ),
+        (
+            F::Workshops,
+            &["Kiln", "Craft Corner", "Toy Workshop", "Treat Bakery"],
+        ),
+        (
+            F::Comforts,
+            &[
+                "Scratching Post",
+                "Hearth",
+                "Gift Stand",
+                "Story Circle",
+                "Sun Room",
+                "Sunbeam Altar",
+                "Tea House",
+                "Moonlight Stage",
+            ],
+        ),
+        (
+            F::Power,
+            &[
+                "Cogworks",
+                "Dynamo Wheel",
+                "Sunning Deck",
+                "Stream Wheel",
+                "Star Basin",
+            ],
+        ),
+        (F::Tidiers, &["Broom Cupboard", "Clockwork Broom"]),
+        (
+            F::Marvels,
+            &[
+                "Prism Spinner",
+                "Memory Chest",
+                "Unicorn Meadow",
+                "Rainbow Arch",
+                "Sunstone",
+            ],
+        ),
+        (
+            F::Outposts,
+            &[
+                "Lookout Post",
+                "Treehouse",
+                "Weather Vane",
+                "Solar Array",
+                "Ranger Station",
+                "Hushfelt Grotto",
+                "Whisper Post",
+                "Cairn Circle",
+                "Sky Dock",
+                "Aurora Lantern",
+                "Star Nursery",
+                "Far Beacon",
+                "Wishing Star",
+            ],
+        ),
+    ];
+    assert_eq!(
+        table.map(|(family, _)| family),
+        StructureFamily::ALL,
+        "the families in the table's order"
+    );
+    let mut placed = 0;
+    for (family, names) in table {
+        for name in names {
+            let structure = StructureId::ALL
+                .into_iter()
+                .find(|s| content::structure_def(*s).name == *name)
+                .unwrap_or_else(|| panic!("{name} is a structure"));
+            assert_eq!(content::structure_family(structure), family, "{name}");
+            placed += 1;
+        }
+    }
+    assert_eq!(placed, StructureId::ALL.len(), "every structure, once");
+}
+
+/// A family's name is a promise about what a player finds in it, held against
+/// each structure's own fields, so a change to what a structure does shows up
+/// here as a question of where it belongs.
+/// @spec SIM-ECO-063
+#[test]
+fn each_family_holds_what_its_name_says() {
+    for s in StructureId::ALL {
+        let def = content::structure_def(s);
+        let family = content::structure_family(s);
+        let name = def.name;
+        assert_eq!(
+            family == StructureFamily::Outposts,
+            def.outdoor,
+            "{name}: outposts are exactly what stands outdoors"
+        );
+        if !def.outdoor {
+            assert_eq!(
+                family == StructureFamily::Homes,
+                def.housing > 0,
+                "{name}: at home, homes are what houses a kitten"
+            );
+            assert_eq!(
+                family == StructureFamily::Power,
+                def.energy_prod > 0.0,
+                "{name}: at home, power is what makes energy"
+            );
+        }
+        match family {
+            StructureFamily::Storerooms => {
+                assert!(!def.cap_bonuses.is_empty(), "{name}: makes room");
+                assert!(def.productions.is_empty(), "{name}: and only makes room");
+            }
+            StructureFamily::Tidiers => {
+                assert!(def.mess < 0.0, "{name}: clears mess");
+            }
+            StructureFamily::Gardens => {
+                assert!(
+                    !def.productions.is_empty(),
+                    "{name}: grows or digs something"
+                );
+            }
+            _ => {}
+        }
+    }
+}
