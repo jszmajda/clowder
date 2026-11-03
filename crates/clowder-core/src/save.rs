@@ -5,6 +5,8 @@ use std::collections::BTreeSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+mod wide;
+
 /// v3: the event journal joins canonical state. v2 was the depth expansion —
 /// speed, the revealed set, and each wave's state blocks. v4 added the
 /// banked-tick count (SAVE-017). v5 adds the report so far of a catch-up set
@@ -68,8 +70,8 @@ pub enum LoadError {
     NotFound,
     /// The save was written by a newer clowder; never guess forward.
     TooNew { found: u32 },
-    /// Unparseable JSON, missing fields, or unknown content ids. Core never
-    /// deletes or rewrites the file; what to do next is the shell's call.
+    /// Unparseable JSON, a missing required field, or unknown content ids. Core
+    /// never deletes or rewrites the file; what to do next is the shell's call.
     Corrupt { detail: String },
 }
 
@@ -252,7 +254,7 @@ fn merge_lists(a: &[(String, u32)], b: &[(String, u32)]) -> Vec<(String, u32)> {
     let mut out = a.to_vec();
     for (name, n) in b {
         if let Some(entry) = out.iter_mut().find(|(nm, _)| nm == name) {
-            entry.1 += n;
+            entry.1 = entry.1.saturating_add(*n);
         } else {
             out.push((name.clone(), *n));
         }
@@ -296,13 +298,19 @@ impl CatchUp {
                 + (self.state.resources[r.ix()] - self.before[r.ix()]);
         }
         OfflineReport {
-            elapsed_seconds: self.carried.elapsed_seconds + self.this_elapsed_seconds,
+            elapsed_seconds: self
+                .carried
+                .elapsed_seconds
+                .saturating_add(self.this_elapsed_seconds),
             truncated: self.carried.truncated || self.this_truncated,
             resource_deltas,
             arrived: merge_lists(&self.carried.arrived, &self.partial.arrived),
             wandered: merge_lists(&self.carried.wandered, &self.partial.wandered),
             returned: merge_lists(&self.carried.returned, &self.partial.returned),
-            seasons_passed: self.carried.seasons_passed + self.partial.seasons_passed,
+            seasons_passed: self
+                .carried
+                .seasons_passed
+                .saturating_add(self.partial.seasons_passed),
         }
     }
 
@@ -379,17 +387,20 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
     } else {
         KeptLooks::default()
     };
-    let file: SaveFile = serde_json::from_value(value).map_err(|e| LoadError::Corrupt {
+    // A field with no default is one every format version wrote, and is required.
+    // @spec SAVE-004, SAVE-032, SAVE-036
+    let file = SaveFile::deserialize(wide::Wide(value)).map_err(|e| LoadError::Corrupt {
         detail: e.to_string(),
     })?;
     let mut state = file.state;
+    keep_room(&mut state);
     // The reveal worklists aren't serialized; rebuild them from `revealed`
     // before any tick (catch-up) runs, so a reloaded game reveals exactly as
     // live play would. @spec SIM-ENG-023
     state.rebuild_unrevealed();
 
-    // Normalize hand-edited numerics: physics, not errors. (Counters were
-    // already clamped by their wide deserializers.)
+    // Normalize hand-edited numerics: physics, not errors. (Integers were
+    // already read as the nearest they can hold.) @spec SAVE-005
     if !state.speed.is_finite() {
         state.speed = 1.0;
     }
@@ -403,16 +414,14 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
         state.kites_high_water = 0.0;
     }
     // Wave-5 normalization: the legacy currencies and adventure reward pools are
-    // physics — floor at zero and stay finite. Generation, completions, and the
-    // armed/active adventure slots are valid by construction (their
-    // deserializers). @spec SAVE-013
+    // physics — floor at zero and stay finite. The armed/active adventure slots
+    // are valid by construction. @spec SAVE-013
     for value in [
         &mut state.elder_wisdom,
         &mut state.warm_memories,
         &mut state.passed_down_wisdom,
         // Wave-6: stirred-dreams heat is physics too — floor at zero and stay
-        // finite. Sites, looms, whale counters, and deja_vu_until are valid by
-        // construction (their deserializers). @spec SAVE-013
+        // finite. Sites and looms are valid by construction. @spec SAVE-013
         &mut state.stirred_dreams,
     ] {
         if !value.is_finite() || *value < 0.0 {
@@ -441,8 +450,7 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
 
     // Society-wave normalization: learning is physics too. Skills and exp
     // floor at zero and must be finite; an out-of-roster Elder index is no
-    // Elder at all. (Ranks were already clamped by their wide deserializer;
-    // jamboree_until and tinkering recipes are valid by construction.)
+    // Elder at all. (Tinkering recipes are valid by construction.)
     // @spec SIM-KIT-027
     for k in &mut state.kittens {
         if !k.exp.is_finite() || k.exp < 0.0 {
@@ -459,9 +467,8 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
     }
 
     // Wave-4 normalization: devotion, serenity, peak_devotion, and dream-drift
-    // are physics — floor at zero and stay finite. The enlightenment tier,
-    // pen-pal levels, discoveries, rites, and Promises are valid by
-    // construction. @spec SAVE-013
+    // are physics — floor at zero and stay finite. Discoveries, rites, and
+    // Promises are valid by construction. @spec SAVE-013
     for value in [
         &mut state.devotion,
         &mut state.serenity,
@@ -528,6 +535,49 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
         partial: OfflineReport::default(),
         earned_at_load,
     })
+}
+
+/// Bring down what keeps counting, so a number read at the top of its range
+/// leaves room: an addition to it can't overflow, and a price, which raises its
+/// ratio to a signed power of the copies held, can't read a negative count. No
+/// meadow reaches either limit by playing. The generator is no count, and keeps
+/// its whole range. @spec SAVE-035
+fn keep_room(state: &mut GameState) {
+    const CLOCK_ROOM: u64 = u64::MAX / 2;
+    const COUNT_ROOM: u32 = i32::MAX as u32;
+    for clock in [
+        &mut state.ticks,
+        &mut state.next_seq,
+        &mut state.zoomies_until,
+        &mut state.jamboree_until,
+        &mut state.deja_vu_until,
+    ] {
+        *clock = (*clock).min(CLOCK_ROOM);
+    }
+    let stamps = state
+        .kittens
+        .iter_mut()
+        .flat_map(|k| [&mut k.job_seq, &mut k.away_seq])
+        .chain([&mut state.pending_sky_event]);
+    for stamp in stamps.flatten() {
+        *stamp = (*stamp).min(CLOCK_ROOM);
+    }
+    let counts = state
+        .structures
+        .iter_mut()
+        .chain(&mut state.rite_counts)
+        .chain(&mut state.penpal)
+        .chain(&mut state.adventure_completions)
+        .chain([
+            &mut state.generation,
+            &mut state.enlightenment_tier,
+            &mut state.whale_visit_years,
+            &mut state.whale_contentment,
+            &mut state.tidy_progress,
+        ]);
+    for count in counts {
+        *count = (*count).min(COUNT_ROOM);
+    }
 }
 
 /// Each idea that now gates a surface this save could already reach, held and

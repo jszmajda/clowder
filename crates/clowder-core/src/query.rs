@@ -722,8 +722,12 @@ impl GameState {
     pub fn bench(&self) -> Bench {
         let seats = StructureId::ALL
             .iter()
-            .map(|s| crate::content::structure_def(*s).tinkerer_seats * self.structures[s.ix()])
-            .sum();
+            .map(|s| {
+                crate::content::structure_def(*s)
+                    .tinkerer_seats
+                    .saturating_mul(self.structures[s.ix()])
+            })
+            .fold(0, u32::saturating_add);
         let seated = self
             .kittens
             .iter()

@@ -27,6 +27,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 - **Everything you research now does what it says.** A few things you could learn didn't open what they promised, and some of what they promised opened without them. Anything you could already reach stays yours: the research that now opens it is granted free when you load your save.
 - **Looking for new faces finds the ones you've earned first.** When you've met the conditions for someone special, they now come ahead of the usual crowd.
 - **An action no longer shows before it can be used.** One was listed early, and did nothing when chosen.
+- **A mistyped number no longer costs you a hand-edited save.** A negative, a fraction, or a number too big for its place now reads as the nearest it can be, where it used to set the whole save aside. Something that isn't a number at all still does.
 - **Hand-edited saves are harder to hurt.** A few unusual edits could empty your stores on load or be misread. They no longer do.
 - **A damaged save is kept safe in one more case.** A single bad byte could slip through unnoticed and be saved over. Now that file is moved aside, you're told where it went, and a new meadow starts.
 - **If clowder can't find your system's data folder, it tells you where your save is.**

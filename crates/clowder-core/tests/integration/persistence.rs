@@ -2638,3 +2638,529 @@ fn a_backwards_clock_still_replays_what_the_save_owes() {
     let none = save_string(&s, 1_000);
     assert_eq!(begin_load(&none, 500).unwrap().total_ticks(), 0);
 }
+
+// =====================================================================
+// A hand edit gets physics: every integer in the save, wherever it sits
+// =====================================================================
+
+type JsonPath = Vec<serde_json::Value>;
+
+/// The path of every integer in a saved value.
+fn integer_paths(value: &serde_json::Value) -> Vec<JsonPath> {
+    fn walk(value: &serde_json::Value, path: &mut JsonPath, found: &mut Vec<JsonPath>) {
+        match value {
+            serde_json::Value::Object(fields) => {
+                for (key, field) in fields {
+                    path.push(serde_json::json!(key));
+                    walk(field, path, found);
+                    path.pop();
+                }
+            }
+            serde_json::Value::Array(items) => {
+                for (ix, item) in items.iter().enumerate() {
+                    path.push(serde_json::json!(ix));
+                    walk(item, path, found);
+                    path.pop();
+                }
+            }
+            serde_json::Value::Number(n) if n.is_u64() => found.push(path.clone()),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    walk(value, &mut Vec::new(), &mut found);
+    found
+}
+
+fn at<'a>(
+    value: &'a mut serde_json::Value,
+    path: &[serde_json::Value],
+) -> &'a mut serde_json::Value {
+    path.iter().fold(value, |here, step| match step {
+        serde_json::Value::String(key) => &mut here[key.as_str()],
+        _ => &mut here[step.as_u64().unwrap() as usize],
+    })
+}
+
+fn spelled(path: &[serde_json::Value]) -> String {
+    path.iter()
+        .map(|step| match step {
+            serde_json::Value::String(key) => key.clone(),
+            _ => "*".to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join(".")
+}
+
+/// A saved meadow with an integer in every field that holds one, and a tale set
+/// down mid-replay carried beside it: one path per field, except that every
+/// place of an array indexed by content keeps its own, since what a count does
+/// depends on what it counts.
+fn every_integer_held() -> (serde_json::Value, Vec<JsonPath>) {
+    let mut s = late_meadow();
+    s.pity = 1;
+    s.famine_days = 1;
+    s.recovery_days = 1;
+    s.next_seq = 9;
+    s.zoomies_until = 3;
+    s.jamboree_until = 3;
+    s.deja_vu_until = 2;
+    s.pending_sky_event = Some(3);
+    s.roster_high_water = 5;
+    s.penpal = [2; ColonyId::ALL.len()];
+    s.adventure_completions = [1; AdventureId::ALL.len()];
+    s.whale_visit_years = 2;
+    s.whale_contentment = 2;
+    s.kittens[1].location = Location::NeighborsYard;
+    s.kittens[1].away_seq = Some(3);
+    s.family_album.push(ArchivedKitten {
+        name: "Remembered".to_string(),
+        trait_id: KittenTrait::None,
+        rank: 1,
+        generation: 1,
+        profile: None,
+    });
+    s.achievements.insert(
+        AchievementId::ALL[0],
+        Earned {
+            generation: 1,
+            day: 2,
+        },
+    );
+    for event in [
+        Event::NewYear { year: 2 },
+        Event::StructureBuilt {
+            id: StructureId::CatnipPatch,
+            count: 2,
+        },
+        Event::ZoomiesStarted { until_tick: 9 },
+        Event::Flavor {
+            template: 0,
+            kitten: None,
+        },
+    ] {
+        s.journal.record(5, &event);
+    }
+    let away = OfflineReport {
+        elapsed_seconds: 90,
+        seasons_passed: 1,
+        arrived: vec![("Newcomer".to_string(), 2)],
+        ..OfflineReport::default()
+    };
+    s.journal.record_away(6, &away);
+    let json = save_string_carrying(&s, 1_000, 3, Some(&away));
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+    let mut shapes = std::collections::BTreeMap::new();
+    for path in integer_paths(&value) {
+        let shape = spelled(&path);
+        let by_place = [
+            "state.structures.*",
+            "state.rite_counts.*",
+            "state.penpal.*",
+            "state.adventure_completions.*",
+        ]
+        .contains(&shape.as_str());
+        let key = if by_place {
+            format!("{shape}{}", path.last().unwrap())
+        } else {
+            shape
+        };
+        shapes.entry(key).or_insert(path);
+    }
+    (value, shapes.into_values().collect())
+}
+
+/// Load a doctored save, replay a little of what it owes, and play on from
+/// there, as a game would: each of these runs with overflow checks on.
+fn load_and_play(doctored: &serde_json::Value) -> Result<GameState, LoadError> {
+    let mut state = match begin_load(&doctored.to_string(), 1_000)?.advance(30) {
+        Advance::Finished(game) => game.state,
+        Advance::Pending(catch_up) => catch_up.set_down().state,
+    };
+    for _ in 0..25 {
+        state.tick();
+    }
+    state.housing_capacity();
+    state.happiness();
+    state.energy_consumption();
+    for r in ResourceId::ALL {
+        state.cap(r);
+    }
+    Ok(state)
+}
+
+/// Reads an integer back after a load, by the same path it was edited at.
+fn read_back(state: &GameState, path: &[serde_json::Value]) -> serde_json::Value {
+    let mut saved: serde_json::Value = serde_json::from_str(&save_string(state, 0)).unwrap();
+    at(&mut saved, path).take()
+}
+
+/// No integer's bad value costs the save, wherever in the save it sits, and
+/// the meadow plays on from there. Walked rather than listed, so a field added
+/// later is held to this without anyone adding it here.
+// @spec SAVE-032, SAVE-035
+#[test]
+fn no_number_in_an_integer_field_costs_the_save() {
+    let (saved, paths) = every_integer_held();
+    assert!(
+        paths.len() > 100,
+        "the walk reaches the save's integers, found {}",
+        paths.len()
+    );
+    for path in paths {
+        if spelled(&path) == "save_version" {
+            continue;
+        }
+        for bad in [
+            serde_json::json!(-1),
+            serde_json::json!(2.5),
+            serde_json::json!(1e30),
+            serde_json::json!(u64::MAX),
+        ] {
+            let mut doctored = saved.clone();
+            *at(&mut doctored, &path) = bad.clone();
+            if let Err(e) = load_and_play(&doctored) {
+                panic!("{} at {bad} refuses the save: {e:?}", spelled(&path));
+            }
+        }
+    }
+}
+
+/// What each kind of bad number reads as, read back from the loaded state.
+// @spec SAVE-032
+#[test]
+fn a_bad_number_reads_as_the_nearest_the_field_can_hold() {
+    let saved: serde_json::Value =
+        serde_json::from_str(&save_string(&played_state(36), 1_000)).unwrap();
+    let cases = [
+        // A count of each width.
+        ("state.pity", serde_json::json!(-1), 0u64),
+        ("state.pity", serde_json::json!(-0.5), 0),
+        ("state.pity", serde_json::json!(-1e30), 0),
+        ("state.pity", serde_json::json!(2.5), 2),
+        ("state.pity", serde_json::json!(300), 255),
+        ("state.pity", serde_json::json!(1e30), 255),
+        ("state.generation", serde_json::json!(-7), 0),
+        ("state.generation", serde_json::json!(2.9), 2),
+        ("state.structures.0", serde_json::json!(-3), 0),
+        ("state.structures.0", serde_json::json!(4.5), 4),
+        ("state.next_seq", serde_json::json!(-1), 0),
+        ("state.next_seq", serde_json::json!(12.75), 12),
+        // Reached through a list and an optional field.
+        ("state.kittens.0.rank", serde_json::json!(-2), 0),
+        ("state.kittens.0.arrived_day", serde_json::json!(-2), 0),
+        ("state.kittens.0.job_seq", serde_json::json!(-2), 0),
+    ];
+    for (field, bad, expected) in cases {
+        let path: JsonPath = field
+            .split('.')
+            .map(|step| match step.parse::<u64>() {
+                Ok(ix) => serde_json::json!(ix),
+                Err(_) => serde_json::json!(step),
+            })
+            .collect();
+        let mut doctored = saved.clone();
+        *at(&mut doctored, &path) = bad.clone();
+        let loaded = begin_load(&doctored.to_string(), 1_000)
+            .unwrap_or_else(|e| panic!("{field} at {bad} refuses the save: {e:?}"))
+            .set_down()
+            .state;
+        assert_eq!(
+            read_back(&loaded, &path),
+            serde_json::json!(expected),
+            "{field} at {bad}"
+        );
+    }
+}
+
+/// The same reading reaches the file's own fields, the journal, and a report.
+// @spec SAVE-032
+#[test]
+fn the_reading_reaches_the_file_the_journal_and_the_report() {
+    let (saved, _) = every_integer_held();
+
+    let mut doctored = saved.clone();
+    doctored["owed_ticks"] = serde_json::json!(-5);
+    doctored["saved_at_unix"] = serde_json::json!(1_000.5);
+    let catch_up = begin_load(&doctored.to_string(), 1_000).expect("it loads");
+    assert_eq!(catch_up.total_ticks(), 0, "nothing owed, and no time away");
+
+    let mut doctored = saved.clone();
+    doctored["state"]["journal"]["recent"][0]["tick"] = serde_json::json!(-1);
+    doctored["report_so_far"]["seasons_passed"] = serde_json::json!(-1);
+    doctored["report_so_far"]["arrived"][0][1] = serde_json::json!(2.5);
+    let set_down = begin_load(&doctored.to_string(), 1_000)
+        .expect("it loads")
+        .set_down();
+    assert_eq!(set_down.state.journal.recent[0].tick, 0);
+    assert_eq!(set_down.report_so_far.seasons_passed, 0);
+    assert_eq!(set_down.report_so_far.arrived[0].1, 2);
+}
+
+/// A carried tale read at the top of its range still adds to what this load
+/// tells, rather than overflowing.
+// @spec SAVE-022, SAVE-032
+#[test]
+fn a_carried_tale_at_the_top_of_its_range_still_adds() {
+    let (saved, _) = every_integer_held();
+    let mut doctored = saved.clone();
+    doctored["report_so_far"]["elapsed_seconds"] = serde_json::json!(1e30);
+    doctored["report_so_far"]["seasons_passed"] = serde_json::json!(1e30);
+    doctored["report_so_far"]["arrived"][0][1] = serde_json::json!(1e30);
+    doctored["owed_ticks"] = serde_json::json!(0);
+    let Advance::Finished(game) = begin_load(&doctored.to_string(), 1_010)
+        .unwrap()
+        .advance(u64::MAX)
+    else {
+        panic!("advancing through everything finishes");
+    };
+    assert_eq!(game.report.elapsed_seconds, u64::MAX);
+    assert_eq!(game.report.seasons_passed, u32::MAX);
+    assert_eq!(game.report.arrived[0].1, u32::MAX);
+}
+
+/// Inside an event in the journal too, a struct within an enum within a list.
+// @spec SAVE-032
+#[test]
+fn the_reading_reaches_inside_a_journaled_event() {
+    let mut s = GameState::new(36_002);
+    s.journal.record(5, &Event::NewYear { year: 2 });
+    let mut doctored: serde_json::Value = serde_json::from_str(&save_string(&s, 1_000)).unwrap();
+    doctored["state"]["journal"]["recent"][0]["item"]["Happened"]["NewYear"]["year"] =
+        serde_json::json!(-4);
+    let loaded = begin_load(&doctored.to_string(), 1_000)
+        .unwrap()
+        .set_down()
+        .state;
+    assert_eq!(
+        loaded.journal.recent[0].item,
+        JournalItem::Happened(Event::NewYear { year: 0 })
+    );
+}
+
+/// A version names a format, so it gets no nearest reading.
+// @spec SAVE-002, SAVE-032
+#[test]
+fn a_version_that_is_not_a_whole_number_is_corrupt() {
+    let saved: serde_json::Value =
+        serde_json::from_str(&save_string(&played_state(36), 1_000)).unwrap();
+    for bad in [serde_json::json!(-1), serde_json::json!(2.5)] {
+        let mut doctored = saved.clone();
+        doctored["save_version"] = bad.clone();
+        assert!(
+            matches!(
+                begin_load(&doctored.to_string(), 1_000),
+                Err(LoadError::Corrupt { .. })
+            ),
+            "a version of {bad}"
+        );
+    }
+}
+
+/// A string has no nearest integer, and an integer field holding one is still
+/// corrupt: the reading is for a mistyped number, not for anything at all.
+// @spec SAVE-004, SAVE-032
+#[test]
+fn something_that_is_not_a_number_where_one_belongs_is_still_corrupt() {
+    let saved: serde_json::Value =
+        serde_json::from_str(&save_string(&played_state(36), 1_000)).unwrap();
+    for (field, bad) in [
+        ("pity", serde_json::json!("three")),
+        ("next_seq", serde_json::json!(null)),
+        ("ticks", serde_json::json!([1])),
+        ("generation", serde_json::json!({ "n": 1 })),
+    ] {
+        let mut doctored = saved.clone();
+        doctored["state"][field] = bad.clone();
+        assert!(
+            matches!(
+                begin_load(&doctored.to_string(), 1_000),
+                Err(LoadError::Corrupt { .. })
+            ),
+            "{field} holding {bad}"
+        );
+    }
+}
+
+/// A negative Elder index is no Elder, not the first kitten in the chair, and
+/// one past the roster is no Elder too.
+// @spec SAVE-034
+#[test]
+fn a_negative_elder_is_no_elder() {
+    let saved: serde_json::Value =
+        serde_json::from_str(&save_string(&played_state(36), 1_000)).unwrap();
+    for bad in [
+        serde_json::json!(-1),
+        serde_json::json!(-0.5),
+        serde_json::json!(99),
+    ] {
+        let mut doctored = saved.clone();
+        doctored["state"]["elder"] = bad.clone();
+        let loaded = begin_load(&doctored.to_string(), 1_000)
+            .unwrap_or_else(|e| panic!("an Elder index of {bad} refuses the save: {e:?}"))
+            .set_down()
+            .state;
+        assert_eq!(loaded.elder, None, "an Elder index of {bad}");
+    }
+    let mut doctored = saved.clone();
+    doctored["state"]["elder"] = serde_json::json!(1.5);
+    let loaded = begin_load(&doctored.to_string(), 1_000)
+        .unwrap()
+        .set_down()
+        .state;
+    assert_eq!(
+        loaded.elder,
+        Some(1),
+        "a fraction rounds down as any integer does"
+    );
+}
+
+/// A number too large leaves room for what adds to it, and a price never reads a
+/// negative count of copies.
+// @spec SAVE-035
+#[test]
+fn what_keeps_counting_keeps_room() {
+    let saved: serde_json::Value =
+        serde_json::from_str(&save_string(&played_state(36), 1_000)).unwrap();
+    let mut doctored = saved.clone();
+    let huge = serde_json::json!(1e30);
+    for field in [
+        "ticks",
+        "next_seq",
+        "zoomies_until",
+        "jamboree_until",
+        "deja_vu_until",
+    ] {
+        doctored["state"][field] = huge.clone();
+    }
+    doctored["state"]["pending_sky"] = huge.clone();
+    doctored["state"]["kittens"][0]["job_seq"] = huge.clone();
+    doctored["state"]["kittens"][1]["away_seq"] = huge.clone();
+    doctored["state"]["structures"][0] = huge.clone();
+    doctored["state"]["generation"] = huge.clone();
+    doctored["state"]["rite_counts"][0] = huge.clone();
+    let s = begin_load(&doctored.to_string(), 1_000)
+        .unwrap()
+        .set_down()
+        .state;
+
+    let room = u64::MAX / 2;
+    assert_eq!(s.ticks, room);
+    assert_eq!(s.next_seq, room);
+    assert_eq!(s.zoomies_until, room);
+    assert_eq!(s.jamboree_until, room);
+    assert_eq!(s.deja_vu_until, room);
+    assert_eq!(s.pending_sky_event, Some(room));
+    assert_eq!(s.kittens[0].job_seq, Some(room));
+    assert_eq!(s.kittens[1].away_seq, Some(room));
+    let small = i32::MAX as u32;
+    assert_eq!(s.structures[0], small);
+    assert_eq!(s.generation, small);
+    assert_eq!(s.rite_counts[0], small);
+    assert!(
+        s.next_cost(StructureId::ALL[0])
+            .iter()
+            .all(|(_, amount)| *amount > 1e6),
+        "the next copy of a great many costs a great deal"
+    );
+}
+
+/// An ordinary save is untouched by any of this: a generator's whole 64-bit
+/// range is its own, and a real save's numbers read as written.
+// @spec SAVE-010, SAVE-032, SAVE-035
+#[test]
+fn numbers_in_range_read_exactly_as_written() {
+    let mut s = played_state(36);
+    let mut high = serde_json::to_value(&s.rng).unwrap();
+    high["state"] = serde_json::json!(u64::MAX - 3);
+    high["inc"] = serde_json::json!(u64::MAX);
+    s.rng = serde_json::from_value(high).unwrap();
+    let json = save_string(&s, 42_000);
+    let loaded = load_string(&json, 42_000).unwrap();
+    assert_eq!(save_string(&loaded.state, 42_000), json, "byte for byte");
+}
+
+/// What a save must hold, and what it may lose, by the name of each field the
+/// format writes.
+// @spec SAVE-004, SAVE-036
+#[test]
+fn only_what_every_version_wrote_is_required() {
+    let (saved, _) = every_integer_held();
+    let required_of = |container: &[&str]| -> Vec<String> {
+        let path: JsonPath = container
+            .iter()
+            .map(|step| match step.parse::<u64>() {
+                Ok(ix) => serde_json::json!(ix),
+                Err(_) => serde_json::json!(step),
+            })
+            .collect();
+        let mut whole = saved.clone();
+        let keys: Vec<String> = at(&mut whole, &path)
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        let mut required: Vec<String> = keys
+            .into_iter()
+            .filter(|key| {
+                let mut doctored = saved.clone();
+                at(&mut doctored, &path)
+                    .as_object_mut()
+                    .unwrap()
+                    .remove(key);
+                match begin_load(&doctored.to_string(), 1_000) {
+                    Err(LoadError::Corrupt { .. }) => true,
+                    Err(e) => panic!("{key} missing fails as {e:?}"),
+                    Ok(_) => false,
+                }
+            })
+            .collect();
+        required.sort();
+        required
+    };
+    assert_eq!(required_of(&[]), ["save_version", "saved_at_unix", "state"]);
+    assert_eq!(
+        required_of(&["state"]),
+        [
+            "famine_days",
+            "grumpy",
+            "ideas",
+            "kittens",
+            "next_seq",
+            "pity",
+            "recovery_days",
+            "resources",
+            "rng",
+            "structures",
+            "ticks",
+            "zoomies_until",
+        ]
+    );
+    assert_eq!(
+        required_of(&["state", "kittens", "0"]),
+        ["arrived_day", "location", "name"]
+    );
+    assert_eq!(
+        required_of(&["state", "family_album", "0"]),
+        ["name", "trait_id"]
+    );
+
+    // Lost from a save of the current version, a field takes its new-game value.
+    let mut doctored = saved.clone();
+    doctored["state"]
+        .as_object_mut()
+        .unwrap()
+        .remove("generation");
+    doctored["state"]["kittens"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("rank");
+    let loaded = begin_load(&doctored.to_string(), 1_000)
+        .unwrap()
+        .set_down()
+        .state;
+    assert_eq!(loaded.generation, GameState::new(0).generation);
+    assert_eq!(loaded.kittens[0].rank, 0);
+}

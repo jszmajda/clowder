@@ -1226,7 +1226,7 @@ impl AdventureId {
 pub struct ArchivedKitten {
     pub name: String,
     pub trait_id: KittenTrait,
-    #[serde(default, deserialize_with = "saturating_u8")]
+    #[serde(default)]
     pub rank: u8,
     #[serde(default)]
     pub generation: u32,
@@ -1336,7 +1336,7 @@ pub struct Kitten {
     #[serde(default)]
     pub exp: f64,
     /// Promoted with exp + shinies. @spec SIM-KIT-021
-    #[serde(default, deserialize_with = "saturating_u8")]
+    #[serde(default)]
     pub rank: u8,
     /// Birth trait; active clowder-wide only while this kitten is the Elder.
     /// @spec SIM-KIT-023
@@ -1352,12 +1352,13 @@ pub struct Kitten {
     pub profile: Option<Profile>,
 }
 
-/// Deserialize a counter wide and clamp — hand-edited saves get physics, not
-/// type errors.
-// @spec SAVE-005
-fn saturating_u8<'de, D: Deserializer<'de>>(d: D) -> Result<u8, D::Error> {
-    let wide = u64::deserialize(d)?;
-    Ok(wide.min(u8::MAX as u64) as u8)
+/// An Elder index names a position, so a negative one names nobody, where the
+/// nearest position would seat the first kitten unasked. A fraction rounds down
+/// as any integer does, and one past the roster is no Elder either, on load.
+// @spec SAVE-034
+fn elder_index<'de, D: Deserializer<'de>>(d: D) -> Result<Option<usize>, D::Error> {
+    let index = Option::<f64>::deserialize(d)?;
+    Ok(index.filter(|ix| *ix >= 0.0).map(|ix| ix as usize))
 }
 
 /// Serialize an enum-indexed array as a plain JSON sequence (serde's built-in
@@ -1414,11 +1415,8 @@ pub struct GameState {
     pub structures: [u32; STRUCTURE_COUNT],
     pub kittens: Vec<Kitten>,
     pub ideas: BTreeSet<IdeaId>,
-    #[serde(deserialize_with = "saturating_u8")]
     pub pity: u8,
-    #[serde(deserialize_with = "saturating_u8")]
     pub famine_days: u8,
-    #[serde(deserialize_with = "saturating_u8")]
     pub recovery_days: u8,
     pub grumpy: bool,
     pub next_seq: u64,
@@ -1465,7 +1463,7 @@ pub struct GameState {
     #[serde(default, rename = "pending_sky")]
     pub pending_sky_event: Option<u64>,
     /// Roster index of the Elder, if one is appointed. @spec SIM-KIT-022
-    #[serde(default)]
+    #[serde(default, deserialize_with = "elder_index")]
     pub elder: Option<usize>,
     /// Tick until which a jamboree runs (active while ticks < jamboree_until);
     /// 0 when none. @spec SIM-KIT-025
@@ -2211,8 +2209,12 @@ impl GameState {
     pub fn housing_capacity(&self) -> u32 {
         StructureId::ALL
             .iter()
-            .map(|s| content::structure_def(*s).housing * self.structures[s.ix()])
-            .sum()
+            .map(|s| {
+                content::structure_def(*s)
+                    .housing
+                    .saturating_mul(self.structures[s.ix()])
+            })
+            .fold(0, u32::saturating_add)
     }
 
     /// Capacity minus the whole roster — every kitten holds a slot, Home or Away.
