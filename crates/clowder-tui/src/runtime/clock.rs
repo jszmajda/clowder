@@ -17,7 +17,7 @@
 use std::time::Duration;
 
 use clowder_core::content::TICKS_PER_SECOND;
-use clowder_core::CATCHUP_CAP_SECONDS;
+use clowder_core::{CATCHUP_CAP_SECONDS, MIN_REPORTABLE_ABSENCE_SECONDS};
 
 const TICKS_PER_SECOND_F: f64 = TICKS_PER_SECOND as f64;
 const CATCHUP_CAP_SECONDS_F: f64 = CATCHUP_CAP_SECONDS as f64;
@@ -30,6 +30,35 @@ pub struct Reading {
     /// Elapsed on the wall clock since the previous reading. Less than
     /// `monotonic` means the wall clock was corrected backwards.
     pub wall: Duration,
+}
+
+/// What one long reading says happened: how long nobody was watching, capped
+/// as a load caps its interval, and whether the cap bit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Absence {
+    pub seconds: u64,
+    pub truncated: bool,
+}
+
+impl Reading {
+    /// The larger of the two clocks' elapsed: the excess of wall over monotonic
+    /// is absence the monotonic clock did not see, and a wall clock showing less
+    /// was corrected backwards, so the monotonic reading wins.
+    /// @spec TUI-RUN-021, TUI-RUN-022, TUI-RUN-023
+    fn elapsed_seconds(self) -> f64 {
+        self.monotonic.as_secs_f64().max(self.wall.as_secs_f64())
+    }
+
+    /// The absence this reading spans, where it spans at least the shortest the
+    /// core would report: the machine slept, or the process or its terminal stood
+    /// still, and either way nobody was watching. @spec TUI-RUN-024, TUI-RUN-076
+    pub fn absence(self) -> Option<Absence> {
+        let elapsed = self.elapsed_seconds();
+        (elapsed >= MIN_REPORTABLE_ABSENCE_SECONDS as f64).then_some(Absence {
+            seconds: (elapsed as u64).min(CATCHUP_CAP_SECONDS),
+            truncated: elapsed > CATCHUP_CAP_SECONDS_F,
+        })
+    }
 }
 
 /// Banked time, held as three distinct quantities.
@@ -56,8 +85,6 @@ pub struct TickAccumulator {
     backlog: u64,
     /// Real time the unrun backlog represents, in seconds. @spec TUI-RUN-027
     unrun_seconds: f64,
-    /// A reading ran past the absence cap, and nothing has yet taken the news.
-    capped: bool,
 }
 
 impl TickAccumulator {
@@ -67,20 +94,8 @@ impl TickAccumulator {
     /// @spec TUI-RUN-018, TUI-RUN-021..024
     pub fn observe(&mut self, reading: Reading, speed: f64) {
         // @spec TUI-RUN-018, TUI-RUN-021, TUI-RUN-022, TUI-RUN-023, TUI-RUN-024
-        let monotonic = reading.monotonic.as_secs_f64();
-        let wall = reading.wall.as_secs_f64();
-        // TUI-RUN-021/022: the monotonic clock drives ordinary accumulation;
-        // when the wall clock shows more elapsed, that excess is suspend
-        // absence the monotonic clock never saw. TUI-RUN-023: when the wall
-        // clock shows less (a backwards correction), the monotonic reading
-        // wins outright.
-        let mut elapsed = monotonic.max(wall);
-
         // TUI-RUN-024: one shared absence cap with the load path.
-        if elapsed > CATCHUP_CAP_SECONDS_F {
-            elapsed = CATCHUP_CAP_SECONDS_F;
-            self.capped = true;
-        }
+        let elapsed = reading.elapsed_seconds().min(CATCHUP_CAP_SECONDS_F);
 
         // TUI-RUN-018/020/030: convert THIS interval at THIS speed, now. What
         // is banked is a fraction of a *tick* — already converted — so a later
@@ -98,12 +113,6 @@ impl TickAccumulator {
             self.unrun_seconds += whole_ticks as f64 / (TICKS_PER_SECOND_F * speed);
             self.backlog += whole_ticks;
         }
-    }
-
-    /// Whether a reading has run past the absence cap since this was last
-    /// asked, so each capped gap is told once. @spec TUI-RUN-024
-    pub fn take_capped(&mut self) -> bool {
-        std::mem::take(&mut self.capped)
     }
 
     /// Draw down at most `max_ticks` from the backlog, so a long catch-up

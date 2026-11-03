@@ -12,6 +12,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 
 ### Changed
 
+- **A long sleep with the game open tells its tale.** Closing your laptop with Clowder running now wakes it as a restart would: the waking screen if it was a long one, the report of what the time brought, and you left just where you were. The time also comes back in moments, where a very long sleep could take hours to work through.
 - **Saves have moved up a version.** A save written by this version won't open in an older one. Older saves still open here.
 - **Drawing the sidebar costs less.** It does in one step what it used to repeat for every store, which matters most in a big clowder.
 - **Clowder sits lighter in its pane.** With nothing pressed, it now works out the screen about as often as something on it can change, rather than several times more. Keys answer as quickly as before; at faster speeds, figures move in slightly larger steps.

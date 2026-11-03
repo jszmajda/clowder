@@ -428,6 +428,27 @@ pub fn session<B: ratatui::backend::Backend>(
         // the frame applies what the wait brought. @spec TUI-RUN-073
         let reading = checkpoint.read();
 
+        // A reading this long means nobody was watching: it wakes as a load
+        // does, and comes back to play where the player left it, unless the wake
+        // ends the session. @spec TUI-RUN-076, TUI-RUN-078
+        if let Some(absence) = reading.absence() {
+            let start = Waking::of_absence(*app, reading, absence).first_frame(terminal, &events);
+            match drive_wake(
+                start,
+                terminal,
+                input,
+                terminated,
+                &mut checkpoint,
+                &mut parting,
+            ) {
+                Some(returned) => {
+                    app = returned;
+                    continue;
+                }
+                None => return parting,
+            }
+        }
+
         // A refused frame has applied and ticked before its draw, and that
         // stands. @spec TUI-RUN-047
         if let Err(e) = app.step(terminal, reading, &events) {
@@ -441,11 +462,20 @@ pub fn session<B: ratatui::backend::Backend>(
     // began the shutdown. A failure does not change the exit code — the
     // session is ending either way, and the player is better served by being
     // told than by a status nobody reads. The stamp is the present, so whatever
-    // has passed since the last reading is counted first. @spec TUI-RUN-074
+    // has passed since the last reading is counted first, and a reading long
+    // enough to be an absence goes into the save as a wake set down at once, for
+    // the next load to tell. @spec TUI-RUN-074, TUI-RUN-080
     // @spec TUI-RUN-026, TUI-RUN-031, TUI-RUN-057
-    let speed = app.state.speed;
-    app.observe(checkpoint.read(), speed);
-    if let Err(e) = app.save() {
+    let reading = checkpoint.read();
+    let saved = match reading.absence() {
+        Some(absence) => Waking::of_absence(*app, reading, absence).shut_down(),
+        None => {
+            let speed = app.state.speed;
+            app.observe(reading, speed);
+            app.save()
+        }
+    };
+    if let Err(e) = saved {
         parting.push(format!("clowder could not save on the way out: {e}"));
     }
     parting
@@ -480,6 +510,21 @@ fn run_wake<B: ratatui::backend::Backend>(
     checkpoint: &mut Checkpoint,
     parting: &mut Vec<String>,
 ) -> Option<Box<App>> {
+    let start = Wake::begin(catch_up, save_path, terminal);
+    drive_wake(start, terminal, input, terminated, checkpoint, parting)
+}
+
+/// Drive a wake from its first frame until the game is awake, or a quit key, a
+/// termination signal, or a lost terminal cuts it short and sets it down.
+/// @spec TUI-RUN-035, TUI-RUN-036, TUI-RUN-039, TUI-RUN-048, TUI-RUN-057
+fn drive_wake<B: ratatui::backend::Backend>(
+    start: Result<Wake, Box<Refused>>,
+    terminal: &mut ratatui::Terminal<B>,
+    input: &mut impl InputSource,
+    terminated: &dyn Fn() -> bool,
+    checkpoint: &mut Checkpoint,
+    parting: &mut Vec<String>,
+) -> Option<Box<App>> {
     // The stamp is the present, so whatever has passed since the last reading
     // is counted first. @spec TUI-RUN-074
     let set_down = |mut w: Waking, reading: clock::Reading, parting: &mut Vec<String>| {
@@ -488,7 +533,7 @@ fn run_wake<B: ratatui::backend::Backend>(
             parting.push(format!("clowder could not save on the way out: {e}"));
         }
     };
-    let mut wake = match Wake::begin(catch_up, save_path, terminal) {
+    let mut wake = match start {
         Ok(wake) => wake,
         Err(refused) => {
             parting.push(format!("clowder stopped while waking: {}", refused.error));
@@ -499,6 +544,11 @@ fn run_wake<B: ratatui::backend::Backend>(
     loop {
         let w = match wake {
             Wake::Awake(app) => return Some(Box::new(app)),
+            // The quit key of a wake's first frame answers as any other's.
+            Wake::Waking(w) if w.quitting => {
+                set_down(w, checkpoint.read(), parting);
+                return None;
+            }
             Wake::Waking(w) => w,
         };
         // A termination signal mid-wake answers exactly as a quit key does:
@@ -524,10 +574,6 @@ fn run_wake<B: ratatui::backend::Backend>(
         let reading = checkpoint.read();
 
         match w.step(terminal, reading, &events) {
-            Ok(Wake::Waking(next)) if next.quitting => {
-                set_down(next, checkpoint.read(), parting);
-                return None;
-            }
             Ok(next) => wake = next,
             Err(refused) => {
                 parting.push(format!("clowder stopped while waking: {}", refused.error));
@@ -823,25 +869,13 @@ impl App {
         Ok(())
     }
 
-    /// Save at the present instant, carrying the ticks banked but not yet run
-    /// as an explicit count. @spec TUI-RUN-027, TUI-RUN-031, SAVE-017
-    /// Bank an interval at the speed in force while it passed. A reading past
-    /// the absence cap leaves the report a load's capped catch-up leaves: flagged
-    /// truncated, the cap its span. Only the shell ever sees such a gap, and its
-    /// ticks have not yet run, so the report states no gains. @spec TUI-RUN-024
+    /// Bank an interval at the speed in force while it passed. @spec TUI-RUN-020
     fn observe(&mut self, reading: clock::Reading, speed: f64) {
         self.clock.observe(reading, speed);
-        if self.clock.take_capped() {
-            let report = clowder_core::OfflineReport {
-                elapsed_seconds: clowder_core::CATCHUP_CAP_SECONDS,
-                truncated: true,
-                ..clowder_core::OfflineReport::default()
-            };
-            self.state.journal.record_away(self.state.ticks, &report);
-            crate::nav::queue_capped_gap_report(&mut self.view, &self.state, &report);
-        }
     }
 
+    /// Save at the present instant, carrying the ticks banked but not yet run
+    /// as an explicit count. @spec TUI-RUN-027, TUI-RUN-031, SAVE-017
     pub fn save(&self) -> std::io::Result<()> {
         // The stamp is simply now, and the ticks this session banked but never
         // ran are written alongside it as a count.

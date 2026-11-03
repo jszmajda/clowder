@@ -433,8 +433,6 @@ fn an_in_process_gap_is_capped_at_the_cores_catch_up_limit() {
         CATCHUP_CAP_SECONDS as f64,
         "and banks only the capped span, so a back-dated save cannot reach past the cap",
     );
-    assert!(acc.take_capped(), "a gap past the cap is flagged");
-    assert!(!acc.take_capped(), "and told once");
 }
 
 /// The cap is a ceiling, not a rounding: a gap just under it is untouched.
@@ -455,20 +453,51 @@ fn a_gap_below_the_cap_is_not_truncated() {
         "an absence inside the cap is replayed in full"
     );
     assert_span(acc.unrun_span(), gap as f64, "and banks its whole span");
-    assert!(!acc.take_capped(), "and leaves no flag");
 }
 
-/// The load path flags what runs past the cap, and so does this: a gap of exactly
-/// the cap has lost nothing.
-/// @spec TUI-RUN-024
+/// A reading says it was an absence from the shortest the core would report,
+/// whichever clock showed it, and says where the cap bit, as the load path flags
+/// what runs past it: a gap of exactly the cap has lost nothing.
+/// @spec TUI-RUN-024, TUI-RUN-076
 #[test]
-fn a_gap_of_exactly_the_cap_is_not_flagged() {
-    let mut acc = TickAccumulator::default();
-    acc.observe(
-        reading(Duration::ZERO, Duration::from_secs(CATCHUP_CAP_SECONDS)),
-        1.0,
+fn a_reading_says_what_absence_it_spans() {
+    let shortest = clowder_core::MIN_REPORTABLE_ABSENCE_SECONDS;
+    let across_a_suspend = |secs: u64| reading(Duration::ZERO, Duration::from_secs(secs));
+    assert_eq!(across_a_suspend(shortest - 1).absence(), None);
+    assert_eq!(
+        reading(
+            Duration::ZERO,
+            Duration::from_secs_f64(shortest as f64 - 0.001)
+        )
+        .absence(),
+        None,
+        "just short of it is ordinary time"
     );
-    assert!(!acc.take_capped());
+    let absence = |seconds: u64, truncated: bool| {
+        Some(clowder_tui::runtime::clock::Absence { seconds, truncated })
+    };
+    assert_eq!(
+        across_a_suspend(shortest).absence(),
+        absence(shortest, false)
+    );
+    assert_eq!(
+        reading(Duration::from_secs(shortest), Duration::ZERO).absence(),
+        absence(shortest, false),
+        "the monotonic clock showing it counts: a process or terminal stood still"
+    );
+    assert_eq!(
+        across_a_suspend(CATCHUP_CAP_SECONDS).absence(),
+        absence(CATCHUP_CAP_SECONDS, false)
+    );
+    assert_eq!(
+        across_a_suspend(CATCHUP_CAP_SECONDS + 1).absence(),
+        absence(CATCHUP_CAP_SECONDS, true)
+    );
+    assert_eq!(
+        reading(Duration::from_millis(100), Duration::ZERO).absence(),
+        None,
+        "a wall clock corrected backwards is no absence"
+    );
 }
 
 // ---------------------------------------------------------------------------

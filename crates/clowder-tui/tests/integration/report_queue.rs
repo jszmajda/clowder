@@ -1095,21 +1095,25 @@ fn the_simulation_advancing_leaves_the_banner_showing() {
 /// @spec TUI-RUN-024, TUI-NAV-027, TUI-NAV-055
 #[test]
 fn a_gap_past_the_cap_shows_a_report_saying_more_than_the_cap() {
-    let mut app = app(GameState::new(24_024), ViewState::default(), "capped-gap");
-    let mut t = term(200, 40);
-    let past = Reading {
-        monotonic: Duration::ZERO,
-        wall: Duration::from_secs(2 * clowder_core::CATCHUP_CAP_SECONDS),
+    let state = GameState::new(24_024);
+    let clowder_core::Advance::Finished(game) =
+        clowder_core::begin_absence(state, 8, clowder_core::CATCHUP_CAP_SECONDS, true)
+            .advance(u64::MAX)
+    else {
+        panic!("advancing through everything finishes");
     };
-    app.step(&mut t, past, &[]).unwrap();
-    assert_eq!(app.view.reports.len(), 1, "one gap, one banner");
-    let line = showing(&app).expect("the report's banner is showing");
-    assert!(line.contains("more than"), "said: {line}");
-
+    let mut view = ViewState::default();
+    clowder_tui::nav::queue_load_report(&mut view, &game);
+    let mut app = app(game.state, view, "capped-gap");
+    let mut t = term(200, 40);
     let still = Reading {
         monotonic: Duration::ZERO,
         wall: Duration::ZERO,
     };
+    app.step(&mut t, still, &[]).unwrap();
+    assert_eq!(app.view.reports.len(), 1, "one gap, one banner");
+    let line = showing(&app).expect("the report's banner is showing");
+    assert!(line.contains("more than"), "said: {line}");
     app.step(&mut t, still, &[]).unwrap();
     assert_eq!(app.view.reports.len(), 1, "told once, and not again");
 }

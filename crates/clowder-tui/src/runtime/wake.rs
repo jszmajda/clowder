@@ -1,5 +1,6 @@
-//! Waking up — a load's catch-up replayed after the terminal is taken, a
-//! bounded count per frame, behind the waking screen, until the game opens.
+//! Waking up — a catch-up replayed a bounded count per frame, behind the waking
+//! screen: a load's, after the terminal is taken, until the game opens; or one a
+//! long gap began in play, until play returns to where it was.
 //!
 //! Mirrors `App::step`'s shape for the same reason: events and the clock
 //! reading arrive as arguments rather than being read here, so a wake runs
@@ -19,7 +20,8 @@ use ratatui::Terminal;
 
 use crate::nav;
 use crate::render;
-use crate::runtime::clock::Reading;
+use crate::render::Layout;
+use crate::runtime::clock::{Absence, Reading};
 use crate::runtime::{App, TickAccumulator, BRIEFEST_WAIT};
 
 /// Waking's own per-frame bound: larger than live play's, since the waking
@@ -27,7 +29,7 @@ use crate::runtime::{App, TickAccumulator, BRIEFEST_WAIT};
 /// @spec TUI-RUN-033
 pub const WAKE_TICKS_PER_FRAME: u64 = 50_000;
 
-/// Whether a load is still waking through its catch-up, or has opened.
+/// Whether a catch-up is still replaying, or the game is awake.
 ///
 /// The size gap is inherent to advancing one frame at a time (TUI-RUN-033) —
 /// boxing `Waking` would cost every frame of a wake an allocation to save
@@ -38,13 +40,28 @@ pub enum Wake {
     Awake(App),
 }
 
-/// A load's catch-up in progress behind the waking screen.
+/// What a finished wake wakes into.
+enum AfterWake {
+    /// A load's: the game opens.
+    Open {
+        /// What the record held as the save was loaded, taken before any tick
+        /// replayed: what the game opens believing the player has seen.
+        /// @spec TUI-NAV-174
+        seen_at_load: BTreeSet<AchievementId>,
+    },
+    /// One a long gap began in play: the game never closed, so the player's
+    /// place stands. @spec TUI-RUN-077
+    Return {
+        view: Box<nav::ViewState>,
+        prev_layout: Option<Layout>,
+        save_failed: bool,
+    },
+}
+
+/// A catch-up in progress behind the waking screen.
 pub struct Waking {
     catch_up: CatchUp,
-    /// What the record held as the save was loaded, taken before any tick
-    /// replayed: what the game opens believing the player has seen.
-    /// @spec TUI-NAV-174
-    seen_at_load: BTreeSet<AchievementId>,
+    after: AfterWake,
     pub clock: TickAccumulator,
     pub save_path: PathBuf,
     pub last_save: Instant,
@@ -95,7 +112,9 @@ impl Wake {
         bound: u64,
     ) -> Result<Wake, Box<Refused>> {
         let waking = Waking {
-            seen_at_load: catch_up.earned_at_load().clone(),
+            after: AfterWake::Open {
+                seen_at_load: catch_up.earned_at_load().clone(),
+            },
             catch_up,
             clock: TickAccumulator::default(),
             save_path,
@@ -108,6 +127,56 @@ impl Wake {
 }
 
 impl Waking {
+    /// A long gap in play becomes a wake: the state and every tick banked, this
+    /// reading's included, go to a catch-up of that span, at waking's own bound.
+    /// @spec TUI-RUN-076
+    pub fn of_absence(app: App, reading: Reading, absence: Absence) -> Waking {
+        let mut clock = app.clock;
+        clock.observe(reading, app.state.speed);
+        let owed = clock.take(u64::MAX);
+        Waking {
+            catch_up: clowder_core::begin_absence(
+                app.state,
+                owed,
+                absence.seconds,
+                absence.truncated,
+            ),
+            after: AfterWake::Return {
+                view: Box::new(app.view),
+                prev_layout: app.prev_layout,
+                save_failed: app.save_failed,
+            },
+            clock,
+            save_path: app.save_path,
+            last_save: app.last_save,
+            quitting: app.quitting,
+            bound: WAKE_TICKS_PER_FRAME,
+        }
+    }
+
+    /// As [`Waking::of_absence`] leaves it, at a caller-chosen bound, so a test's
+    /// wake of a few frames costs a few hundred ticks. @spec TUI-RUN-033
+    pub fn bounded(mut self, bound: u64) -> Waking {
+        self.bound = bound;
+        self
+    }
+
+    /// The frame whose reading began a wake in play: its input is a waking
+    /// frame's, its reading already taken. @spec TUI-RUN-078
+    pub fn first_frame<B: Backend>(
+        mut self,
+        terminal: &mut Terminal<B>,
+        input: &[Event],
+    ) -> Result<Wake, Box<Refused>> {
+        if let Err(error) = self.answer(terminal, input) {
+            return Err(Box::new(Refused {
+                error,
+                waking: self,
+            }));
+        }
+        self.advance_and_draw(terminal)
+    }
+
     pub fn total_ticks(&self) -> u64 {
         self.catch_up.total_ticks()
     }
@@ -134,22 +203,11 @@ impl Waking {
         reading: Reading,
         input: &[Event],
     ) -> Result<Wake, Box<Refused>> {
-        for event in input {
-            match event {
-                Event::Key(key) if is_quit_key(*key) => self.quitting = true,
-                // Only the final size matters, as for the awake loop.
-                Event::Resize(w, h) => {
-                    if let Err(error) = terminal.resize(Rect::new(0, 0, *w, *h)) {
-                        return Err(Box::new(Refused {
-                            error,
-                            waking: self,
-                        }));
-                    }
-                }
-                // Every other key is discarded, not held: it would otherwise
-                // act on a meadow the player has not yet seen.
-                _ => {}
-            }
+        if let Err(error) = self.answer(terminal, input) {
+            return Err(Box::new(Refused {
+                error,
+                waking: self,
+            }));
         }
 
         // TUI-RUN-036: no live tick runs while waking. Real time keeps
@@ -161,21 +219,45 @@ impl Waking {
         self.advance_and_draw(terminal)
     }
 
-    /// Bank an interval at the save's speed. @spec TUI-RUN-036
+    /// What a waking frame's input can do: quitting answers, a resize applies,
+    /// and nothing else does anything. @spec TUI-NAV-103, TUI-RUN-078
+    fn answer<B: Backend>(
+        &mut self,
+        terminal: &mut Terminal<B>,
+        input: &[Event],
+    ) -> io::Result<()> {
+        for event in input {
+            match event {
+                Event::Key(key) if is_quit_key(*key) => self.quitting = true,
+                // Only the final size matters, as for the awake loop.
+                Event::Resize(w, h) => terminal.resize(Rect::new(0, 0, *w, *h))?,
+                // Every other key is discarded, not held: it would otherwise
+                // act on a meadow the player has not yet seen.
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// Bank an interval at the save's speed; one long enough to be an absence
+    /// joins the catch-up with everything banked so far, and is told with it.
+    /// @spec TUI-RUN-036, TUI-RUN-079
     pub(crate) fn observe(&mut self, reading: Reading) {
         let speed = self.catch_up.speed();
         self.clock.observe(reading, speed);
+        if let Some(absence) = reading.absence() {
+            let owed = self.clock.take(u64::MAX);
+            self.catch_up
+                .add_absence(owed, absence.seconds, absence.truncated);
+        }
     }
 
     /// Shutdown taken while waking: set the catch-up down and save promptly,
     /// the owed count carrying the catch-up's remaining ticks together with
     /// any live ticks banked while waking, and the save carrying the core's
-    /// report so far, which also says where a gap past the absence cap has
-    /// not yet been told. @spec TUI-RUN-024, TUI-RUN-039
-    pub fn shut_down(mut self) -> io::Result<()> {
-        let capped = self.clock.take_capped();
-        let mut sd = self.catch_up.set_down();
-        sd.report_so_far.truncated |= capped;
+    /// report so far. @spec TUI-RUN-039, TUI-RUN-080
+    pub fn shut_down(self) -> io::Result<()> {
+        let sd = self.catch_up.set_down();
         let owed = sd.owed_ticks + self.clock.backlog();
         clowder_core::write_save_carrying(
             &self.save_path,
@@ -186,13 +268,14 @@ impl Waking {
         )
     }
 
-    /// Advance this wake's bound. Where that finishes the catch-up, open the
-    /// game against exactly the state a one-call load would have produced —
-    /// no live tick in that frame, the opening taken and the load's report
-    /// queued, and the time banked while waking carried forward to run once
-    /// play begins (TUI-RUN-038). Otherwise draw the waking screen having
-    /// replayed no more than this bound, and come back pending.
-    /// @spec TUI-RUN-033, TUI-RUN-034, TUI-RUN-037, TUI-RUN-038
+    /// Advance this wake's bound. Where that finishes the catch-up, wake into
+    /// exactly the state a one-call replay would have produced — no live tick in
+    /// that frame, the report queued, and the time banked while waking carried
+    /// forward to run once play begins: a load's takes the opening (TUI-RUN-038),
+    /// and one begun in play returns to where the player was (TUI-RUN-077).
+    /// Otherwise draw the waking screen having replayed no more than this bound,
+    /// and come back pending.
+    /// @spec TUI-RUN-033, TUI-RUN-034, TUI-RUN-037, TUI-RUN-038, TUI-RUN-077
     fn advance_and_draw<B: Backend>(
         mut self,
         terminal: &mut Terminal<B>,
@@ -200,12 +283,22 @@ impl Waking {
         let bound = self.bound;
         match self.catch_up.advance(bound) {
             Advance::Finished(loaded) => {
-                let mut view = nav::ViewState::default();
-                // @spec TUI-NAV-024
-                nav::opening(&mut view, &loaded.state);
-                // What the absence earned is new to the returning player.
-                // @spec TUI-NAV-174
-                view.achievements_seen = self.seen_at_load;
+                let (mut view, prev_layout, save_failed) = match self.after {
+                    AfterWake::Open { seen_at_load } => {
+                        let mut view = nav::ViewState::default();
+                        // @spec TUI-NAV-024
+                        nav::opening(&mut view, &loaded.state);
+                        // What the absence earned is new to the returning player.
+                        // @spec TUI-NAV-174
+                        view.achievements_seen = seen_at_load;
+                        (view, None, false)
+                    }
+                    AfterWake::Return {
+                        view,
+                        prev_layout,
+                        save_failed,
+                    } => (*view, prev_layout, save_failed),
+                };
                 // @spec TUI-NAV-027
                 nav::queue_load_report(&mut view, &loaded);
                 Ok(Wake::Awake(App {
@@ -214,10 +307,12 @@ impl Waking {
                     clock: self.clock,
                     save_path: self.save_path,
                     last_save: self.last_save,
-                    prev_layout: None,
+                    prev_layout,
+                    // Whatever the player last saw, it is no frame of this
+                    // meadow to aim a pointer at. @spec TUI-RUN-065
                     pointer_record: None,
                     quitting: self.quitting,
-                    save_failed: false,
+                    save_failed,
                 }))
             }
             Advance::Pending(next) => {

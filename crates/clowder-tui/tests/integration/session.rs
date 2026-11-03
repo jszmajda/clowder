@@ -1565,6 +1565,8 @@ fn a_key_behind_fewer_mouse_events_than_the_mouse_bound_is_taken_in_their_frame(
 
 const A_NIGHT: Duration = Duration::from_secs(8 * 3600);
 const A_MOMENT: Duration = Duration::from_secs(90);
+/// Short enough to be ordinary time, not an absence.
+const A_NAP: Duration = Duration::from_secs(30);
 
 /// What the accumulator banks for these spans, each suspended over and priced
 /// at its speed: the figure a session has to arrive at, with no span left out.
@@ -1652,27 +1654,170 @@ fn the_time_a_last_frame_took_counts_where_no_frame_follows_it() {
     );
 }
 
-/// A speed key pressed just after a resume applies from there on. The night was
-/// lived at the speed set before it.
+/// A speed key pressed just after a suspend too short to be an absence applies
+/// from there on. The suspend was lived at the speed set before it.
 /// @spec TUI-RUN-020, TUI-RUN-073
 #[test]
-fn a_speed_key_just_after_a_resume_does_not_reprice_the_suspend() {
+fn a_speed_key_just_after_a_short_suspend_does_not_reprice_it() {
     let (before, after) = speeds();
     let _clock = now::held();
     let run = play_out(
         play(scratch("suspend-speed")),
         vec![
-            ready(speed_key()).and_a_suspend(A_NIGHT),
+            ready(speed_key()).and_a_suspend(A_NAP),
             // A wait with nothing ready ends the frame the key arrived in.
             quiet(),
-            ready(quit_key()).and_a_suspend(A_MOMENT),
+            ready(quit_key()).and_a_suspend(A_NAP),
         ],
     );
     assert_eq!(
-        run.counted("a speed key just after a resume"),
-        banked_for(&[(A_NIGHT, before), (A_MOMENT, after)]),
+        run.counted("a speed key just after a short suspend"),
+        banked_for(&[(A_NAP, before), (A_NAP, after)]),
         "each span at the speed in force while it passed"
     );
+}
+
+/// A speed key in the frame a long absence ends in was pressed at a screen from
+/// before it, so it does nothing, and the night keeps its price.
+/// @spec TUI-RUN-020, TUI-RUN-078
+#[test]
+fn a_speed_key_just_after_a_long_absence_does_nothing() {
+    let (before, _) = speeds();
+    let _clock = now::held();
+    let run = play_out(
+        play(scratch("absence-speed")),
+        std::iter::once(ready(speed_key()).and_a_suspend(A_NIGHT))
+            .chain(std::iter::repeat_n(quiet(), 2))
+            .chain([ready(quit_key())])
+            .collect(),
+    );
+    let saved = run.saved("a speed key just after a long absence");
+    assert_eq!(saved.state.speed, before);
+    assert_eq!(
+        saved.state.ticks + saved.owed_ticks,
+        banked_for(&[(A_NIGHT, before)])
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-076, TUI-RUN-080 — a long gap in a running game, through the whole loop
+// ---------------------------------------------------------------------------
+
+/// What the save's journal keeps of absences.
+fn tales(saved: &SetDown) -> Vec<&clowder_core::OfflineReport> {
+    saved
+        .state
+        .journal
+        .kept
+        .iter()
+        .filter_map(|e| match &e.item {
+            clowder_core::JournalItem::Away(r) => Some(r),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A suspend the first bound finishes is told as a restart would tell it, its
+/// ticks having run by the time play goes on, and the waits of play resume.
+/// @spec TUI-RUN-076
+#[test]
+fn a_suspend_in_play_leaves_the_report_a_restart_would() {
+    let speed = GameState::new(PLAY_SEED).speed;
+    let _clock = now::held();
+    let an_hour = Duration::from_secs(3_600);
+    let run = play_out(
+        play(scratch("suspend-told")),
+        vec![quiet().and_a_suspend(an_hour), ready(quit_key()), quiet()],
+    );
+    run.expect_it_stopped_there("a suspend, and a quit");
+    let saved = run.saved("a quit after a suspend");
+    assert_eq!(saved.owed_ticks, 0, "its ticks have run");
+    assert_eq!(saved.state.ticks, banked_for(&[(an_hour, speed)]));
+    let told = tales(&saved);
+    assert_eq!(told.len(), 1, "one absence, one report");
+    assert_eq!(told[0].elapsed_seconds, 3_600);
+    assert!(!told[0].truncated);
+}
+
+/// One that outlasts a bound wakes behind the screen, polling without waiting,
+/// and comes back to play's own wait when it finishes.
+/// @spec TUI-RUN-035, TUI-RUN-076
+#[test]
+fn a_suspend_outlasting_a_bound_wakes_and_returns_to_play() {
+    let speed = GameState::new(PLAY_SEED).speed;
+    let _clock = now::held();
+    let owed = banked_for(&[(A_NIGHT, speed)]);
+    let frames = owed.div_ceil(WAKE_TICKS_PER_FRAME) as usize;
+    assert!(frames > 1, "fixture: the night outlasts a bound");
+    let run = play_out(
+        play(scratch("suspend-wakes")),
+        std::iter::once(quiet().and_a_suspend(A_NIGHT))
+            .chain(std::iter::repeat_n(quiet(), frames - 1))
+            .chain([ready(quit_key()), quiet()])
+            .collect(),
+    );
+    run.expect_it_stopped_there("a long suspend, its wake, and a quit");
+    let saved = run.saved("a quit after a wake in play");
+    assert_eq!(saved.owed_ticks, 0);
+    assert_eq!(saved.state.ticks, owed, "the whole night");
+    assert_eq!(tales(&saved).len(), 1);
+    let waits: Vec<Duration> = run
+        .log
+        .iter()
+        .filter_map(|op| match op {
+            Op::Wait(d) => Some(*d),
+            _ => None,
+        })
+        .collect();
+    assert!(
+        waits[1..frames]
+            .iter()
+            .all(|d| *d <= Duration::from_millis(1)),
+        "no waiting out a frame budget while waking: {waits:?}"
+    );
+    assert!(
+        waits[frames] > Duration::from_millis(1),
+        "and play's own wait once it returned: {waits:?}"
+    );
+}
+
+/// However a session ends in the frame a long suspend ends in, or just after, the
+/// save owes what has not run and carries the span in its report so far, for the
+/// next load to tell.
+/// @spec TUI-RUN-039, TUI-RUN-048, TUI-RUN-080
+#[test]
+fn a_session_ending_just_after_a_long_suspend_leaves_its_tale_in_the_save() {
+    let speed = GameState::new(PLAY_SEED).speed;
+    let owed = banked_for(&[(A_NIGHT, speed)]);
+    let endings: [(&str, Cue); 5] = [
+        ("a quit key", ready(quit_key())),
+        ("a signal", quiet().and_a_signal()),
+        ("a wait that fails", wait_fails(io::ErrorKind::Other)),
+        ("a read that fails", read_fails(io::ErrorKind::Other)),
+        ("the screen going", quiet().and_the_screen_goes()),
+    ];
+    for (what, ending) in endings {
+        let _clock = now::held();
+        let run = play_out(
+            play(scratch("suspend-tale")),
+            vec![ending.and_a_suspend(A_NIGHT)],
+        );
+        let saved = run.saved(what);
+        assert_eq!(
+            saved.state.ticks + saved.owed_ticks,
+            owed,
+            "{what}: the whole night"
+        );
+        assert_eq!(
+            saved.report_so_far.elapsed_seconds,
+            A_NIGHT.as_secs(),
+            "{what}: the span goes with it"
+        );
+        assert!(
+            tales(&saved).is_empty(),
+            "{what}: told once, by the load that finishes"
+        );
+    }
 }
 
 /// A wake owing a bound and a half: its second frame finishes it.
@@ -1771,8 +1916,8 @@ fn a_suspend_counts_whatever_ends_a_wake_just_after_it() {
     }
 }
 
-/// A gap past the absence cap is told as a load's is, in what the save keeps.
-/// @spec TUI-RUN-024
+/// A gap past the absence cap is told as a load's is, in what the save carries.
+/// @spec TUI-RUN-024, TUI-RUN-080
 #[test]
 fn a_gap_past_the_cap_leaves_a_truncated_report_in_the_save() {
     let _clock = now::held();
@@ -1782,20 +1927,12 @@ fn a_gap_past_the_cap_leaves_a_truncated_report_in_the_save() {
         vec![ready(quit_key()).and_a_suspend(two_years)],
     );
     let saved = run.saved("a quit just after a capped gap");
-    let reports: Vec<_> = saved
-        .state
-        .journal
-        .kept
-        .iter()
-        .filter_map(|e| match &e.item {
-            clowder_core::JournalItem::Away(r) => Some(r),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(reports.len(), 1, "one gap, one report");
-    assert!(reports[0].truncated, "flagged as the load path flags it");
+    assert!(
+        saved.report_so_far.truncated,
+        "flagged as the load path flags it"
+    );
     assert_eq!(
-        reports[0].elapsed_seconds,
+        saved.report_so_far.elapsed_seconds,
         clowder_core::CATCHUP_CAP_SECONDS
     );
 }

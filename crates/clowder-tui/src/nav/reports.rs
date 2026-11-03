@@ -46,18 +46,12 @@ fn queue(view: &mut ViewState, state: &GameState, report: &OfflineReport, nap_ye
     }
 }
 
-/// Queue whatever report a load's catch-up retained, exactly where the core
-/// kept it — called once, at start-up, with what the core's loader returned.
-/// A load never runs through `update`, so this is its own entry point rather
-/// than a case inside the reducer. @spec TUI-NAV-027
+/// Queue whatever report a catch-up retained, exactly where the core kept it —
+/// called once each, with what the catch-up finished with, whether a load's or
+/// one a long gap began in play. A catch-up never runs through `update`, so this
+/// is its own entry point rather than a case inside the reducer. @spec TUI-NAV-027
 pub fn queue_load_report(view: &mut ViewState, loaded: &LoadedGame) {
     queue(view, &loaded.state, &loaded.report, None);
-}
-
-/// Queue the report the runtime just retained for a gap past the absence cap,
-/// which also never runs through `update`. @spec TUI-NAV-027
-pub fn queue_capped_gap_report(view: &mut ViewState, state: &GameState, report: &OfflineReport) {
-    queue(view, state, report, None);
 }
 
 /// Queue a banner for whatever an applied command's own events say the core

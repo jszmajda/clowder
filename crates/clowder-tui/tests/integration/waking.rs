@@ -624,40 +624,27 @@ fn time_spent_waking_is_banked_at_the_saves_speed_and_runs_after_the_replay() {
     );
 }
 
-/// The ordinary accumulator's rules hold while waking: suspend excess is
-/// absence, and an interval is capped by the one absence rule.
+/// The ordinary accumulator's rules hold while waking: suspend excess too short
+/// to be an absence is banked at the save's speed, to run as live ticks.
 /// @spec TUI-RUN-036
 #[test]
-fn waking_observes_suspend_excess_and_the_absence_cap() {
+fn waking_banks_a_suspend_too_short_to_be_an_absence() {
     let speed = 0.5;
     let json = save_of(&meadow(36_002, speed));
-    for (reading, why) in [
-        (
-            Reading {
-                monotonic: Duration::from_millis(500),
-                wall: Duration::from_secs(3_600),
-            },
-            "suspend excess",
-        ),
-        (
-            Reading {
-                monotonic: Duration::ZERO,
-                wall: Duration::from_secs(3 * CATCHUP_CAP_SECONDS),
-            },
-            "the absence cap",
-        ),
-    ] {
-        let mut t = term(100, 30);
-        let w = waking(begin(&json, SAVED_AT + 300, 10, &mut t, "suspend"));
-        let mut reference = TickAccumulator::default();
-        reference.observe(reading, speed);
-        let w = waking(step(w, &mut t, reading, &[]));
-        assert_eq!(
-            w.clock, reference,
-            "{why}: observed as the accumulator observes it, at the save's speed"
-        );
-        assert!(w.clock.backlog() > 0, "{why}: and banked, not dropped");
-    }
+    let reading = Reading {
+        monotonic: Duration::from_millis(500),
+        wall: Duration::from_secs(30),
+    };
+    let mut t = term(100, 30);
+    let w = waking(begin(&json, SAVED_AT + 300, 10, &mut t, "suspend"));
+    let mut reference = TickAccumulator::default();
+    reference.observe(reading, speed);
+    let w = waking(step(w, &mut t, reading, &[]));
+    assert_eq!(
+        w.clock, reference,
+        "observed as the accumulator observes it, at the save's speed"
+    );
+    assert!(w.clock.backlog() > 0, "and banked, not dropped");
 }
 
 // ---------------------------------------------------------------------------
@@ -1288,34 +1275,9 @@ fn past_the_cap() -> Reading {
     }
 }
 
-/// A gap past the cap while waking is told once the game opens.
-/// @spec TUI-RUN-024
-#[test]
-fn a_capped_gap_while_waking_is_told_once_the_game_opens() {
-    let json = save_of(&meadow(24_001, 1.0));
-    let mut t = term(100, 30);
-    let w = waking(begin(&json, SAVED_AT + 300, 10, &mut t, "capped-open"));
-    let mut w = waking(step(w, &mut t, past_the_cap(), &[]));
-    let mut app = loop {
-        match step(w, &mut t, still(), &[]) {
-            Wake::Waking(next) => w = next,
-            Wake::Awake(app) => break app,
-        }
-    };
-    app.step(&mut t, still(), &[]).unwrap();
-    let flagged = app
-        .state
-        .journal
-        .kept
-        .iter()
-        .filter(|e| matches!(&e.item, clowder_core::JournalItem::Away(r) if r.truncated))
-        .count();
-    assert_eq!(flagged, 1, "the capped gap leaves its one report");
-}
-
 /// A wake set down just after such a gap carries the flag in its report so far,
 /// so the load that wakes through the rest tells it.
-/// @spec TUI-RUN-024, TUI-RUN-039
+/// @spec TUI-RUN-024, TUI-RUN-039, TUI-RUN-079
 #[test]
 fn a_capped_gap_while_waking_carries_its_flag_through_a_set_down() {
     let json = save_of(&meadow(24_002, 1.0));
@@ -1327,4 +1289,318 @@ fn a_capped_gap_while_waking_carries_its_flag_through_a_set_down() {
     let saved = std::fs::read_to_string(&path).unwrap();
     let carried = begin_load(&saved, 0).unwrap().set_down().report_so_far;
     assert!(carried.truncated, "the flag travels with the report so far");
+    assert_eq!(
+        carried.elapsed_seconds,
+        300 + CATCHUP_CAP_SECONDS,
+        "the load's own span, and the cap for the gap"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-076..079 — a long gap in a running game wakes as a load does
+// ---------------------------------------------------------------------------
+
+/// A game in play, as a session would have it.
+fn playing(state: GameState, name: &str) -> App {
+    let mut view = ViewState::default();
+    nav::opening(&mut view, &state);
+    App {
+        state,
+        view,
+        clock: TickAccumulator::default(),
+        save_path: scratch(name),
+        last_save: Instant::now(),
+        prev_layout: None,
+        pointer_record: None,
+        quitting: false,
+        save_failed: false,
+    }
+}
+
+fn across(seconds: u64) -> Reading {
+    Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::from_secs(seconds),
+    }
+}
+
+/// The first frame of the wake a reading of this length begins.
+fn gap(
+    app: App,
+    seconds: u64,
+    bound: u64,
+    t: &mut Terminal<TestBackend>,
+    input: &[TermEvent],
+) -> Wake {
+    let reading = across(seconds);
+    let absence = reading.absence().expect("the fixture spans an absence");
+    Waking::of_absence(app, reading, absence)
+        .bounded(bound)
+        .first_frame(t, input)
+        .expect("a wake against a TestBackend does not fail")
+}
+
+fn finish(mut wake: Wake, t: &mut Terminal<TestBackend>) -> App {
+    loop {
+        match wake {
+            Wake::Awake(app) => return app,
+            Wake::Waking(w) => wake = step(w, t, still(), &[]),
+        }
+    }
+}
+
+fn on_screen(t: &Terminal<TestBackend>) -> String {
+    t.backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect()
+}
+
+/// A suspend and a closed save of the same length come to the same meadow, the
+/// same report, and the same journal, byte for byte.
+/// @spec TUI-RUN-076, SAVE-037
+#[test]
+fn a_long_gap_in_play_ends_as_a_load_of_that_absence_would() {
+    let state = meadow(76_001, 2.0);
+    let by_load = clowder_core::load_string(&save_of(&state), SAVED_AT + 300).unwrap();
+
+    let mut t = term(100, 30);
+    let app = finish(
+        gap(playing(state, "gap-as-load"), 300, 200, &mut t, &[]),
+        &mut t,
+    );
+    assert_eq!(state_bytes(&app.state), state_bytes(&by_load.state));
+    assert_eq!(
+        app.clock.backlog(),
+        0,
+        "nothing is left to drain through play"
+    );
+    let Some(clowder_core::JournalEntry {
+        item: clowder_core::JournalItem::Away(report),
+        ..
+    }) = app.state.journal.kept.last()
+    else {
+        panic!("the absence's report is retained");
+    };
+    assert_eq!(report, &by_load.report);
+    assert_eq!(app.view.reports.len(), 1, "and queued for its banner");
+}
+
+/// It replays at waking's bound behind the waking screen, every tick banked
+/// before it included, and runs no live tick.
+/// @spec TUI-RUN-076, TUI-NAV-102
+#[test]
+fn a_long_gap_in_play_replays_behind_the_waking_screen() {
+    let mut app = playing(meadow(76_002, 1.0), "gap-screen");
+    app.clock.observe(across(10), 1.0);
+    let banked = app.clock.backlog();
+    assert!(banked > 0, "fixture: a backlog stands when the gap arrives");
+    let before = app.state.ticks;
+
+    let mut t = term(100, 30);
+    let w = waking(gap(app, 300, 100, &mut t, &[]));
+    assert_eq!(
+        w.total_ticks(),
+        1_200 + banked,
+        "the gap's and the backlog's"
+    );
+    assert_eq!(
+        w.remaining_ticks(),
+        w.total_ticks() - 100,
+        "one bound replayed"
+    );
+    assert_eq!(w.clock.backlog(), 0, "nothing left banked");
+    let drawn = on_screen(&t);
+    assert!(drawn.contains('░'), "the waking screen's bar: {drawn}");
+
+    let app = finish(Wake::Waking(w), &mut t);
+    assert_eq!(app.state.ticks, before + 1_200 + banked);
+}
+
+/// One the first bound finishes shows no waking screen, as a short load's.
+/// @spec TUI-RUN-034, TUI-RUN-076
+#[test]
+fn a_long_gap_the_first_bound_finishes_shows_no_waking_screen() {
+    let mut t = term(100, 30);
+    let wake = gap(
+        playing(meadow(76_003, 1.0), "gap-short"),
+        60,
+        1_000,
+        &mut t,
+        &[],
+    );
+    let app = awake(wake);
+    assert!(
+        !on_screen(&t).contains('░'),
+        "no screen to flash for a frame"
+    );
+    assert_eq!(app.view.reports.len(), 1, "though the report still comes");
+}
+
+/// The game never closed, so nothing moves the player: no opening, and the same
+/// screen, cursor, overlay, armed row, and seen achievements.
+/// @spec TUI-RUN-077
+#[test]
+fn a_long_gap_in_play_keeps_the_players_place() {
+    let mut t = term(100, 30);
+    let mut app = playing(meadow(76_004, 1.0), "gap-place");
+    app.step(&mut t, still(), &[]).unwrap();
+    assert!(
+        app.pointer_record.is_some(),
+        "fixture: a frame of play was drawn"
+    );
+    app.save_failed = true;
+    app.view.section = Some(nav::Section::ALL[1]);
+    app.view.focus[1] = Some(nav::RowKey::Fixed("kept"));
+    app.view.done_open = true;
+    app.view.armed = Some(nav::ArmedRow {
+        key: nav::RowKey::Fixed("armed"),
+        command: Command::SetSpeed(1.0),
+        expires_at: Instant::now(),
+    });
+    app.view
+        .achievements_seen
+        .insert(clowder_core::AchievementId::ALL[0]);
+    let place = |a: &App| {
+        format!(
+            "{:?}{:?}{:?}{:?}{:?}{:?}",
+            a.view.section,
+            a.view.focus,
+            a.view.overlay,
+            a.view.armed,
+            a.view.done_open,
+            a.view.achievements_seen,
+        )
+    };
+    let kept = place(&app);
+    let layout = app.prev_layout;
+    let app = finish(gap(app, 300, 200, &mut t, &[]), &mut t);
+    assert_eq!(place(&app), kept);
+    assert_eq!(
+        app.prev_layout, layout,
+        "the breakpoints' dead-band carries on"
+    );
+    assert!(layout.is_some());
+    assert!(
+        app.save_failed,
+        "and a failure already told is not told again"
+    );
+    assert!(
+        app.pointer_record.is_none(),
+        "no drawn frame of this meadow to aim at yet"
+    );
+}
+
+/// The report arrives queued, and survives the player's place: a banner from
+/// before the gap keeps its turn.
+/// @spec TUI-RUN-077, TUI-NAV-027
+#[test]
+fn a_long_gap_in_play_queues_its_report_behind_any_already_waiting() {
+    let mut t = term(100, 30);
+    let once = finish(
+        gap(
+            playing(meadow(76_005, 1.0), "gap-twice"),
+            90,
+            200,
+            &mut t,
+            &[],
+        ),
+        &mut t,
+    );
+    assert_eq!(once.view.reports.len(), 1);
+    let twice = finish(gap(once, 90, 200, &mut t, &[]), &mut t);
+    assert_eq!(twice.view.reports.len(), 2, "each absence is told");
+}
+
+/// The frame that began it answers as a waking frame does: quitting and a resize,
+/// and nothing else, since those keys were pressed at a screen from before it.
+/// @spec TUI-RUN-078, TUI-NAV-103
+#[test]
+fn the_frame_that_begins_a_wake_in_play_answers_only_quitting_and_a_resize() {
+    let mut t = term(100, 30);
+    let app = playing(meadow(76_006, 1.0), "gap-keys");
+    let section = app.view.section;
+    let speed = app.state.speed;
+    let input = [
+        press(KeyCode::Char('>'), KeyModifiers::NONE),
+        press(KeyCode::Tab, KeyModifiers::NONE),
+    ];
+    let app = finish(gap(app, 300, 200, &mut t, &input), &mut t);
+    assert_eq!(app.state.speed, speed, "a speed key does nothing");
+    assert_eq!(app.view.section, section, "nor does any other");
+    assert!(!app.quitting);
+
+    // A resize it could not apply is a terminal lost, so reaching for the
+    // terminal at all is what shows it applied.
+    let app = playing(meadow(76_008, 1.0), "gap-resize");
+    t.backend_mut().resize(120, 40);
+    let w = waking(gap(app, 300, 100, &mut t, &[TermEvent::Resize(120, 40)]));
+    assert_eq!(t.get_frame().area().width, 120, "a resize applies");
+    assert!(!w.quitting);
+
+    for quit in [
+        press(KeyCode::Char('q'), KeyModifiers::NONE),
+        press(KeyCode::Char('c'), KeyModifiers::CONTROL),
+    ] {
+        let app = playing(meadow(76_007, 1.0), "gap-quit");
+        let w = waking(gap(app, 300, 100, &mut t, &[quit]));
+        assert!(w.quitting, "quitting answers");
+    }
+}
+
+/// While waking, a load's or one begun in play, a long reading adds its ticks and
+/// its span to the catch-up, every tick banked so far with them.
+/// @spec TUI-RUN-079, SAVE-038
+#[test]
+fn a_long_gap_while_waking_joins_the_catch_up() {
+    let mut t = term(100, 30);
+    let starts = [
+        begin(
+            &save_of(&meadow(79_001, 1.0)),
+            SAVED_AT + 300,
+            100,
+            &mut t,
+            "join-load",
+        ),
+        gap(
+            playing(meadow(79_002, 1.0), "join-play"),
+            300,
+            100,
+            &mut t,
+            &[],
+        ),
+    ];
+    for start in starts {
+        let w = waking(start);
+        assert_eq!(w.total_ticks(), 1_200, "fixture: five minutes owed");
+        let w = waking(step(w, &mut t, across(30), &[]));
+        let banked = w.clock.backlog();
+        assert_eq!(banked, 120, "a short reading banks");
+
+        let w = waking(step(w, &mut t, across(120), &[]));
+        assert_eq!(
+            w.total_ticks(),
+            1_200 + banked + 480,
+            "a long one joins, with the bank"
+        );
+        assert_eq!(w.clock.backlog(), 0);
+
+        let path = w.save_path.clone();
+        let app = finish(Wake::Waking(w), &mut t);
+        let tales: Vec<_> = app
+            .state
+            .journal
+            .kept
+            .iter()
+            .filter_map(|e| match &e.item {
+                clowder_core::JournalItem::Away(r) => Some(r),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(tales.len(), 1, "one absence, told once");
+        assert_eq!(tales[0].elapsed_seconds, 420, "by its whole span");
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
 }
