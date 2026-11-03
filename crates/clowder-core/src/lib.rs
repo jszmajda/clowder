@@ -29,9 +29,9 @@ pub use query::{
 };
 pub use rng::Pcg32;
 pub use save::{
-    begin_load, default_save_path, load_string, read_save, save_string, save_string_carrying,
-    save_string_owing, write_save, write_save_carrying, write_save_owing, Advance, CatchUp,
-    LoadError, LoadedGame, OfflineReport, SetDown, CATCHUP_CAP_SECONDS,
+    begin_absence, begin_load, default_save_path, load_string, read_save, save_string,
+    save_string_carrying, save_string_owing, write_save, write_save_carrying, write_save_owing,
+    Advance, CatchUp, LoadError, LoadedGame, OfflineReport, SetDown, CATCHUP_CAP_SECONDS,
     MIN_REPORTABLE_ABSENCE_SECONDS, SAVE_VERSION,
 };
 pub use state::season_of_day;

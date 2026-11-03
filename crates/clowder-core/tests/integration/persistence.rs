@@ -3164,3 +3164,105 @@ fn only_what_every_version_wrote_is_required() {
     assert_eq!(loaded.generation, GameState::new(0).generation);
     assert_eq!(loaded.kittens[0].rank, 0);
 }
+
+// =====================================================================
+// An absence the caller saw: the same catch-up, with no save read
+// =====================================================================
+
+/// Given the state, the ticks, and the span a load of the same absence would
+/// work out, it comes to the same meadow, report, and journal, byte for byte.
+// @spec SAVE-037
+#[test]
+fn an_absence_the_caller_saw_ends_as_a_load_of_it_would() {
+    let s = played_state(37);
+    let json = save_string(&s, 0);
+    let by_load = load_string(&json, 300).unwrap();
+
+    let state = load_string(&json, 0).unwrap().state;
+    let Advance::Finished(seen) = begin_absence(state, 300 * 4, 300, false).advance(u64::MAX)
+    else {
+        panic!("advancing through everything finishes");
+    };
+    assert_eq!(save_string(&seen.state, 0), save_string(&by_load.state, 0));
+    assert_eq!(seen.report, by_load.report);
+    assert_eq!(seen.report.elapsed_seconds, 300);
+}
+
+/// Advanced a little at a time, set down part way, and told by its whole span.
+// @spec SAVE-037
+#[test]
+fn an_absence_the_caller_saw_paces_and_sets_down_as_a_load_does() {
+    let state = played_state(38);
+    let catch_up = begin_absence(state.clone(), 100, 90, true);
+    assert_eq!(catch_up.total_ticks(), 100);
+    let Advance::Pending(catch_up) = catch_up.advance(40) else {
+        panic!("sixty ticks are still owed");
+    };
+    assert_eq!(catch_up.remaining_ticks(), 60);
+    let set_down = catch_up.set_down();
+    assert_eq!(set_down.owed_ticks, 60);
+    assert_eq!(set_down.report_so_far.elapsed_seconds, 90);
+    assert!(set_down.report_so_far.truncated);
+    assert_eq!(set_down.state.ticks, state.ticks + 40);
+}
+
+/// The report is retained under the rule a load's is, by its span.
+// @spec SAVE-015, SAVE-037
+#[test]
+fn an_absence_the_caller_saw_is_retained_by_the_same_rule() {
+    let away_entries = |seconds: u64| {
+        let state = played_state(39);
+        let Advance::Finished(game) = begin_absence(state, 8, seconds, false).advance(u64::MAX)
+        else {
+            panic!("advancing through everything finishes");
+        };
+        game.state
+            .journal
+            .kept
+            .iter()
+            .filter(|e| matches!(e.item, JournalItem::Away(_)))
+            .count()
+    };
+    assert_eq!(away_entries(MIN_REPORTABLE_ABSENCE_SECONDS - 1), 0);
+    assert_eq!(away_entries(MIN_REPORTABLE_ABSENCE_SECONDS), 1);
+}
+
+/// What the record held before any tick replayed, for telling what it earned.
+// @spec SAVE-030, SAVE-037
+#[test]
+fn an_absence_the_caller_saw_answers_what_the_record_held() {
+    let mut state = played_state(40);
+    state.achievements.insert(
+        AchievementId::ALL[0],
+        Earned {
+            generation: 0,
+            day: 0,
+        },
+    );
+    let held: BTreeSet<_> = state.achievements.keys().copied().collect();
+    assert_eq!(begin_absence(state, 1, 60, false).earned_at_load(), &held);
+}
+
+/// An absence joining one in progress: its ticks owed, its span and truncation
+/// in the one report, however the two divide it.
+// @spec SAVE-038
+#[test]
+fn a_further_absence_joins_the_one_in_progress() {
+    let state = played_state(41);
+    let Advance::Finished(whole) = begin_absence(state.clone(), 360, 90, true).advance(u64::MAX)
+    else {
+        panic!("advancing through everything finishes");
+    };
+
+    let Advance::Pending(mut joined) = begin_absence(state, 200, 50, false).advance(100) else {
+        panic!("some is still owed");
+    };
+    joined.add_absence(160, 40, true);
+    assert_eq!(joined.total_ticks(), 360);
+    assert_eq!(joined.remaining_ticks(), 260);
+    let Advance::Finished(game) = joined.advance(u64::MAX) else {
+        panic!("advancing through everything finishes");
+    };
+    assert_eq!(game.report, whole.report, "told as one absence");
+    assert_eq!(save_string(&game.state, 0), save_string(&whole.state, 0));
+}

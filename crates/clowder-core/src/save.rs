@@ -275,6 +275,16 @@ impl CatchUp {
         self.remaining_ticks
     }
 
+    /// A further absence joins this one, so an absence interrupted by another
+    /// is told once: its ticks owed, and its span and truncation in the report.
+    /// @spec SAVE-038
+    pub fn add_absence(&mut self, owed_ticks: u64, elapsed_seconds: u64, truncated: bool) {
+        self.total_ticks = self.total_ticks.saturating_add(owed_ticks);
+        self.remaining_ticks = self.remaining_ticks.saturating_add(owed_ticks);
+        self.this_elapsed_seconds = self.this_elapsed_seconds.saturating_add(elapsed_seconds);
+        self.this_truncated |= truncated;
+    }
+
     /// The achievements the record held as the save was loaded, before any
     /// tick of this catch-up replayed — so a frontend can tell what the
     /// absence earned. @spec SAVE-030
@@ -535,6 +545,31 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
         partial: OfflineReport::default(),
         earned_at_load,
     })
+}
+
+/// Begin a catch-up for an absence the caller observed itself rather than read
+/// from a save: a shell that stayed running across it says what it owes and how
+/// long it was, having read the clocks and applied the cap (SAVE-016) itself. It
+/// advances, finishes, and sets down as a load's does. @spec SAVE-037
+pub fn begin_absence(
+    state: GameState,
+    owed_ticks: u64,
+    elapsed_seconds: u64,
+    truncated: bool,
+) -> CatchUp {
+    let before = state.resources;
+    let earned_at_load = state.achievements.keys().copied().collect();
+    CatchUp {
+        state,
+        total_ticks: owed_ticks,
+        remaining_ticks: owed_ticks,
+        before,
+        carried: OfflineReport::default(),
+        this_elapsed_seconds: elapsed_seconds,
+        this_truncated: truncated,
+        partial: OfflineReport::default(),
+        earned_at_load,
+    }
 }
 
 /// Bring down what keeps counting, so a number read at the top of its range
