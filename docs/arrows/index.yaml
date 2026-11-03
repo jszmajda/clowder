@@ -1,5 +1,5 @@
 schema_version: 2
-last_updated: 2026-11-01
+last_updated: 2026-11-03
 
 # Grouped by the two crates the HLD's architecture splits on: the headless
 # simulation and the terminal shell. Persistence sits with the sim crate it
@@ -12,6 +12,7 @@ last_updated: 2026-11-01
 # queries. A segment is ready when every segment in its blockedBy is OK.
 taxonomy:
   sim:
+    - achievements
     - adventures
     - ceremonies
     - colonies
@@ -35,7 +36,7 @@ arrows:
   sim:
     status: MAPPED
     parent: null
-    children: [adventures, ceremonies, colonies, cosmic, curiosity, dreamtime, economy, engine, expeditions, kittens, mystic, prestige]
+    children: [achievements, adventures, ceremonies, colonies, cosmic, curiosity, dreamtime, economy, engine, expeditions, kittens, mystic, prestige]
     sampled: 2026-08-10
     audited: null
     audited_sha: null
@@ -56,12 +57,23 @@ arrows:
     detail: ../intent/tui/tui-design.md
     next: null
     drift: null
+  achievements:
+    status: PARTIAL
+    parent: sim
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
+    blocks: []
+    blockedBy: []
+    detail: sim/achievements/achievements.md
+    next: "#42: conditions without tests"
+    drift: null
   adventures:
     status: OK
     parent: sim
-    sampled: 2026-11-01
-    audited: 2026-10-29
-    audited_sha: 8443eda1698c8df48efd2557f47f3f18455dcf5f
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
     blocks: [cosmic, dreamtime]
     blockedBy: [ceremonies, colonies, mystic]
     detail: sim/adventures/adventures.md
@@ -70,9 +82,9 @@ arrows:
   ceremonies:
     status: OK
     parent: sim
-    sampled: 2026-11-01
-    audited: 2026-11-01
-    audited_sha: c799869e32f728e9f9eba515c31e68d4287d230e
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/ceremonies/ceremonies.md
@@ -92,9 +104,9 @@ arrows:
   cosmic:
     status: OK
     parent: sim
-    sampled: 2026-11-02
-    audited: 2026-11-02
-    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
     blocks: []
     blockedBy: [adventures, prestige]
     detail: sim/cosmic/cosmic.md
@@ -103,9 +115,9 @@ arrows:
   curiosity:
     status: PARTIAL
     parent: sim
-    sampled: 2026-11-02
-    audited: 2026-11-02
-    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
     blocks: [ceremonies, colonies, mystic]
     blockedBy: [economy]
     detail: sim/curiosity/curiosity.md
@@ -114,9 +126,9 @@ arrows:
   dreamtime:
     status: OK
     parent: sim
-    sampled: 2026-11-02
-    audited: 2026-11-02
-    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
     blocks: []
     blockedBy: [adventures, prestige]
     detail: sim/dreamtime/dreamtime.md
@@ -125,9 +137,9 @@ arrows:
   economy:
     status: OK
     parent: sim
-    sampled: 2026-11-01
-    audited: 2026-11-01
-    audited_sha: c5a6aacb2cccb97e19ac2830ce3b93d60479fb84
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
     blocks: [curiosity, expeditions, kittens]
     blockedBy: [engine]
     detail: sim/economy/economy.md
@@ -136,9 +148,9 @@ arrows:
   engine:
     status: OK
     parent: sim
-    sampled: 2026-11-02
-    audited: 2026-11-02
-    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
     blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md
@@ -156,22 +168,22 @@ arrows:
     next: null
     drift: null
   kittens:
-    status: OK
+    status: PARTIAL
     parent: sim
-    sampled: 2026-08-10
-    audited: null
-    audited_sha: null
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
     blocks: [ceremonies, colonies, mystic]
     blockedBy: [economy]
     detail: sim/kittens/kittens.md
-    next: null
+    next: "#40, #41: a timed effect one tick short, thin tests"
     drift: null
   mystic:
     status: PARTIAL
     parent: sim
-    sampled: 2026-11-02
-    audited: 2026-11-02
-    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/mystic/mystic.md
@@ -191,20 +203,20 @@ arrows:
   persistence:
     status: PARTIAL
     parent: null
-    sampled: 2026-11-02
-    audited: 2026-11-02
-    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
     blocks: [runtime]
     blockedBy: [engine]
     detail: persistence/persistence.md
-    next: "#32, #36, #37: the catch-up bound, hand-edited counters, thin tests"
+    next: "#36, #37: hand-edited counters, thin tests"
     drift: null
   prestige:
     status: OK
     parent: sim
-    sampled: 2026-11-01
-    audited: 2026-11-01
-    audited_sha: c799869e32f728e9f9eba515c31e68d4287d230e
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
     blocks: [cosmic, dreamtime]
     blockedBy: [ceremonies, colonies, mystic]
     detail: sim/prestige/prestige.md

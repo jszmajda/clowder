@@ -4,7 +4,7 @@ Ceremonies are clowder's faith system, reimagined as warmth and devotion rather 
 
 ## Status
 
-**OK** — last audited 2026-11-01 (commit `c799869e32f7`). 10 of 10 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-03 (commit `2cddde1e39c7`). 10 of 10 active specs implemented, each cited by a test.
 
 ## References
 
@@ -43,6 +43,8 @@ Ceremonies are clowder's faith system, reimagined as warmth and devotion rather 
 ## Key Findings
 
 Audited 2026-11-01. First full audit, by the same route as the mystic leaf. It found a shortfall naming an unrelated resource (fixed, SIM-SUN-008), an absolute claim its sibling spec contradicted (corrected, SIM-SUN-003), a formula missing a term and a factor (corrected, SIM-SUN-004), and clauses no test exercised (tested). Issue #17 named the flat term the cap formula had left out (SIM-SUN-004), fed from the cosmic and adventures leaves. Issue #13 held every rite's figures to its rule (SIM-SUN-009).
+
+Audited 2026-11-03, for what issue #32 changed. The code that sums this segment's effect contributions moved behind the per-key source lists (SIM-ENG-084), annotations with it; its specs did not change. Each contribution is held by a bit-for-bit comparison against a walk of every source, and a real late save replayed by the previous build and this one ended in the same bytes. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

@@ -4,7 +4,7 @@ Curiosity is the game's research system: kittens investigate the world and their
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-02 (commit `376d3e12c927`). 16 of 16 active specs implemented, each cited by a test.
+**PARTIAL** — last audited 2026-11-03 (commit `2cddde1e39c7`). 16 of 16 active specs implemented, each cited by a test.
 
 ## References
 
@@ -48,6 +48,8 @@ Curiosity is the game's research system: kittens investigate the world and their
 Audited 2026-11-01. First full audit: every spec read against its code and tests, and the design's three tables read row by row, by a reader given only the arrow artifacts, its findings then checked by hand. All 59 idea, 35 refinement, and 8 rule rows match on every number. It found ideas whose named unlocks no rule reads (SIM-CUR-009, deferred), three blurbs leaving out figures their rules apply and one stating the wrong kind (fixed), a spec forbidding grants others require (SIM-CUR-006, corrected), and one claiming more permanence than a Move leaves (SIM-CUR-004, corrected). Issue #13 added SIM-CUR-016, holding every blurb's figures to their rule in both directions.
 
 Audited 2026-11-02, for what issue #30 changed. A rule now reads each idea for each unlock its row names (SIM-CUR-009): Scout Picnicking, Dream Tending, and Hushfelt Seeking gate what they promise, and Dream Loomcraft opens the loom ahead of the idea that used to. Solar Devotion's row and blurb stopped claiming the ceremonies, which keep their own reason to wait, and Sun Salutations' row and blurb state them. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. SIM-CUR-016 is a property of the tables as a whole, so no code decides it, and its tests are its pins. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-03, for what issue #32 changed. The code that sums this segment's effect contributions moved behind the per-key source lists (SIM-ENG-084), annotations with it; its specs did not change. Each contribution is held by a bit-for-bit comparison against a walk of every source, and a real late save replayed by the previous build and this one ended in the same bytes. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

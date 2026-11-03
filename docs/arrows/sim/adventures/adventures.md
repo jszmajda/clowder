@@ -4,7 +4,7 @@ Adventures are clowder's challenge modes, reimagined as *optional themed outings
 
 ## Status
 
-**OK** — last audited 2026-10-29 (git SHA `8443eda1698c`). 8 of 8 active specs implemented, each cited by a test and annotated at its entry point.
+**OK** — last audited 2026-11-03 (commit `2cddde1e39c7`). 8 of 8 active specs implemented, each cited by a test.
 
 ## References
 
@@ -42,6 +42,8 @@ Adventures are clowder's challenge modes, reimagined as *optional themed outings
 ## Key Findings
 
 Audited 2026-10-29 against the source: every spec marked implemented has a test citing it, no `@spec` in the code or tests names a spec that does not exist, and no spec ID is defined twice.
+
+Audited 2026-11-03, for what issue #32 changed. The code that sums this segment's effect contributions moved behind the per-key source lists (SIM-ENG-084), annotations with it; its specs did not change. Each contribution is held by a bit-for-bit comparison against a walk of every source, and a real late save replayed by the previous build and this one ended in the same bytes. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

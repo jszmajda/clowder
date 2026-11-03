@@ -4,7 +4,7 @@ Prestige in clowder is **The Great Meadow Move**: when a clowder has grown as la
 
 ## Status
 
-**OK** — last audited 2026-11-01 (commit `c799869e32f7`). 16 of 16 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-03 (commit `2cddde1e39c7`). 16 of 16 active specs implemented, each cited by a test.
 
 ## References
 
@@ -46,6 +46,8 @@ Prestige in clowder is **The Great Meadow Move**: when a clowder has grown as la
 ## Key Findings
 
 Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. SIM-MOVE-014 is a property of the content tables as a whole, so no code decides it, and its tests are its pins. Issue #13 held every tradition's figures to its rule (SIM-MOVE-014).
+
+Audited 2026-11-03, for what issue #32 changed. The code that sums this segment's effect contributions moved behind the per-key source lists (SIM-ENG-084), annotations with it; its specs did not change. Each contribution is held by a bit-for-bit comparison against a walk of every source, and a real late save replayed by the previous build and this one ended in the same bytes. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

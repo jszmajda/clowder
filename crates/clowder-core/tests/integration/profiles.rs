@@ -1030,7 +1030,10 @@ fn the_bonus_a_kitten_states_is_the_one_its_work_gets() {
 
     s.adventure_rewards[AdventureId::NapTime.ix()] = 1.0;
     let raised = s.kitten_facts(0).unwrap().best_at.unwrap().bonus;
-    assert!(raised > plain, "a master-skill reward raises what it states");
+    assert!(
+        raised > plain,
+        "a master-skill reward raises what it states"
+    );
 
     while s.ticks % 10 != 1 {
         s.tick();

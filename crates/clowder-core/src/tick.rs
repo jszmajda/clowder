@@ -755,10 +755,7 @@ impl GameState {
                 tally(per_copy_mess, count as f64);
                 continue;
             };
-            let demands = converter
-                .inputs
-                .iter()
-                .map(|(r, d)| (*r, d * count as f64));
+            let demands = converter.inputs.iter().map(|(r, d)| (*r, d * count as f64));
             let fraction = self.throttle_of(demands.clone());
             tally(per_copy_mess, count as f64 * fraction);
             if fraction <= 0.0 {

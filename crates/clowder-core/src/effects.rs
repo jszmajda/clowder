@@ -718,7 +718,10 @@ mod every_source {
         // How many altars a rite's share scales by, none included, since a
         // share that is zero at one count may not be at another.
         for copies in [0, 1, 2, 5, 20] {
-            meadows.push((format!("everything held, {copies} copies"), all_held(copies)));
+            meadows.push((
+                format!("everything held, {copies} copies"),
+                all_held(copies),
+            ));
         }
         for trait_id in KittenTrait::ALL {
             let mut s = all_held(3);
@@ -793,7 +796,9 @@ mod every_source {
         assert!(moved(|s| s.rites.clear()));
         assert!(moved(|s| s.arches_bought.clear()));
         assert!(moved(|s| s.traditions.clear()));
-        assert!(moved(|s| s.adventure_rewards = [0.0; AdventureId::ALL.len()]));
+        assert!(moved(
+            |s| s.adventure_rewards = [0.0; AdventureId::ALL.len()]
+        ));
         assert!(moved(|s| s.active_adventure = None));
         assert!(moved(|s| s.promises.clear()));
         assert!(moved(|s| s.dream_looms.clear()));

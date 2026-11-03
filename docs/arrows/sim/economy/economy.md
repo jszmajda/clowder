@@ -4,7 +4,7 @@ The economy is the material world of the game: what exists, what it costs, what 
 
 ## Status
 
-**OK** — last audited 2026-11-01 (commit `c5a6aacb2ccc`). 62 of 62 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-03 (commit `2cddde1e39c7`). 62 of 62 active specs implemented, each cited by a test.
 
 ## References
 
@@ -33,6 +33,7 @@ The economy is the material world of the game: what exists, what it costs, what 
 - `crates/clowder-core/src/command.rs`
 - `crates/clowder-core/src/content.rs`
 - `crates/clowder-core/src/effects.rs`
+- `crates/clowder-core/src/effects/index.rs`
 - `crates/clowder-core/src/gating.rs`
 - `crates/clowder-core/src/query.rs`
 - `crates/clowder-core/src/save.rs`
@@ -50,6 +51,8 @@ The economy is the material world of the game: what exists, what it costs, what 
 ## Key Findings
 
 Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. The structure table was read row by row against the definitions: one effect it listed had never reached the rules, and now does (SIM-ECO-053). Rule-held structure behaviour now lives in definition fields, and no rule branches on a structure's id to find a rate. SIM-ECO-024 and SIM-ECO-047 are properties of the content tables as a whole, so no code decides them and their tests are their pins. Issue #2 gave every store a description (SIM-ECO-061, SIM-ECO-062), held to its limits by tests over the whole table.
+
+Audited 2026-11-03, for what issue #32 changed. The code that sums this segment's effect contributions moved behind the per-key source lists (SIM-ENG-084), annotations with it; its specs did not change. Each contribution is held by a bit-for-bit comparison against a walk of every source, and a real late save replayed by the previous build and this one ended in the same bytes. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader. Converters and fuel fractions now ask the throttle over demands worked out as they are read, allocating nothing, with the same fraction.
 
 ## Work Required
 

@@ -438,7 +438,10 @@ mod tests {
                     }
                     _ => true,
                 };
-                assert!(carries, "{source:?} is listed for {key:?}, which it gives nothing");
+                assert!(
+                    carries,
+                    "{source:?} is listed for {key:?}, which it gives nothing"
+                );
             }
         }
     }
