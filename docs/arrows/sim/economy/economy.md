@@ -4,7 +4,7 @@ The economy is the material world of the game: what exists, what it costs, what 
 
 ## Status
 
-**OK** — last audited 2026-11-03 (commit `2cddde1e39c7`). 62 of 62 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-03 (commit `5e255644179a`). 63 of 63 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ The economy is the material world of the game: what exists, what it costs, what 
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/economy/economy-specs.md` — 62 specs, prefix `SIM-ECO`
+- `docs/intent/sim/economy/economy-specs.md` — 63 specs, prefix `SIM-ECO`
 
 ### Tests
 - `crates/clowder-core/tests/integration/economy.rs`
@@ -28,6 +28,7 @@ The economy is the material world of the game: what exists, what it costs, what 
 - `crates/clowder-core/tests/integration/structure_fields.rs`
 - `crates/clowder-core/tests/integration/wonder.rs`
 - `crates/clowder-tui/tests/integration/bench.rs`
+- `crates/clowder-tui/tests/integration/frame.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`
@@ -44,15 +45,17 @@ The economy is the material world of the game: what exists, what it costs, what 
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-ECO-001 – SIM-ECO-062 | 62 | 0 | 0 |
+| All | SIM-ECO-001 – SIM-ECO-063 | 63 | 0 | 0 |
 
-**Summary:** 62 of 62 active specs implemented.
+**Summary:** 63 of 63 active specs implemented.
 
 ## Key Findings
 
 Audited 2026-11-01. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. The structure table was read row by row against the definitions: one effect it listed had never reached the rules, and now does (SIM-ECO-053). Rule-held structure behaviour now lives in definition fields, and no rule branches on a structure's id to find a rate. SIM-ECO-024 and SIM-ECO-047 are properties of the content tables as a whole, so no code decides them and their tests are their pins. Issue #2 gave every store a description (SIM-ECO-061, SIM-ECO-062), held to its limits by tests over the whole table.
 
 Audited 2026-11-03, for what issue #32 changed. The code that sums this segment's effect contributions moved behind the per-key source lists (SIM-ENG-084), annotations with it; its specs did not change. Each contribution is held by a bit-for-bit comparison against a walk of every source, and a real late save replayed by the previous build and this one ended in the same bytes. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader. Converters and fuel fractions now ask the throttle over demands worked out as they are read, allocating nothing, with the same fraction.
+
+Audited 2026-11-03, for what issue #38 changed. Every structure now has one family (SIM-ECO-063), through a rule exhaustive over the structures. The table is pinned as the design states it, and what a family's name promises is held against each structure's own fields, so a change to what a structure does asks again where it belongs. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

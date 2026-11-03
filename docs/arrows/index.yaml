@@ -139,7 +139,7 @@ arrows:
     parent: sim
     sampled: 2026-11-03
     audited: 2026-11-03
-    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
+    audited_sha: 5e255644179a98d8685bd60516896e75fb53cbb9
     blocks: [curiosity, expeditions, kittens]
     blockedBy: [engine]
     detail: sim/economy/economy.md
@@ -194,7 +194,7 @@ arrows:
     parent: tui
     sampled: 2026-11-03
     audited: 2026-11-03
-    audited_sha: e1a0720b63e584b549f04d0b7d61f1980767aaa3
+    audited_sha: 5e255644179a98d8685bd60516896e75fb53cbb9
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
