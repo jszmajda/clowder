@@ -50,7 +50,7 @@ pub struct SaveFile {
     /// whatever speed happened to be set at save time. Ticks earned at one
     /// speed and saved at another were being lost or conjured by the ratio
     /// between them. What the player earned is theirs, so it is stored as
-    /// what it is: a count. @spec SAVE-017
+    /// what it is: a count.
     #[serde(default)]
     pub owed_ticks: u64,
     /// The report so far of a catch-up set down before it finished, or
@@ -58,7 +58,7 @@ pub struct SaveFile {
     /// the meadow has already lived through, and nothing else can recompute
     /// it. Its arrival is a version step (SAVE_VERSION 5) rather than a
     /// defaulted field, so an older binary refuses the save as too new rather
-    /// than silently dropping the tale it carries. @spec SAVE-021
+    /// than silently dropping the tale it carries.
     #[serde(default)]
     pub report_so_far: Option<OfflineReport>,
     pub state: GameState,
@@ -78,7 +78,6 @@ pub enum LoadError {
 /// What happened while you were away, folded from the catch-up replay.
 /// Name lists are gross with per-name counts — a kitten may appear in more
 /// than one list, and more than once per list.
-// @spec SAVE-008
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OfflineReport {
     pub elapsed_seconds: u64,
@@ -95,6 +94,10 @@ pub struct OfflineReport {
     pub wandered: Vec<(String, u32)>,
     pub returned: Vec<(String, u32)>,
     pub seasons_passed: u32,
+    /// What the replay earned, in the order earned. Nearly always empty, so a
+    /// report that earned nothing writes no field for it. @spec SAVE-039
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub earned: Vec<AchievementId>,
 }
 
 impl Default for OfflineReport {
@@ -107,6 +110,7 @@ impl Default for OfflineReport {
             wandered: Vec::new(),
             returned: Vec::new(),
             seasons_passed: 0,
+            earned: Vec::new(),
         }
     }
 }
@@ -198,7 +202,6 @@ pub fn write_save_carrying(
 /// divided into calls changes nothing it produces: the same ticks run in the
 /// same order through the same replay step, and the report folds the same
 /// events, whichever way the total is divided.
-/// @spec SAVE-018
 pub struct CatchUp {
     state: GameState,
     total_ticks: u64,
@@ -208,17 +211,16 @@ pub struct CatchUp {
     before: [f64; crate::state::RESOURCE_COUNT],
     /// The report so far this save carried (SAVE-021), or its default (every
     /// field zero/empty) when it carried none — continuing a report that
-    /// started empty is simply this catch-up's own tale. @spec SAVE-022
+    /// started empty is simply this catch-up's own tale.
     carried: OfflineReport,
     /// This load's own capped interval and truncation flag — never summed
-    /// with the carried report's until a result is built. @spec SAVE-022
+    /// with the carried report's until a result is built.
     this_elapsed_seconds: u64,
     this_truncated: bool,
     /// Folded from the ticks this catch-up itself has replayed so far: names
     /// and seasons only, since resource deltas are recomputed from `before`.
     partial: OfflineReport,
-    /// The achievements the record held as loaded, before any tick replayed.
-    /// @spec SAVE-030
+    /// The achievements the record held as the absence began.
     earned_at_load: BTreeSet<AchievementId>,
 }
 
@@ -228,7 +230,6 @@ pub struct CatchUp {
 /// against one tick-count at a time (SAVE-018) — boxing `CatchUp` would cost
 /// every caller an allocation per advance to save space a few-frames-long
 /// wake never notices.
-/// @spec SAVE-018, SAVE-019
 #[allow(clippy::large_enum_variant)]
 pub enum Advance {
     Pending(CatchUp),
@@ -239,7 +240,6 @@ pub enum Advance {
 /// still owed, and the report so far — folded from the ticks replayed,
 /// continuing any report the save carried. Nothing is recorded in the
 /// journal; the load that finally finishes it does that once.
-/// @spec SAVE-020
 pub struct SetDown {
     pub state: GameState,
     pub owed_ticks: u64,
@@ -321,6 +321,12 @@ impl CatchUp {
                 .carried
                 .seasons_passed
                 .saturating_add(self.partial.seasons_passed),
+            // @spec SAVE-039
+            earned: [
+                self.carried.earned.as_slice(),
+                self.partial.earned.as_slice(),
+            ]
+            .concat(),
         }
     }
 
@@ -329,8 +335,8 @@ impl CatchUp {
     /// this replays the last owed tick, the catch-up finishes exactly as a
     /// one-call load would (SAVE-019): the report completed and recorded in
     /// the journal, and the caught-up state and report handed back.
-    /// Otherwise the catch-up comes back still pending. @spec SAVE-018,
-    /// SAVE-019
+    /// Otherwise the catch-up comes back still pending.
+    /// @spec SAVE-018, SAVE-019
     pub fn advance(mut self, max_ticks: u64) -> Advance {
         let n = max_ticks.min(self.remaining_ticks);
         for _ in 0..n {
@@ -533,13 +539,21 @@ pub fn begin_load(s: &str, now_unix: u64) -> Result<CatchUp, LoadError> {
     let ticks_to_replay = (((elapsed * TICKS_PER_SECOND) as f64 * state.speed).round() as u64)
         .saturating_add(file.owed_ticks);
     let before = state.resources;
-    let earned_at_load = state.achievements.keys().copied().collect();
+    let carried = file.report_so_far.unwrap_or_default();
+    // What a wake set down had earned is the absence's, not what the player
+    // already knew. @spec SAVE-030, SAVE-039
+    let earned_at_load = state
+        .achievements
+        .keys()
+        .filter(|id| !carried.earned.contains(id))
+        .copied()
+        .collect();
     Ok(CatchUp {
         state,
         total_ticks: ticks_to_replay,
         remaining_ticks: ticks_to_replay,
         before,
-        carried: file.report_so_far.unwrap_or_default(),
+        carried,
         this_elapsed_seconds: elapsed,
         this_truncated: truncated,
         partial: OfflineReport::default(),
@@ -765,6 +779,7 @@ pub(crate) fn fold_event(report: &mut OfflineReport, event: Event) {
         Event::KittenWanderedOff { name } => bump(&mut report.wandered, &name),
         Event::KittenReturned { name } => bump(&mut report.returned, &name),
         Event::SeasonChanged { .. } => report.seasons_passed += 1,
+        Event::AchievementEarned { id } => report.earned.push(id),
         _ => {}
     }
 }

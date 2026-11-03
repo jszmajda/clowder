@@ -3266,3 +3266,235 @@ fn a_further_absence_joins_the_one_in_progress() {
     assert_eq!(game.report, whole.report, "told as one absence");
     assert_eq!(save_string(&game.state, 0), save_string(&whole.state, 0));
 }
+
+// =====================================================================
+// Clauses the first audit found no test for
+// =====================================================================
+
+/// A hand-edited speed comes back on the ladder, at whichever end it passed.
+// @spec SAVE-005
+#[test]
+fn a_hand_edited_speed_clamps_to_the_ladder() {
+    let saved: serde_json::Value =
+        serde_json::from_str(&save_string(&GameState::new(37_001), 1_000)).unwrap();
+    let speed_of = |edit: serde_json::Value| {
+        let mut doctored = saved.clone();
+        doctored["state"]["speed"] = edit;
+        begin_load(&doctored.to_string(), 1_000)
+            .unwrap()
+            .set_down()
+            .state
+            .speed
+    };
+    let top = {
+        let mut s = GameState::new(37_002);
+        s.apply(Command::SetSpeed(f64::MAX)).unwrap();
+        s.speed
+    };
+    let bottom = {
+        let mut s = GameState::new(37_003);
+        s.apply(Command::SetSpeed(0.0)).unwrap();
+        s.speed
+    };
+    assert_eq!(speed_of(serde_json::json!(1_000.0)), top);
+    assert_eq!(speed_of(serde_json::json!(0.0001)), bottom);
+    assert_eq!(speed_of(serde_json::json!(-3.0)), bottom);
+    assert_eq!(
+        speed_of(serde_json::json!(2.0)),
+        2.0,
+        "one on the ladder stands"
+    );
+}
+
+/// "At least": an absence of exactly the minimum is kept, and one a second
+/// shorter is not, judged by the same load.
+// @spec SAVE-015
+#[test]
+fn an_absence_of_exactly_the_minimum_is_kept() {
+    let json = save_string(&GameState::new(37_004), 0);
+    let kept_after = |seconds: u64| {
+        load_string(&json, seconds)
+            .unwrap()
+            .state
+            .journal
+            .kept
+            .iter()
+            .filter(|e| matches!(e.item, JournalItem::Away(_)))
+            .count()
+    };
+    assert_eq!(kept_after(MIN_REPORTABLE_ABSENCE_SECONDS), 1);
+    assert_eq!(kept_after(MIN_REPORTABLE_ABSENCE_SECONDS - 1), 0);
+}
+
+/// An entry in a save of the current version, written before its event or its
+/// report gained data, loads with that data at its default, and with no version
+/// step: the save's own version is what says so.
+// @spec SAVE-025
+#[test]
+fn an_entry_from_before_it_gained_data_loads_in_a_current_save() {
+    let mut s = GameState::new(37_005);
+    s.journal.record(
+        5,
+        &Event::TradeReturned {
+            colony: ColonyId::Otters,
+            caravans: 4,
+            napped: 1,
+            goods: vec![(ResourceId::Twigs, 3.0)],
+        },
+    );
+    let earned = OfflineReport {
+        elapsed_seconds: 90,
+        earned: vec![AchievementId::ALL[0]],
+        ..OfflineReport::default()
+    };
+    s.journal.record_away(6, &earned);
+    let mut saved: serde_json::Value = serde_json::from_str(&save_string(&s, 1_000)).unwrap();
+    assert_eq!(saved["save_version"], SAVE_VERSION);
+    let journal = &mut saved["state"]["journal"];
+    let trade = journal["recent"][0]["item"]["Happened"]["TradeReturned"]
+        .as_object_mut()
+        .expect("fixture: the trade's entry");
+    trade
+        .remove("napped")
+        .expect("fixture: it held its nap count");
+    trade.remove("goods").expect("fixture: it held its goods");
+    let away = journal["kept"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find_map(|e| e["item"]["Away"].as_object_mut())
+        .expect("fixture: the report's entry");
+    away.remove("earned")
+        .expect("fixture: it listed what it earned");
+
+    let loaded = begin_load(&saved.to_string(), 1_000)
+        .unwrap()
+        .set_down()
+        .state;
+    assert_eq!(
+        loaded.journal.recent[0].item,
+        JournalItem::Happened(Event::TradeReturned {
+            colony: ColonyId::Otters,
+            caravans: 4,
+            napped: 0,
+            goods: vec![],
+        })
+    );
+    let Some(JournalItem::Away(report)) = loaded.journal.kept.last().map(|e| &e.item) else {
+        panic!("the report stands");
+    };
+    assert!(report.earned.is_empty());
+}
+
+// =====================================================================
+// SAVE-039 — what a wake set down had earned still counts as the absence's
+// =====================================================================
+
+/// A meadow that earns its first achievements in the first days it replays.
+fn about_to_earn() -> String {
+    let mut s = played_state(39_000);
+    assert!(!s.kittens.is_empty(), "fixture: the condition is met");
+    s.achievements.clear();
+    save_string(&s, 0)
+}
+
+/// A report lists what its replay earned, in the order earned; and one that
+/// earned nothing writes no field for it, so such a save's bytes do not change.
+// @spec SAVE-008, SAVE-039
+#[test]
+fn a_report_lists_what_its_replay_earned() {
+    let loaded = load_string(&about_to_earn(), 300).unwrap();
+    assert!(
+        !loaded.report.earned.is_empty(),
+        "fixture: it earned something"
+    );
+    let recorded: BTreeSet<_> = loaded.state.achievements.keys().copied().collect();
+    let listed: BTreeSet<_> = loaded.report.earned.iter().copied().collect();
+    assert_eq!(listed, recorded, "exactly what the record gained");
+    assert_eq!(listed.len(), loaded.report.earned.len(), "each once");
+
+    let none = OfflineReport::default();
+    let written = serde_json::to_string(&none).unwrap();
+    assert!(!written.contains("earned"), "no field: {written}");
+}
+
+/// A wake set down part way and taken up again answers the record as the absence
+/// found it, and tells what the whole absence earned, as one sitting would.
+// @spec SAVE-019, SAVE-030, SAVE-039
+#[test]
+fn a_wake_set_down_keeps_what_the_absence_earned_as_new() {
+    let json = about_to_earn();
+    let whole = load_string(&json, 300).unwrap();
+
+    let first = begin_load(&json, 300).unwrap();
+    assert!(
+        first.earned_at_load().is_empty(),
+        "fixture: nothing held yet"
+    );
+    let Advance::Pending(part_way) = first.advance(100) else {
+        panic!("fixture: most of the absence is still owed");
+    };
+    let set_down = part_way.set_down();
+    assert!(
+        !set_down.report_so_far.earned.is_empty(),
+        "fixture: the first part earned something"
+    );
+    assert!(
+        !set_down.state.achievements.is_empty(),
+        "and the record holds it, in the save"
+    );
+
+    let saved = save_string_carrying(
+        &set_down.state,
+        300,
+        set_down.owed_ticks,
+        Some(&set_down.report_so_far),
+    );
+    let taken_up = begin_load(&saved, 300).unwrap();
+    assert!(
+        taken_up.earned_at_load().is_empty(),
+        "what the absence earned isn't what the player already knew"
+    );
+    let Advance::Finished(game) = taken_up.advance(u64::MAX) else {
+        panic!("advancing through everything finishes");
+    };
+    assert_eq!(
+        game.report.earned, whole.report.earned,
+        "told as one absence"
+    );
+    assert_eq!(game.report.elapsed_seconds, whole.report.elapsed_seconds);
+}
+
+/// What the record held before the absence still counts as held after a set-down.
+// @spec SAVE-030, SAVE-039
+#[test]
+fn a_wake_set_down_leaves_what_was_already_known_as_known() {
+    let mut s = played_state(39_001);
+    s.achievements.clear();
+    let old = AchievementId::ALL[AchievementId::ALL.len() - 1];
+    s.achievements.insert(
+        old,
+        Earned {
+            generation: 0,
+            day: 0,
+        },
+    );
+    let json = save_string(&s, 0);
+    let Advance::Pending(part_way) = begin_load(&json, 300).unwrap().advance(100) else {
+        panic!("fixture: most of the absence is still owed");
+    };
+    let set_down = part_way.set_down();
+    let saved = save_string_carrying(
+        &set_down.state,
+        300,
+        set_down.owed_ticks,
+        Some(&set_down.report_so_far),
+    );
+    let held = begin_load(&saved, 300).unwrap();
+    assert!(held.earned_at_load().contains(&old));
+    assert_eq!(
+        held.earned_at_load().len(),
+        1,
+        "and nothing the absence earned"
+    );
+}

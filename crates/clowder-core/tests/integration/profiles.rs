@@ -968,6 +968,128 @@ fn a_v8_save_keeps_its_kittens_fur_and_eyes() {
     }
 }
 
+/// A rostered kitten named as a memorial of the generation before takes that
+/// memorial's favourites and pose under v8 too, and keeps its own fur and eyes.
+/// Every other kitten draws as one holding no profile does.
+/// @spec SAVE-028, SAVE-029
+#[test]
+fn a_v8_rostered_kitten_inherits_its_memorials_favourites_and_keeps_its_looks() {
+    let s = load_string(V8_FIXTURE, 1_760_500_000).unwrap().state;
+    let before: serde_json::Value = serde_json::from_str(V8_FIXTURE).unwrap();
+    let mut inherited = 0;
+    for (i, k) in s.kittens.iter().enumerate() {
+        let p = k.profile.as_ref().expect("a profile");
+        let memorial = s
+            .family_album
+            .iter()
+            .find(|a| a.generation + 1 == s.generation && a.name == k.name);
+        let source = match memorial {
+            Some(a) => {
+                inherited += 1;
+                a.profile.clone().expect("a memorial's profile")
+            }
+            None => draw_profile(&k.name, s.generation),
+        };
+        assert_eq!(p.favourites, source.favourites, "{}", k.name);
+        assert_eq!(p.pose, source.pose, "{}", k.name);
+        assert_eq!(
+            serde_json::to_value(&p.fur).unwrap(),
+            before["state"]["kittens"][i]["profile"]["fur"],
+            "{}: its own fur, stored",
+            k.name
+        );
+    }
+    assert!(inherited > 0, "fixture: a kitten the album remembers");
+}
+
+/// A stored fur and eyes are kept even where a draw would give others. A v8
+/// binary's own profiles agree with the draw, so only a look differing from it
+/// shows the keeping.
+/// @spec SAVE-029
+#[test]
+fn a_v8_kitten_keeps_a_look_its_draw_would_not_give_it() {
+    let mut v: serde_json::Value = serde_json::from_str(V8_FIXTURE).unwrap();
+    let name = v["state"]["kittens"][1]["name"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let generation = v["state"]["generation"].as_u64().unwrap() as u32;
+    let drawn = draw_profile(&name, generation);
+    let eyes = EyeLook::ALL
+        .into_iter()
+        .find(|e| *e != drawn.eyes)
+        .expect("fixture: another look of eye");
+    let pattern = FurPattern::ALL
+        .into_iter()
+        .find(|p| *p != drawn.fur.pattern)
+        .expect("fixture: another pattern");
+    let fur = Fur {
+        pattern,
+        colours: vec![FurColour::ALL[0]],
+    };
+    v["state"]["kittens"][1]["profile"]["eyes"] = serde_json::to_value(eyes).unwrap();
+    v["state"]["kittens"][1]["profile"]["fur"] = serde_json::to_value(&fur).unwrap();
+
+    let s = load_string(&v.to_string(), 1_760_500_000).unwrap().state;
+    let p = s.kittens[1].profile.as_ref().expect("a profile");
+    assert_eq!(p.eyes, eyes, "its own eyes");
+    assert_eq!(p.fur, fur, "its own fur");
+    assert_eq!(
+        p.favourites, drawn.favourites,
+        "and the favourites it draws"
+    );
+    assert_eq!(p.pose, drawn.pose);
+}
+
+/// A v8 profile whose fur or eyes do not read is set aside whole, and draws them
+/// as a missing profile does, rather than costing the save.
+/// @spec SAVE-029
+#[test]
+fn a_v8_profile_that_does_not_read_draws_as_a_missing_one() {
+    let mut v: serde_json::Value = serde_json::from_str(V8_FIXTURE).unwrap();
+    let kittens = v["state"]["kittens"].as_array().unwrap().clone();
+    let album = v["state"]["family_album"].as_array().unwrap().clone();
+    let ix = kittens
+        .iter()
+        .position(|k| !album.iter().any(|a| a["name"] == k["name"]))
+        .expect("fixture: a kitten the album does not remember");
+    let name = kittens[ix]["name"].as_str().unwrap().to_string();
+    for (field, bad) in [
+        (
+            "fur",
+            serde_json::json!({ "pattern": "NoSuchPattern", "colours": [] }),
+        ),
+        ("eyes", serde_json::json!("NoSuchEyes")),
+    ] {
+        let mut doctored = v.clone();
+        doctored["state"]["kittens"][ix]["profile"][field] = bad;
+        let s = load_string(&doctored.to_string(), 1_760_500_000)
+            .unwrap_or_else(|e| panic!("{field} unread refuses the save: {e:?}"))
+            .state;
+        assert_eq!(
+            s.kittens[ix].profile,
+            Some(draw_profile(&name, s.generation)),
+            "{name}, its {field} unread: the whole profile as its draw gives it"
+        );
+    }
+    let mut gone = v.clone();
+    gone["state"]["kittens"][ix]["profile"] = serde_json::json!("not a profile at all");
+    let s = load_string(&gone.to_string(), 1_760_500_000).unwrap().state;
+    assert_eq!(
+        s.kittens[ix].profile,
+        Some(draw_profile(&name, s.generation))
+    );
+    v["state"]["kittens"][ix]
+        .as_object_mut()
+        .unwrap()
+        .remove("profile");
+    let s = load_string(&v.to_string(), 1_760_500_000).unwrap().state;
+    assert_eq!(
+        s.kittens[ix].profile,
+        Some(draw_profile(&name, s.generation))
+    );
+}
+
 /// Migrating a v8 save changes nothing but its profiles' favourites and
 /// poses.
 /// @spec SAVE-029, SAVE-013

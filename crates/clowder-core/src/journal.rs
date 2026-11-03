@@ -18,7 +18,6 @@ const RECENT_CAPACITY: usize = 1_000;
 /// What a journal entry records. An away-report is not an `Event` — it is a
 /// fold of an interval rather than an occurrence at an instant, which is why
 /// it needs its own arm rather than a variant in the event vocabulary.
-/// @spec SAVE-015
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum JournalItem {
     Happened(Event),
@@ -26,7 +25,6 @@ pub enum JournalItem {
 }
 
 /// One entry, stamped with the tick it occurred at so entries group by day.
-/// @spec SIM-ENG-027
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct JournalEntry {
     pub tick: u64,
@@ -34,7 +32,6 @@ pub struct JournalEntry {
 }
 
 /// The retained history. `recent` rolls; `kept` does not.
-/// @spec SIM-ENG-027, SIM-ENG-029
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Journal {
     /// Bounded rolling window, oldest at the front.

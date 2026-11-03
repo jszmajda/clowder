@@ -1604,3 +1604,50 @@ fn a_long_gap_while_waking_joins_the_catch_up() {
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 }
+
+// ---------------------------------------------------------------------------
+// SAVE-039, TUI-NAV-174 — a quit mid-wake loses no achievement's being new
+// ---------------------------------------------------------------------------
+
+/// What an absence earned before a quit mid-wake is new when the wake is taken
+/// up again, as it would have been had nobody quit.
+/// @spec SAVE-039, TUI-NAV-174
+#[test]
+fn what_a_wake_earned_before_a_quit_is_still_new_when_it_is_taken_up() {
+    let mut s = meadow(39_001, 1.0);
+    s.resources[ResourceId::Catnip.ix()] = 500.0;
+    s.structures[clowder_core::StructureId::CozyCushion.ix()] = 2;
+    s.pity = 4;
+    while s.kittens.is_empty() {
+        s.tick();
+    }
+    s.achievements.clear();
+
+    let mut t = term(100, 30);
+    let w = waking(begin(
+        &save_of(&s),
+        SAVED_AT + 300,
+        100,
+        &mut t,
+        "earned-quit",
+    ));
+    let path = w.save_path.clone();
+    w.shut_down().unwrap();
+    let saved = std::fs::read_to_string(&path).unwrap();
+    let carried = begin_load(&saved, SAVED_AT + 300).unwrap();
+    assert!(
+        carried.earned_at_load().is_empty(),
+        "fixture: the record held nothing as the absence began"
+    );
+
+    let wake = Wake::begin_bounded(carried, scratch("earned-taken-up"), &mut t, 100).unwrap();
+    let app = finish(wake, &mut t);
+    assert!(
+        !app.state.achievements.is_empty(),
+        "fixture: the absence earned something"
+    );
+    assert!(
+        app.view.achievements_seen.is_empty(),
+        "and none of it counts as seen, so the chip and the tag say so"
+    );
+}
