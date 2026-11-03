@@ -93,13 +93,13 @@ arrows:
   colonies:
     status: PARTIAL
     parent: sim
-    sampled: 2026-11-02
-    audited: 2026-11-02
-    audited_sha: 376d3e12c927d0c5fd5ebf63f61fd70f0df046d7
+    sampled: 2026-11-03
+    audited: 2026-11-03
+    audited_sha: cbe48509dc551b6b17271688ddcc8b2c45328560
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/colonies/colonies.md
-    next: "#34, #35: a nap's gift, thin tests"
+    next: "#35: thin tests"
     drift: null
   cosmic:
     status: OK
@@ -194,7 +194,7 @@ arrows:
     parent: tui
     sampled: 2026-11-03
     audited: 2026-11-03
-    audited_sha: 3adc81459fdce7396c685942380e0a19cd5a3ca4
+    audited_sha: cbe48509dc551b6b17271688ddcc8b2c45328560
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
