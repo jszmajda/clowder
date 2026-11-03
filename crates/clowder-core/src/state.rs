@@ -2231,22 +2231,17 @@ impl GameState {
             .count() as u32
     }
 
-    fn home_count(&self) -> u32 {
-        self.kittens
-            .iter()
-            .filter(|k| k.location == Location::Home)
-            .count() as u32
-    }
-
     /// Happiness in percentage points (floored at 25, no ceiling).
     // @spec SIM-KIT-011
     pub fn happiness(&self) -> f64 {
-        let home = self.home_count();
-        let loafers = self
-            .kittens
-            .iter()
-            .filter(|k| k.location == Location::Home && k.job.is_none())
-            .count() as f64;
+        let (mut home, mut loafers) = (0u32, 0u32);
+        for k in &self.kittens {
+            if k.location == Location::Home {
+                home += 1;
+                loafers += u32::from(k.job.is_none());
+            }
+        }
+        let loafers = f64::from(loafers);
         let crowding = home.saturating_sub(content::CROWDING_FREE) as f64;
         // Story Circles and Moonlight Stages pool into one DR-limited relief
         // knob: at least 10% of the crowding always bites. With no crowding the
@@ -2254,12 +2249,7 @@ impl GameState {
         // skipped — the quiet/small-meadow hot path, and happiness runs thrice a
         // tick.
         let relief = if crowding > 0.0 {
-            let relief_sum: f64 = StructureId::ALL
-                .iter()
-                .map(|s| {
-                    content::structure_def(*s).crowding_relief * self.structures[s.ix()] as f64
-                })
-                .sum();
+            let relief_sum = self.structure_sum(|d| d.crowding_relief);
             crate::effects::limited_dr(relief_sum, content::CROWDING_RELIEF_DR_LIMIT)
         } else {
             0.0
@@ -2392,11 +2382,7 @@ impl GameState {
             .converter
             .expect("a fuel-scaled structure draws fuel")
             .inputs;
-        let demands: Vec<(ResourceId, f64)> = inputs
-            .iter()
-            .map(|(r, d)| (*r, d * copies as f64))
-            .collect();
-        self.throttle_fraction(&demands)
+        self.throttle_of(inputs.iter().map(|(r, d)| (*r, d * copies as f64)))
     }
 
     /// Energy produced by active structures: each definition's rate, marked

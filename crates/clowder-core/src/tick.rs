@@ -589,30 +589,38 @@ impl GameState {
             1.0
         };
         let mood = self.mood_multiplier();
-        for j in JobId::ALL {
-            let Some((r, per_worker)) = content::job_def(j).yield_per_tick else {
+        // Production resolves per kitten in roster order: each Home worker
+        // contributes base × (1 + job-ratio effects) × its skill tier × the
+        // Elder's own-job leadership; the aggregate layers (per-resource ratio,
+        // mood, zoomies, global, mess) are identical per kitten and stay
+        // aggregate. One walk of the roster, whatever the number of jobs, each
+        // job's ratio read only once it has a worker to read it for.
+        // @spec SIM-KIT-020, SIM-KIT-022
+        let mut job_ratios = [None; JobId::ALL.len()];
+        let mut base_sums = [0.0; JobId::ALL.len()];
+        for (ix, k) in self.kittens.iter().enumerate() {
+            if k.location != Location::Home {
+                continue;
+            }
+            let Some(j) = k.job else { continue };
+            let Some((_, per_worker)) = content::job_def(j).yield_per_tick else {
                 continue; // the Tinkerer crafts in the background (below)
             };
-            // Production resolves per kitten in roster order: each Home
-            // worker contributes base × (1 + job-ratio effects) × its skill
-            // tier × the Elder's own-job leadership; the aggregate layers
-            // (per-resource ratio, mood, zoomies, global, mess) are identical
-            // per kitten and stay aggregate.
-            // @spec SIM-KIT-020, SIM-KIT-022
-            let job_ratio = 1.0 + self.effect(crate::effects::Effect::JobRatio(j));
-            let mut base_sum = 0.0;
-            for (ix, k) in self.kittens.iter().enumerate() {
-                if k.location != Location::Home || k.job != Some(j) {
-                    continue;
-                }
-                let mut per = per_worker
-                    * job_ratio
-                    * (1.0 + content::skill_tier_bonus_scaled(k.skills[j as usize], master_mult));
-                if self.elder == Some(ix) {
-                    per *= ((k.rank as f64 + 1.0) / content::ELDER_RANK_DIVISOR).max(1.0);
-                }
-                base_sum += per;
+            let job_ratio = *job_ratios[j as usize]
+                .get_or_insert_with(|| 1.0 + self.effect(crate::effects::Effect::JobRatio(j)));
+            let mut per = per_worker
+                * job_ratio
+                * (1.0 + content::skill_tier_bonus_scaled(k.skills[j as usize], master_mult));
+            if self.elder == Some(ix) {
+                per *= ((k.rank as f64 + 1.0) / content::ELDER_RANK_DIVISOR).max(1.0);
             }
+            base_sums[j as usize] += per;
+        }
+        for j in JobId::ALL {
+            let Some((r, _)) = content::job_def(j).yield_per_tick else {
+                continue;
+            };
+            let base_sum = base_sums[j as usize];
             if base_sum == 0.0 {
                 continue;
             }
@@ -699,21 +707,17 @@ impl GameState {
                     * (def.tier as f64 - (k.rank as f64 + 1.0)).max(0.0))
             .max(content::TINKER_EFFECTIVENESS_FLOOR);
             let rate = content::TINKER_BATCHES_PER_TICK * speed * effectiveness;
-            let demands: Vec<(ResourceId, f64)> = def
-                .inputs
-                .iter()
-                .map(|(r, amount)| (*r, amount * rate))
-                .collect();
-            let fraction = self.throttle_fraction(&demands);
+            let demands = def.inputs.iter().map(|(r, amount)| (*r, amount * rate));
+            let fraction = self.throttle_of(demands.clone());
             if fraction <= 0.0 {
                 continue; // a starved Tinkerer idles quietly, still bound
             }
             let src = FlowSource::Craft(recipe);
-            for (r, demand) in &demands {
+            for (r, demand) in demands {
                 let rix = r.ix();
                 let before = self.resources[rix];
                 self.resources[rix] = (before - demand * fraction).max(0.0);
-                credit(ledger, src, *r, self.resources[rix] - before);
+                credit(ledger, src, r, self.resources[rix] - before);
             }
             let output = content::craft_output(recipe);
             let boosted = rate * fraction * (1.0 + self.craft_ratio_for(recipe));
@@ -751,22 +755,21 @@ impl GameState {
                 tally(per_copy_mess, count as f64);
                 continue;
             };
-            let demands: Vec<(ResourceId, f64)> = converter
+            let demands = converter
                 .inputs
                 .iter()
-                .map(|(r, d)| (*r, d * count as f64))
-                .collect();
-            let fraction = self.throttle_fraction(&demands);
+                .map(|(r, d)| (*r, d * count as f64));
+            let fraction = self.throttle_of(demands.clone());
             tally(per_copy_mess, count as f64 * fraction);
             if fraction <= 0.0 {
                 continue; // a starved converter idles quietly
             }
             let src = FlowSource::Structure(s);
-            for (r, demand) in &demands {
+            for (r, demand) in demands {
                 let ix = r.ix();
                 let before = self.resources[ix];
                 self.resources[ix] = (before - demand * fraction).max(0.0);
-                credit(ledger, src, *r, self.resources[ix] - before);
+                credit(ledger, src, r, self.resources[ix] - before);
             }
             for (r, out) in converter.outputs {
                 self.resources[r.ix()] += out * count as f64 * fraction;
