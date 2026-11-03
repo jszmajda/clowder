@@ -4,7 +4,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 ## Status
 
-**OK** — last audited 2026-11-03 (commit `2cddde1e39c7`). 83 of 83 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-03 (commit `3c6da3bc5aae`). 83 of 83 active specs implemented, each cited by a test.
 
 ## References
 
@@ -73,6 +73,8 @@ Audited 2026-11-02, for what issue #25 changed. The effect sum gained one struct
 Audited 2026-11-02, for what issue #30 changed. Which idea opens the loom and the picnics moved in the availability and command-gate answers, and the pen pal gate now says what its command says, where a row could offer a letter that refused (SIM-ENG-045). The reveal scan reads a structure's gate inline, since a call there, once the gate gained a kind, took the catch-up bound (SAVE-009) about 13% over the previous build and past its limit; measured alone and alternating, it now stands level with that build. That bound's thin margin is #32. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-03, for what issue #32 changed. An effect sum now reads only the sources that can carry its key, each key's list derived once from the definitions (SIM-ENG-084), which with the roster pass took a real late save's 30-day replay from about 212 s to about 23 s, and removed the one-holder shortcut issue #25 needed. SIM-ENG-019 now lists the sources the sum has: colony standing was named and is no source, and kept promises and dream looms were sources it did not name. Every key's sum is compared bit for bit against a walk of every source, on meadows reaching every kind of source. Breaking the index on purpose showed that comparison could not see a wrong order where sums round alike, so the order is read off the lists directly; the one order change still passing, among rules, changes no list, no key having two rule sources. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-03, for what issue #36 changed. The tinkerers' bench counts its seats saturating, so a copy count at the top of its range cannot overflow the sum (SIM-ENG-073). No spec changed. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

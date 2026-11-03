@@ -4,7 +4,7 @@ Persistence turns the deterministic sim into a game that survives closing the te
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-03 (commit `2cddde1e39c7`). 32 of 32 active specs implemented, each cited by a test; 1 deferred.
+**PARTIAL** — last audited 2026-11-03 (commit `3c6da3bc5aae`). 36 of 36 active specs implemented, each cited by a test.
 
 ## References
 
@@ -15,7 +15,7 @@ Persistence turns the deterministic sim into a game that survives closing the te
 - `docs/intent/persistence/persistence-design.md`
 
 ### EARS
-- `docs/intent/persistence/persistence-specs.md` — 33 specs, prefix `SAVE`
+- `docs/intent/persistence/persistence-specs.md` — 36 specs, prefix `SAVE`
 
 ### Tests
 - `crates/clowder-core/tests/integration/achievements.rs`
@@ -35,6 +35,7 @@ Persistence turns the deterministic sim into a game that survives closing the te
 - `crates/clowder-core/src/events.rs`
 - `crates/clowder-core/src/journal.rs`
 - `crates/clowder-core/src/save.rs`
+- `crates/clowder-core/src/save/wide.rs`
 - `crates/clowder-core/src/state.rs`
 - `crates/clowder-tui/src/runtime/mod.rs`
 
@@ -42,9 +43,9 @@ Persistence turns the deterministic sim into a game that survives closing the te
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SAVE-001 – SAVE-033 | 32 | 1 | 0 |
+| All | SAVE-001 – SAVE-036 | 36 | 0 | 0 |
 
-**Summary:** 32 of 32 active specs implemented; 1 deferred.
+**Summary:** 36 of 36 active specs implemented.
 
 ## Key Findings
 
@@ -52,7 +53,8 @@ Audited 2026-11-02. First full audit, made for issue #30, which added the v10 to
 
 Audited 2026-11-03, for what issue #32 changed. SAVE-009 now names the meadow and speed its bound holds at, and SAVE-033 bounds a late meadow, the design saying why a faster speed scales the wait rather than the bound. The late guard fails on the previous build at 424 s and passes on this one at about 28 s; the early guards stand at about 4 s of their 10 s, and every ignored guard passes run side by side. A real late save, both fixtures, and a larger late meadow, replayed by the previous build and this one, ended in the same bytes. SAVE-009 and SAVE-033 are properties of the whole path, so no code decides them, and their tests are their pins. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
+Audited 2026-11-03, for what issue #36 changed. A load reads every integer through one reader, as the nearest value its field can hold (SAVE-032), which closes the deferred gap. A test walks every integer the format writes, at a negative, a fraction, and numbers past any field's range, and plays each meadow on with overflow checks on: that walk found housing, tinkerer seats, an away stamp, and the tick count overflowing at the top of their ranges, now given room (SAVE-035) or saturated. A negative Elder index is no Elder (SAVE-034), and required now names the fields every format version wrote, the walk holding both lists by name (SAVE-036). A real save loads byte for byte as it did under the previous build. An owed count read at its greatest is honoured rather than capped, so a one-call load of one would not return; the shell's wake stays paced and can be set down. Each test was checked by breaking what it guards. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
 ## Work Required
 
-- #36: a hand-edited save with a negative counter is rejected (SAVE-032, deferred).
 - #37: thin tests, shape annotations, and an open question on achievements across a set-down.

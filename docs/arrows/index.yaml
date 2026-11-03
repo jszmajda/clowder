@@ -150,7 +150,7 @@ arrows:
     parent: sim
     sampled: 2026-11-03
     audited: 2026-11-03
-    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
+    audited_sha: 3c6da3bc5aaecb24296fbf5feda3ff7936345a7f
     blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md
@@ -172,7 +172,7 @@ arrows:
     parent: sim
     sampled: 2026-11-03
     audited: 2026-11-03
-    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
+    audited_sha: 3c6da3bc5aaecb24296fbf5feda3ff7936345a7f
     blocks: [ceremonies, colonies, mystic]
     blockedBy: [economy]
     detail: sim/kittens/kittens.md
@@ -205,11 +205,11 @@ arrows:
     parent: null
     sampled: 2026-11-03
     audited: 2026-11-03
-    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
+    audited_sha: 3c6da3bc5aaecb24296fbf5feda3ff7936345a7f
     blocks: [runtime]
     blockedBy: [engine]
     detail: persistence/persistence.md
-    next: "#36, #37: hand-edited counters, thin tests"
+    next: "#37: thin tests"
     drift: null
   prestige:
     status: OK
