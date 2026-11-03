@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-03 (commit `5e255644179a`). 203 of 203 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-03 (commit `ce32a57b5421`). 203 of 203 active specs implemented, each cited by a test.
 
 ## References
 
@@ -98,6 +98,8 @@ Audited 2026-11-03, for what issue #34 changed. A shy colony's pen-pal row state
 Audited 2026-11-03, for what issue #37 changed. What the core answers as held before an absence now survives a quit mid-wake, so the chip and the `new` tag still tell what the absence earned, tested through the shell (TUI-NAV-174). Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-03, for what issue #38 changed. The Meadow's structures stand in one ordinary group per family (TUI-NAV-097, TUI-NAV-098, TUI-NAV-100), so `[`/`]` stop at each and a header stands only over a listed row (TUI-NAV-099). The list is no shorter, so what stands below it is still off-screen until the cursor or a group key reaches it. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-03, for what issue #39 changed. A press on a row now also holds that section's list where the frame aimed at drew it (TUI-NAV-129), so the clicked row stays under the pointer; the wheel's rule is unchanged (TUI-NAV-130). Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 
