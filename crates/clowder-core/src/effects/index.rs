@@ -370,6 +370,46 @@ mod tests {
         assert_eq!(slots.last().copied(), Some(KEY_COUNT - 1));
     }
 
+    /// Where each source stands in the fixed order: its class, then its own
+    /// place in that class. Two copies of a place are one structure naming one
+    /// key twice.
+    fn place(source: &Source) -> (u8, usize) {
+        match *source {
+            Source::Structure { structure, .. } => (0, structure.ix()),
+            Source::Refinement { refinement, .. } => (1, refinement as usize),
+            Source::Idea { idea, .. } => (2, idea as usize),
+            Source::Rule { rule, .. } => (3, rule as usize),
+            Source::Rite(rite) => (4, rite.ix()),
+            Source::Frescoes => (5, 0),
+            Source::Arch(arch) => (6, arch.ix()),
+            Source::Tradition(tradition) => (7, tradition.ix()),
+            Source::AdventureReward { adventure, .. } => (8, adventure.ix()),
+            Source::FrugalTwist => (9, 0),
+            Source::KeptPromises => (10, 0),
+            Source::Loom(loom) => (11, loom.ix()),
+            Source::ElderTrait => (12, 0),
+        }
+    }
+
+    /// Order is what keeps a float sum the same sum, and a wrong order can round
+    /// the same way on any meadow a test happens to try, so the order is read
+    /// off the lists themselves rather than left to a sum to show.
+    /// @spec SIM-ENG-019, SIM-ENG-084
+    #[test]
+    fn each_keys_sources_stand_in_the_fixed_order() {
+        for key in every_key() {
+            let list = sources(key);
+            for pair in list.windows(2) {
+                assert!(
+                    place(&pair[0]) <= place(&pair[1]),
+                    "{key:?} lists {:?} ahead of {:?}",
+                    pair[0],
+                    pair[1]
+                );
+            }
+        }
+    }
+
     /// Most keys carry nothing, so the lists save most of a walk over every
     /// source; and the keys that do are never left with more than their own.
     /// @spec SIM-ENG-084
