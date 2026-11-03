@@ -3,9 +3,12 @@
 
 use crate::content;
 use crate::state::{
-    AdventureId, ArchId, ColonyId, CraftId, GameState, IdeaId, JobId, KittenTrait, ResourceId,
-    RiteId, Season, StructureId, TraditionId,
+    AdventureId, ArchId, ColonyId, CraftId, GameState, JobId, KittenTrait, ResourceId, RiteId,
+    Season, StructureId, TraditionId,
 };
+
+mod index;
+use index::Source;
 
 /// Compiler-checked modifier vocabulary. Variants are added per content wave;
 /// exhaustiveness checks keep every consumer honest.
@@ -146,239 +149,167 @@ pub fn unlimited_dr(value: f64, stripe: f64) -> f64 {
 
 impl GameState {
     /// Sum every source's contribution to an effect key, in the fixed source
-    /// order (structures, refinements, ideas, house rules, rites, arch
-    /// upgrades, traditions, colony standing, adventure rewards, Elder trait).
-    /// Sources not yet built contribute nothing; the order is normative so
-    /// float sums stay bit-identical as content grows.
-    // @spec SIM-ENG-019
+    /// order (structures, refinements, ideas, house rules, rites, arch upgrades,
+    /// traditions, adventure rewards and the twist, kept promises, dream loom
+    /// upgrades, Elder trait). Sources not yet held contribute nothing; the
+    /// order is normative so float sums stay bit-identical as content grows.
+    /// Only the sources that can carry the key are read, which is what makes
+    /// this cheap enough for the hundreds of sums a tick asks for.
+    // @spec SIM-ENG-019, SIM-ENG-084
+    #[inline]
     pub fn effect(&self, key: Effect) -> f64 {
+        let sources = index::sources(key);
+        if sources.is_empty() {
+            return 0.0;
+        }
+        self.sum_sources(sources, key)
+    }
+
+    fn sum_sources(&self, sources: &[Source], key: Effect) -> f64 {
         let mut sum = 0.0;
-        // 1. Structures (× owned count; global/energy terms count actives —
-        // the active set is the built set until toggling lands). Only these key
-        // shapes ever carry a structure contribution, so every other key (e.g.
-        // JobRatio, called for all eight jobs each tick, and StructureRatio, per
-        // production flow) skips the whole structure scan — effect() is the
-        // per-tick hot path. Iterate the packed counts array directly so the
-        // (usually many) empty structures are skipped with an elided-bounds,
-        // cache-friendly scan. @spec SIM-ENG-019
-        let structures_carry = matches!(
-            key,
-            Effect::MaxCap(_)
-                | Effect::HappinessPoints
-                | Effect::JamboreeRatio
-                | Effect::JamboreeArrivalRatio
-                | Effect::ResourceRatio(_)
-                | Effect::CraftRatio
-                | Effect::LuxuryDemandRatio
-                | Effect::TradeRatio
-                | Effect::PrismDescentChance
-                | Effect::GlobalProductionRatio
-                | Effect::OutdoorProductionRatio
-                | Effect::LongSunCapBonus
-                | Effect::CapRatio
-                | Effect::DejaVuChance
-        );
-        for (ix, &raw_count) in self.structures.iter().enumerate() {
-            if !structures_carry {
-                break;
-            }
-            // Every cap reads this key, every tick, and one structure alone sets
-            // its field (a table test holds that), so it takes that structure's
-            // share rather than scan for it: catch-up's bound has no room for
-            // the scan. @spec SIM-SKY-011
-            if let Effect::CapRatio = key {
-                let beacon = StructureId::FarBeacon;
-                sum +=
-                    content::structure_def(beacon).cap_ratio * self.structures[beacon.ix()] as f64;
-                break;
-            }
-            if raw_count == 0 {
-                continue;
-            }
-            let s = StructureId::ALL[ix];
-            let count = raw_count as f64;
-            let def = content::structure_def(s);
-            match key {
-                Effect::MaxCap(r) => {
-                    for (cr, amount) in def.cap_bonuses {
-                        if *cr == r {
-                            let mut value = amount * count;
-                            // Marked caps ratchet on the kite high-water.
-                            // @spec SIM-ECO-031
-                            if def.caps_kite_ratcheted {
-                                value *= 1.0
-                                    + limited_dr(
-                                        content::PORCH_KITE_PER * self.kites_high_water,
-                                        content::PORCH_KITE_DR_LIMIT,
-                                    );
-                            }
-                            sum += value;
-                        }
-                    }
+        for source in sources {
+            sum += self.contribution(source, key);
+        }
+        sum
+    }
+
+    /// What one source gives a key in this state: zero for one the meadow does
+    /// not hold, read at the call and never remembered, since a held count, a
+    /// stock, or who sits in the Elder's chair can move between any two sums.
+    #[inline]
+    fn contribution(&self, source: &Source, key: Effect) -> f64 {
+        match *source {
+            // Structures × copies held. @spec SIM-ENG-019
+            Source::Structure {
+                structure,
+                per_copy,
+                kite_ratcheted,
+                fuel_scaled,
+            } => {
+                let copies = self.structures[structure.ix()];
+                if copies == 0 {
+                    return 0.0;
                 }
-                Effect::HappinessPoints => sum += def.happiness_points * count,
-                Effect::JamboreeRatio => sum += def.jamboree_ratio * count,
-                Effect::JamboreeArrivalRatio => sum += def.jamboree_arrival * count,
-                Effect::ResourceRatio(r) => {
-                    for (rr, ratio) in def.resource_ratios {
-                        if *rr == r {
-                            sum += ratio * count;
-                        }
-                    }
+                let mut value = per_copy * copies as f64;
+                // Marked caps ratchet on the kite high-water.
+                // @spec SIM-ECO-031
+                if kite_ratcheted {
+                    value *= 1.0
+                        + limited_dr(
+                            content::PORCH_KITE_PER * self.kites_high_water,
+                            content::PORCH_KITE_DR_LIMIT,
+                        );
                 }
-                Effect::CraftRatio => sum += def.craft_ratio * count,
-                Effect::LuxuryDemandRatio => sum += def.luxury_demand * count,
-                // @spec SIM-ECO-053
-                Effect::TradeRatio => sum += def.trade_ratio * count,
-                // @spec SIM-UNI-006
-                Effect::PrismDescentChance => sum += def.prism_descent * count,
+                // A starved structure spins down; boosts amplify it.
                 // @spec SIM-ECO-032
-                Effect::GlobalProductionRatio => {
-                    let mut value = def.global_ratio * count;
-                    if def.fuel_scaled {
-                        // A starved structure spins down; boosts amplify it.
-                        value *= self.fuel_fraction(s)
-                            * (1.0 + self.structure_sum(|d| d.fuel_global_boost));
-                    }
-                    sum += value;
+                if fuel_scaled {
+                    value *= self.fuel_fraction(structure)
+                        * (1.0 + self.structure_sum(|d| d.fuel_global_boost));
                 }
-                // ---- Wave 6: cosmic outposts ----
-                // @spec SIM-SKY-004, SIM-SKY-009
-                Effect::OutdoorProductionRatio => sum += def.outdoor_ratio * count,
-                Effect::LongSunCapBonus => sum += def.long_sun_cap * count,
-                // @spec SIM-DREAM-004, SIM-DREAM-013
-                Effect::DejaVuChance => sum += def.deja_vu_chance * count,
-                _ => {}
+                value
             }
-        }
-        // 2. Refinements. Ladder entries stack additively per key; a few
-        // scale by an owned-structure count (Catnip Cellars per Pantry,
-        // Thicker Blankets per Hearth). Iterate the owned set (BTree-sorted =
-        // the same fixed order as RefinementId::ALL) so an empty set is free.
-        // @spec SIM-CUR-010, SIM-CUR-012
-        for r in &self.refinements {
-            let def = content::refinement_def(*r);
-            let scale = def
-                .per_structure
-                .map_or(1.0, |s| self.structures[s.ix()] as f64);
-            for (k, value) in def.effects {
-                if *k == key {
-                    sum += value * scale;
+            // Refinements stack additively per key; a few scale by an
+            // owned-structure count (Catnip Cellars per Pantry, Thicker Blankets
+            // per Hearth). @spec SIM-CUR-010, SIM-CUR-012
+            Source::Refinement {
+                refinement,
+                value,
+                per_structure,
+            } => {
+                if !self.refinements.contains(&refinement) {
+                    return 0.0;
+                }
+                value * per_structure.map_or(1.0, |s| self.structures[s.ix()] as f64)
+            }
+            Source::Idea { idea, value } => {
+                if self.ideas.contains(&idea) {
+                    value
+                } else {
+                    0.0
                 }
             }
-        }
-        // 3. Ideas.
-        match key {
-            Effect::HappinessPoints if self.ideas.contains(&IdeaId::BiscuitMaking) => {
-                sum += content::BISCUIT_POINTS;
-            }
-            Effect::ArrivalChanceOnTop if self.ideas.contains(&IdeaId::NeighborhoodWatch) => {
-                sum += content::ARRIVAL_WATCH_BONUS;
-            }
-            _ => {}
-        }
-        // 4. House rules — iterate the owned set (BTree order = RuleId::ALL
-        // order), free when none adopted. @spec SIM-CUR-011, SIM-CUR-012
-        for rule in &self.rules {
-            for (k, value) in content::rule_def(*rule).effects {
-                if *k == key {
-                    sum += value;
+            // @spec SIM-CUR-011, SIM-CUR-012
+            Source::Rule { rule, value } => {
+                if self.rules.contains(&rule) {
+                    value
+                } else {
+                    0.0
                 }
             }
-        }
-        // 5. Sunbeam Rites, scaled by their copy count; altar-hosted rites also
-        // scale by the Sunbeam Altar count. The whole section is skipped when no
-        // rite is bought (the common hot path). @spec SIM-SUN-007
-        if !self.rites.is_empty() {
-            let altars = self.structures[StructureId::SunbeamAltar.ix()] as f64;
-            for rite in &self.rites {
-                let n = self.rite_counts[rite.ix()] as f64;
-                if n == 0.0 {
-                    continue;
+            // Sunbeam Rites, scaled by their copy count; altar-hosted rites also
+            // scale by the Sunbeam Altar count. @spec SIM-SUN-007
+            Source::Rite(rite) => {
+                if !self.rites.contains(&rite) {
+                    return 0.0;
                 }
-                sum += rite_effect(*rite, key, altars) * n;
+                let altars = self.structures[StructureId::SunbeamAltar.ix()] as f64;
+                rite_effect(rite, key, altars) * self.rite_counts[rite.ix()] as f64
             }
             // Everwarm Frescoes: each Sun Room gains warmth cap =
             // unlimited_dr(frescoes, 1.65) × Warm Memories (the prestige legacy
             // the rite reads). @spec SIM-SUN-005, SIM-MOVE-008
-            if let Effect::MaxCap(ResourceId::Warmth) = key {
+            Source::Frescoes => {
                 let frescoes = self.rite_counts[RiteId::EverwarmFrescoes.ix()];
-                if frescoes > 0 && self.warm_memories > 0.0 {
-                    let sun_rooms = self.structures[StructureId::SunRoom.ix()] as f64;
-                    sum += unlimited_dr(frescoes as f64, 1.65) * self.warm_memories * sun_rooms;
+                if self.rites.is_empty() || frescoes == 0 || self.warm_memories <= 0.0 {
+                    return 0.0;
+                }
+                let sun_rooms = self.structures[StructureId::SunRoom.ix()] as f64;
+                unlimited_dr(frescoes as f64, 1.65) * self.warm_memories * sun_rooms
+            }
+            // Rainbow Arch upgrades (bought once each). @spec SIM-UNI-005
+            Source::Arch(arch) => {
+                if self.arches_bought.contains(&arch) {
+                    arch_effect(arch, key)
+                } else {
+                    0.0
                 }
             }
-        }
-        // 6. Rainbow Arch upgrades (bought once each). @spec SIM-UNI-005
-        if !self.arches_bought.is_empty() {
-            for arch in &self.arches_bought {
-                sum += arch_effect(*arch, key);
-            }
-        }
-        // 7. Traditions (permanent prestige purchases). Iterate the owned set
-        // (BTree order = TraditionId::ALL order); free when none bought.
-        // @spec SIM-MOVE-010, SIM-MOVE-012
-        if !self.traditions.is_empty() {
-            for t in &self.traditions {
-                sum += tradition_effect(*t, key);
-            }
-        }
-        // 8. Adventure rewards (LimitedDR-capped, permanent). Only these five
-        // key shapes ever carry a reward, so every other (hot-path) key skips
-        // the pool scan; then it is skipped again until a reward has been paid.
-        // @spec SIM-ADV-005
-        if matches!(
-            key,
-            Effect::MasterSkillMultiplier
-                | Effect::EnergyConsumptionRatio
-                | Effect::SeasonResourceRatio(..)
-                | Effect::PounceRatio
-                | Effect::LongSunCapBonus
-        ) && self.adventure_rewards.iter().any(|&x| x != 0.0)
-        {
-            for a in AdventureId::ALL {
-                let def = content::adventure_def(a);
-                if def.reward_key == key {
-                    // The pool may be negative (Frugal Meadow lowers
-                    // consumption); LimitedDR caps its magnitude, sign kept.
-                    let pool = self.adventure_rewards[a.ix()];
-                    sum += pool.signum() * limited_dr(pool.abs(), def.reward_cap);
+            // Traditions (permanent prestige purchases). @spec SIM-MOVE-010, SIM-MOVE-012
+            Source::Tradition(tradition) => {
+                if self.traditions.contains(&tradition) {
+                    tradition_effect(tradition, key)
+                } else {
+                    0.0
                 }
             }
-        }
-        // The Frugal Meadow twist raises energy consumption +10% while active —
-        // it flows through the same EnergyConsumptionRatio key the reward lowers,
-        // so both land in one summed multiplier. @spec SIM-ADV-002
-        if let Effect::EnergyConsumptionRatio = key {
-            if self.active_adventure == Some(AdventureId::FrugalMeadow) {
-                sum += content::FRUGAL_MEADOW_TWIST;
+            // Adventure rewards (LimitedDR-capped, permanent). The pool may be
+            // negative (Frugal Meadow lowers consumption); LimitedDR caps its
+            // magnitude, sign kept. @spec SIM-ADV-005
+            Source::AdventureReward { adventure, cap } => {
+                let pool = self.adventure_rewards[adventure.ix()];
+                pool.signum() * limited_dr(pool.abs(), cap)
             }
-        }
-        // Promises: each kept (non-quiet) Promise grants its small global
-        // production effect. @spec SIM-UNI-009
-        if !self.promises.is_empty() {
-            if let Effect::GlobalProductionRatio = key {
+            // The Frugal Meadow twist raises energy consumption +10% while active —
+            // it flows through the same key the reward lowers, so both land in one
+            // summed multiplier. @spec SIM-ADV-002
+            Source::FrugalTwist => {
+                if self.active_adventure == Some(AdventureId::FrugalMeadow) {
+                    content::FRUGAL_MEADOW_TWIST
+                } else {
+                    0.0
+                }
+            }
+            // Each kept (non-quiet) Promise grants its small global production
+            // effect. @spec SIM-UNI-009
+            Source::KeptPromises => {
                 let kept = self.promises.iter().filter(|p| !p.quiet).count() as f64;
-                sum += content::PROMISE_GLOBAL_RATIO * kept;
+                content::PROMISE_GLOBAL_RATIO * kept
             }
-        }
-        // Dream Loom upgrades (bought once each). Iterate the owned set (BTree
-        // order = DreamLoomId::ALL order); free when none woven. @spec SIM-DREAM-006
-        if !self.dream_looms.is_empty() {
-            for l in &self.dream_looms {
-                sum += loom_effect(*l, key);
+            // Dream Loom upgrades (bought once each). @spec SIM-DREAM-006
+            Source::Loom(loom) => {
+                if self.dream_looms.contains(&loom) {
+                    loom_effect(loom, key)
+                } else {
+                    0.0
+                }
             }
+            // The Elder's birth trait, active only from the chair.
+            // @spec SIM-KIT-024
+            Source::ElderTrait => self
+                .elder
+                .and_then(|ix| self.kittens.get(ix))
+                .map_or(0.0, |k| trait_effect(k.trait_id, key)),
         }
-        // 10. The Elder's birth trait, active only from the chair.
-        // @spec SIM-KIT-024
-        if let Some(trait_id) = self
-            .elder
-            .and_then(|ix| self.kittens.get(ix))
-            .map(|k| k.trait_id)
-        {
-            sum += trait_effect(trait_id, key);
-        }
-        sum
     }
 
     /// Combined craft-output ratio for one recipe: the global craft bonus
@@ -392,12 +323,19 @@ impl GameState {
     /// Scaling all inputs and outputs by this keeps chains proportional.
     // @spec SIM-ENG-022
     pub fn throttle_fraction(&self, demands: &[(ResourceId, f64)]) -> f64 {
+        self.throttle_of(demands.iter().copied())
+    }
+
+    /// The same fraction over demands worked out as they are read, so a tick's
+    /// converters allocate nothing to ask it.
+    #[inline]
+    pub(crate) fn throttle_of(&self, demands: impl Iterator<Item = (ResourceId, f64)>) -> f64 {
         let mut fraction: f64 = 1.0;
         for (r, demand) in demands {
-            if *demand <= 0.0 {
+            if demand <= 0.0 {
                 continue;
             }
-            fraction = fraction.min((self.stock(*r) / demand).clamp(0.0, 1.0));
+            fraction = fraction.min((self.stock(r) / demand).clamp(0.0, 1.0));
         }
         fraction
     }
@@ -590,8 +528,9 @@ fn tradition_effect(t: TraditionId, key: Effect) -> f64 {
 
 #[cfg(test)]
 mod every_source {
+    use super::index::every_key;
     use super::*;
-    use crate::state::{DreamLoomId, Location, Promise, RefinementId, RuleId};
+    use crate::state::{DreamLoomId, IdeaId, Location, Promise, RefinementId, RuleId};
 
     /// Every source's contribution, walked in full. What a sum over only a
     /// key's own sources has to match bit for bit, so it stays a walk of every
@@ -729,61 +668,6 @@ mod every_source {
             sum += trait_effect(trait_id, key);
         }
         sum
-    }
-
-    /// Every key the vocabulary can spell.
-    fn every_key() -> Vec<Effect> {
-        use Effect::*;
-        let mut keys = vec![
-            GlobalProductionRatio,
-            CraftRatio,
-            HappinessPoints,
-            LuxuryDemandRatio,
-            CapRatio,
-            PounceRatio,
-            TinkererSpeed,
-            SkillXpRatio,
-            JamboreeRatio,
-            JamboreeArrivalRatio,
-            ArrivalChanceInCap,
-            ArrivalChanceOnTop,
-            IdeaCostRatio,
-            TradeRatio,
-            RiteCostRatio,
-            SkyEventChanceRatio,
-            AutoObserveChanceRatio,
-            PrismDescentChance,
-            RainbowShowerChance,
-            UnicornsRatio,
-            StarshardRefine,
-            EchoRefine,
-            ParadeRatio,
-            DreamBoost,
-            GlobalPriceRatioDelta,
-            KittenGrowthRatio,
-            StandingRatio,
-            MasterSkillMultiplier,
-            EnergyConsumptionRatio,
-            MessAccrualRatio,
-            OutdoorProductionRatio,
-            LongSunCapBonus,
-            DejaVuChance,
-            ReverieYield,
-            HeatEfficiency,
-            HeatDissipation,
-        ];
-        for r in ResourceId::ALL {
-            keys.extend([ResourceRatio(r), MaxCap(r), MaxCapRatio(r)]);
-            keys.extend(Season::ALL.map(|season| SeasonResourceRatio(season, r)));
-            keys.extend(StructureId::ALL.map(|s| StructureOutputAdd(s, r)));
-        }
-        for s in StructureId::ALL {
-            keys.extend([StructureRatio(s), StructureMessDelta(s)]);
-        }
-        keys.extend(JobId::ALL.map(JobRatio));
-        keys.extend(CraftId::ALL.map(CraftRatioFor));
-        keys.extend(ColonyId::ALL.map(StandingFor));
-        keys
     }
 
     /// Everything held, `copies` of each structure, half-stocked so a
