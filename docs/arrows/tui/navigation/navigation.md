@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-03 (commit `cbe48509dc55`). 203 of 203 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-03 (commit `e1a0720b63e5`). 203 of 203 active specs implemented, each cited by a test.
 
 ## References
 
@@ -94,6 +94,8 @@ Audited 2026-11-02, for what issue #30 changed. No rule of this segment changed:
 Audited 2026-11-03, for what issue #33 changed. The waking screen and the report's banner now also serve a catch-up begun in play (TUI-NAV-027, TUI-NAV-102, TUI-NAV-103), and the capped gap's own queueing went with its report. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-03, for what issue #34 changed. A shy colony's pen-pal row states the courtesy gift's chance beside the nap's, read from the core's constant (TUI-NAV-172). Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-03, for what issue #37 changed. What the core answers as held before an absence now survives a quit mid-wake, so the chip and the `new` tag still tell what the absence earned, tested through the shell (TUI-NAV-174). Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

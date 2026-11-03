@@ -150,7 +150,7 @@ arrows:
     parent: sim
     sampled: 2026-11-03
     audited: 2026-11-03
-    audited_sha: 3c6da3bc5aaecb24296fbf5feda3ff7936345a7f
+    audited_sha: e1a0720b63e584b549f04d0b7d61f1980767aaa3
     blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md
@@ -194,22 +194,22 @@ arrows:
     parent: tui
     sampled: 2026-11-03
     audited: 2026-11-03
-    audited_sha: cbe48509dc551b6b17271688ddcc8b2c45328560
+    audited_sha: e1a0720b63e584b549f04d0b7d61f1980767aaa3
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
     next: null
     drift: null
   persistence:
-    status: PARTIAL
+    status: OK
     parent: null
     sampled: 2026-11-03
     audited: 2026-11-03
-    audited_sha: 3adc81459fdce7396c685942380e0a19cd5a3ca4
+    audited_sha: e1a0720b63e584b549f04d0b7d61f1980767aaa3
     blocks: [runtime]
     blockedBy: [engine]
     detail: persistence/persistence.md
-    next: "#37: thin tests"
+    next: null
     drift: null
   prestige:
     status: OK
