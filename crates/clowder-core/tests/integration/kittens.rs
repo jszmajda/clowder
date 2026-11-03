@@ -367,6 +367,42 @@ fn happiness_formula() {
     assert_eq!(crowded.happiness(), 25.0, "floor at 25: 100 − 105 + 0");
 }
 
+/// A kitten away neither crowds the house nor loafs in it, whatever it holds.
+// @spec SIM-KIT-011
+#[test]
+fn only_kittens_at_home_crowd_the_house_or_loaf_in_it() {
+    let mut s = GameState::new(15);
+    adopt(&mut s, 6);
+    for k in &mut s.kittens {
+        k.job = Some(JobId::Gardener);
+        k.job_seq = Some(1);
+    }
+    assert!(
+        (s.happiness() - 97.0).abs() < 1e-9,
+        "six at home, all working: one past the fifth crowds"
+    );
+
+    s.kittens[0].job = None;
+    assert!(
+        (s.happiness() - 98.0).abs() < 1e-9,
+        "and one of them loafing adds its point"
+    );
+
+    s.kittens[0].location = Location::NeighborsYard;
+    s.kittens[0].away_seq = Some(0);
+    assert!(
+        (s.happiness() - 100.0).abs() < 1e-9,
+        "gone next door, the loafer neither crowds nor loafs"
+    );
+
+    s.kittens.push(away_kitten("Away One"));
+    s.kittens.push(away_kitten("Away Two"));
+    assert!(
+        (s.happiness() - 100.0).abs() < 1e-9,
+        "however many are away"
+    );
+}
+
 // @spec SIM-KIT-012
 #[test]
 fn mood_multiplier_tracks_happiness_and_grumpiness_quarters_it() {

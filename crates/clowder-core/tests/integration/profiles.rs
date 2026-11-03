@@ -1014,3 +1014,33 @@ fn a_v8_save_migrates_with_everything_else_exact() {
         }
     }
 }
+
+/// The bonus the facts state is the one production applies, the master tier
+/// scaled as production scales it, so what a kitten says of itself stays true
+/// once an adventure's reward has raised that tier.
+// @spec SIM-KIT-041, SIM-KIT-020
+#[test]
+fn the_bonus_a_kitten_states_is_the_one_its_work_gets() {
+    let mut s = GameState::new(7_041);
+    adopt(&mut s, 1);
+    s.kittens[0].job = Some(JobId::Gardener);
+    s.kittens[0].skills[JobId::Gardener as usize] = 9_000.0;
+    let plain = s.kitten_facts(0).unwrap().best_at.unwrap().bonus;
+    assert!((plain - 0.1875).abs() < 1e-9, "the master tier's own bonus");
+
+    s.adventure_rewards[AdventureId::NapTime.ix()] = 1.0;
+    let raised = s.kitten_facts(0).unwrap().best_at.unwrap().bonus;
+    assert!(raised > plain, "a master-skill reward raises what it states");
+
+    while s.ticks % 10 != 1 {
+        s.tick();
+    }
+    give(&mut s, ResourceId::Catnip, 100.0);
+    s.kittens[0].skills[JobId::Gardener as usize] = 9_000.0;
+    s.tick();
+    let made = s.stock(ResourceId::Catnip) - 100.0 + 0.085;
+    assert!(
+        (made - 0.15 * (1.0 + raised)).abs() < 1e-9,
+        "and it is what the kitten's work gets, measured {made}"
+    );
+}

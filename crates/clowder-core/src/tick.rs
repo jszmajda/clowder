@@ -595,7 +595,7 @@ impl GameState {
         // mood, zoomies, global, mess) are identical per kitten and stay
         // aggregate. One walk of the roster, whatever the number of jobs, each
         // job's ratio read only once it has a worker to read it for.
-        // @spec SIM-KIT-020, SIM-KIT-022
+        // @spec SIM-KIT-010, SIM-KIT-020, SIM-KIT-022
         let mut job_ratios = [None; JobId::ALL.len()];
         let mut base_sums = [0.0; JobId::ALL.len()];
         for (ix, k) in self.kittens.iter().enumerate() {

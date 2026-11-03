@@ -2344,7 +2344,6 @@ impl GameState {
         self.ticks < self.zoomies_until
     }
 
-    /// A jamboree runs while ticks < jamboree_until. @spec SIM-KIT-025
     /// Each day's chance of a prism descending, brightened by Prism Sight.
     /// @spec SIM-UNI-006, SIM-MOVE-015
     pub fn prism_descent_chance(&self) -> f64 {
@@ -2365,6 +2364,7 @@ impl GameState {
         }
     }
 
+    /// A jamboree runs while ticks < jamboree_until. @spec SIM-KIT-025
     pub fn jamboree_active(&self) -> bool {
         self.ticks < self.jamboree_until
     }

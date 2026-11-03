@@ -51,9 +51,9 @@ pub enum Effect {
     ArrivalChanceOnTop,
     /// Delta on an idea's curiosity price (the Curious Elder).
     IdeaCostRatio,
-    /// Trade ratio (dormant until the colonies leaf).
+    /// Trade ratio on what a colony's caravans bring.
     TradeRatio,
-    /// Rite cost delta (dormant until the ceremonies leaf).
+    /// Delta on a rite's price.
     RiteCostRatio,
     /// Flat extra output of one resource per copy of one structure
     /// (Bellows, Ember Beds, the Story Press).
@@ -484,7 +484,7 @@ fn loom_effect(loom: crate::state::DreamLoomId, key: Effect) -> f64 {
 }
 
 /// One trait's contribution to one key — the kittens design's trait list,
-/// exactly. Charming and Serene are dormant keys until their subsystems land.
+/// exactly.
 // @spec SIM-KIT-024
 fn trait_effect(trait_id: KittenTrait, key: Effect) -> f64 {
     use CraftId::*;

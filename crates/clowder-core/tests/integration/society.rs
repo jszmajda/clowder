@@ -249,6 +249,84 @@ fn skill_tiers_multiply_the_kittens_own_job_yield() {
     }
 }
 
+/// Every kitten's own skill counts for its own job's yield, an away kitten's
+/// counts for nothing though it keeps the title, and the Elder's lift is the
+/// Elder's alone: a roster of mixed workers adds up kitten by kitten.
+// @spec SIM-KIT-010, SIM-KIT-020, SIM-KIT-022
+#[test]
+fn a_jobs_yield_adds_up_each_home_worker_and_lifts_only_the_elder() {
+    let mut s = GameState::new(226);
+    adopt(&mut s, 5);
+    for k in &mut s.kittens {
+        k.job = Some(JobId::Gardener);
+    }
+    s.kittens[0].rank = 3;
+    s.elder = Some(0);
+    s.kittens[1].skills[JobId::Gardener as usize] = 5_000.0;
+    s.kittens[1].rank = 3;
+    s.kittens[2].skills[JobId::Gardener as usize] = 100.0;
+    // A different job, skilled, makes its own store and none of this one's.
+    s.kittens[3].job = Some(JobId::TwigCollector);
+    s.kittens[3].skills[JobId::TwigCollector as usize] = 500.0;
+    s.kittens[3].skills[JobId::Gardener as usize] = 9_000.0;
+    // The gardener away keeps the title, and adds nothing however skilled.
+    s.kittens[4].location = Location::NeighborsYard;
+    s.kittens[4].away_seq = Some(0);
+    s.kittens[4].skills[JobId::Gardener as usize] = 9_000.0;
+
+    off_boundary(&mut s);
+    give(&mut s, ResourceId::Catnip, 100.0);
+    give(&mut s, ResourceId::Twigs, 0.0);
+    run_ticks(&mut s, 1);
+
+    let elder = 0.15 * (4.0 / 1.4);
+    let skilled = 0.15 * 1.125;
+    let learning = 0.15 * 1.0125;
+    let eaten = 4.0 * 0.085;
+    let catnip = s.stock(ResourceId::Catnip) - 100.0 + eaten;
+    assert!(
+        (catnip - (elder + skilled + learning)).abs() < 1e-9,
+        "the three gardeners at home, each its own, measured {catnip}"
+    );
+    let twigs = s.stock(ResourceId::Twigs);
+    assert!(
+        (twigs - 0.03 * 1.025).abs() < 1e-9,
+        "the collector's own job, at its own tier, measured {twigs}"
+    );
+}
+
+/// A job's ratio is that job's: raising one leaves another's yield where it
+/// was, whichever of them the roster reaches first.
+// @spec SIM-KIT-020, SIM-CUR-010
+#[test]
+fn a_ratio_on_one_job_lifts_that_job_alone() {
+    for (first, second) in [
+        (JobId::Gardener, JobId::TwigCollector),
+        (JobId::TwigCollector, JobId::Gardener),
+    ] {
+        let mut s = GameState::new(227);
+        adopt(&mut s, 2);
+        s.kittens[0].job = Some(first);
+        s.kittens[1].job = Some(second);
+        s.refinements.insert(RefinementId::PebbleSnips);
+        off_boundary(&mut s);
+        give(&mut s, ResourceId::Catnip, 100.0);
+        give(&mut s, ResourceId::Twigs, 0.0);
+        run_ticks(&mut s, 1);
+
+        let catnip = s.stock(ResourceId::Catnip) - 100.0 + 2.0 * 0.085;
+        assert!(
+            (catnip - 0.15).abs() < 1e-9,
+            "the gardener takes no share of the collector's ratio, measured {catnip}"
+        );
+        let twigs = s.stock(ResourceId::Twigs);
+        assert!(
+            (twigs - 0.03 * 1.7).abs() < 1e-9,
+            "the collector takes all of it, measured {twigs}"
+        );
+    }
+}
+
 // @spec SIM-KIT-021
 #[test]
 fn promote_spends_exp_and_shinies_and_ranks_up() {
