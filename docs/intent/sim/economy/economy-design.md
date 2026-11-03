@@ -127,6 +127,25 @@ No staged rebuilds in this pass: every structure is its own entry (see Decisions
 - *A running cost that escalates.* The energy used per copy, plus the energy used per copy squared, so that the Yarn Computer's total at n copies is 2·n + 0.5·n².
 - *Scaling flags.* Whether a figure the definition gives is scaled by current state: energy made breathing with the season (the Sunning Deck and the Solar Array), a global ratio and energy made scaled by the structure's fuel fraction (the Dynamo Wheel), cap extensions ratcheting on the kite high-water (the Porch). A flag is what the statement's qualifier reads; the factor stays in the rule, since what current state makes of a figure is the core's to report.
 
+### Structure families
+
+Every structure belongs to one family, named for what the player comes to it for, so a long list of structures can be read by purpose and walked by family. The families are the core's because which one a structure belongs to is a statement about what it is, and a frontend that sorted structures itself would hold that rule. The family table is exhaustive over the structures, so a new structure cannot compile without one.
+
+| Family | Holds | Structures |
+|---|---|---|
+| Homes | What houses kittens at home | Cozy Cushion, Cat Tree, Window Perch |
+| Gardens | What grows or digs up raw goods | Catnip Patch, Herb Garden, Couch Mine, Gravel Pit, Dew Collector |
+| Storerooms | What only makes room | Pantry, Twig Pile, Shed, Porch |
+| Studies | What feeds curiosity and cleverness | Cardboard Box, Study Nook, Stargazing Ledge, Whisker Lab, Box Labyrinth, Yarn Computer |
+| Workshops | What makes one good from another | Kiln, Craft Corner, Toy Workshop, Treat Bakery |
+| Comforts | What brightens the clowder and its charm | Scratching Post, Hearth, Gift Stand, Story Circle, Sun Room, Sunbeam Altar, Tea House, Moonlight Stage |
+| Power | What makes energy at home | Cogworks, Dynamo Wheel, Sunning Deck, Stream Wheel, Star Basin |
+| Tidiers | What clears mess | Broom Cupboard, Clockwork Broom |
+| Marvels | The mystic and the strange | Prism Spinner, Memory Chest, Unicorn Meadow, Rainbow Arch, Sunstone |
+| Outposts | Everything built beyond the home meadow | Lookout Post, Treehouse, Weather Vane, Solar Array, Ranger Station, Hushfelt Grotto, Whisper Post, Cairn Circle, Sky Dock, Aurora Lantern, Star Nursery, Far Beacon, Wishing Star |
+
+A structure that could stand in two goes where the player would first look for it. An outpost is an outpost whatever else it does, since where it stands is what it costs to reach: a Treehouse houses kittens and a Solar Array makes energy, and both are outposts.
+
 ## CRAFT — Crafting
 
 `Craft(id)` makes one batch: output = 1 × (1 + CraftRatio effects). All-or-nothing input spend, epsilon-tolerant. Recipes (inputs per batch):
@@ -224,6 +243,7 @@ StorageFull rejection when the yield resource is at cap (unchanged rule).
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
+| How structures divide | One family each, by what the player comes to it for | By the good each makes; by the stage of play it opens at; by what it costs | A player looking for more room, or for energy, is asking what a structure is for. Sorting by its good scatters what answers one question and leaves many with no good at all. Sorting by stage answers a question nobody brings to the list, and changes nothing a player can use |
 | Where a structure's rule-held behaviour lives | A typed field per behaviour on the definition, read by the rule | A blurb on the structures that need one; constants beside each rule, with sentences written in the shell | A blurb repeats its figures in prose that can drift from the rule, and a blurb kind's fields go unstated, which would split one kind into two statement rules. Sentences in the shell over constants in the core are a second copy of the rule outside the tables. A field gives the rule and the statement one value to read, and describes a later structure for free |
 | How state-driven scaling is stated | A flag on the definition per scaling, read by the rule and worded as a qualifier without its factor | One flag for energy and production seasonality; stating each factor | Production seasonality and energy seasonality are different rules with different factors, so one flag would read as one rule. A factor stated beside a figure invites working out a yield the core owns, as the production qualifiers already decline to |
 | Energy before the band-3 producers | The Cogworks, the one band-1 producer, gives enough energy that one covers a band-2 consumer or two | Band-2 consumers with only a +1 producer; band-2 consumers that use no energy | Every band-2 energy consumer arrives a band before any other producer, so a +1 Cogworks at a 1.25 price ramp leaves a meadow in deficit for the whole band, with the deficit cutting the global layers it has no other way to restore. Consumers that use no energy until later would remove the trade-off the band introduces energy to teach |
