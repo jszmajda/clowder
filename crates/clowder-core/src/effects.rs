@@ -587,3 +587,336 @@ fn tradition_effect(t: TraditionId, key: Effect) -> f64 {
         _ => 0.0,
     }
 }
+
+#[cfg(test)]
+mod every_source {
+    use super::*;
+    use crate::state::{DreamLoomId, Location, Promise, RefinementId, RuleId};
+
+    /// Every source's contribution, walked in full. What a sum over only a
+    /// key's own sources has to match bit for bit, so it stays a walk of every
+    /// source, and it stays here because the per-source tables are private.
+    fn scan(state: &GameState, key: Effect) -> f64 {
+        let mut sum = 0.0;
+        for (ix, &raw_count) in state.structures.iter().enumerate() {
+            if raw_count == 0 {
+                continue;
+            }
+            let s = StructureId::ALL[ix];
+            let count = raw_count as f64;
+            let def = content::structure_def(s);
+            match key {
+                Effect::MaxCap(r) => {
+                    for (cr, amount) in def.cap_bonuses {
+                        if *cr == r {
+                            let mut value = amount * count;
+                            if def.caps_kite_ratcheted {
+                                value *= 1.0
+                                    + limited_dr(
+                                        content::PORCH_KITE_PER * state.kites_high_water,
+                                        content::PORCH_KITE_DR_LIMIT,
+                                    );
+                            }
+                            sum += value;
+                        }
+                    }
+                }
+                Effect::CapRatio => sum += def.cap_ratio * count,
+                Effect::HappinessPoints => sum += def.happiness_points * count,
+                Effect::JamboreeRatio => sum += def.jamboree_ratio * count,
+                Effect::JamboreeArrivalRatio => sum += def.jamboree_arrival * count,
+                Effect::ResourceRatio(r) => {
+                    for (rr, ratio) in def.resource_ratios {
+                        if *rr == r {
+                            sum += ratio * count;
+                        }
+                    }
+                }
+                Effect::CraftRatio => sum += def.craft_ratio * count,
+                Effect::LuxuryDemandRatio => sum += def.luxury_demand * count,
+                Effect::TradeRatio => sum += def.trade_ratio * count,
+                Effect::PrismDescentChance => sum += def.prism_descent * count,
+                Effect::GlobalProductionRatio => {
+                    let mut value = def.global_ratio * count;
+                    if def.fuel_scaled {
+                        value *= state.fuel_fraction(s)
+                            * (1.0 + state.structure_sum(|d| d.fuel_global_boost));
+                    }
+                    sum += value;
+                }
+                Effect::OutdoorProductionRatio => sum += def.outdoor_ratio * count,
+                Effect::LongSunCapBonus => sum += def.long_sun_cap * count,
+                Effect::DejaVuChance => sum += def.deja_vu_chance * count,
+                _ => {}
+            }
+        }
+        for r in &state.refinements {
+            let def = content::refinement_def(*r);
+            let scale = def
+                .per_structure
+                .map_or(1.0, |s| state.structures[s.ix()] as f64);
+            for (k, value) in def.effects {
+                if *k == key {
+                    sum += value * scale;
+                }
+            }
+        }
+        match key {
+            Effect::HappinessPoints if state.ideas.contains(&IdeaId::BiscuitMaking) => {
+                sum += content::BISCUIT_POINTS;
+            }
+            Effect::ArrivalChanceOnTop if state.ideas.contains(&IdeaId::NeighborhoodWatch) => {
+                sum += content::ARRIVAL_WATCH_BONUS;
+            }
+            _ => {}
+        }
+        for rule in &state.rules {
+            for (k, value) in content::rule_def(*rule).effects {
+                if *k == key {
+                    sum += value;
+                }
+            }
+        }
+        if !state.rites.is_empty() {
+            let altars = state.structures[StructureId::SunbeamAltar.ix()] as f64;
+            for rite in &state.rites {
+                let n = state.rite_counts[rite.ix()] as f64;
+                if n == 0.0 {
+                    continue;
+                }
+                sum += rite_effect(*rite, key, altars) * n;
+            }
+            if let Effect::MaxCap(ResourceId::Warmth) = key {
+                let frescoes = state.rite_counts[RiteId::EverwarmFrescoes.ix()];
+                if frescoes > 0 && state.warm_memories > 0.0 {
+                    let sun_rooms = state.structures[StructureId::SunRoom.ix()] as f64;
+                    sum += unlimited_dr(frescoes as f64, 1.65) * state.warm_memories * sun_rooms;
+                }
+            }
+        }
+        for arch in &state.arches_bought {
+            sum += arch_effect(*arch, key);
+        }
+        for t in &state.traditions {
+            sum += tradition_effect(*t, key);
+        }
+        if state.adventure_rewards.iter().any(|&x| x != 0.0) {
+            for a in AdventureId::ALL {
+                let def = content::adventure_def(a);
+                if def.reward_key == key {
+                    let pool = state.adventure_rewards[a.ix()];
+                    sum += pool.signum() * limited_dr(pool.abs(), def.reward_cap);
+                }
+            }
+        }
+        if let Effect::EnergyConsumptionRatio = key {
+            if state.active_adventure == Some(AdventureId::FrugalMeadow) {
+                sum += content::FRUGAL_MEADOW_TWIST;
+            }
+        }
+        if let Effect::GlobalProductionRatio = key {
+            let kept = state.promises.iter().filter(|p| !p.quiet).count() as f64;
+            sum += content::PROMISE_GLOBAL_RATIO * kept;
+        }
+        for l in &state.dream_looms {
+            sum += loom_effect(*l, key);
+        }
+        if let Some(trait_id) = state
+            .elder
+            .and_then(|ix| state.kittens.get(ix))
+            .map(|k| k.trait_id)
+        {
+            sum += trait_effect(trait_id, key);
+        }
+        sum
+    }
+
+    /// Every key the vocabulary can spell.
+    fn every_key() -> Vec<Effect> {
+        use Effect::*;
+        let mut keys = vec![
+            GlobalProductionRatio,
+            CraftRatio,
+            HappinessPoints,
+            LuxuryDemandRatio,
+            CapRatio,
+            PounceRatio,
+            TinkererSpeed,
+            SkillXpRatio,
+            JamboreeRatio,
+            JamboreeArrivalRatio,
+            ArrivalChanceInCap,
+            ArrivalChanceOnTop,
+            IdeaCostRatio,
+            TradeRatio,
+            RiteCostRatio,
+            SkyEventChanceRatio,
+            AutoObserveChanceRatio,
+            PrismDescentChance,
+            RainbowShowerChance,
+            UnicornsRatio,
+            StarshardRefine,
+            EchoRefine,
+            ParadeRatio,
+            DreamBoost,
+            GlobalPriceRatioDelta,
+            KittenGrowthRatio,
+            StandingRatio,
+            MasterSkillMultiplier,
+            EnergyConsumptionRatio,
+            MessAccrualRatio,
+            OutdoorProductionRatio,
+            LongSunCapBonus,
+            DejaVuChance,
+            ReverieYield,
+            HeatEfficiency,
+            HeatDissipation,
+        ];
+        for r in ResourceId::ALL {
+            keys.extend([ResourceRatio(r), MaxCap(r), MaxCapRatio(r)]);
+            keys.extend(Season::ALL.map(|season| SeasonResourceRatio(season, r)));
+            keys.extend(StructureId::ALL.map(|s| StructureOutputAdd(s, r)));
+        }
+        for s in StructureId::ALL {
+            keys.extend([StructureRatio(s), StructureMessDelta(s)]);
+        }
+        keys.extend(JobId::ALL.map(JobRatio));
+        keys.extend(CraftId::ALL.map(CraftRatioFor));
+        keys.extend(ColonyId::ALL.map(StandingFor));
+        keys
+    }
+
+    /// Everything held, `copies` of each structure, half-stocked so a
+    /// fuel-scaled structure runs part-throttled.
+    fn all_held(copies: u32) -> GameState {
+        let mut s = GameState::new(84);
+        s.structures = [copies; crate::state::STRUCTURE_COUNT];
+        s.ideas.extend(IdeaId::ALL);
+        s.refinements.extend(RefinementId::ALL);
+        s.rules.extend(RuleId::ALL);
+        s.rites.extend(RiteId::ALL);
+        s.rite_counts = [2; RiteId::ALL.len()];
+        s.arches_bought.extend(ArchId::ALL);
+        s.traditions.extend(TraditionId::ALL);
+        s.dream_looms.extend(DreamLoomId::ALL);
+        s.promises = vec![Promise { quiet: false }, Promise { quiet: true }];
+        s.warm_memories = 7.0;
+        s.kites_high_water = 40.0;
+        s.adventure_rewards = [0.3; AdventureId::ALL.len()];
+        s.adventure_rewards[AdventureId::FrugalMeadow.ix()] = -0.2;
+        s.active_adventure = Some(AdventureId::FrugalMeadow);
+        s.resources = [0.5; crate::state::RESOURCE_COUNT];
+        s
+    }
+
+    /// A kitten in the chair with this trait.
+    fn seat_elder(s: &mut GameState, trait_id: KittenTrait) {
+        s.kittens.clear();
+        s.kittens.push(crate::state::Kitten {
+            name: "Elder".to_string(),
+            job: None,
+            location: Location::Home,
+            arrived_day: 0,
+            job_seq: None,
+            away_seq: None,
+            skills: [0.0; 8],
+            exp: 0.0,
+            rank: 0,
+            trait_id,
+            tinkering: None,
+            profile: None,
+        });
+        s.elder = Some(0);
+    }
+
+    fn meadows() -> Vec<(String, GameState)> {
+        let mut meadows = vec![("a new meadow".to_string(), GameState::new(84))];
+        // How many altars a rite's share scales by, none included, since a
+        // share that is zero at one count may not be at another.
+        for copies in [0, 1, 2, 5, 20] {
+            meadows.push((format!("everything held, {copies} copies"), all_held(copies)));
+        }
+        for trait_id in KittenTrait::ALL {
+            let mut s = all_held(3);
+            seat_elder(&mut s, trait_id);
+            meadows.push((format!("an Elder who is {trait_id:?}"), s));
+        }
+        // Every other item of each kind, so a key's list holds sources this
+        // meadow has and sources it does not, side by side.
+        let mut alternate = all_held(3);
+        alternate.structures = std::array::from_fn(|ix| (ix % 2) as u32 * 4);
+        alternate.refinements = RefinementId::ALL.iter().copied().step_by(2).collect();
+        alternate.rules = RuleId::ALL.iter().copied().step_by(2).collect();
+        alternate.rites = RiteId::ALL.iter().copied().step_by(2).collect();
+        alternate.arches_bought = ArchId::ALL.iter().copied().step_by(2).collect();
+        alternate.traditions = TraditionId::ALL.iter().copied().step_by(2).collect();
+        alternate.dream_looms = DreamLoomId::ALL.iter().copied().step_by(2).collect();
+        meadows.push(("every other item".to_string(), alternate));
+        // What only a hand-edited save can say.
+        let mut counts_no_set = all_held(3);
+        counts_no_set.rites.clear();
+        meadows.push(("rite counts without the rites".to_string(), counts_no_set));
+        let mut set_no_counts = all_held(3);
+        set_no_counts.rite_counts = [0; RiteId::ALL.len()];
+        meadows.push(("rites with no counts".to_string(), set_no_counts));
+        let mut gone_elder = all_held(3);
+        gone_elder.elder = Some(99);
+        meadows.push(("an Elder past the roster".to_string(), gone_elder));
+        let mut no_memories = all_held(3);
+        no_memories.warm_memories = 0.0;
+        meadows.push(("no warm memories".to_string(), no_memories));
+        let mut no_rewards = all_held(3);
+        no_rewards.adventure_rewards = [0.0; AdventureId::ALL.len()];
+        no_rewards.active_adventure = None;
+        no_rewards.promises.clear();
+        meadows.push(("no rewards, twist, or promises".to_string(), no_rewards));
+        meadows
+    }
+
+    /// @spec SIM-ENG-019, SIM-ENG-084
+    #[test]
+    fn a_sum_is_bit_identical_to_one_taken_over_every_source() {
+        for (what, meadow) in meadows() {
+            for key in every_key() {
+                let scanned = scan(&meadow, key);
+                let summed = meadow.effect(key);
+                assert_eq!(
+                    summed.to_bits(),
+                    scanned.to_bits(),
+                    "{key:?} on {what}: {summed} where every source sums to {scanned}"
+                );
+            }
+        }
+    }
+
+    /// The comparison above is only as good as its meadows: each kind of source
+    /// has to have moved some sum in them, or it would pass with that kind gone.
+    /// @spec SIM-ENG-084
+    #[test]
+    fn the_meadows_compared_reach_every_kind_of_source() {
+        let meadow = all_held(3);
+        let moved = |without: fn(&mut GameState)| {
+            let mut less = meadow.clone();
+            without(&mut less);
+            every_key()
+                .into_iter()
+                .any(|key| scan(&meadow, key).to_bits() != scan(&less, key).to_bits())
+        };
+        assert!(moved(|s| s.structures = [0; crate::state::STRUCTURE_COUNT]));
+        assert!(moved(|s| s.refinements.clear()));
+        assert!(moved(|s| s.ideas.clear()));
+        assert!(moved(|s| s.rules.clear()));
+        assert!(moved(|s| s.rites.clear()));
+        assert!(moved(|s| s.arches_bought.clear()));
+        assert!(moved(|s| s.traditions.clear()));
+        assert!(moved(|s| s.adventure_rewards = [0.0; AdventureId::ALL.len()]));
+        assert!(moved(|s| s.active_adventure = None));
+        assert!(moved(|s| s.promises.clear()));
+        assert!(moved(|s| s.dream_looms.clear()));
+        let mut seated = meadow.clone();
+        seat_elder(&mut seated, KittenTrait::Crafty);
+        assert!(every_key()
+            .into_iter()
+            .any(|key| scan(&seated, key).to_bits() != scan(&meadow, key).to_bits()));
+    }
+}

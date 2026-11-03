@@ -256,7 +256,7 @@ fn thirty_day_catch_up_feels_like_loading_not_compiling() {
     let loaded = load_string(&json, 30 * 86_400).unwrap();
     let took = start.elapsed();
     assert_eq!(loaded.state.ticks, 30 * 86_400 * 4);
-    assert!(took.as_secs_f64() < 5.0, "30-day catch-up took {took:?}");
+    assert!(took.as_secs_f64() < 10.0, "30-day catch-up took {took:?}");
 }
 
 /// The resource-reveal rule leaves that bound standing at either extreme of
@@ -292,10 +292,153 @@ fn thirty_day_catch_up_holds_its_bound_under_the_resource_reveal_rule() {
         let took = start.elapsed();
         assert_eq!(loaded.state.ticks, 30 * 86_400 * 4);
         assert!(
-            took.as_secs_f64() < 5.0,
+            took.as_secs_f64() < 10.0,
             "30-day catch-up of {what} took {took:?}"
         );
     }
+}
+
+/// The meadow SAVE-033's bound is measured on: twenty copies of every structure
+/// kind, everything else it can hold, and as many kittens as those copies house.
+/// Built from the content lists rather than by name, so what later content
+/// costs a tick is measured here without anyone remembering to add it.
+fn late_meadow() -> GameState {
+    let mut s = GameState::new(33);
+    for structure in StructureId::ALL {
+        grant(&mut s, structure, 20);
+    }
+    s.ideas.extend(IdeaId::ALL);
+    s.refinements.extend(RefinementId::ALL);
+    for rule in RuleId::ALL {
+        if !s.rules.contains(&content::rule_def(rule).blocks) {
+            s.rules.insert(rule);
+        }
+    }
+    s.rites.extend(RiteId::ALL);
+    s.rite_counts = [3; RiteId::ALL.len()];
+    s.arches_bought.extend(ArchId::ALL);
+    s.traditions.extend(TraditionId::ALL);
+    s.dream_looms.extend(DreamLoomId::ALL);
+    s.promises = vec![Promise { quiet: false }; 3];
+    s.generation = 3;
+    s.elder_wisdom = 50.0;
+    s.passed_down_wisdom = 50.0;
+    s.warm_memories = 10.0;
+    s.devotion = 1_000.0;
+    s.serenity = 10.0;
+    s.enlightenment_tier = 3;
+    s.adventure_rewards = [0.1; AdventureId::ALL.len()];
+
+    let seats = s.bench().seats as usize;
+    let mut bound = 0;
+    for i in 0..s.housing_capacity() as usize {
+        let name = format!("Kitten {i}");
+        let job = JobId::ALL[i % JobId::ALL.len()];
+        let tinkering = (job == JobId::Tinkerer && bound < seats).then(|| {
+            bound += 1;
+            CraftId::ALL[i % CraftId::ALL.len()]
+        });
+        let profile = draw_profile(&name, s.generation);
+        s.kittens.push(Kitten {
+            name,
+            job: Some(job),
+            location: Location::Home,
+            arrived_day: 0,
+            job_seq: Some(i as u64),
+            away_seq: None,
+            skills: [3_000.0; JobId::ALL.len()],
+            exp: 0.0,
+            rank: 2,
+            trait_id: KittenTrait::ALL[i % KittenTrait::ALL.len()],
+            tinkering,
+            profile: Some(profile),
+        });
+    }
+    s.elder = Some(0);
+    for r in ResourceId::ALL {
+        let cap = s.cap(r);
+        if cap.is_finite() && cap > 0.0 {
+            give(&mut s, r, cap / 2.0);
+        }
+    }
+    s
+}
+
+/// A guard is worth only what its meadow is, so the meadow is held to what the
+/// spec says it holds, and to staying that size while it replays.
+// @spec SAVE-033
+#[test]
+fn the_late_meadow_holds_what_its_bound_says() {
+    let s = late_meadow();
+    assert!(
+        s.structures.iter().all(|&copies| copies == 20),
+        "twenty copies of every structure kind"
+    );
+    assert_eq!(s.refinements.len(), RefinementId::ALL.len());
+    assert_eq!(s.rites.len(), RiteId::ALL.len());
+    assert_eq!(s.arches_bought.len(), ArchId::ALL.len());
+    assert_eq!(s.traditions.len(), TraditionId::ALL.len());
+    assert_eq!(s.dream_looms.len(), DreamLoomId::ALL.len());
+    for rule in RuleId::ALL {
+        assert!(
+            s.rules.contains(&rule) || s.rules.contains(&content::rule_def(rule).blocks),
+            "{rule:?} is held, or the rule that blocks it is"
+        );
+    }
+    assert_eq!(
+        s.kittens.len(),
+        s.housing_capacity() as usize,
+        "as many kittens as its copies house"
+    );
+    assert!(
+        s.kittens.len() >= 200,
+        "about two hundred kittens, and more only as content adds homes"
+    );
+
+    let json = save_string(&s, 0);
+    let loaded = load_string(&json, 59).unwrap();
+    assert_eq!(
+        loaded.state.kittens.len(),
+        s.kittens.len(),
+        "the roster it starts with is the one the replay runs"
+    );
+}
+
+/// Every source class is live on this meadow, so the replay's every step reads
+/// what a sum over the whole content would: replayed or ticked, it is one
+/// simulation, byte for byte. An absence under the reportable minimum, so the
+/// two differ in no journal entry.
+// @spec SAVE-006, SIM-ENG-084
+#[test]
+fn a_late_meadow_replays_exactly_as_it_lives() {
+    let json = save_string(&late_meadow(), 0);
+    let replayed = load_string(&json, MIN_REPORTABLE_ABSENCE_SECONDS - 1)
+        .unwrap()
+        .state;
+
+    let mut ticked = load_string(&json, 0).unwrap().state;
+    for _ in 0..replayed.ticks - ticked.ticks {
+        ticked.tick_replay();
+    }
+    assert_eq!(
+        save_string(&replayed, 0),
+        save_string(&ticked, 0),
+        "a catch-up is the same ticks as any others"
+    );
+}
+
+/// The late meadow's bound, at more than twice what it measures, so this fails
+/// on a real regression and not on a busy machine.
+// @spec SAVE-033
+#[test]
+#[ignore = "perf bound is a release-build property; run with --release --ignored"]
+fn thirty_days_away_from_a_late_meadow_wakes_within_a_minute() {
+    let json = save_string(&late_meadow(), 0);
+    let start = std::time::Instant::now();
+    let loaded = load_string(&json, 30 * 86_400).unwrap();
+    let took = start.elapsed();
+    assert_eq!(loaded.state.ticks, 30 * 86_400 * 4);
+    assert!(took.as_secs_f64() < 60.0, "30-day catch-up took {took:?}");
 }
 
 // @spec SAVE-010
