@@ -32,6 +32,8 @@ pub struct PointerRecord {
     tabs: Vec<(Section, Rect)>,
     rows: Vec<(Rect, Section, RowKey)>,
     list: Option<(Rect, Section)>,
+    /// The line the drawn list began on, for a click to hold. @spec TUI-RENDER-036
+    list_start: usize,
     journal: Option<(Rect, Option<usize>)>,
     sidebar: Option<SidebarRecord>,
 }
@@ -53,8 +55,15 @@ impl PointerRecord {
         self.tabs = tabs;
     }
 
-    pub(crate) fn record_list(&mut self, space: Rect, section: Section, rows: Vec<(Rect, RowKey)>) {
+    pub(crate) fn record_list(
+        &mut self,
+        space: Rect,
+        section: Section,
+        rows: Vec<(Rect, RowKey)>,
+        start: usize,
+    ) {
         self.list = Some((space, section));
+        self.list_start = start;
         self.rows = rows.into_iter().map(|(r, k)| (r, section, k)).collect();
     }
 
@@ -97,6 +106,11 @@ impl PointerRecord {
     }
 
     /// The section whose list's space this cell is in.
+    /// The line the drawn list began on.
+    pub fn list_start(&self) -> usize {
+        self.list_start
+    }
+
     pub fn list_at(&self, x: u16, y: u16) -> Option<Section> {
         self.list
             .as_ref()

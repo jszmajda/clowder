@@ -641,10 +641,37 @@ struct Window {
     hidden: usize,
 }
 
-/// Derive the visible slice of a row list from the cursor alone — never from
-/// a stored offset — keeping a small margin above and below where the list
-/// has rows to spare. @spec TUI-RENDER-009
-fn window_for(total: usize, cursor: usize, capacity: usize) -> Window {
+/// Where a held list begins this frame: the line a click held, moved as little
+/// as draws the cursor's row with one row beside it on each side where rows lie
+/// past it. Worked out afresh against the cursor each frame, so a line held
+/// before a reveal or a resize cannot leave the cursor off the screen, and a
+/// step of the cursor cannot move the list further than the lines it passed.
+/// @spec TUI-RENDER-036
+fn held_start(held: usize, cursor: usize, usable: usize, max_start: usize) -> usize {
+    // Between the list's ends, a line goes to each overflow note.
+    let between = usable.saturating_sub(1).max(1);
+    let shown = |start: usize| {
+        if start > 0 && start < max_start {
+            between
+        } else {
+            usable
+        }
+    };
+    let mut start = held.min(max_start);
+    if cursor <= start {
+        start = cursor.saturating_sub(1);
+    }
+    if start < max_start && cursor + 1 >= start + shown(start) {
+        start = (cursor + 2).saturating_sub(between).min(max_start);
+    }
+    // A pane too short for a row beside the cursor still draws the cursor.
+    start.min(cursor)
+}
+
+/// Derive the visible slice of a row list from the cursor and any line a click
+/// held — never a stored offset used as it stands — keeping a small margin above
+/// and below where the list has rows to spare. @spec TUI-RENDER-009, TUI-RENDER-036
+fn window_for(total: usize, cursor: usize, capacity: usize, held: Option<usize>) -> Window {
     if capacity == 0 || total == 0 {
         return Window {
             start: 0,
@@ -666,7 +693,10 @@ fn window_for(total: usize, cursor: usize, capacity: usize) -> Window {
     const MARGIN: usize = 3;
 
     let max_start = total - usable;
-    let start = cursor.saturating_sub(MARGIN).min(max_start);
+    let start = match held {
+        Some(held) => held_start(held, cursor, usable, max_start),
+        None => cursor.saturating_sub(MARGIN).min(max_start),
+    };
     let len = if start > 0 && start < max_start {
         usable.saturating_sub(1).max(1)
     } else {
@@ -694,7 +724,7 @@ fn draw_list(
     state: &GameState,
     section: Section,
     view: &ViewState,
-) -> Vec<(Rect, RowKey)> {
+) -> (Vec<(Rect, RowKey)>, usize) {
     let cursor_key = view.focus.get(section.index()).and_then(|k| k.as_ref());
     let prompt = view.prompt.as_ref();
     let armed = view.armed.as_ref();
@@ -707,7 +737,7 @@ fn draw_list(
     let armed = armed.filter(|a| armed_is_live(a));
 
     let capacity = area.height as usize;
-    let win = window_for(all.len(), cursor, capacity);
+    let win = window_for(all.len(), cursor, capacity, view.list_held[section.index()]);
 
     let mut lines: Vec<Line<'static>> = Vec::with_capacity(win.len + 2);
     // Where each row drew, whole line, for the frame's pointer record.
@@ -770,7 +800,7 @@ fn draw_list(
     }
 
     f.render_widget(Paragraph::new(lines), area);
-    drawn_at
+    (drawn_at, win.start)
 }
 
 /// One list row, drawn as the design's anatomy: cursor, availability marker,
@@ -1333,8 +1363,8 @@ pub fn frame_recorded(
                 if view.inspector_wanted {
                     widgets::inspector::draw(f, space, state, view);
                 } else {
-                    let drawn = draw_list(f, space, state, section, view);
-                    record.record_list(space, section, drawn);
+                    let (drawn, start) = draw_list(f, space, state, section, view);
+                    record.record_list(space, section, drawn, start);
                 }
                 draw_dividers(f, &[main.x], main.y, main.height, state.season());
             }
@@ -1345,8 +1375,8 @@ pub fn frame_recorded(
             } => {
                 record.record_sidebar(widgets::chrome::sidebar(f, sidebar, state, view));
                 let space = left_between_dividers(list);
-                let drawn = draw_list(f, space, state, section, view);
-                record.record_list(space, section, drawn);
+                let (drawn, start) = draw_list(f, space, state, section, view);
+                record.record_list(space, section, drawn, start);
                 // TUI-NAV-035's count-prompt substitution belongs to the
                 // narrow-mode swap alone — "while the inspector holds the
                 // list's space" — so the persistent pane never loses its next
@@ -1404,4 +1434,65 @@ pub fn frame_recorded(
     }
 
     (layout, record)
+}
+
+#[cfg(test)]
+mod held_viewport {
+    use super::window_for;
+
+    /// Whatever a list, a pane, a cursor, and a held line have come to, the
+    /// cursor's row is drawn, down to a pane of one line.
+    /// @spec TUI-RENDER-009, TUI-RENDER-036
+    #[test]
+    fn a_held_line_always_draws_the_cursor() {
+        for total in 1..70 {
+            for capacity in 1..40 {
+                for cursor in 0..total {
+                    for held in [0, 1, 2, cursor, cursor + 1, total / 2, total, total + 50] {
+                        let win = window_for(total, cursor, capacity, Some(held));
+                        assert!(
+                            win.start <= cursor && cursor < win.start + win.len,
+                            "{total} rows in {capacity} lines, cursor {cursor}, held {held}: \
+                             drew {} from {}",
+                            win.len,
+                            win.start
+                        );
+                        assert_eq!(win.start + win.len + win.hidden, total);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Within a pane worth holding: a list stands still until the cursor reaches
+    /// its edge, then moves a line for a line, and never further.
+    /// @spec TUI-RENDER-036
+    #[test]
+    fn a_held_list_moves_by_at_most_a_line_a_step() {
+        for total in 12..70 {
+            for capacity in 8..12 {
+                for held in 0..total {
+                    let mut previous = window_for(total, 0, capacity, Some(held)).start;
+                    for cursor in 1..total {
+                        let start = window_for(total, cursor, capacity, Some(held)).start;
+                        assert!(
+                            start.abs_diff(previous) <= 2,
+                            "{total} rows in {capacity} lines, held {held}: stepping to {cursor} \
+                             moved the list from {previous} to {start}"
+                        );
+                        previous = start;
+                    }
+                }
+            }
+        }
+    }
+
+    /// A list no click has held keeps the cursor three rows down, as it always has.
+    /// @spec TUI-RENDER-009
+    #[test]
+    fn an_unheld_list_scrolls_as_it_did() {
+        let win = window_for(60, 30, 20, None);
+        assert_eq!(win.start, 27);
+        assert_eq!(window_for(60, 2, 20, None).start, 0);
+    }
 }

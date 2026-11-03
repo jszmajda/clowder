@@ -91,6 +91,10 @@ pub struct ViewState {
     /// Remembered focus per section, by identity. Indexed by
     /// `Section::index()`. @spec TUI-NAV-008
     pub focus: [Option<RowKey>; 10],
+    /// The line a click held each section's list at, where one has: only where
+    /// each frame's derivation of the viewport starts, never used as it stands.
+    /// @spec TUI-RENDER-036
+    pub list_held: [Option<usize>; 10],
     /// Whether the player has called for the inspector. Whether that shows as
     /// a pane or a swap is the layout's to say each frame — not stored, so it
     /// cannot disagree after a resize.

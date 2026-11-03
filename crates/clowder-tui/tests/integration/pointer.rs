@@ -602,6 +602,7 @@ fn settled(view: &ViewState) -> String {
     let mut v = view.clone();
     v.last_repeat = None;
     v.field_guard = false;
+    v.list_held = Default::default();
     format!("{v:?}")
 }
 
@@ -616,6 +617,7 @@ fn untouchable(view: &ViewState) -> String {
     v.armed = None;
     v.last_repeat = None;
     v.field_guard = false;
+    v.list_held = Default::default();
     if let Some(Overlay::Journal { anchor }) = v.overlay.as_mut() {
         *anchor = 0;
     }
@@ -2881,5 +2883,248 @@ fn players_eye_a_mid_game_meadow_driven_by_the_pointer_alone() {
             saved,
             "at {size:?} the game changed"
         );
+    }
+}
+
+// ===========================================================================
+// TUI-NAV-129, TUI-RENDER-036 — a click leaves the list where it is
+// ===========================================================================
+
+/// A long list with the cursor partway down, rows lying past both ends of what
+/// is drawn, at the sizes the list is drawn at.
+fn partway_down(state: &GameState, size: (u16, u16)) -> ViewState {
+    let mut view = standing_in(state, Section::Meadow);
+    let keys: Vec<RowKey> = drawn_rows(state, Section::Meadow, &view)
+        .into_iter()
+        .filter(|r| r.selectable())
+        .map(|r| r.key)
+        .collect();
+    assert!(
+        keys.len() > 2 * size.1 as usize,
+        "fixture: a list longer than any pane"
+    );
+    view.focus[Section::Meadow.index()] = Some(keys[keys.len() / 2].clone());
+    view
+}
+
+/// Each line of the list as drawn, whichever of them wears the cursor.
+fn list_lines(shot: &Shot) -> Vec<String> {
+    let space = list_space(&shot.layout);
+    (space.y..space.bottom())
+        .map(|y| uncursored(&text(&shot.buf, y, space.x, space.right())))
+        .collect()
+}
+
+/// The lines of the list that name a row, top to bottom.
+fn row_lines(shot: &Shot) -> Vec<(u16, RowKey)> {
+    let space = list_space(&shot.layout);
+    (space.y..space.bottom())
+        .filter_map(|y| {
+            shot.record
+                .row_at(space.x, y)
+                .map(|(_, key)| (y, key.clone()))
+        })
+        .collect()
+}
+
+const CLICK_SIZES: [(u16, u16); 2] = [(80, 24), (160, 50)];
+
+/// Any row but the first or last drawn stays where it is when clicked, and so
+/// does every other line of the list, however deep the list stands.
+/// @spec TUI-NAV-129, TUI-RENDER-036
+#[test]
+fn a_click_inside_the_drawn_list_moves_nothing() {
+    let state = mid_game();
+    for size in CLICK_SIZES {
+        let view = partway_down(&state, size);
+        let shot = shoot(&state, &view, size);
+        let space = list_space(&shot.layout);
+        let rows = row_lines(&shot);
+        assert!(rows.len() > 3, "fixture: rows to click at {size:?}");
+        let cursor = view.focus[Section::Meadow.index()].clone();
+        for (y, key) in &rows[1..rows.len() - 1] {
+            if Some(key) == cursor.as_ref() {
+                continue;
+            }
+            let mut v = view.clone();
+            point(click(space.x, *y), &mut v, &state, &shot);
+            assert_eq!(v.focus[Section::Meadow.index()].as_ref(), Some(key));
+            let after = shoot(&state, &v, size);
+            assert_eq!(
+                list_lines(&after),
+                list_lines(&shot),
+                "at {size:?}, a click on {key:?} moved the list"
+            );
+            assert_eq!(
+                cursor_line(&after).map(|(line, _)| line),
+                Some(*y),
+                "at {size:?}, the clicked row stays under the pointer"
+            );
+        }
+    }
+}
+
+/// A row at the very edge moves the list by one row, in the direction that shows
+/// the row past it, and every row still drawn moves by that one row at most.
+/// @spec TUI-RENDER-036
+#[test]
+fn a_click_at_the_very_edge_moves_the_list_by_one_row() {
+    let state = mid_game();
+    for size in CLICK_SIZES {
+        let view = partway_down(&state, size);
+        let shot = shoot(&state, &view, size);
+        let space = list_space(&shot.layout);
+        let rows = row_lines(&shot);
+        let order: Vec<RowKey> = drawn_rows(&state, Section::Meadow, &view)
+            .into_iter()
+            .filter(|r| r.selectable())
+            .map(|r| r.key)
+            .collect();
+        for (edge, past) in [(0usize, -1isize), (rows.len() - 1, 1)] {
+            let (y, key) = &rows[edge];
+            let mut v = view.clone();
+            point(click(space.x, *y), &mut v, &state, &shot);
+            let after = shoot(&state, &v, size);
+            let drawn = row_lines(&after);
+            for (was, row) in &rows {
+                if let Some((now, _)) = drawn.iter().find(|(_, k)| k == row) {
+                    assert!(
+                        now.abs_diff(*was) <= 1,
+                        "at {size:?}, {row:?} moved from line {was} to {now}"
+                    );
+                }
+            }
+            let at = order.iter().position(|k| k == key).expect("a listed row");
+            let beyond = &order[(at as isize + past) as usize];
+            assert!(
+                drawn.iter().any(|(_, k)| k == beyond),
+                "at {size:?}, the row past {key:?} comes into view"
+            );
+            assert!(
+                drawn.iter().any(|(_, k)| k == key),
+                "and the clicked row stays drawn"
+            );
+        }
+    }
+}
+
+/// After a click, walking the cursor to either end of the list never moves the
+/// list by more than a row a step, nor loses the cursor: no jump comes back.
+/// @spec TUI-NAV-130, TUI-RENDER-009, TUI-RENDER-036
+#[test]
+fn steps_after_a_click_never_jump_the_list() {
+    let state = mid_game();
+    for size in CLICK_SIZES {
+        for (down, step) in [
+            (true, wheel_down as fn(u16, u16) -> MouseEvent),
+            (false, wheel_up),
+        ] {
+            let mut view = partway_down(&state, size);
+            let mut shot = shoot(&state, &view, size);
+            let space = list_space(&shot.layout);
+            let rows = row_lines(&shot);
+            let (y, _) = rows[if down { 1 } else { rows.len() - 2 }];
+            point(click(space.x, y), &mut view, &state, &shot);
+            shot = shoot(&state, &view, size);
+            for n in 0.. {
+                assert!(n < 400, "fixture: the walk ends");
+                let before = view.focus[Section::Meadow.index()].clone();
+                let drawn = row_lines(&shot);
+                point(step(space.x, y), &mut view, &state, &shot);
+                if view.focus[Section::Meadow.index()] == before {
+                    break;
+                }
+                // A step passes one row, and any group header between it and the next.
+                let list = drawn_rows(&state, Section::Meadow, &view);
+                let line_of = |key: &Option<RowKey>| {
+                    list.iter()
+                        .position(|r| Some(&r.key) == key.as_ref())
+                        .expect("a listed row")
+                };
+                let passed =
+                    line_of(&before).abs_diff(line_of(&view.focus[Section::Meadow.index()]));
+                shot = shoot(&state, &view, size);
+                assert!(
+                    cursor_line(&shot).is_some(),
+                    "at {size:?}, the cursor stays drawn"
+                );
+                let moved = row_lines(&shot);
+                for (was, row) in &drawn {
+                    if let Some((now, _)) = moved.iter().find(|(_, k)| k == row) {
+                        assert!(
+                            usize::from(now.abs_diff(*was)) <= passed,
+                            "at {size:?}, step {n}: {row:?} moved from line {was} to {now}, \
+                             the step passing {passed}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A click holds only its own section's list.
+/// @spec TUI-RENDER-036
+#[test]
+fn a_click_holds_only_its_own_sections_list() {
+    let state = mid_game();
+    let size = CLICK_SIZES[0];
+    let mut view = partway_down(&state, size);
+    assert_eq!(
+        view.list_held,
+        <[Option<usize>; 10]>::default(),
+        "none until a click"
+    );
+    let shot = shoot(&state, &view, size);
+    let (y, _) = row_lines(&shot)[1];
+    point(
+        click(list_space(&shot.layout).x, y),
+        &mut view,
+        &state,
+        &shot,
+    );
+    for section in Section::ALL {
+        assert_eq!(
+            view.list_held[section.index()].is_some(),
+            section == Section::Meadow,
+            "{section:?}"
+        );
+    }
+}
+
+/// A held line is only where the derivation starts. Whatever a reveal or a resize
+/// has made of the list, or wherever the cursor has gone by other means, the
+/// cursor is still drawn.
+/// @spec TUI-RENDER-009, TUI-RENDER-036
+#[test]
+fn a_held_line_never_leaves_the_cursor_off_the_screen() {
+    let state = mid_game();
+    let order: Vec<RowKey> = drawn_rows(
+        &state,
+        Section::Meadow,
+        &standing_in(&state, Section::Meadow),
+    )
+    .into_iter()
+    .filter(|r| r.selectable())
+    .map(|r| r.key)
+    .collect();
+    for size in [(80, 24), (100, 30), (120, 40), (160, 50), (200, 70)] {
+        for held in [0, 1, 5, 20, 60, 10_000] {
+            for key in [&order[0], &order[order.len() / 2], &order[order.len() - 1]] {
+                let mut view = standing_in(&state, Section::Meadow);
+                view.focus[Section::Meadow.index()] = Some(key.clone());
+                view.list_held[Section::Meadow.index()] = Some(held);
+                let shot = shoot(&state, &view, size);
+                assert!(
+                    cursor_line(&shot).is_some(),
+                    "at {size:?}, held at {held}, the cursor on {key:?} isn't drawn"
+                );
+                let drawn = row_lines(&shot);
+                assert!(
+                    drawn.iter().any(|(_, k)| k == key),
+                    "at {size:?}, held at {held}: {key:?} is among the rows drawn"
+                );
+            }
+        }
     }
 }
