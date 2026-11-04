@@ -4,7 +4,7 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-03 (commit `ce32a57b5421`). 36 of 36 active specs implemented, each cited by a test.
+**PARTIAL** — last audited 2026-11-04 (commit `9d87540cb436`). 36 of 36 active specs implemented, each cited by a test.
 
 ## References
 
@@ -62,6 +62,8 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 Audited 2026-11-01. First full audit: every spec read against its code, its tests, and the design by a reader given only the arrow artifacts, its findings then checked by hand. It found an overflow note clipped with the cursor mid-list (fixed, TUI-RENDER-011), a rate that is not a number signed as a drain (fixed, TUI-RENDER-012), ties judged two ways in the compact form (fixed and pinned, TUI-RENDER-017), specs that left out what a frame really reads (corrected, TUI-RENDER-001), an inspector minimum the dead-band undercuts (stated and tested, TUI-RENDER-008), and annotations on shapes and helpers (moved). A reader's pass is no proof: specs 002 to 007, 010, 013, 014, and 023 were read more lightly than the rest. Issue #3 placed the store-link mark in the column every store keeps free (TUI-RENDER-034, TUI-RENDER-019). Issue #12 moved the sidebar to one all-stores rate query a frame (TUI-RENDER-035), held by a timing test on a large roster, where one query outweighs the drawing; on a long-running save that took a game from about 7.7% of a core to about 4.4%. Issue #10 routed the frame's reads of the clock through the runtime's one function. A frame builds each section's row list at most once and drops the lists when it ends (TUI-RENDER-015, #18); on a copy of a long-running save in a 120×40 pane with no keys pressed, that moved the game from about 6.8% of a core to about 5.2%. The inspector widget keeps no placement rule of its own; the layout and the frame hold the only one (#22). The header rule's sweep covers the header's fifth width step (#23). How often frames run is the runtime leaf's decision, and the Frame Budget now points there (#24).
 
 Audited 2026-11-03, for what issue #39 changed. A click now holds its section's list (TUI-RENDER-036), the pointer record carrying the line the frame began on. The held line is only where each frame's derivation starts (TUI-RENDER-009), held to keeping the cursor drawn across every list, pane, cursor, and held line down to a pane of one line. Clicks inside the drawn list move nothing, an edge row moves the list by one, and later steps move it no further than the lines they pass, a group header counted. A list no click has held scrolls as it did, its tests unchanged. Each test was checked by breaking what it guards. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-04, for what issue #45 changed. A count prompt's count keeps its place and its layout (TUI-RENDER-021), its text and every fit unchanged, and is only drawn apart (TUI-THEME-034). Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

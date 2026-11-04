@@ -1,5 +1,5 @@
 schema_version: 2
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 
 # Grouped by the two crates the HLD's architecture splits on: the headless
 # simulation and the terminal shell. Persistence sits with the sim crate it
@@ -225,9 +225,9 @@ arrows:
   render:
     status: PARTIAL
     parent: tui
-    sampled: 2026-11-03
-    audited: 2026-11-03
-    audited_sha: ce32a57b5421739e88e24593861f66ec1918af9f
+    sampled: 2026-11-04
+    audited: 2026-11-04
+    audited_sha: 9d87540cb436904ac3bdbb3db30e35b6c90329df
     blocks: []
     blockedBy: [navigation, runtime, theme]
     detail: tui/render/render.md
@@ -247,9 +247,9 @@ arrows:
   theme:
     status: PARTIAL
     parent: tui
-    sampled: 2026-11-01
-    audited: 2026-11-01
-    audited_sha: 89ce0039b606002881fb2f91bc2efadb5c75dea4
+    sampled: 2026-11-04
+    audited: 2026-11-04
+    audited_sha: 9d87540cb436904ac3bdbb3db30e35b6c90329df
     blocks: [render]
     blockedBy: []
     detail: tui/theme/theme.md
