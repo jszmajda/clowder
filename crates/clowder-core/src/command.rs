@@ -15,6 +15,8 @@ pub enum Command {
     /// Idea-gated pebble foraging. @spec SIM-ECO-027
     Rummage,
     Build(StructureId),
+    /// Take one copy of a structure down. @spec SIM-ECO-065
+    Raze(StructureId),
     AssignJob(JobId),
     UnassignJob(JobId),
     ResearchIdea(IdeaId),
@@ -108,6 +110,8 @@ pub enum CommandError {
     NoSeats,
     NoWorkersAssigned,
     StorageFull,
+    /// No copy of the structure stands to take down. @spec SIM-ECO-065
+    NothingToRaze,
     InsufficientResources {
         missing: Vec<(ResourceId, f64)>,
     },
@@ -222,6 +226,7 @@ impl GameState {
             Command::Forage => self.forage(),
             Command::Rummage => self.rummage(),
             Command::Build(s) => self.build(s),
+            Command::Raze(s) => self.raze(s),
             Command::AssignJob(j) => self.assign(j),
             Command::UnassignJob(j) => self.unassign(j),
             Command::ResearchIdea(i) => self.research(i),
@@ -396,6 +401,23 @@ impl GameState {
         Ok(vec![Event::StructureBuilt {
             id: s,
             count: self.structures[s.ix()],
+        }])
+    }
+
+    /// One copy comes down, and what the report says comes home. Nothing about
+    /// any kitten changes, whatever the housing or seats fall to.
+    /// @spec SIM-ECO-065, SIM-ECO-066
+    fn raze(&mut self, s: StructureId) -> Result<Vec<Event>, CommandError> {
+        let Some(report) = self.raze_report(s) else {
+            return Err(CommandError::NothingToRaze);
+        };
+        self.structures[s.ix()] -= 1;
+        for (r, amount) in report.returned {
+            self.resources[r.ix()] += amount;
+        }
+        Ok(vec![Event::StructureRazed {
+            id: s,
+            count: report.left,
         }])
     }
 

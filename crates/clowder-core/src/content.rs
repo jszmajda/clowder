@@ -304,6 +304,10 @@ pub const STRUCTURE_OUTPUT_ADD_TARGETS: [(StructureId, ResourceId); 3] = [
     (StructureId::SunbeamAltar, ResourceId::Charm),
 ];
 
+/// The share of what a copy would cost to build back that taking it down returns.
+/// @spec SIM-ECO-065
+pub const RAZE_RETURN_SHARE: f64 = 0.25;
+
 // ---- Wave 4: ceremonies / mystic / colonies ----
 // @spec SIM-UNI-001
 pub const PARADE_UNICORN_COST: f64 = 2500.0;

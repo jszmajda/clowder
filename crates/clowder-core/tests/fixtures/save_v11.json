@@ -1,0 +1,508 @@
+{
+  "save_version": 11,
+  "saved_at_unix": 1000000,
+  "owed_ticks": 0,
+  "report_so_far": null,
+  "state": {
+    "ticks": 30,
+    "rng": {
+      "state": 12515044992212157094,
+      "inc": 2885390081777926815
+    },
+    "resources": [
+      42.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "structures": [
+      0,
+      3,
+      0,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "kittens": [
+      {
+        "name": "Parmesan",
+        "job": null,
+        "location": "Home",
+        "arrived_day": 1,
+        "job_seq": null,
+        "away_seq": null,
+        "skills": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 0.0,
+        "rank": 0,
+        "trait_id": "None",
+        "tinkering": null,
+        "profile": {
+          "fur": {
+            "pattern": "Bicolour",
+            "colours": [
+              "Cream",
+              "White"
+            ]
+          },
+          "eyes": "Hazel",
+          "favourites": [
+            {
+              "kind": "Toy",
+              "entry": "the pull cord of a lamp"
+            },
+            {
+              "kind": "NapSpot",
+              "entry": "behind the curtains"
+            },
+            {
+              "kind": "SecretTalent",
+              "entry": "telling the time by dinner"
+            },
+            {
+              "kind": "AfraidOf",
+              "entry": "the hairdryer"
+            },
+            {
+              "kind": "OftenSays",
+              "entry": "wow, apparently"
+            },
+            {
+              "kind": "PetPeeve",
+              "entry": "a new brand of litter"
+            }
+          ],
+          "pose": "Sitting"
+        }
+      },
+      {
+        "name": "Tortellini",
+        "job": null,
+        "location": "Home",
+        "arrived_day": 2,
+        "job_seq": null,
+        "away_seq": null,
+        "skills": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 0.0,
+        "rank": 0,
+        "trait_id": "Curious",
+        "tinkering": null,
+        "profile": {
+          "fur": {
+            "pattern": "Solid",
+            "colours": [
+              "Grey"
+            ]
+          },
+          "eyes": "Hazel",
+          "favourites": [
+            {
+              "kind": "Food",
+              "entry": "plain yogurt off a spoon"
+            },
+            {
+              "kind": "Show",
+              "entry": "cooking shows, from the counter"
+            },
+            {
+              "kind": "Pastime",
+              "entry": "sprinting about at three in the morning"
+            },
+            {
+              "kind": "Quirk",
+              "entry": "sits in any square on the floor"
+            },
+            {
+              "kind": "OftenSays",
+              "entry": "eek"
+            },
+            {
+              "kind": "Smell",
+              "entry": "rain on hot stones"
+            }
+          ],
+          "pose": "Sitting"
+        }
+      },
+      {
+        "name": "Strudel",
+        "job": "Gardener",
+        "location": "Home",
+        "arrived_day": 3,
+        "job_seq": 0,
+        "away_seq": null,
+        "skills": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "exp": 0.0,
+        "rank": 0,
+        "trait_id": "Curious",
+        "tinkering": null,
+        "profile": {
+          "fur": {
+            "pattern": "Solid",
+            "colours": [
+              "Cinnamon"
+            ]
+          },
+          "eyes": "Amber",
+          "favourites": [
+            {
+              "kind": "Show",
+              "entry": "the shadow of a passing bird"
+            },
+            {
+              "kind": "SecretTalent",
+              "entry": "knowing when you'll be home"
+            },
+            {
+              "kind": "AfraidOf",
+              "entry": "thunder, a little"
+            },
+            {
+              "kind": "Smell",
+              "entry": "rain on hot stones"
+            }
+          ],
+          "pose": "Sitting"
+        }
+      }
+    ],
+    "ideas": [
+      "PantryOrganization"
+    ],
+    "pity": 0,
+    "famine_days": 0,
+    "recovery_days": 3,
+    "grumpy": false,
+    "next_seq": 1,
+    "zoomies_until": 141,
+    "speed": 1.0,
+    "roster_high_water": 3,
+    "revealed": [
+      {
+        "Structure": "CatnipPatch"
+      }
+    ],
+    "revealed_resources": [
+      "Catnip"
+    ],
+    "journal": {
+      "recent": [
+        {
+          "tick": 1,
+          "item": {
+            "Happened": {
+              "Revealed": {
+                "id": {
+                  "Structure": "CatnipPatch"
+                }
+              }
+            }
+          }
+        },
+        {
+          "tick": 10,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Parmesan"
+              }
+            }
+          }
+        },
+        {
+          "tick": 20,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Tortellini"
+              }
+            }
+          }
+        },
+        {
+          "tick": 20,
+          "item": {
+            "Happened": {
+              "ZoomiesStarted": {
+                "until_tick": 141
+              }
+            }
+          }
+        },
+        {
+          "tick": 30,
+          "item": {
+            "Happened": {
+              "KittenArrived": {
+                "name": "Strudel"
+              }
+            }
+          }
+        },
+        {
+          "tick": 30,
+          "item": {
+            "Happened": {
+              "JobAssigned": {
+                "name": "Strudel",
+                "job": "Gardener"
+              }
+            }
+          }
+        }
+      ],
+      "kept": [
+        {
+          "tick": 10,
+          "item": {
+            "Happened": {
+              "AchievementEarned": {
+                "id": "AFaceAtTheDoor"
+              }
+            }
+          }
+        },
+        {
+          "tick": 10,
+          "item": {
+            "Happened": {
+              "AchievementEarned": {
+                "id": "HomeImprovement"
+              }
+            }
+          }
+        },
+        {
+          "tick": 20,
+          "item": {
+            "Happened": {
+              "AchievementEarned": {
+                "id": "TheZoomies"
+              }
+            }
+          }
+        },
+        {
+          "tick": 30,
+          "item": {
+            "Happened": {
+              "AchievementEarned": {
+                "id": "ABrightIdea"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "kites_high_water": 0.0,
+    "mess": 0.0,
+    "pending_sky": null,
+    "elder": null,
+    "jamboree_until": 0,
+    "refinements": [],
+    "rules": [],
+    "devotion": 0.0,
+    "serenity": 0.0,
+    "peak_devotion": 0.0,
+    "enlightenment_tier": 0,
+    "rites": [],
+    "rite_counts": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "arches_bought": [],
+    "dream_drift": 0.0,
+    "promises": [],
+    "penpal": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "discovered": [],
+    "learned_goods": {},
+    "elder_wisdom": 0.0,
+    "warm_memories": 0.0,
+    "passed_down_wisdom": 0.0,
+    "generation": 0,
+    "traditions": [],
+    "family_album": [],
+    "achievements": {
+      "AFaceAtTheDoor": {
+        "generation": 0,
+        "day": 1
+      },
+      "TheZoomies": {
+        "generation": 0,
+        "day": 2
+      },
+      "HomeImprovement": {
+        "generation": 0,
+        "day": 1
+      },
+      "ABrightIdea": {
+        "generation": 0,
+        "day": 3
+      }
+    },
+    "armed_adventure": null,
+    "active_adventure": null,
+    "adventure_completions": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "adventure_rewards": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "adventure_done": false,
+    "tidy_progress": 0,
+    "sites_reached": [],
+    "dream_looms": [],
+    "stirred_dreams": 0.0,
+    "distant_dawn": false,
+    "whale_visit_years": 0,
+    "whale_contentment": 0,
+    "deja_vu_until": 0
+  }
+}

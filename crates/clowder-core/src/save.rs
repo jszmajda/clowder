@@ -25,9 +25,12 @@ mod wide;
 /// profile keeps its fur and eyes and draws the rest (SAVE-029). v10 adds the
 /// achievement record (SAVE-030), arriving empty; the meadow's state checks
 /// credit what it has already done as it plays. v11 changes no field: it marks a
-/// save as written under the idea gates a prior save may be past (SAVE-031).
-/// @spec SAVE-013, SAVE-014, SAVE-021, SAVE-023, SAVE-026, SAVE-027, SAVE-029, SAVE-030
-pub const SAVE_VERSION: u32 = 11;
+/// save as written under the idea gates a prior save may be past (SAVE-031). v12
+/// changes no field: a journal may hold an event a v11 binary cannot name, which
+/// has that binary refuse the save as too new rather than as corrupt (SAVE-040).
+/// @spec SAVE-013, SAVE-014, SAVE-021, SAVE-023, SAVE-026, SAVE-027, SAVE-029, SAVE-030,
+/// SAVE-040
+pub const SAVE_VERSION: u32 = 12;
 /// The shortest absence worth reporting. Public for the same reason the cap
 /// is: a caller deciding whether to surface a report must use this value, not
 /// a copy of it. @spec SAVE-015

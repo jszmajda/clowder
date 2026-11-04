@@ -48,6 +48,11 @@ pub enum Event {
     NewYear {
         year: u64,
     },
+    /// One copy came down, and how many are left.
+    StructureRazed {
+        id: StructureId,
+        count: u32,
+    },
     StructureBuilt {
         id: StructureId,
         count: u32,
@@ -229,6 +234,7 @@ impl Event {
             Event::Flavor { .. } => EventClass::Flavor,
 
             Event::KittenArrived { .. }
+            | Event::StructureRazed { .. }
             | Event::KittenWanderedOff { .. }
             | Event::KittenReturned { .. }
             | Event::JobAssigned { .. }

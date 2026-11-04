@@ -52,6 +52,10 @@ fn vocabulary() -> Vec<Event> {
             season: Season::Summer,
         },
         Event::NewYear { year: 3 },
+        Event::StructureRazed {
+            id: StructureId::ALL[0],
+            count: 0,
+        },
         Event::StructureBuilt {
             id: StructureId::CatnipPatch,
             count: 2,
@@ -172,6 +176,7 @@ fn variant_name(e: &Event) -> &'static str {
         Event::SeasonChanged { .. } => "SeasonChanged",
         Event::NewYear { .. } => "NewYear",
         Event::StructureBuilt { .. } => "StructureBuilt",
+        Event::StructureRazed { .. } => "StructureRazed",
         Event::IdeaResearched { .. } => "IdeaResearched",
         Event::ZoomiesStarted { .. } => "ZoomiesStarted",
         Event::ZoomiesEnded => "ZoomiesEnded",

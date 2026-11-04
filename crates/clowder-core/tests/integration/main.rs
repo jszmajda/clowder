@@ -30,6 +30,7 @@ mod queries_flows;
 mod queries_gating;
 mod queries_rates;
 mod queries_timers;
+mod raze;
 mod revealed_resources;
 mod society;
 mod sources;

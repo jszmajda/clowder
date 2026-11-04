@@ -50,6 +50,7 @@ fn shape(c: &Command) -> Shape {
         | C::Forage
         | C::Rummage
         | C::Build(_)
+        | C::Raze(_)
         | C::AssignJob(_)
         | C::UnassignJob(_)
         | C::ResearchIdea(_)

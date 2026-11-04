@@ -283,6 +283,17 @@ pub enum Arrival {
     CarriedAlong,
 }
 
+/// What taking one copy of a structure down would do.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RazeReport {
+    /// The copies that would be left.
+    pub left: u32,
+    /// What would come home, each as it would be credited.
+    pub returned: Vec<(ResourceId, f64)>,
+    /// What the next clamp would take from each store left above its cap.
+    pub trimmed: Vec<(ResourceId, f64)>,
+}
+
 /// The tinkerers' bench: the meadow's seats, who holds them, and who waits
 /// for one. @spec SIM-ENG-073
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -710,6 +721,37 @@ impl GameState {
                 .collect(),
             tells_by_name: self.standing(c) > 0.0,
         }
+    }
+
+    /// What applying `Raze` to a structure now would do, with no copy standing
+    /// nothing. Worked out on a meadow with the copy gone, so every cap reads as it
+    /// would then. @spec SIM-ENG-086, SIM-ECO-065
+    pub fn raze_report(&self, s: StructureId) -> Option<RazeReport> {
+        let left = self.structures[s.ix()].checked_sub(1)?;
+        let mut after = self.clone();
+        after.structures[s.ix()] = left;
+        let returned: Vec<(ResourceId, f64)> = after
+            .next_cost(s)
+            .into_iter()
+            .map(|(r, price)| {
+                let room = (after.cap(r) - after.stock(r)).max(0.0);
+                (r, (price * crate::content::RAZE_RETURN_SHARE).min(room))
+            })
+            .filter(|(_, amount)| *amount > 0.0)
+            .collect();
+        for (r, amount) in &returned {
+            after.resources[r.ix()] += amount;
+        }
+        let trimmed = ResourceId::ALL
+            .into_iter()
+            .map(|r| (r, after.stock(r) - after.cap(r)))
+            .filter(|(_, over)| *over > 0.0)
+            .collect();
+        Some(RazeReport {
+            left,
+            returned,
+            trimmed,
+        })
     }
 
     /// The tinkerers' bench: the seats the meadow's structures give, every

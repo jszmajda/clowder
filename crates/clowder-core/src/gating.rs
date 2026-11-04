@@ -407,7 +407,12 @@ impl GameState {
 
             // Actions with no gate at all: the meadow can always do these, or
             // the command layer refuses them for its own reasons.
-            C::GatherCatnip | C::Forage | C::ObserveSky | C::SetSpeed(_) | C::Trade(..) => true,
+            C::GatherCatnip
+            | C::Forage
+            | C::ObserveSky
+            | C::SetSpeed(_)
+            | C::Trade(..)
+            | C::Raze(_) => true,
         }
     }
 }
