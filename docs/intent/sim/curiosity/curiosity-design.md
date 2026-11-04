@@ -161,7 +161,7 @@ Mutually exclusive pairs, charm-priced (`AdoptRule`), each permanently blocking 
 | 4/5 | 4000 charm | **Sharing Circle**: luxury drain −25% | **Personal Stashes**: all caps +10% |
 | 6/7 | 15000 charm | **Loud Purring**: charm production +20% | **Quiet Contemplation**: warmth production +20% |
 
-Adopting a rule whose sibling is adopted rejects with Locked. Rules are effect-key sources like everything else. Personal Stashes composes as cap = (base + flat extensions) × (1 + cap-ratio effects): infinite caps stay infinite, and a zero cap stays zero — the Cardboard-Box gate does not open by percentage.
+Adopting a rule whose sibling is adopted rejects with Locked. Rules are effect-key sources like everything else. A rule's "production" is the production stack's (root sub-HLD: The Production Stack): a flat add a refinement or a rite states is outside it and reaches the store as the figure its own blurb gives. Personal Stashes composes as cap = (base + flat extensions) × (1 + cap-ratio effects): infinite caps stay infinite, and a zero cap stays zero — the Cardboard-Box gate does not open by percentage.
 
 Refinement material costs may tease one band ahead of their gate idea (Pebble Combs wants more pebbles than the gate band can store) — reachability is property-tested at gate band + 1.
 
@@ -183,6 +183,7 @@ Effects are **flags and modifier values exposed by pure lookup** (`ideas.has(Ide
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
+| What a store's production share scales | The production stack's flows; a flat add stays the figure its blurb gives | Scaling flat adds as well | A blurb that states an exact figure stays exact whichever rules are adopted, and the figure a player reads in one place is the figure they get |
 | An idea whose row named an unlock no rule read | Gate what it names, for Scout Picnicking, Dream Tending, Hushfelt Seeking, and Dream Loomcraft; correct the row and blurb for Solar Devotion | Correct every row to say the idea leads on and does nothing else; gate the ceremonies on Solar Devotion too | An idea that only leads on spends a hard-won currency on a promise of nothing. The ceremonies alone have their own reason to wait, recorded in the engine's gate: a section means something once the meadow can hold what it trades in |
 | Tree shape | Banded ladder with short forks — 59 ideas over five bands, each band gated by the previous band's crafted currency | Wide branching tree; flat shop | Bands make every idea a visible milestone while gate crafts turn research into an infrastructure problem, not a wait |
 | Effects as flags/lookups | Pure `has(idea)` + derived modifiers | Event-driven effect application, direct state mutation on research | Idempotent under save/load and catch-up; no ordering bugs; each owning leaf keeps its own math legible |
