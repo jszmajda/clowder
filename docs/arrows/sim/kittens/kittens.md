@@ -4,7 +4,7 @@ Kittens are the heart of the game and the reason the cozy invariants exist. This
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-04 (commit `c095c32c7b64`). 42 of 42 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-04 (commit `a734bb551137`). 42 of 42 active specs implemented, each cited by a test.
 
 ## References
 
@@ -28,7 +28,6 @@ Kittens are the heart of the game and the reason the cozy invariants exist. This
 - `crates/clowder-core/src/command.rs`
 - `crates/clowder-core/src/content.rs`
 - `crates/clowder-core/src/effects.rs`
-- `crates/clowder-core/src/events.rs`
 - `crates/clowder-core/src/profile.rs`
 - `crates/clowder-core/src/query.rs`
 - `crates/clowder-core/src/save.rs`
@@ -51,6 +50,8 @@ Audited 2026-11-03, for what issue #36 changed. Housing capacity sums saturating
 
 Audited 2026-11-04, for what issue #40 changed. A jamboree now reaches exactly its stated production ticks (SIM-KIT-025), measured by what it does to a worker's yield, where it had reached one fewer: 999 of 1000, and 1999 of 2000 extended. A new one ends one past the arithmetic end, as the zoomies do (SIM-ENG-012), and an extension adds only its own length. Each test was checked by breaking the line it guards. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
+Audited 2026-11-04, for what issue #41 changed. A twin in `profiles.rs` walks the profile draw as its spec orders it from the published hash, so any reordered draw, or a changed hash or byte order, lands a profile elsewhere (SIM-KIT-032). Tests now hold each numeral of a name past the pool (SIM-KIT-002), the upper tier edges (SIM-KIT-014), a return with no stamp (SIM-KIT-017), and each trait in play (SIM-KIT-024). Annotations moved off the types that list outcomes onto the rules that decide. The two uncited specs are settled: SIM-KIT-001 is cited at the two places a kitten changes place or leaves the roster; SIM-KIT-033 is a property of every rule, with no one line that decides it, so its test in `profiles.rs` is its pin and it has no citation in source. Twenty-three mutations were each caught, one only after a test bound was tightened.
+
 ## Work Required
 
-- #41: thin tests and shape annotations; SIM-KIT-001 and SIM-KIT-033 cite nothing in source.
+None.
