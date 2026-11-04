@@ -553,7 +553,14 @@ impl GameState {
             (ResourceId::Charm, content::JAMBOREE_CHARM),
             (ResourceId::Quills, content::JAMBOREE_QUILLS),
         ])?;
-        self.jamboree_until = self.ticks.max(self.jamboree_until) + content::JAMBOREE_TICKS;
+        // The first of them is the next tick, whose count has already advanced by
+        // the time it produces, so a new one ends one past the arithmetic end, for
+        // exactly its stated production ticks; one added to it adds just its own.
+        self.jamboree_until = if self.jamboree_active() {
+            self.jamboree_until + content::JAMBOREE_TICKS
+        } else {
+            self.ticks + content::JAMBOREE_TICKS + 1
+        };
         Ok(vec![Event::JamboreeStarted {
             until_tick: self.jamboree_until,
         }])

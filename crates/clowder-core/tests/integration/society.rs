@@ -561,9 +561,13 @@ fn jamboree_is_gated_costed_and_runs_a_hundred_days() {
     let start = s.ticks;
     let events = s.apply(Command::HostJamboree).unwrap();
     assert!(events.contains(&Event::JamboreeStarted {
-        until_tick: start + 1000
+        until_tick: start + 1001
     }));
-    assert_eq!(s.jamboree_until, start + 1000, "100 days × 10 ticks");
+    assert_eq!(
+        s.jamboree_until,
+        start + 1001,
+        "100 days × 10 ticks, and one past it for the tick the command lands before"
+    );
     assert_eq!(s.stock(ResourceId::Pep), 0.0);
     assert_eq!(s.stock(ResourceId::Charm), 0.0);
     assert_eq!(s.stock(ResourceId::Quills), 0.0);
@@ -590,6 +594,87 @@ fn jamboree_is_gated_costed_and_runs_a_hundred_days() {
     give(&mut s, ResourceId::Charm, 1500.0);
     give(&mut s, ResourceId::Quills, 40.0);
     s.apply(Command::HostJamboree).unwrap();
+}
+
+/// A meadow whose one worker's yield says, tick by tick, whether a jamboree's
+/// mood reached that tick's production: nothing else moves it, the skill held at
+/// nothing and the zoomies held on so none can start.
+fn measuring_a_jamboree(seed: u64) -> (GameState, f64) {
+    let mut s = GameState::new(seed);
+    adopt(&mut s, 1);
+    s.kittens[0].job = Some(JobId::Gardener);
+    s.ideas.insert(IdeaId::TeaCeremonies);
+    s.zoomies_until = u64::MAX;
+    let plain = produced_this_tick(&mut s);
+    (s, plain)
+}
+
+fn produced_this_tick(s: &mut GameState) -> f64 {
+    give(s, ResourceId::Catnip, 100.0);
+    s.kittens[0].skills[JobId::Gardener as usize] = 0.0;
+    s.tick();
+    s.stock(ResourceId::Catnip) - 100.0
+}
+
+fn stock_the_bill(s: &mut GameState) {
+    give(s, ResourceId::Pep, 800.0);
+    give(s, ResourceId::Charm, 1500.0);
+    give(s, ResourceId::Quills, 40.0);
+}
+
+/// However long past its end this runs, how many production ticks the mood
+/// reached, the first counted being the one right after the call.
+fn count_boosted(s: &mut GameState, plain: f64, ticks: u64) -> u64 {
+    (0..ticks)
+        .filter(|_| produced_this_tick(s) > plain + 1e-9)
+        .count() as u64
+}
+
+/// A jamboree's stated 100 days are 1000 production ticks, measured by what it
+/// does to production, the first on the tick after it is hosted.
+// @spec SIM-KIT-025
+#[test]
+fn a_jamboree_reaches_exactly_its_thousand_production_ticks() {
+    let (mut s, plain) = measuring_a_jamboree(245);
+    stock_the_bill(&mut s);
+    s.apply(Command::HostJamboree).unwrap();
+    assert!(
+        produced_this_tick(&mut s) > plain + 1e-9,
+        "it reaches the very next tick"
+    );
+    assert_eq!(1 + count_boosted(&mut s, plain, 1_500), 1_000);
+    assert!(!s.jamboree_active(), "and has ended");
+    assert_eq!(s.jamboree_until, 0);
+}
+
+/// Another hosted while one runs adds exactly its own 1000, not one more: the
+/// one extra the first needs is not owed again.
+// @spec SIM-KIT-025
+#[test]
+fn a_jamboree_hosted_over_one_running_adds_exactly_a_thousand_more() {
+    let (mut s, plain) = measuring_a_jamboree(246);
+    s.traditions.insert(TraditionId::FestivalSpirit);
+    stock_the_bill(&mut s);
+    s.apply(Command::HostJamboree).unwrap();
+    let first = count_boosted(&mut s, plain, 300);
+    assert_eq!(first, 300, "fixture: it has been running");
+    stock_the_bill(&mut s);
+    s.apply(Command::HostJamboree).unwrap();
+    assert_eq!(first + count_boosted(&mut s, plain, 2_500), 2_000);
+}
+
+/// One hosted after another has ended is a fresh one, with its own full length.
+// @spec SIM-KIT-025
+#[test]
+fn a_jamboree_hosted_after_one_ended_runs_its_full_length() {
+    let (mut s, plain) = measuring_a_jamboree(247);
+    stock_the_bill(&mut s);
+    s.apply(Command::HostJamboree).unwrap();
+    count_boosted(&mut s, plain, 1_200);
+    assert!(!s.jamboree_active(), "fixture: the first is over");
+    stock_the_bill(&mut s);
+    s.apply(Command::HostJamboree).unwrap();
+    assert_eq!(count_boosted(&mut s, plain, 1_500), 1_000);
 }
 
 // @spec SIM-KIT-025, SIM-KIT-011
