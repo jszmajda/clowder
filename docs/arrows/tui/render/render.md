@@ -4,7 +4,7 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 
 ## Status
 
-**OK** — last audited 2026-11-04 (commit `8ea2ab82bb22`). 36 of 36 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-04 (commit `f6326095a28b`). 36 of 36 active specs implemented, each cited by a test.
 
 ## References
 
@@ -19,6 +19,7 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 - `docs/intent/tui/render/render-specs.md` — 36 specs, prefix `TUI-RENDER`
 
 ### Tests
+- `crates/clowder-tui/tests/integration/act_prices.rs`
 - `crates/clowder-tui/tests/integration/armed_summary.rs`
 - `crates/clowder-tui/tests/integration/bench.rs`
 - `crates/clowder-tui/tests/integration/chrome.rs`
@@ -66,6 +67,8 @@ Audited 2026-11-03, for what issue #39 changed. A click now holds its section's 
 Audited 2026-11-04, for what issue #45 changed. A count prompt's count keeps its place and its layout (TUI-RENDER-021), its text and every fit unchanged, and is only drawn apart (TUI-THEME-034). Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-04, for what issue #21 changed. The clause cutting the bench's seats could not be reached: the place fits the seats at six digits each, which the test now pins, far past a meadow's figures. It left the spec, the design, and the code (TUI-RENDER-028).
+
+Audited 2026-11-04, for what issue #46 changed. The cost field draws a fixed act's price as it draws any other (TUI-RENDER-020), and the Sky list now gives the field, since rows it lists state that heading.
 
 ## Work Required
 

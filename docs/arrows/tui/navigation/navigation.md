@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-04 (commit `ab33fd4fc7c9`). 206 of 206 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-04 (commit `f6326095a28b`). 207 of 207 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,9 +16,10 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/navigation/navigation-specs.md` — 206 specs, prefix `TUI-NAV`
+- `docs/intent/tui/navigation/navigation-specs.md` — 207 specs, prefix `TUI-NAV`
 
 ### Tests
+- `crates/clowder-tui/tests/integration/act_prices.rs`
 - `crates/clowder-tui/tests/integration/raze.rs`
 - `crates/clowder-tui/tests/integration/achievements.rs`
 - `crates/clowder-tui/tests/integration/act_results.rs`
@@ -78,9 +79,9 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-NAV-001 – TUI-NAV-206 | 206 | 0 | 0 |
+| All | TUI-NAV-001 – TUI-NAV-207 | 207 | 0 | 0 |
 
-**Summary:** 206 of 206 active specs implemented.
+**Summary:** 207 of 207 active specs implemented.
 
 ## Key Findings
 
@@ -105,6 +106,8 @@ Audited 2026-11-03, for what issue #39 changed. A press on a row now also holds 
 Audited 2026-11-04, for what issue #44 changed. `X` on a recipe's make row is now one call that makes every batch the stocks cover (TUI-NAV-012); every other row keeps its run of calls and its cap. The census of commands a row must reach names the new command as having no row of its own (TUI-NAV-039). The shell-cap comments now say what holds on both kinds of row.
 
 Audited 2026-11-04, for what issue #43 changed. `-` and `Backspace` arm taking a copy down from a structure's row (TUI-NAV-204), the armed row states the core's report (TUI-NAV-205), and the hint bar and help name it (TUI-NAV-206). The new command has no row of its own, as TUI-NAV-039 now says. Twenty-three mutations across this and the sim segments were each caught; the first run exposed test loops a broken count could hang, which are now bounded.
+
+Audited 2026-11-04, for what issue #46 changed. An action row the core prices as a fixed act states the price in the inspector, with need and have (TUI-NAV-207). A test reads every action row against what applying its command takes, so a row that spends and says nothing fails. On screen there were eleven such rows, two more than the code scan the issue started from. Twelve mutations across this and the sim engine were each caught.
 
 ## Work Required
 

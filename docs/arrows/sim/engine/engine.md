@@ -4,7 +4,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 ## Status
 
-**OK** — last audited 2026-11-04 (commit `ab33fd4fc7c9`). 85 of 85 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-04 (commit `f6326095a28b`). 86 of 86 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,9 +16,10 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/engine/engine-specs.md` — 85 specs, prefix `SIM-ENG`
+- `docs/intent/sim/engine/engine-specs.md` — 86 specs, prefix `SIM-ENG`
 
 ### Tests
+- `crates/clowder-core/tests/integration/act_price.rs`
 - `crates/clowder-core/tests/integration/raze.rs`
 - `crates/clowder-core/tests/integration/draw_schedule.rs`
 - `crates/clowder-core/tests/integration/economy_depth.rs`
@@ -61,9 +62,9 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-ENG-001 – SIM-ENG-086 | 85 | 0 | 0 |
+| All | SIM-ENG-001 – SIM-ENG-087 | 86 | 0 | 0 |
 
-**Summary:** 85 of 85 active specs implemented.
+**Summary:** 86 of 86 active specs implemented.
 
 ## Key Findings
 
@@ -84,6 +85,8 @@ Audited 2026-11-04, for what issue #44 changed. No rule of this segment changed:
 Audited 2026-11-04, for what issue #15 changed. An effect key now arrives with the content that feeds it (SIM-ENG-085), held by a test over every key family. The one family excepted, per-colony standing, belongs to sim/colonies and is filed as #47. The key slots closed up; the test that every key has its own place still holds them.
 
 Audited 2026-11-04, for what issue #43 changed. A query reports what taking a copy down would do (SIM-ENG-086), and the command and the query share one rule: the command applies what the query reports.
+
+Audited 2026-11-04, for what issue #46 changed. A query prices each act that takes no count and spends from the stores what nothing else prices (SIM-ENG-087). Tests read each price against what applying the act takes, hold each fixed amount at the line where the act is refused, and classify every command exhaustively, so a new one must be decided. A kitten's promotion is left out and filed as #48.
 
 ## Work Required
 
