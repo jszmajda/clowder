@@ -188,6 +188,49 @@ fn kitten_reading_conditions_wait_for_a_reason_to_look() {
     );
 }
 
+/// A kitten-reading condition is noticed at a day close that brings a kitten or
+/// turns the year, with no command to prompt a look.
+/// @spec SIM-ACH-002
+#[test]
+fn a_kitten_reading_condition_is_noticed_when_a_day_brings_a_reason() {
+    let oddly_eyed = |seed: u64| {
+        let mut s = GameState::new(seed);
+        adopt(&mut s, 1);
+        s.achievements.clear();
+        let mut p = s.kittens[0].profile.clone().unwrap();
+        p.eyes = EyeLook::OddBlueGreen;
+        s.kittens[0].profile = Some(p);
+        s
+    };
+
+    // An arrival.
+    let mut s = oddly_eyed(1621);
+    adopt(&mut s, 1);
+    assert!(
+        s.achievements.contains_key(&AchievementId::OddOneOut),
+        "an arrival's day close looks at every kitten"
+    );
+
+    // A new year, with nobody arriving.
+    let mut s = oddly_eyed(1622);
+    let days_left = content::DAYS_PER_YEAR - s.day() % content::DAYS_PER_YEAR;
+    let events = run_days(&mut s, days_left);
+    assert!(
+        events.iter().any(|e| matches!(e, Event::NewYear { .. })),
+        "fixture: the year turned"
+    );
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e, Event::KittenArrived { .. })),
+        "fixture: nobody arrived"
+    );
+    assert!(
+        s.achievements.contains_key(&AchievementId::OddOneOut),
+        "a new year's day close looks at every kitten"
+    );
+}
+
 /// A moment condition is noticed against the events of the tick that made it.
 /// @spec SIM-ACH-002, SIM-ACH-006
 #[test]
