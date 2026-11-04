@@ -4,7 +4,7 @@ This leaf owns the boundary between the operating system and the pure core: term
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-03 (commit `3adc81459fdc`). 68 of 68 active specs implemented, each cited by a test; 1 deferred.
+**OK** — last audited 2026-11-04 (commit `657a00c9835b`). 68 of 68 active specs implemented, each cited by a test; 1 deferred.
 
 ## References
 
@@ -61,6 +61,8 @@ Audited 2026-11-02, for what issue #28 changed. A save is decoded strictly, so a
 
 Audited 2026-11-03, for what issue #33 changed. A reading spanning the core's minimum reportable absence now wakes the running game as a load does, keeping the player's place (TUI-RUN-076 to TUI-RUN-078), a second long gap joins the first (TUI-RUN-079), and a session ending on one saves it as a wake set down (TUI-RUN-080). This replaces the report a capped gap retained with no gains, and the hours a capped gap took to drain at live play's bound. A long gap in play and a load of the same absence were shown to end in the same bytes, and each new test was checked by breaking what it guards, eleven ways. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
+Audited 2026-11-04, for what issue #29 changed. Two behaviours moved: a burst of resizes while waking applies once (TUI-RUN-016), and a quit key ends its waking frame before the advance, so the finishing frame is still a quit while waking (TUI-RUN-039). The open questions are pinned in the specs and design: a wall clock stepped forward is credited as a suspend (TUI-RUN-021, TUI-RUN-022); autosave keeps to the monotonic clock (TUI-RUN-026); two launches are kept apart wherever the filesystem grants the advisory lock (TUI-RUN-029). The last question, what an in-process absence owes a report, was already settled by TUI-RUN-024 and TUI-RUN-076. Tests now reach the once-gate and cadence of a failed save (TUI-RUN-028), a backlog left undrained (TUI-RUN-031), and the override and the lock's order through the game itself (TUI-RUN-009, TUI-RUN-029). The speed-key item the issue named was already held by `session.rs`, and the override text by `lock.rs`. Annotation ranges are gone and every spec is cited by name; annotations moved off an unused type, since deleted, and onto what decides, and a test of the rejected back-dating scheme went with them. Thirteen mutations were each caught. TUI-RUN-032 stays deferred as its own text explains.
+
 ## Work Required
 
-- #29: thin tests, stray annotations, and open questions.
+None.

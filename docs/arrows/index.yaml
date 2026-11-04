@@ -234,15 +234,15 @@ arrows:
     next: null
     drift: null
   runtime:
-    status: PARTIAL
+    status: OK
     parent: tui
-    sampled: 2026-11-03
-    audited: 2026-11-03
-    audited_sha: 3adc81459fdce7396c685942380e0a19cd5a3ca4
+    sampled: 2026-11-04
+    audited: 2026-11-04
+    audited_sha: 657a00c9835bd7da2b9979a92e18e818440bdf50
     blocks: [render]
     blockedBy: [navigation, persistence]
     detail: tui/runtime/runtime.md
-    next: "#29: thin tests"
+    next: null
     drift: null
   theme:
     status: OK
