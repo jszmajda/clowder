@@ -296,7 +296,7 @@ impl GameState {
                 }
             }
             // The Elder's birth trait, active only from the chair.
-            // @spec SIM-KIT-024
+            // @spec SIM-KIT-023, SIM-KIT-024
             Source::ElderTrait => self
                 .elder
                 .and_then(|ix| self.kittens.get(ix))

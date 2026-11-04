@@ -30,13 +30,10 @@ pub enum Command {
     /// @spec SIM-EXP-001
     Pounce(u32),
     /// 800 pep + 1500 charm + 40 quills buy 100 days of celebration.
-    /// @spec SIM-KIT-025
     HostJamboree,
     /// Spend a kitten's exp (plus shinies) to raise its rank.
-    /// @spec SIM-KIT-021
     Promote(usize),
     /// Name a kitten the Elder (replacing any prior one, freely).
-    /// @spec SIM-KIT-022
     AppointElder(usize),
     BuyRefinement(RefinementId),
     AdoptRule(RuleId),
@@ -1203,6 +1200,8 @@ impl GameState {
         self.refinements.clear();
         self.rules.clear();
         self.resources = [0.0; RESOURCE_COUNT];
+        // A Move is the one thing that takes a kitten off the roster, and the
+        // Album holds it first. @spec SIM-KIT-001
         self.kittens = basket;
         self.devotion = 0.0;
         self.peak_devotion = 0.0;

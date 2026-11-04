@@ -575,3 +575,95 @@ fn returns_are_first_out_first_back_and_need_food_in_the_bowl() {
     );
     assert_eq!(gated.kittens[1].location, Location::NeighborsYard);
 }
+
+/// A name past the pool's cycles carries the Roman numeral of its cycle, whichever
+/// cycle that is, and the name's first part is still from the pool.
+///
+/// @spec SIM-KIT-002
+#[test]
+fn each_cycle_of_the_pool_is_numbered_in_roman() {
+    for (cycle, numeral) in [
+        (2, "II"),
+        (3, "III"),
+        (4, "IV"),
+        (5, "V"),
+        (9, "IX"),
+        (10, "X"),
+        (14, "XIV"),
+        (19, "XIX"),
+    ] {
+        let mut s = GameState::new(170 + cycle);
+        s.kittens = content::NAME_POOL.iter().map(|n| away_kitten(n)).collect();
+        for earlier in ["II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
+            .into_iter()
+            .chain(["XI", "XII", "XIII", "XIV", "XV", "XVI", "XVII", "XVIII"])
+            .take(cycle as usize - 2)
+        {
+            s.kittens.extend(
+                content::NAME_POOL
+                    .iter()
+                    .map(|n| away_kitten(&format!("{n} {earlier}"))),
+            );
+        }
+        let before = s.kittens.len();
+        adopt(&mut s, 1);
+        let name = &s.kittens[before].name;
+        let base = name
+            .strip_suffix(&format!(" {numeral}"))
+            .unwrap_or_else(|| panic!("cycle {cycle} should be numbered {numeral}: {name}"));
+        assert!(content::NAME_POOL.contains(&base), "{name}: a pool name");
+    }
+}
+
+/// Each upper tier begins exactly at its edge: 120 is Blissful and 119 is not, 90
+/// is Content and 87 is not.
+///
+/// @spec SIM-KIT-014
+#[test]
+fn the_upper_mood_tiers_begin_exactly_at_their_edges() {
+    let at = |seed: u64, kittens: usize, posts: u32| {
+        let mut s = GameState::new(seed);
+        adopt(&mut s, kittens);
+        grant(&mut s, StructureId::ScratchingPost, posts);
+        s
+    };
+    let blissful = at(181, 5, 3);
+    assert_eq!(blissful.happiness(), 120.0, "fixture: the edge");
+    assert_eq!(blissful.mood_tier(), MoodTier::Blissful);
+
+    let content_below = at(182, 4, 3);
+    assert_eq!(content_below.happiness(), 119.0, "fixture: under the edge");
+    assert_eq!(content_below.mood_tier(), MoodTier::Content);
+
+    let content_edge = at(183, 10, 0);
+    assert_eq!(content_edge.happiness(), 90.0, "fixture: the edge");
+    assert_eq!(content_edge.mood_tier(), MoodTier::Content);
+
+    let restless = at(184, 11, 0);
+    assert!(restless.happiness() < 90.0, "fixture: under the edge");
+    assert_eq!(restless.mood_tier(), MoodTier::Restless);
+}
+
+/// A kitten away with no stamp is the first back, ahead of every stamped one: an
+/// absent stamp sorts lowest.
+///
+/// @spec SIM-KIT-017
+#[test]
+fn a_kitten_away_with_no_stamp_is_the_first_back() {
+    for unstamped in 0..3 {
+        let mut s = GameState::new(190 + unstamped as u64);
+        adopt(&mut s, 3);
+        for (i, k) in s.kittens.iter_mut().enumerate() {
+            k.location = Location::NeighborsYard;
+            k.away_seq = (i != unstamped).then_some(i as u64);
+        }
+        s.recovery_days = 5;
+        give(&mut s, ResourceId::Catnip, 150.0);
+        let name = s.kittens[unstamped].name.clone();
+        let events = run_days(&mut s, 1);
+        assert!(
+            events.contains(&Event::KittenReturned { name }),
+            "the unstamped kitten {unstamped} should be back first: {events:?}"
+        );
+    }
+}

@@ -1169,3 +1169,116 @@ fn the_bonus_a_kitten_states_is_the_one_its_work_gets() {
         "and it is what the kitten's work gets, measured {made}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// SIM-KIT-032 — the draw, walked by a twin
+// ---------------------------------------------------------------------------
+
+/// 64-bit FNV-1a from its published parameters, apart from the game's.
+fn fnv1a_twin(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |h: u64, b| {
+        (h ^ *b as u64).wrapping_mul(0x0000_0100_0000_01b3)
+    })
+}
+
+/// The twin is the published hash: its reference values, so a wrong twin cannot
+/// agree with a wrong game.
+///
+/// @spec SIM-KIT-032
+#[test]
+fn the_twins_hash_is_the_published_one() {
+    assert_eq!(fnv1a_twin(b""), 0xcbf2_9ce4_8422_2325);
+    assert_eq!(fnv1a_twin(b"a"), 0xaf63_dc4c_8601_ec8c);
+    assert_eq!(fnv1a_twin(b"foobar"), 0x8594_4171_f739_67e8);
+}
+
+/// A profile drawn as the spec orders it, step by step, from a generator of its
+/// own: the fur pattern; each slot's colour over those no earlier slot took; the
+/// eyes; how many favourites; those kinds, then held in kind order; an entry for
+/// each; the pose; and then whether it is a surprise. Returns it with that answer.
+fn twin_draw(name: &str, generation: u32) -> (Profile, bool) {
+    let mut bytes = name.as_bytes().to_vec();
+    bytes.extend(generation.to_le_bytes());
+    let mut rng = Pcg32::new(fnv1a_twin(&bytes));
+
+    let pattern = FurPattern::ALL[rng.index(FurPattern::ALL.len())];
+    let mut colours: Vec<FurColour> = Vec::new();
+    for slot in content::fur_pattern_def(pattern).slots {
+        let free: Vec<FurColour> = slot
+            .iter()
+            .filter(|c| !colours.contains(c))
+            .copied()
+            .collect();
+        colours.push(free[rng.index(free.len())]);
+    }
+    let eyes = EyeLook::ALL[rng.index(EyeLook::ALL.len())];
+
+    let how_many = [4, 5, 6][rng.index(3)];
+    let mut free_kinds = FavouriteKind::ALL.to_vec();
+    let mut kinds = Vec::new();
+    for _ in 0..how_many {
+        kinds.push(free_kinds.remove(rng.index(free_kinds.len())));
+    }
+    kinds.sort();
+    let mut favourites = Vec::new();
+    for kind in kinds {
+        let entries = content::favourite_kind_def(kind).entries;
+        favourites.push(Favourite {
+            kind,
+            entry: entries[rng.index(entries.len())].to_string(),
+        });
+    }
+    let pose = Pose::ALL[rng.index(Pose::ALL.len())];
+
+    let surprise = rng.index(40) == 0;
+    if surprise {
+        let mut taken: Vec<FurColour> = Vec::new();
+        for _ in 0..colours.len() {
+            let free: Vec<FurColour> = content::SURPRISING_COLOURS
+                .iter()
+                .filter(|c| !taken.contains(c))
+                .copied()
+                .collect();
+            taken.push(free[rng.index(free.len())]);
+        }
+        colours = taken;
+    }
+    (
+        Profile {
+            fur: Fur { pattern, colours },
+            eyes,
+            favourites,
+            pose,
+        },
+        surprise,
+    )
+}
+
+/// The game draws exactly what the twin walks to, for every name across many
+/// generations: any draw reordered, added, or dropped, the hash or its bytes
+/// changed, or the surprise's odds moved, lands a profile somewhere else.
+///
+/// @spec SIM-KIT-032
+#[test]
+fn every_profile_is_the_one_the_specs_order_of_draws_walks_to() {
+    let mut surprises = 0;
+    let mut counts = BTreeSet::new();
+    for name in content::NAME_POOL.iter().copied().chain(["Bïscuit"]) {
+        for generation in [0, 1, 2, 7, 255, 256, 65_536, u32::MAX] {
+            let (want, surprise) = twin_draw(name, generation);
+            assert_eq!(
+                draw_profile(name, generation),
+                want,
+                "{name} in generation {generation}"
+            );
+            surprises += usize::from(surprise);
+            counts.insert(want.favourites.len());
+        }
+    }
+    assert!(surprises > 0, "fixture: the sweep reaches a surprise");
+    assert_eq!(
+        counts,
+        BTreeSet::from([4, 5, 6]),
+        "fixture: the sweep reaches every count of favourites"
+    );
+}

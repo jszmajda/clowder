@@ -98,16 +98,13 @@ pub enum Event {
         shinies: f64,
         unicorns: u32,
     },
-    // @spec SIM-KIT-025
     JamboreeStarted {
         until_tick: u64,
     },
     JamboreeEnded,
-    // @spec SIM-KIT-022
     ElderAppointed {
         name: String,
     },
-    // @spec SIM-KIT-021
     KittenPromoted {
         name: String,
         rank: u8,
@@ -205,7 +202,7 @@ pub enum Event {
     DejaVuDay,
     DistantDawn,
     // ---- Achievements (SIM-ACH) ----
-    /// An achievement was earned. @spec SIM-ACH-002
+    /// An achievement was earned.
     AchievementEarned {
         id: AchievementId,
     },

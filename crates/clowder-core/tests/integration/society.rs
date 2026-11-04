@@ -2125,3 +2125,171 @@ fn festival_spirit_stacks_jamborees_end_to_end() {
     assert_eq!(s.jamboree_until, first_end + 1000, "100 more days");
     assert_eq!(s.stock(ResourceId::Charm), 0.0, "the bill is paid again");
 }
+
+// =====================================================================
+// KIT — each trait in play (SIM-KIT-024)
+// =====================================================================
+
+/// A meadow whose first kitten has a trait and sits in the Elder's chair, with
+/// every idea learned.
+fn elder_of(kitten_trait: KittenTrait, seed: u64) -> GameState {
+    let mut s = GameState::new(seed);
+    adopt(&mut s, 1);
+    s.kittens[0].trait_id = kitten_trait;
+    s.apply(Command::AppointElder(0)).unwrap();
+    s.ideas = IdeaId::ALL.into_iter().collect();
+    s
+}
+
+/// What one batch of a recipe makes under an Elder of this trait.
+fn batch_under(kitten_trait: KittenTrait, c: CraftId) -> f64 {
+    let mut s = elder_of(kitten_trait, 700);
+    for (r, amount) in content::craft_def(c).inputs {
+        give(&mut s, *r, *amount);
+    }
+    let output = content::craft_output(c);
+    let before = s.stock(output);
+    s.apply(Command::Craft(c)).unwrap();
+    s.stock(output) - before
+}
+
+/// Brassy and Alchemical each raise their listed recipes by their share, and no
+/// others.
+///
+/// @spec SIM-KIT-024
+#[test]
+fn a_craft_trait_raises_its_recipes_and_no_others() {
+    use CraftId::*;
+    for (kitten_trait, share, listed) in [
+        (
+            KittenTrait::Brassy,
+            0.10,
+            vec![Badges, Brass, Cogs, Moonsteel],
+        ),
+        (
+            KittenTrait::Alchemical,
+            0.075,
+            vec![Pavers, Moonmilk, Dreamweave, Cometsilk],
+        ),
+    ] {
+        for c in CraftId::ALL {
+            let raised = batch_under(kitten_trait, c) - batch_under(KittenTrait::None, c);
+            let want = if listed.contains(&c) { share } else { 0.0 };
+            assert!(
+                (raised - want).abs() < 1e-9,
+                "{kitten_trait:?} raised {c:?} by {raised}, wanted {want}"
+            );
+        }
+    }
+}
+
+/// A Charming Elder raises what a caravan brings home by 3%: its best draws pass
+/// what any draw can reach without it, and stop at the raised top.
+///
+/// @spec SIM-KIT-024
+#[test]
+fn a_charming_elder_raises_what_caravans_bring_home() {
+    let most_brought = |kitten_trait: KittenTrait| {
+        let mut s = elder_of(kitten_trait, 701);
+        s.discovered.insert(ColonyId::Hedgehogs);
+        while s.season() != Season::Summer {
+            s.ticks += content::TICKS_PER_DAY;
+        }
+        let mut most: f64 = 0.0;
+        for _ in 0..1_000 {
+            give(&mut s, ResourceId::Pep, 50.0);
+            give(&mut s, ResourceId::Shinies, 15.0);
+            give(&mut s, ResourceId::Feathers, 500.0);
+            let before = s.stock(ResourceId::Pebbles);
+            s.apply(Command::Trade(ColonyId::Hedgehogs, 1)).unwrap();
+            most = most.max(s.stock(ResourceId::Pebbles) - before);
+        }
+        most
+    };
+    let top = 1_000.0 * 1.15;
+    assert!(
+        most_brought(KittenTrait::None) <= top + 1e-6,
+        "fixture: the plain top"
+    );
+    let charmed = most_brought(KittenTrait::Charming);
+    assert!(
+        charmed > top * 1.03 * 0.99 && charmed <= top * 1.03 + 1e-6,
+        "a Charming Elder's best draw should reach {}: {charmed}",
+        top * 1.03
+    );
+}
+
+/// A Curious Elder takes 5% off an idea's curiosity and nothing off its gate craft.
+///
+/// @spec SIM-KIT-024
+#[test]
+fn a_curious_elder_discounts_curiosity_and_not_the_gate_craft() {
+    let idea = IdeaId::ALL
+        .into_iter()
+        .find(|i| !content::idea_def(*i).gate.is_empty())
+        .expect("fixture: an idea with a gate craft");
+    let def = content::idea_def(idea);
+    let stocked = |curiosity: f64| {
+        let mut s = elder_of(KittenTrait::Curious, 702);
+        s.ideas.remove(&idea);
+        grant(&mut s, StructureId::CardboardBox, 1);
+        give(&mut s, ResourceId::Curiosity, curiosity);
+        for (r, amount) in def.gate {
+            give(&mut s, *r, *amount);
+        }
+        s
+    };
+
+    let mut s = stocked(def.cost * 0.95);
+    s.apply(Command::ResearchIdea(idea)).unwrap();
+    assert_eq!(s.stock(ResourceId::Curiosity), 0.0, "the discounted price");
+    for (r, _) in def.gate {
+        assert_eq!(s.stock(*r), 0.0, "the gate craft at full price: {r:?}");
+    }
+
+    let mut short = stocked(def.cost * 0.95 - 1.0);
+    assert!(matches!(
+        short.apply(Command::ResearchIdea(idea)),
+        Err(CommandError::InsufficientResources { .. })
+    ));
+
+    let mut s = stocked(def.cost);
+    let (r, amount) = def.gate[0];
+    give(&mut s, r, amount * 0.95);
+    assert!(
+        matches!(
+            s.apply(Command::ResearchIdea(idea)),
+            Err(CommandError::InsufficientResources { .. })
+        ),
+        "the gate craft takes no discount"
+    );
+}
+
+/// A Serene Elder takes 9% off a rite's whole price.
+///
+/// @spec SIM-KIT-024
+#[test]
+fn a_serene_elder_discounts_a_rites_whole_price() {
+    let rite = RiteId::ALL[0];
+    let def = content::rite_def(rite);
+    let stocked = |share: f64| {
+        let mut s = elder_of(KittenTrait::Serene, 703);
+        s.peak_devotion = 1.0e12;
+        for (r, amount) in def.cost {
+            s.resources[r.ix()] = amount * share;
+        }
+        s
+    };
+
+    let mut s = stocked(0.91);
+    s.apply(Command::BuyRite(rite)).unwrap();
+    for (r, _) in def.cost {
+        assert!(s.stock(*r).abs() < 1e-6, "the discounted price of {r:?}");
+    }
+
+    let mut short = stocked(0.90);
+    assert!(matches!(
+        short.apply(Command::BuyRite(rite)),
+        Err(CommandError::InsufficientResources { .. })
+    ));
+}

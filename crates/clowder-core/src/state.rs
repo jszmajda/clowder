@@ -403,7 +403,6 @@ impl CraftId {
 /// Birth traits, rolled uniformly at arrival (one draw after the name draw).
 /// A trait's clowder-wide effect applies only while its kitten is the Elder.
 /// Some cats simply are: None is a full member of the eight.
-// @spec SIM-KIT-023, SIM-KIT-024
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum KittenTrait {
     #[default]
@@ -1368,7 +1367,6 @@ pub struct Kitten {
     #[serde(default)]
     pub rank: u8,
     /// Birth trait; active clowder-wide only while this kitten is the Elder.
-    /// @spec SIM-KIT-023
     #[serde(default)]
     pub trait_id: KittenTrait,
     /// The recipe this Tinkerer is bound to, if any. @spec SIM-ECO-043

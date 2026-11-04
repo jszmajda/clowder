@@ -253,7 +253,7 @@ impl GameState {
         }
 
         // (c) Wanders: newest bonds are loosest; the last Home kitten never goes.
-        // @spec SIM-KIT-016
+        // Going is a change of place, never a removal. @spec SIM-KIT-001, SIM-KIT-016
         if self.famine_days >= content::FAMINE_WANDER_DAYS {
             let home: Vec<usize> = self
                 .kittens
