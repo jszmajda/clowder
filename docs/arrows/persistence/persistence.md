@@ -4,7 +4,7 @@ Persistence turns the deterministic sim into a game that survives closing the te
 
 ## Status
 
-**OK** — last audited 2026-11-03 (commit `e1a0720b63e5`). 39 of 39 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-04 (commit `ab33fd4fc7c9`). 40 of 40 active specs implemented, each cited by a test.
 
 ## References
 
@@ -15,9 +15,10 @@ Persistence turns the deterministic sim into a game that survives closing the te
 - `docs/intent/persistence/persistence-design.md`
 
 ### EARS
-- `docs/intent/persistence/persistence-specs.md` — 39 specs, prefix `SAVE`
+- `docs/intent/persistence/persistence-specs.md` — 40 specs, prefix `SAVE`
 
 ### Tests
+- `crates/clowder-core/tests/integration/raze.rs`
 - `crates/clowder-core/tests/integration/achievements.rs`
 - `crates/clowder-core/tests/integration/economy_depth.rs`
 - `crates/clowder-core/tests/integration/frontier.rs`
@@ -44,9 +45,9 @@ Persistence turns the deterministic sim into a game that survives closing the te
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SAVE-001 – SAVE-039 | 39 | 0 | 0 |
+| All | SAVE-001 – SAVE-040 | 40 | 0 | 0 |
 
-**Summary:** 39 of 39 active specs implemented.
+**Summary:** 40 of 40 active specs implemented.
 
 ## Key Findings
 
@@ -59,6 +60,8 @@ Audited 2026-11-03, for what issue #36 changed. A load reads every integer throu
 Audited 2026-11-03, for what issue #33 changed. A caller that stayed running across an absence can begin a catch-up for it (SAVE-037) and join a further one to it (SAVE-038), each ending byte for byte as a load of the same absence would. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-03, for what issue #37 changed, which closes what the first audit left open. Its question has an answer: one tale does cover achievements, so a report lists what its replay earned and a wake set down keeps that as new (SAVE-039). Tests now hold the speed clamp (SAVE-005), the exact minimum a report is kept at (SAVE-015), older entries in a current save (SAVE-025), and a v8 save's inherited, kept, and unread looks (SAVE-029), where breaking the keeping of looks passed until a look differing from its draw was tried, a v8 binary's own always agreeing with it. Annotations left the types that enumerate outcomes for what decides, and SAVE-004's missing fields are held by #36's walk. SAVE-009, SAVE-010, and SAVE-033 are properties of the whole path, so no code decides them, and their tests are their pins. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-04, for what issue #43 changed. Saves move to version 12 so a journal holding the new event reads as too new to an older binary rather than corrupt, and a v11 fixture holds that migrating changes no field (SAVE-040).
 
 ## Work Required
 

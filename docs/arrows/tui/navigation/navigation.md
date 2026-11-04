@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-04 (commit `031e89bf46a6`). 203 of 203 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-04 (commit `ab33fd4fc7c9`). 206 of 206 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,9 +16,10 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/navigation/navigation-specs.md` — 203 specs, prefix `TUI-NAV`
+- `docs/intent/tui/navigation/navigation-specs.md` — 206 specs, prefix `TUI-NAV`
 
 ### Tests
+- `crates/clowder-tui/tests/integration/raze.rs`
 - `crates/clowder-tui/tests/integration/achievements.rs`
 - `crates/clowder-tui/tests/integration/act_results.rs`
 - `crates/clowder-tui/tests/integration/adventures.rs`
@@ -77,9 +78,9 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-NAV-001 – TUI-NAV-203 | 203 | 0 | 0 |
+| All | TUI-NAV-001 – TUI-NAV-206 | 206 | 0 | 0 |
 
-**Summary:** 203 of 203 active specs implemented.
+**Summary:** 206 of 206 active specs implemented.
 
 ## Key Findings
 
@@ -102,6 +103,8 @@ Audited 2026-11-03, for what issue #38 changed. The Meadow's structures stand in
 Audited 2026-11-03, for what issue #39 changed. A press on a row now also holds that section's list where the frame aimed at drew it (TUI-NAV-129), so the clicked row stays under the pointer; the wheel's rule is unchanged (TUI-NAV-130). Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-04, for what issue #44 changed. `X` on a recipe's make row is now one call that makes every batch the stocks cover (TUI-NAV-012); every other row keeps its run of calls and its cap. The census of commands a row must reach names the new command as having no row of its own (TUI-NAV-039). The shell-cap comments now say what holds on both kinds of row.
+
+Audited 2026-11-04, for what issue #43 changed. `-` and `Backspace` arm taking a copy down from a structure's row (TUI-NAV-204), the armed row states the core's report (TUI-NAV-205), and the hint bar and help name it (TUI-NAV-206). The new command has no row of its own, as TUI-NAV-039 now says. Twenty-three mutations across this and the sim segments were each caught; the first run exposed test loops a broken count could hang, which are now bounded.
 
 ## Work Required
 

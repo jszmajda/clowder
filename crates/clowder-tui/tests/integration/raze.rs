@@ -69,14 +69,16 @@ fn footer(v: &ViewState) -> Option<&str> {
 fn both_keys_arm_taking_one_down_and_neither_acts() {
     let _clock = now::held();
     let (s, key, st) = meadow(2);
-    for action in [Action::Decrement] {
-        let mut v = on(&key);
-        assert_eq!(update(action, &mut v, &s), Outcome::Handled, "it only arms");
-        let armed = v.armed.as_ref().expect("the row is armed");
-        assert_eq!(armed.key, key);
-        assert_eq!(armed.command, Command::Raze(st));
-        assert_eq!(footer(&v), None, "arming needs no note");
-    }
+    let mut v = on(&key);
+    assert_eq!(
+        update(Action::Decrement, &mut v, &s),
+        Outcome::Handled,
+        "it only arms"
+    );
+    let armed = v.armed.as_ref().expect("the row is armed");
+    assert_eq!(armed.key, key);
+    assert_eq!(armed.command, Command::Raze(st));
+    assert_eq!(footer(&v), None, "arming needs no note");
     for code in [KeyCode::Char('-'), KeyCode::Backspace] {
         assert_eq!(
             clowder_tui::nav::keys::resolve(KeyEvent::new(code, KeyModifiers::NONE), &on(&key)),

@@ -4,7 +4,7 @@ The economy is the material world of the game: what exists, what it costs, what 
 
 ## Status
 
-**OK** — last audited 2026-11-04 (commit `031e89bf46a6`). 64 of 64 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-04 (commit `ab33fd4fc7c9`). 66 of 66 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,9 +16,10 @@ The economy is the material world of the game: what exists, what it costs, what 
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/economy/economy-specs.md` — 64 specs, prefix `SIM-ECO`
+- `docs/intent/sim/economy/economy-specs.md` — 66 specs, prefix `SIM-ECO`
 
 ### Tests
+- `crates/clowder-core/tests/integration/raze.rs`
 - `crates/clowder-core/tests/integration/craft_all.rs`
 - `crates/clowder-core/tests/integration/economy.rs`
 - `crates/clowder-core/tests/integration/economy_depth.rs`
@@ -46,9 +47,9 @@ The economy is the material world of the game: what exists, what it costs, what 
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-ECO-001 – SIM-ECO-064 | 64 | 0 | 0 |
+| All | SIM-ECO-001 – SIM-ECO-066 | 66 | 0 | 0 |
 
-**Summary:** 64 of 64 active specs implemented.
+**Summary:** 66 of 66 active specs implemented.
 
 ## Key Findings
 
@@ -59,6 +60,8 @@ Audited 2026-11-03, for what issue #32 changed. The code that sums this segment'
 Audited 2026-11-03, for what issue #38 changed. Every structure now has one family (SIM-ECO-063), through a rule exhaustive over the structures. The table is pinned as the design states it, and what a family's name promises is held against each structure's own fields, so a change to what a structure does asks again where it belongs. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-04, for what issue #44 changed. A recipe can now be made as many times as the stocks cover in one application (SIM-ECO-064), with the count worked out from the scarcest input. The tests hold it to what batch-by-batch calls leave, with each input in turn scarce and a craft ratio standing, and pin the recipe shape the count rests on: no input named twice, none the recipe's own output. Twelve mutations of the count, the spend, the yield, the refusals, and the row's call were each caught. Above roughly 2^53 a whole count of batches can round short of the stock by a sliver of its size, so a second press may still make a little; that is a rounding error of the stock, and no spec promises otherwise at that height.
+
+Audited 2026-11-04, for what issue #43 changed. A copy of a structure can be taken down, returning a quarter of what it would cost to build back, up to each store's cap with the copy gone (SIM-ECO-065), and nobody is turned out (SIM-ECO-066). Tests hold that for every structure, and that building one and taking it down never gains anything.
 
 ## Work Required
 
