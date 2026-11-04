@@ -4,7 +4,7 @@ Colonies are clowder's trade and diplomacy: eight neighbouring animal colonies t
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-03 (commit `cbe48509dc55`). 14 of 14 active specs implemented, each cited by a test.
+**PARTIAL** — last audited 2026-11-04 (commit `0187df88228b`). 14 of 14 active specs implemented, each cited by a test.
 
 ## References
 
@@ -19,6 +19,7 @@ Colonies are clowder's trade and diplomacy: eight neighbouring animal colonies t
 - `docs/intent/sim/colonies/colonies-specs.md` — 14 specs, prefix `SIM-TRADE`
 
 ### Tests
+- `crates/clowder-core/tests/integration/colonies_tables.rs`
 - `crates/clowder-core/tests/integration/idea_unlocks.rs`
 - `crates/clowder-core/tests/integration/neighbour_offers.rs`
 - `crates/clowder-core/tests/integration/sources.rs`
@@ -48,7 +49,8 @@ Audited 2026-11-02. First full audit, made for issue #30: every spec read agains
 
 Audited 2026-11-03, for what issue #34 changed. A napping caravan now brings its promised courtesy gift (SIM-TRADE-014), a tenth of the first good the colony's Pen Pal level opens at one nap in four, drawn directly after the nap's own draw, a twin of the generator pinning the order. It is a good the colony already offers, so the sources, store-links, and offers queries stay true unchanged, and a gift records the colony as reached and its good as learned (SIM-TRADE-010). Each test was checked by breaking what it guards. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
+Audited 2026-11-04, for what issue #35 changed. `colonies_tables.rs` reads the design's table row by row (SIM-TRADE-003) and pins a caravan's yield: bounds on every draw and how often each outcome falls, for the fuzz, season, trade ratio, bonus, and nap (SIM-TRADE-002); each figure of the kite-scaled good (SIM-TRADE-004); and a kept good withheld and then returned on a real trade (SIM-TRADE-006). A shy colony's standing is held at or below neutral, so no bonus outcome could reach the one good only a shy colony brings: that clause left SIM-TRADE-004 and its rule. Twenty mutations were each caught. The segment stays PARTIAL for #47 alone.
+
 ## Work Required
 
-- #35: thin table and multiplier tests.
 - #47: a per-colony effect key no content feeds (SIM-TRADE-005).
