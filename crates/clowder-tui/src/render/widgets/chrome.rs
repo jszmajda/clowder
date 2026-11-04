@@ -44,6 +44,8 @@ fn draw_line(f: &mut Frame, area: Rect, text: String) {
     f.render_widget(Paragraph::new(Line::from(text)), area);
 }
 
+/// The mood's one channel: a word, drawn among the facts in no colour at all.
+/// @spec TUI-THEME-005
 fn mood_word(tier: MoodTier) -> &'static str {
     match tier {
         MoodTier::Blissful => "blissful",

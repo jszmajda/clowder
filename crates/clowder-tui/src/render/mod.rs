@@ -1068,7 +1068,7 @@ fn kitten_state_word(state: &GameState, ix: usize) -> String {
 /// The tinkerers' bench at a glance: the bindings, the seats, and — where any
 /// Tinkerer waits — how many, as the core's bench query reports them. Where
 /// the place cannot hold it all, the waiting clause gives way whole, the
-/// inspector naming every waiting kitten; the seats are cut only as a name is.
+/// inspector naming every waiting kitten; the seats alone always fit.
 /// @spec TUI-NAV-157, TUI-RENDER-028
 fn bench_summary(state: &GameState, place: usize) -> String {
     let bench = state.bench();
@@ -1081,7 +1081,7 @@ fn bench_summary(state: &GameState, place: usize) -> String {
     if full.chars().count() <= place {
         full
     } else {
-        fmt::fit(&seats, place)
+        seats
     }
 }
 

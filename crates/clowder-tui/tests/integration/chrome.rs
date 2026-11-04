@@ -458,6 +458,12 @@ const NEW: (char, &str) = ('★', "new");
 const AWAY: (char, &str) = ('~', "away");
 const CHIPS: [(char, &str); 4] = [IDLE, SKY, NEW, AWAY];
 
+/// The two chips a settled meadow leaves quiet, measured here against the same
+/// rules as the four above, and every chip the header can draw.
+const ENERGY: (char, &str) = ('↯', "energy");
+const EARNED: (char, &str) = ('✦', "earned");
+const ALL_CHIPS: [(char, &str); 6] = [IDLE, SKY, NEW, AWAY, ENERGY, EARNED];
+
 fn chip_name(chip: (char, &str)) -> String {
     format!("`{}{}`", chip.0, chip.1)
 }
@@ -2525,7 +2531,7 @@ fn no_attention_channel_is_ever_the_affordable_or_partial_marker() {
 }
 
 /// A meadow where the list draws `●` and `◐` rows, a Teased row wears `◐` in
-/// dim, a store is capped, and all four attention chips are live — so every
+/// dim, a store is capped, and all six attention chips are live — so every
 /// glyph of the compressed run is on screen at once.
 fn compressed_run_meadows() -> Vec<(&'static str, GameState, ViewState)> {
     let mut out = Vec::new();
@@ -2556,7 +2562,9 @@ fn compressed_run_meadows() -> Vec<(&'static str, GameState, ViewState)> {
     out.push(("a mixed meadow with every chip live", mixed, view));
 
     // The rich meadow, every chip live: mostly `●` and `✓`.
-    let (rich, view) = all_four_live();
+    let (mut rich, view) = all_four_live();
+    run_short_of_energy(&mut rich);
+    earn_two(&mut rich);
     out.push(("a rich meadow with every chip live", rich, view));
 
     // A revealed structure half paid for: Teased, and wearing `◐` in dim.
@@ -2618,7 +2626,8 @@ fn among_the_compressed_run_each_glyph_wears_only_its_own_colour() {
     };
 
     let sizes: [(u16, u16); 4] = [(FLOOR_W, FLOOR_H), (99, 30), (120, 40), (WIDE_W, WIDE_H)];
-    let (mut saw_filled, mut saw_half, mut saw_chip) = (0usize, 0usize, 0usize);
+    let (mut saw_filled, mut saw_half) = (0usize, 0usize);
+    let mut chips_seen: BTreeSet<char> = BTreeSet::new();
 
     for (label, state, base) in compressed_run_meadows() {
         // Each view with the sizes it is drawn at. The cursor is walked over
@@ -2703,9 +2712,9 @@ fn among_the_compressed_run_each_glyph_wears_only_its_own_colour() {
                                     (&[ready, attention], "◐")
                                 }
                                 s if header.contains(ratatui::layout::Position { x, y })
-                                    && CHIPS.iter().any(|c| s.starts_with(c.0)) =>
+                                    && ALL_CHIPS.iter().any(|c| s.starts_with(c.0)) =>
                                 {
-                                    saw_chip += 1;
+                                    chips_seen.extend(s.chars().next());
                                     (&[ready, partial], "an attention chip's glyph")
                                 }
                                 _ => continue,
@@ -2728,9 +2737,13 @@ fn among_the_compressed_run_each_glyph_wears_only_its_own_colour() {
     }
 
     assert!(
-        saw_filled > 0 && saw_half > 0 && saw_chip > 0,
-        "fixture: the sweep should draw every glyph of the run (● {saw_filled}, ◐ {saw_half}, \
-         chip glyphs {saw_chip})"
+        saw_filled > 0 && saw_half > 0,
+        "fixture: the sweep should draw both markers (● {saw_filled}, ◐ {saw_half})"
+    );
+    assert_eq!(
+        chips_seen,
+        ALL_CHIPS.iter().map(|c| c.0).collect::<BTreeSet<char>>(),
+        "fixture: the sweep should draw every chip's glyph"
     );
 }
 
@@ -2762,7 +2775,7 @@ fn chip_spans(symbols: &[String]) -> Vec<(std::ops::Range<usize>, &'static str)>
     let mut out = Vec::new();
     let mut i = 0;
     while i < symbols.len() {
-        let Some(chip) = CHIPS.iter().find(|c| symbols[i].starts_with(c.0)) else {
+        let Some(chip) = ALL_CHIPS.iter().find(|c| symbols[i].starts_with(c.0)) else {
             i += 1;
             continue;
         };
@@ -2835,6 +2848,141 @@ fn symbols_of(cells: &[ratatui::buffer::Cell]) -> Vec<String> {
     cells.iter().map(|c| c.symbol().to_string()).collect()
 }
 
+/// At width `w`, the header draws exactly the chips `wanted`, each whole in the
+/// one `attention` value, and nothing else on its line wears it. Records each
+/// chip's form: its word, and whether its count is drawn.
+fn chips_wear_attention_alone(
+    state: &GameState,
+    view: &ViewState,
+    w: u16,
+    wanted: &[&str],
+    forms_seen: &mut BTreeSet<(&'static str, bool)>,
+) {
+    let attention = attention_colour();
+    let mut term = terminal(w, 1);
+    term.draw(|f| {
+        let area = f.area();
+        chrome::header(f, area, state, view);
+    })
+    .expect("TestBackend is infallible");
+    let buf = term.backend().buffer();
+    let cells = row_cells(buf, Rect::new(0, 0, w, 1), 0);
+    let symbols = symbols_of(&cells);
+    let line = symbols.concat();
+
+    let spans = chip_spans(&symbols);
+    let drawn: Vec<&str> = spans.iter().map(|(_, word)| *word).collect();
+    assert_eq!(
+        drawn, wanted,
+        "fixture: at width {w}, the header's chips should read as {wanted:?}: {line:?}"
+    );
+
+    let mut in_chip = vec![false; cells.len()];
+    for (span, word) in &spans {
+        let counted = symbols[span.clone()]
+            .iter()
+            .any(|s| s.chars().all(|c| c.is_ascii_digit()));
+        forms_seen.insert((word, counted));
+        for x in span.clone() {
+            in_chip[x] = true;
+            assert_eq!(
+                cells[x].fg,
+                attention,
+                "at width {w}, the `{word}` chip's `{}` at column {x} is drawn in {:?}, not \
+                 attention. A chip wears attention whole — glyph, count, and word — at every \
+                 width step.\nline: {line:?}",
+                cells[x].symbol(),
+                cells[x].fg
+            );
+        }
+    }
+    for (x, cell) in cells.iter().enumerate() {
+        if in_chip[x] {
+            continue;
+        }
+        assert_ne!(
+            cell.fg,
+            attention,
+            "at width {w}, `{}` at column {x} is outside every chip and drawn in attention — \
+             the blank columns between chips and the header's facts are not something that \
+             wants the player.\nline: {line:?}",
+            cell.symbol()
+        );
+    }
+}
+
+/// A meadow that is using more energy than it makes: `↯energy` is live.
+fn run_short_of_energy(state: &mut GameState) {
+    state.structures[StructureId::BoxLabyrinth.ix()] += 200;
+    assert!(
+        state.energy_consumption() > state.energy_production(),
+        "fixture: the meadow runs short"
+    );
+}
+
+/// Two achievements the player has not been shown: `✦2 earned` is live.
+fn earn_two(state: &mut GameState) {
+    use clowder_core::{AchievementId, Earned};
+    for id in [AchievementId::ABrightIdea, AchievementId::AFaceAtTheDoor] {
+        state.achievements.insert(
+            id,
+            Earned {
+                generation: 0,
+                day: 3,
+            },
+        );
+    }
+}
+
+/// `↯energy` and `✦N earned` are held to what every chip is: each drawn whole in
+/// the one `attention` value at every width step, and nothing else on the line
+/// in it, alone and beside the other four, the count of `✦N earned` drawn and
+/// shed as the header's step decides.
+///
+/// @spec TUI-THEME-015, TUI-NAV-020
+#[test]
+fn the_energy_and_earned_chips_are_drawn_whole_in_attention_at_every_width() {
+    let mut forms_seen: BTreeSet<(&str, bool)> = BTreeSet::new();
+    for mask in [0u8, 0b0101, 0b1111] {
+        let live = [mask & 1 != 0, mask & 2 != 0, mask & 4 != 0, mask & 8 != 0];
+        for (energy, earned) in [(true, false), (false, true), (true, true)] {
+            let (mut state, view) = live_chips_fixture(live, 3, 2);
+            let mut wanted: Vec<&str> = CHIPS
+                .iter()
+                .zip(live)
+                .filter(|(_, on)| *on)
+                .map(|(c, _)| c.1)
+                .collect();
+            let mut cluster = vec![chip_cluster(live, None)];
+            if energy {
+                run_short_of_energy(&mut state);
+                wanted.push(ENERGY.1);
+                cluster.push("↯energy".to_string());
+            }
+            if earned {
+                earn_two(&mut state);
+                wanted.push(EARNED.1);
+                cluster.push("✦earned".to_string());
+            }
+            cluster.retain(|c| !c.is_empty());
+            let floor_line = cluster.join("  ").chars().count()
+                + compact_facts(&state, false)[3..].join(" ").chars().count()
+                + 1;
+            for w in floor_line..=(WIDE_W as usize) {
+                chips_wear_attention_alone(&state, &view, w as u16, &wanted, &mut forms_seen);
+            }
+        }
+    }
+    for form in [("energy", false), ("earned", true), ("earned", false)] {
+        assert!(
+            forms_seen.contains(&form),
+            "fixture: the sweep should draw the `{}` chip {} its count (saw {forms_seen:?})",
+            form.0,
+            if form.1 { "with" } else { "without" }
+        );
+    }
+}
+
 /// Each attention chip is drawn whole in the one `attention` value — its
 /// glyph, its count where it has one, and its word — and nothing else on the
 /// header line is: not the blank columns between chips, not the facts. Swept
@@ -2846,7 +2994,6 @@ fn symbols_of(cells: &[ratatui::buffer::Cell]) -> Vec<String> {
 /// @spec TUI-THEME-015
 #[test]
 fn every_attention_chip_is_drawn_whole_in_attention_and_nothing_else_on_the_header_is() {
-    let attention = attention_colour();
     let mut forms_seen: BTreeSet<(&str, bool)> = BTreeSet::new();
 
     for (idle, new) in [(3usize, 2usize), (12, 3)] {
@@ -2856,65 +3003,14 @@ fn every_attention_chip_is_drawn_whole_in_attention_and_nothing_else_on_the_head
             let floor_line = chip_cluster(live, None).chars().count()
                 + compact_facts(&state, false)[3..].join(" ").chars().count()
                 + 1;
+            let wanted: Vec<&str> = CHIPS
+                .iter()
+                .zip(live)
+                .filter(|(_, on)| *on)
+                .map(|(c, _)| c.1)
+                .collect();
             for w in floor_line..=(WIDE_W as usize) {
-                let mut term = terminal(w as u16, 1);
-                term.draw(|f| {
-                    let area = f.area();
-                    chrome::header(f, area, &state, &view);
-                })
-                .expect("TestBackend is infallible");
-                let buf = term.backend().buffer();
-                let cells = row_cells(buf, Rect::new(0, 0, w as u16, 1), 0);
-                let symbols = symbols_of(&cells);
-                let line = symbols.concat();
-
-                let spans = chip_spans(&symbols);
-                let drawn: Vec<&str> = spans.iter().map(|(_, word)| *word).collect();
-                let wanted: Vec<&str> = CHIPS
-                    .iter()
-                    .zip(live)
-                    .filter(|(_, on)| *on)
-                    .map(|(c, _)| c.1)
-                    .collect();
-                assert_eq!(
-                    drawn, wanted,
-                    "fixture: at width {w} with chips {live:?} live, the header's chips should \
-                     read as {wanted:?}: {line:?}"
-                );
-
-                let mut in_chip = vec![false; cells.len()];
-                for (span, word) in &spans {
-                    let counted = symbols[span.clone()]
-                        .iter()
-                        .any(|s| s.chars().all(|c| c.is_ascii_digit()));
-                    forms_seen.insert((word, counted));
-                    for x in span.clone() {
-                        in_chip[x] = true;
-                        assert_eq!(
-                            cells[x].fg,
-                            attention,
-                            "at width {w}, the `{word}` chip's `{}` at column {x} is drawn in \
-                             {:?}, not attention. A chip wears attention whole — glyph, count, \
-                             and word — at every width step.\nline: {line:?}",
-                            cells[x].symbol(),
-                            cells[x].fg
-                        );
-                    }
-                }
-                for (x, cell) in cells.iter().enumerate() {
-                    if in_chip[x] {
-                        continue;
-                    }
-                    assert_ne!(
-                        cell.fg,
-                        attention,
-                        "at width {w} with chips {live:?} live, `{}` at column {x} is outside \
-                         every chip and drawn in attention — the blank columns between chips and \
-                         the header's facts are not something that wants the player.\n\
-                         line: {line:?}",
-                        cell.symbol()
-                    );
-                }
+                chips_wear_attention_alone(&state, &view, w as u16, &wanted, &mut forms_seen);
             }
         }
     }
@@ -3368,6 +3464,24 @@ fn nothing_but_a_chip_or_a_full_tag_wears_attention_in_a_frame_with_nothing_arme
                                 let to = text.trim_end().chars().count();
                                 for x in from..to {
                                     allowed[side.x as usize + x] = true;
+                                }
+                            }
+                        }
+                    }
+                    // The Energy row's `short`, on a row the cursor has not
+                    // reversed (TUI-NAV-168).
+                    let symbols = symbols_of(&cells);
+                    if symbols.concat().contains("Energy") {
+                        for span in word_spans(&symbols, "short") {
+                            if span.start >= 2
+                                && symbols[span.start - 2] == "·"
+                                && !cells[span.start]
+                                    .modifier
+                                    .contains(ratatui::style::Modifier::REVERSED)
+                            {
+                                marks += 1;
+                                for x in span {
+                                    allowed[x] = true;
                                 }
                             }
                         }
@@ -6501,6 +6615,71 @@ fn the_help_overlay_lists_d_show_or_fold_done_among_the_ideas_keys_alone() {
 // ---------------------------------------------------------------------------
 // Coats in the sidebar — TUI-THEME-019, TUI-THEME-020, TUI-THEME-021
 // ---------------------------------------------------------------------------
+
+/// A store's coat says which store it is and nothing else: its name wears the
+/// same colours with its stock low, high, and at its cap, and with its rate at
+/// rest and moving.
+///
+/// @spec TUI-THEME-003
+#[test]
+fn a_stores_coat_does_not_move_with_its_stock_its_cap_or_its_rate() {
+    let base = every_store_held(0);
+    let listed = listed_stores(&base);
+    let w = 40u16;
+    let h = 2 * listed.len() as u16;
+
+    let stocked = |stock: &dyn Fn(ResourceId, &GameState) -> f64, crew: bool| {
+        let mut s = base.clone();
+        for r in ResourceId::ALL {
+            s.resources[r.ix()] = stock(r, &s);
+        }
+        if crew {
+            for k in s.kittens.iter_mut() {
+                k.job = Some(clowder_core::JobId::ALL[0]);
+            }
+        }
+        s
+    };
+    let at_cap = |r: ResourceId, s: &GameState| {
+        let cap = s.cap(r);
+        if cap.is_finite() && cap > 0.0 {
+            cap
+        } else {
+            9_000.0
+        }
+    };
+    let states = [
+        stocked(&|_, _| 0.25, false),
+        stocked(&|_, _| 0.25, true),
+        stocked(&at_cap, false),
+        stocked(&at_cap, true),
+    ];
+    assert!(
+        states
+            .iter()
+            .any(|s| listed.iter().any(|r| wears_full(s, *r))),
+        "fixture: some store stands at its cap"
+    );
+
+    for state in &states {
+        assert_eq!(
+            listed_stores(state),
+            listed,
+            "fixture: the same stores are listed in every state"
+        );
+        let (_, buf) = sidebar_in(state, w, h);
+        for (i, r) in listed.iter().enumerate() {
+            let full = stores_row_name(state, *r);
+            for (x, want) in coat_on(*r, &full, &full).iter().enumerate() {
+                assert_eq!(
+                    &fg_at(&buf, x as u16, 2 * i as u16),
+                    want,
+                    "{full:?}: character {x} changed colour with the store's state"
+                );
+            }
+        }
+    }
+}
 
 /// The colours a resource's coat puts on each character of `drawn`, read by
 /// position in the whole name: a kept character wears its own position's

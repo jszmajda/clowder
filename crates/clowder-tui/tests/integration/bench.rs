@@ -379,6 +379,11 @@ fn where_the_place_cannot_hold_it_the_waiting_clause_gives_way_whole() {
             "the seats stand: {bench:?}"
         );
         assert!(
+            "999999/999999 seats taken".chars().count() <= room,
+            "the seats alone fit the place at far higher figures than a meadow reaches, so they \
+             are never cut"
+        );
+        assert!(
             !bench.contains("waiting") && !bench.contains('·') && !bench.contains("1000"),
             "the waiting clause gives way whole, not in part: {bench:?}"
         );

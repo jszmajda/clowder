@@ -1,23 +1,25 @@
 //! The theme read off whole frames rather than tables: what any cell of a
 //! drawn frame may wear, and what the frame's header and focused row wear.
 //!
-//! @spec TUI-THEME-001, TUI-THEME-004, TUI-THEME-005, TUI-THEME-006,
-//! TUI-THEME-007, TUI-THEME-008
+//! @spec TUI-THEME-001, TUI-THEME-003, TUI-THEME-004, TUI-THEME-005,
+//! TUI-THEME-006, TUI-THEME-007, TUI-THEME-008, TUI-THEME-010
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use clowder_core::content;
 use clowder_core::{
-    AdventureId, Availability, ContentId, EyeColour, EyeLook, Fur, FurColour, FurPattern,
-    GameState, IdeaId, Kitten, KittenTrait, Location, Pose, Profile, ResourceId, Season,
-    StructureId,
+    AdventureId, ArchId, Availability, ContentId, CraftId, DreamLoomId, EyeColour, EyeLook, Fur,
+    FurColour, FurPattern, GameState, IdeaId, JobId, Kitten, KittenTrait, Location, Pose, Profile,
+    RefinementId, ResourceId, RiteId, RuleId, Season, StructureId, TraditionId,
 };
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
 use ratatui::style::{Color, Modifier};
 use ratatui::Terminal;
 
+use clowder_tui::nav::rows::{drawn_rows, rows, RowKind};
 use clowder_tui::nav::{RowKey, Section, ViewState};
+use clowder_tui::render::layout::{Body, Layout};
 use clowder_tui::theme::fur::{eye_colour, fur_colour};
 use clowder_tui::theme::{coat, coat_colours, seasonal_accent, Role};
 
@@ -272,4 +274,231 @@ fn a_focused_row_keeps_its_state_colour_under_the_reversal() {
         }
     }
     assert_eq!(seen.len(), 3, "fixture: every state's colour met: {seen:?}");
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-003 — state, never identity
+// ---------------------------------------------------------------------------
+
+/// Tall enough that no list scrolls, so a row stands at its place in the list.
+const TALL_FRAME: (u16, u16) = (200, 300);
+
+fn every_content_id() -> Vec<ContentId> {
+    let mut out: Vec<ContentId> = Vec::new();
+    out.extend(StructureId::ALL.map(ContentId::Structure));
+    out.extend(IdeaId::ALL.map(ContentId::Idea));
+    out.extend(JobId::ALL.map(ContentId::Job));
+    out.extend(CraftId::ALL.map(ContentId::Craft));
+    out.extend(RefinementId::ALL.map(ContentId::Refinement));
+    out.extend(RuleId::ALL.map(ContentId::Rule));
+    out.extend(RiteId::ALL.map(ContentId::Rite));
+    out.extend(ArchId::ALL.map(ContentId::Arch));
+    out.extend(TraditionId::ALL.map(ContentId::Tradition));
+    out.extend(DreamLoomId::ALL.map(ContentId::DreamLoom));
+    out
+}
+
+/// The meadow with every item revealed and every store at `stock`.
+fn everything_listed(stock: f64) -> GameState {
+    let mut s = world();
+    s.revealed = every_content_id().into_iter().collect();
+    for r in ResourceId::ALL {
+        s.resources[r.ix()] = stock;
+    }
+    s
+}
+
+/// A frame and its layout, the cursor on the section's first row it can rest on.
+fn section_frame(s: &GameState, section: Section) -> Option<(Buffer, Layout, ViewState)> {
+    let mut view = ViewState {
+        section: Some(section),
+        done_open: true,
+        ..Default::default()
+    };
+    let first = drawn_rows(s, section, &view)
+        .into_iter()
+        .find(|r| !matches!(r.kind, RowKind::Group | RowKind::Display))?;
+    view.focus[section.index()] = Some(first.key);
+
+    let (w, h) = TALL_FRAME;
+    let mut term = Terminal::new(TestBackend::new(w, h)).expect("TestBackend is infallible");
+    let mut layout = None;
+    term.draw(|f| layout = Some(clowder_tui::render::frame(f, s, &view, None)))
+        .expect("TestBackend is infallible");
+    let layout = layout.expect("a frame returns its layout");
+    Some((term.backend().buffer().clone(), layout, view))
+}
+
+/// The list's first column and first row: a row's cursor stands there, its marker
+/// two columns on, and its name two more.
+fn list_origin(layout: &Layout) -> (u16, u16) {
+    match layout.body {
+        Body::Wide { list, .. } => (list.x + 1, list.y),
+        _ => panic!("fixture: {TALL_FRAME:?} lays out three columns"),
+    }
+}
+
+/// Two rows in one state wear one colour, whichever items they are: read off
+/// every content row of every section, in meadows that cover every price, some
+/// prices, and no price, with nothing learned and everything learned, so a late
+/// item meets the same rows as an early one.
+///
+/// @spec TUI-THEME-003
+#[test]
+fn a_row_takes_its_colours_from_its_state_and_never_from_which_item_it_is() {
+    let mut worn: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut items: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+
+    let meadows = [1.0e12, 5.0, 0.0].into_iter().flat_map(|stock| {
+        let open = everything_listed(stock);
+        let mut learned = open.clone();
+        learned.ideas = IdeaId::ALL.into_iter().collect();
+        [open, learned]
+    });
+    for s in meadows {
+        for section in Section::ALL {
+            let Some((buf, layout, view)) = section_frame(&s, section) else {
+                continue;
+            };
+            let (x, top) = list_origin(&layout);
+            for (i, row) in drawn_rows(&s, section, &view).iter().enumerate() {
+                let RowKey::Content(id, _) = row.key else {
+                    continue;
+                };
+                let y = top + i as u16;
+                if buf[(x, y)].symbol() == "▸" {
+                    continue;
+                }
+                let (marker, name) = (&buf[(x + 2, y)], &buf[(x + 4, y)]);
+                let state = format!("{} {:?}", marker.symbol(), s.availability(id));
+                worn.entry(state.clone())
+                    .or_default()
+                    .insert(format!("marker {:?}, name {:?}", marker.fg, name.fg));
+                items.entry(state).or_default().insert(format!("{id:?}"));
+            }
+        }
+    }
+
+    for (state, colours) in &worn {
+        assert_eq!(
+            colours.len(),
+            1,
+            "rows in the state {state:?} wear different colours, so a colour is saying which \
+             item this is: {colours:?}"
+        );
+    }
+    assert!(
+        worn.len() >= 3,
+        "fixture: rows in several states: {:?}",
+        worn.keys()
+    );
+    assert!(
+        items.values().filter(|i| i.len() > 1).count() >= 3,
+        "fixture: several states held by more than one item: {items:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-010 — colour is always the second channel
+// ---------------------------------------------------------------------------
+
+/// The text of one row of a frame's list, every colour gone.
+fn row_text(s: &GameState, section: Section, key: &RowKey) -> String {
+    let (buf, layout, view) = section_frame(s, section).expect("fixture: a list");
+    let (_, top) = list_origin(&layout);
+    let at = drawn_rows(s, section, &view)
+        .iter()
+        .position(|r| r.key == *key)
+        .expect("fixture: the row is listed");
+    line(&buf, top + at as u16)
+}
+
+/// With every colour taken off a drawn frame, a row still says which state it
+/// is in: a price covered, part covered, and not covered at all read as three
+/// different lines, a finished item as a fourth, and a store at its cap differs
+/// from one just under it by the word `full`. The rest of what colour carries is
+/// read off frames beside its own surface: a chip's glyph and word (`chrome.rs`),
+/// an armed row's expansion (`armed_summary.rs`), an event's glyph
+/// (`overlays.rs`), and the mood and season words here.
+///
+/// @spec TUI-THEME-010
+#[test]
+fn with_every_colour_removed_a_frame_still_says_each_state() {
+    let id = StructureId::ALL
+        .into_iter()
+        .map(ContentId::Structure)
+        .find(|id| {
+            let s = everything_listed(1.0e12);
+            s.availability(*id) == Availability::Available && !s.cost_of_next(*id, 1).is_empty()
+        })
+        .expect("fixture: a structure open to build");
+    let key = rows(&everything_listed(1.0e12), Section::Meadow)
+        .into_iter()
+        .map(|r| r.key)
+        .find(|k| matches!(k, RowKey::Content(c, _) if *c == id))
+        .expect("fixture: its row is listed");
+
+    let priced = |cover: f64| {
+        let mut s = everything_listed(1.0e12);
+        for (r, amount) in s.cost_of_next(id, 1) {
+            s.resources[r.ix()] = amount * cover;
+        }
+        row_text(&s, Section::Meadow, &key)
+    };
+    let (covered, part, none) = (priced(2.0), priced(0.5), priced(0.0));
+    for (line, glyph) in [(&covered, "●"), (&part, "◐"), (&none, "○")] {
+        assert!(
+            line.contains(glyph),
+            "with its colour gone, the row should still carry {glyph}: {line:?}"
+        );
+    }
+    assert!(
+        covered != part && part != none && covered != none,
+        "two affordability states read the same with colour gone:\n{covered}\n{part}\n{none}"
+    );
+
+    let idea = IdeaId::ALL[0];
+    let idea_key = rows(&everything_listed(1.0e12), Section::Ideas)
+        .into_iter()
+        .map(|r| r.key)
+        .find(|k| matches!(k, RowKey::Content(ContentId::Idea(i), _) if *i == idea))
+        .expect("fixture: an idea is listed");
+    let mut done = everything_listed(1.0e12);
+    done.ideas.insert(idea);
+    assert!(
+        row_text(&done, Section::Ideas, &idea_key).contains('✓'),
+        "with its colour gone, a finished item should still carry ✓"
+    );
+
+    let store = ResourceId::ALL
+        .into_iter()
+        .find(|r| {
+            let cap = everything_listed(1.0).cap(*r);
+            cap.is_finite() && cap > 1.0
+        })
+        .expect("fixture: some store has a cap");
+    let sidebar_says_full = |stock: f64| {
+        let mut s = everything_listed(1.0);
+        s.resources[store.ix()] = stock;
+        let (buf, layout, _) = section_frame(&s, Section::Meadow).expect("fixture: a list");
+        let Body::Wide { sidebar, .. } = layout.body else {
+            panic!("fixture: three columns");
+        };
+        (sidebar.y..sidebar.bottom())
+            .map(|y| {
+                (sidebar.x..sidebar.right())
+                    .map(|x| buf[(x, y)].symbol().to_string())
+                    .collect::<String>()
+            })
+            .any(|l| l.contains("full"))
+    };
+    let cap = everything_listed(1.0).cap(store);
+    assert!(
+        sidebar_says_full(cap),
+        "with its colour gone, a store at its cap should still say `full`"
+    );
+    assert!(
+        !sidebar_says_full(cap - 1.0),
+        "a store under its cap says `full`"
+    );
 }

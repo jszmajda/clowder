@@ -4335,20 +4335,31 @@ fn every_resource_a_blurb_marks_wears_its_coat_across_the_words_as_written() {
 
     let rect = pane_rect(WIDE, TALL);
     let mut references = 0;
+    let mut kinds: BTreeSet<&str> = BTreeSet::new();
     for state in [world(true), world(false)] {
         for (section, row) in every_row(&state) {
-            let RowKey::Content(id, _) = &row.key else {
-                continue;
-            };
-            let blurb = match id {
-                ContentId::Idea(i) => tables::idea_def(*i).blurb,
-                ContentId::Refinement(r) => tables::refinement_def(*r).blurb,
-                ContentId::Rule(r) => tables::rule_def(*r).blurb,
+            let (kind, blurb) = match &row.key {
+                RowKey::Content(ContentId::Idea(i), _) => ("idea", tables::idea_def(*i).blurb),
+                RowKey::Content(ContentId::Refinement(r), _) => {
+                    ("refinement", tables::refinement_def(*r).blurb)
+                }
+                RowKey::Content(ContentId::Rule(r), _) => ("rule", tables::rule_def(*r).blurb),
+                RowKey::Content(ContentId::Rite(r), _) => ("rite", tables::rite_def(*r).blurb),
+                RowKey::Content(ContentId::Arch(a), _) => ("arch", tables::arch_def(*a).blurb),
+                RowKey::Content(ContentId::Tradition(t), _) => {
+                    ("tradition", tables::tradition_def(*t).blurb)
+                }
+                RowKey::Content(ContentId::DreamLoom(l), _) => {
+                    ("dream loom", tables::dream_loom_def(*l).blurb)
+                }
+                RowKey::Adventure(Some(a)) => ("adventure", tables::adventure_def(*a).blurb),
                 _ => continue,
             };
             if blurb.is_empty() {
                 continue;
             }
+            kinds.insert(kind);
+            let id = &row.key;
             let buf = render(
                 &state,
                 &looking_at(section, row.key.clone()),
@@ -4385,5 +4396,10 @@ fn every_resource_a_blurb_marks_wears_its_coat_across_the_words_as_written() {
     assert!(
         references > 20,
         "fixture: many blurb references drawn ({references})"
+    );
+    assert_eq!(
+        kinds.len(),
+        8,
+        "fixture: every kind that carries a blurb is drawn: {kinds:?}"
     );
 }

@@ -1638,6 +1638,163 @@ fn a_per_unit_priced_rows_next_cost_is_the_cores_price_of_one_unit() {
     );
 }
 
+/// The inspector drawn alone, wide enough that none of its lines wrap, with each
+/// line as its text and the row it stands on.
+fn roomy_inspector(state: &GameState, view: &ViewState) -> (ratatui::buffer::Buffer, Rect) {
+    const ROOMY: u16 = 400;
+    let rect = match compute(Rect::new(0, 0, ROOMY, TALL), None, false).body {
+        Body::Wide { inspector, .. } => inspector,
+        other => panic!("fixture: three columns at {ROOMY}x{TALL}, not {other:?}"),
+    };
+    let mut term = Terminal::new(TestBackend::new(ROOMY, TALL)).expect("TestBackend is infallible");
+    term.draw(|f| inspector::draw(f, rect, state, view))
+        .expect("TestBackend is infallible");
+    (term.backend().buffer().clone(), rect)
+}
+
+/// The row a line beginning `head` stands on in the pane, and its first column.
+fn line_headed(buf: &ratatui::buffer::Buffer, rect: Rect, head: &str) -> Option<(u16, u16)> {
+    (rect.y..rect.bottom()).find_map(|y| {
+        let text: String = (rect.x..rect.right())
+            .map(|x| buf[(x, y)].symbol().to_string())
+            .collect();
+        let trimmed = text.trim_start();
+        trimmed.starts_with(head).then(|| {
+            (
+                rect.x + (text.chars().count() - trimmed.chars().count()) as u16,
+                y,
+            )
+        })
+    })
+}
+
+/// Reads `n` cells from `at` on a line, asserting each wears what `want` says.
+fn expect_colours(
+    buf: &ratatui::buffer::Buffer,
+    at: &mut u16,
+    y: u16,
+    want: &[ratatui::style::Color],
+    what: &str,
+) {
+    for colour in want {
+        assert_eq!(
+            buf[(*at, y)].fg,
+            *colour,
+            "{what}: {:?} at column {at} wears the wrong colour",
+            buf[(*at, y)].symbol()
+        );
+        *at += 1;
+    }
+}
+
+/// An open prompt's preview in the inspector names each component in its coat:
+/// only the name's characters wear it, and the count, the figures, and the
+/// separators wear none. The list's own row, reversed under the cursor, wears no
+/// coat at all. Quantified over every row whose preview names a store.
+///
+/// @spec TUI-THEME-019, TUI-THEME-020
+#[test]
+fn an_open_prompts_preview_wears_each_components_coat_on_its_name() {
+    use clowder_tui::theme::{coat, coat_colours};
+    use ratatui::style::Color;
+
+    const DIGITS: &str = "37";
+    let state = rich();
+    let names = stores_row_names();
+    let plain = |n: usize| vec![Color::Reset; n];
+    let mut seen = 0;
+
+    for (section, row) in prompt_rows(&state) {
+        let comps = preview_components(&state, &row, DIGITS);
+        if comps.is_empty() || comps.iter().any(|(_, a)| !a.is_finite()) {
+            continue;
+        }
+        seen += 1;
+        let view = prompt_on(section, &row, DIGITS, &state);
+        let (buf, rect) = roomy_inspector(&state, &view);
+        let head = format!("×{DIGITS}");
+        let (mut at, y) = line_headed(&buf, rect, &head)
+            .unwrap_or_else(|| panic!("no preview line on {:?}", row.key));
+        let what = format!("the preview on {:?}", row.key);
+
+        expect_colours(&buf, &mut at, y, &plain(head.chars().count() + 2), &what);
+        for (i, (r, amount)) in comps.iter().enumerate() {
+            if i > 0 {
+                expect_colours(&buf, &mut at, y, &plain(2), &what);
+            }
+            let figure = fmt::exact(*amount).chars().count() + 1;
+            expect_colours(&buf, &mut at, y, &plain(figure), &what);
+            let name = names[r].chars().count();
+            expect_colours(&buf, &mut at, y, &coat_colours(coat(*r), name), &what);
+        }
+
+        let worn: BTreeSet<String> = focused_row_cells(&state, &view, (200, 60))
+            .iter()
+            .filter(|(symbol, style)| {
+                !symbol.trim().is_empty()
+                    && style
+                        .add_modifier
+                        .contains(ratatui::style::Modifier::REVERSED)
+            })
+            .map(|(_, style)| format!("{:?}", style.fg))
+            .collect();
+        assert_eq!(
+            worn.len(),
+            1,
+            "{what}: the reversed row wears the line's one colour, no coat: {worn:?}"
+        );
+    }
+    assert!(seen > 1, "fixture: rows whose preview names a store");
+}
+
+/// A Pounce or Trade row's one-unit price line heads with the component's name
+/// in its coat, and nothing else on the line wears one. Quantified over the
+/// Pounce row and every colony's trade row, covered and short alike.
+///
+/// @spec TUI-THEME-019
+#[test]
+fn a_unit_price_line_wears_its_components_coat_on_its_name() {
+    use clowder_tui::theme::{coat, coat_colours};
+    use ratatui::style::Color;
+
+    let base = rich();
+    let names = stores_row_names();
+    let mut seen = 0;
+    for (section, row) in every_row(&base) {
+        let RowKind::Act { command, .. } = row.kind else {
+            continue;
+        };
+        if !matches!(command, Command::Pounce(_) | Command::Trade(..)) {
+            continue;
+        }
+        let unit = base
+            .unit_price(&command)
+            .unwrap_or_else(|| panic!("fixture: {command:?} is priced here"));
+        for short in [false, true] {
+            let mut state = base.clone();
+            if short {
+                for (r, _) in &unit {
+                    state.resources[r.ix()] = 0.25;
+                }
+            }
+            let (buf, rect) = roomy_inspector(&state, &focused(section, row.key.clone()));
+            for (r, _) in &unit {
+                seen += 1;
+                let name = &names[r];
+                let (mut at, y) = line_headed(&buf, rect, &format!("{name}: need"))
+                    .unwrap_or_else(|| panic!("no unit-price line for {name} on {:?}", row.key));
+                let n = name.chars().count();
+                let what = format!("the {name} unit-price line on {:?}", row.key);
+                expect_colours(&buf, &mut at, y, &coat_colours(coat(*r), n), &what);
+                while at < rect.right() {
+                    expect_colours(&buf, &mut at, y, &[Color::Reset], &what);
+                }
+            }
+        }
+    }
+    assert!(seen > 2, "fixture: the Pounce row and the trade rows");
+}
+
 /// A drawing with every number replaced by one placeholder and whitespace
 /// collapsed: two drawings that mask alike said the same things about
 /// different amounts.

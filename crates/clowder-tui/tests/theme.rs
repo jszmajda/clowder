@@ -41,9 +41,6 @@
 //!   sites in `render`, which are `todo!()` in a leaf this chunk does not own.
 //!   What is checked instead is that no accent is a state colour, and that
 //!   nothing about the values themselves keeps the two apart.
-//! - TUI-THEME-012's "once" — that the notice is said at startup and never
-//!   again — has no seam: `App::step` is `todo!()`, so no run reaches a second
-//!   frame to say it twice in.
 //! - TUI-THEME-006's cursor glyph and TUI-THEME-007's reversal are rendered by
 //!   `render`, and `theme` exposes no style seam for either; what is checked
 //!   here is the half that is this leaf's — that no palette colour is spent on
@@ -1404,7 +1401,7 @@ fn the_three_states_a_red_green_deficiency_compresses_are_told_apart_by_glyph() 
     // The glyphs (TUI-NAV-009's markers, TUI-NAV-020's chips).
     const AFFORDABLE: &str = "●";
     const PARTIAL: &str = "◐";
-    const ATTENTION_CHIPS: [&str; 4] = ["◦", "!", "★", "~"];
+    const ATTENTION_CHIPS: [&str; 6] = ["◦", "!", "★", "~", "↯", "✦"];
 
     assert_eq!(AFFORDABLE, meaning("affordable now").first_channel);
     assert_eq!(PARTIAL, meaning("partially affordable").first_channel);
@@ -1756,6 +1753,25 @@ fn first_notice(output: &str) -> Option<usize> {
 #[test]
 fn a_terminal_without_truecolor_is_told_so_before_the_alternate_screen() {
     let output = run_clowder("no-truecolor", None);
+
+    let opening = output
+        .lines()
+        .find(|l| {
+            let lower = l.to_lowercase();
+            NOTICE_WORDS.iter().any(|w| lower.contains(w))
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "no notice in the child's output:\n{}",
+                output.escape_debug()
+            )
+        });
+    assert_eq!(
+        output.matches(opening).count(),
+        1,
+        "the notice is said once, at startup; it was said more often:\n{}",
+        output.escape_debug()
+    );
 
     let at = first_notice(&output).unwrap_or_else(|| {
         panic!(
