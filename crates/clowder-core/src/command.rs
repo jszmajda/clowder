@@ -38,9 +38,7 @@ pub enum Command {
     /// Name a kitten the Elder (replacing any prior one, freely).
     /// @spec SIM-KIT-022
     AppointElder(usize),
-    // @spec SIM-CUR-010
     BuyRefinement(RefinementId),
-    // @spec SIM-CUR-011
     AdoptRule(RuleId),
     /// Bind the newest unbound Home Tinkerer to a recipe (seat permitting).
     /// @spec SIM-ECO-043
@@ -1199,6 +1197,8 @@ impl GameState {
         // would reseed the RNG); the legacy set below is left untouched.
         // @spec SIM-SUN-003 ----
         self.structures = [0; STRUCTURE_COUNT];
+        // A Move is the one thing that takes a researched idea away.
+        // @spec SIM-CUR-004
         self.ideas.clear();
         self.refinements.clear();
         self.rules.clear();

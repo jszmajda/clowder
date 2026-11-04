@@ -112,11 +112,9 @@ pub enum Event {
         name: String,
         rank: u8,
     },
-    // @spec SIM-CUR-010
     RefinementBought {
         id: RefinementId,
     },
-    // @spec SIM-CUR-011
     RuleAdopted {
         id: RuleId,
     },

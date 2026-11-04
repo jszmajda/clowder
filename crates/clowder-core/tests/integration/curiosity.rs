@@ -85,8 +85,8 @@ fn ideas_are_forever() {
 // @spec SIM-CUR-005
 #[test]
 fn the_idea_tree_matches_the_design_table() {
-    // The founding nine keep their tabled costs and prerequisites; the rest
-    // of the 57-idea banded tree is pinned by tests/economy_depth.rs.
+    // The founding nine keep their tabled costs and prerequisites; every row
+    // of the tree is read from the design in `curiosity_tables.rs`.
     let costs: Vec<f64> = IdeaId::ALL[..9]
         .iter()
         .map(|i| content::idea_def(*i).cost)

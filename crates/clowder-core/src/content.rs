@@ -1313,6 +1313,10 @@ pub fn season_patch_modifier(season: Season, winter_eased: bool) -> f64 {
 }
 
 // ---- Blurbs ----
+//
+// The tables' blurbs mark each resource they name, and every brace in them is
+// such a mark, and each states the figures its rule applies. @spec SIM-CUR-013,
+// SIM-CUR-015, SIM-CUR-016
 
 /// A run of a blurb: plain words, or words naming a resource.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1371,14 +1375,14 @@ pub fn blurb_text(blurb: &str) -> String {
 pub struct IdeaDef {
     pub name: &'static str,
     /// The joke and the plain effect, each resource it names marked
-    /// (`blurb_parts`). @spec SIM-CUR-013, SIM-CUR-015
+    /// (`blurb_parts`).
     pub blurb: &'static str,
     /// Curiosity price.
     pub cost: f64,
     /// Gate-craft components spent together with the curiosity, all-or-
-    /// nothing. @spec SIM-CUR-007
+    /// nothing.
     pub gate: &'static [(ResourceId, f64)],
-    /// ALL prerequisites must be researched. @spec SIM-CUR-008
+    /// ALL prerequisites must be researched.
     pub prereqs: &'static [IdeaId],
 }
 
@@ -2030,10 +2034,10 @@ static CRAFTS: [CraftDef; 18] = [
 // ---- Refinements ----
 
 /// One-time improvements priced in curiosity + materials, gated by ideas,
-/// each contributing effect-key values permanently. @spec SIM-CUR-010
+/// each contributing effect-key values permanently.
 pub struct RefinementDef {
     pub name: &'static str,
-    /// Marked as an idea's blurb is. @spec SIM-CUR-013, SIM-CUR-015
+    /// Marked as an idea's blurb is.
     pub blurb: &'static str,
     /// Curiosity price, spent together with the materials, all-or-nothing.
     pub cost: f64,
@@ -2046,6 +2050,7 @@ pub struct RefinementDef {
     pub per_structure: Option<StructureId>,
 }
 
+/// @spec SIM-CUR-010
 pub fn refinement_def(r: RefinementId) -> &'static RefinementDef {
     &REFINEMENTS[r as usize]
 }
@@ -2416,10 +2421,10 @@ static REFINEMENTS: [RefinementDef; REFINEMENT_COUNT] = [
 // ---- House Rules ----
 
 /// Mutually exclusive pairs, charm-priced; adopting one permanently blocks
-/// its sibling for the current meadow. @spec SIM-CUR-011
+/// its sibling for the current meadow.
 pub struct RuleDef {
     pub name: &'static str,
-    /// Marked as an idea's blurb is. @spec SIM-CUR-013, SIM-CUR-015
+    /// Marked as an idea's blurb is.
     pub blurb: &'static str,
     pub cost_charm: f64,
     /// The sibling this rule permanently blocks (and is blocked by).
@@ -2427,6 +2432,7 @@ pub struct RuleDef {
     pub effects: &'static [(Effect, f64)],
 }
 
+/// @spec SIM-CUR-011
 pub fn rule_def(r: RuleId) -> &'static RuleDef {
     &RULES[r as usize]
 }

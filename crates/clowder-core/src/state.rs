@@ -809,7 +809,7 @@ pub struct Profile {
 /// The banded idea tree, ids append-only: 0–8 are the founding nine, 9–17
 /// finish band 0, 18–27 band 1, 28–35 band 2, 36–43 band 3, 44–55 band 4,
 /// and 56 (Pouncing Practice) is a band-0 idea appended late — ids never
-/// reorder. @spec SIM-CUR-005
+/// reorder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum IdeaId {
     PantryOrganization,
@@ -940,7 +940,6 @@ impl IdeaId {
 }
 
 /// The Refinements table, ids append-only (35 in the society wave).
-// @spec SIM-CUR-010
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RefinementId {
     PebbleCombs,
@@ -1023,7 +1022,6 @@ impl RefinementId {
 }
 
 /// House Rules: four mutually exclusive, charm-priced pairs.
-// @spec SIM-CUR-011
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RuleId {
     EarlyBirds,
@@ -1500,10 +1498,10 @@ pub struct GameState {
     /// 0 when none. @spec SIM-KIT-025
     #[serde(default)]
     pub jamboree_until: u64,
-    /// Purchased refinements — permanent. @spec SIM-CUR-010
+    /// Purchased refinements — permanent.
     #[serde(default)]
     pub refinements: BTreeSet<RefinementId>,
-    /// Adopted house rules — permanent for this meadow. @spec SIM-CUR-011
+    /// Adopted house rules — permanent for this meadow.
     #[serde(default)]
     pub rules: BTreeSet<RuleId>,
     // ---- Wave 4: ceremonies (SIM-SUN) ----
@@ -2198,6 +2196,7 @@ impl GameState {
         content::OUTDOOR_TRANSFER
     }
 
+    /// @spec SIM-CUR-009
     pub fn job_unlocked(&self, j: JobId) -> bool {
         match content::job_def(j).gate {
             content::JobGate::Always => true,
@@ -2226,7 +2225,7 @@ impl GameState {
     }
 
     /// A recipe rides the idea tree: Locked until its granting idea.
-    // @spec SIM-ECO-033
+    // @spec SIM-ECO-033, SIM-CUR-009
     pub fn craft_unlocked(&self, c: CraftId) -> bool {
         match content::craft_def(c).gate {
             None => true,

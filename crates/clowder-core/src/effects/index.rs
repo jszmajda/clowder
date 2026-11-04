@@ -387,10 +387,19 @@ mod tests {
 
     /// Order is what keeps a float sum the same sum, and a wrong order can round
     /// the same way on any meadow a test happens to try, so the order is read
-    /// off the lists themselves rather than left to a sum to show.
-    /// @spec SIM-ENG-019, SIM-ENG-084
+    /// off the lists themselves rather than left to a sum to show. A refinement
+    /// and a house rule on one key is the case the curiosity leaf's sources meet.
+    /// @spec SIM-ENG-019, SIM-ENG-084, SIM-CUR-012
     #[test]
     fn each_keys_sources_stand_in_the_fixed_order() {
+        let both = sources(Effect::HappinessPoints);
+        let at = |wanted: fn(&Source) -> bool| both.iter().position(wanted);
+        let refinement = at(|s| matches!(s, Source::Refinement { .. }));
+        let rule = at(|s| matches!(s, Source::Rule { .. }));
+        assert!(
+            refinement.is_some() && rule.is_some(),
+            "fixture: a key carries both"
+        );
         for key in every_key() {
             let list = sources(key);
             for pair in list.windows(2) {

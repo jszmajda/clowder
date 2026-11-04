@@ -560,8 +560,9 @@ impl GameState {
 
         // Refinement-granted extra outputs on non-converter structures (the
         // Story Press). Converter hosts (the Hearth's Bellows and Ember
-        // Beds) add theirs throttle-scaled in run_converters.
-        // @spec SIM-CUR-010
+        // Beds) add theirs throttle-scaled in run_converters. Each reaches its
+        // store as its stated figure, outside the production stack's ratios.
+        // @spec SIM-CUR-010, SIM-CUR-017
         for (s, r) in content::STRUCTURE_OUTPUT_ADD_TARGETS {
             if content::structure_def(s).converter.is_some() {
                 continue;
@@ -773,7 +774,8 @@ impl GameState {
                 credit(ledger, src, *r, out * count as f64 * fraction);
             }
             // Refinement-granted extra outputs ride the same throttle (the
-            // Bellows and Ember Beds stoke the Hearth). @spec SIM-CUR-010
+            // Bellows and Ember Beds stoke the Hearth), and stand outside the
+            // stack's ratios. @spec SIM-CUR-010, SIM-CUR-017
             for (target, r) in content::STRUCTURE_OUTPUT_ADD_TARGETS {
                 if target != s {
                     continue;

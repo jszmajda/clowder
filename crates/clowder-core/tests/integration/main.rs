@@ -11,6 +11,7 @@ mod blurbs;
 mod bulktime;
 mod craft_all;
 mod curiosity;
+mod curiosity_tables;
 mod draw_schedule;
 mod economy;
 mod economy_depth;
