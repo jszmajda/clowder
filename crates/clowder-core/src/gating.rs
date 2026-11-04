@@ -397,6 +397,7 @@ impl GameState {
             C::Build(_)
             | C::ResearchIdea(_)
             | C::Craft(_)
+            | C::CraftAll(_)
             | C::BuyRefinement(_)
             | C::AdoptRule(_)
             | C::BuyRite(_)

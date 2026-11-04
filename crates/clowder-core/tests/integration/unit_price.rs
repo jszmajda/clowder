@@ -54,6 +54,7 @@ fn shape(c: &Command) -> Shape {
         | C::UnassignJob(_)
         | C::ResearchIdea(_)
         | C::Craft(_)
+        | C::CraftAll(_)
         | C::ObserveSky
         | C::SetSpeed(_)
         | C::HostJamboree

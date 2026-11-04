@@ -548,7 +548,7 @@ impl GameState {
                 }
             }
             C::AssignJob(j) => source = Some(Source::Job(j)),
-            C::Craft(c) => {
+            C::Craft(c) | C::CraftAll(c) => {
                 priced = Some(Id::Craft(c));
                 source = Some(Source::Craft(c));
             }

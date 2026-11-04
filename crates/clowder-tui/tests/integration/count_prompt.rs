@@ -896,6 +896,18 @@ fn stocked_for_builds(k: u32) -> (GameState, RowKey, StructureId) {
     (state, key, s)
 }
 
+/// A meadow whose stores cover `batches` of a recipe, its make row, and the
+/// recipe.
+fn stocked_for_batches(batches: f64) -> (GameState, RowKey, CraftId) {
+    let mut state = rich();
+    let c = CraftId::ALL[0];
+    state.resources[clowder_core::content::craft_output(c).ix()] = 0.0;
+    for (r, amount) in clowder_core::content::craft_def(c).inputs {
+        state.resources[r.ix()] = amount * batches;
+    }
+    (state, RowKey::Content(ContentId::Craft(c), "craft"), c)
+}
+
 /// The first count row in Clowder, and the job it assigns to.
 fn job_row(state: &GameState) -> (RowKey, Command) {
     rows(state, Section::Clowder)
@@ -1020,6 +1032,55 @@ fn a_count_row_count_stopped_partway_says_why_and_how_many_of_how_many() {
         on.contains("2") && on.contains("5"),
         "the footer {said:?} does not say that 2 of 5 were done"
     );
+}
+
+/// `X` on a make row makes every batch, far past the shell-side cap, in one call
+/// that finishes without a word.
+///
+/// @spec TUI-NAV-012
+#[test]
+fn x_max_on_a_make_row_makes_every_batch_past_any_cap_and_says_nothing() {
+    let batches = 40_000.0;
+    let (state, key, c) = stocked_for_batches(batches);
+    let output = clowder_core::content::craft_output(c);
+    let before = state.stock(output);
+    let mut one = state.clone();
+    one.apply(Command::Craft(c)).unwrap();
+    let batch = one.stock(output) - before;
+
+    let mut app = app_on(state, Section::Crafts, key, "max-make");
+    step(&mut app, &[press('X')]);
+
+    let made = app.state.stock(output) - before;
+    assert!(
+        (made - batches * batch).abs() <= 1e-6 * batches * batch,
+        "X made {made}, wanted {} from {batches} batches",
+        batches * batch
+    );
+    assert!(
+        app.state.apply(Command::Craft(c)).is_err(),
+        "X left the stores covering a batch"
+    );
+    assert_eq!(
+        footer(&app),
+        None,
+        "X on a make row that finished said something"
+    );
+}
+
+/// A make row whose stores cover no batch: the one call's refusal reads as
+/// Enter's, with no count of calls.
+///
+/// @spec TUI-NAV-012, TUI-NAV-069
+#[test]
+fn x_max_on_a_make_row_covering_no_batch_reads_as_enter_does() {
+    let (state, key, c) = stocked_for_batches(0.5);
+    let why = plain_error(&rejection_after(&state, Command::Craft(c), 0));
+
+    let mut app = app_on(state, Section::Crafts, key, "max-make-none");
+    step(&mut app, &[press('X')]);
+
+    assert_eq!(footer(&app).as_deref(), Some(why.as_str()));
 }
 
 /// `X` stopped by the core states the rejection and how many were done — and

@@ -1008,7 +1008,12 @@ fn handle_max_affordable(view: &mut ViewState, state: &GameState) -> Outcome {
         RowKind::Act { command, semantics } => match semantics {
             CountSemantics::CountTaking | CountSemantics::RepeatN => {
                 view.last_repeat = Some(now);
-                Outcome::Repeat(*command, MAX_AFFORDABLE_CAP)
+                match command {
+                    // A recipe's price never climbs, so the core makes every
+                    // batch the stocks cover in the one call.
+                    Command::Craft(c) => Outcome::Repeat(Command::CraftAll(*c), 1),
+                    _ => Outcome::Repeat(*command, MAX_AFFORDABLE_CAP),
+                }
             }
             CountSemantics::Single => {
                 set_footer(view, "There's no count to set here.");

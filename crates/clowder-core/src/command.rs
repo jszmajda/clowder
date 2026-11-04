@@ -20,6 +20,8 @@ pub enum Command {
     ResearchIdea(IdeaId),
     /// One batch of a recipe. @spec SIM-ECO-033
     Craft(CraftId),
+    /// Every batch of a recipe the stocks cover. @spec SIM-ECO-064
+    CraftAll(CraftId),
     /// Bank a pending sky event's yields before its window closes.
     /// @spec SIM-ENG-025
     ObserveSky,
@@ -229,6 +231,7 @@ impl GameState {
             Command::UnassignJob(j) => self.unassign(j),
             Command::ResearchIdea(i) => self.research(i),
             Command::Craft(c) => self.craft(c),
+            Command::CraftAll(c) => self.craft_all(c),
             Command::ObserveSky => self.observe_sky(),
             Command::SetSpeed(v) => self.set_speed(v),
             Command::Pounce(squads) => self.pounce(squads),
@@ -334,11 +337,43 @@ impl GameState {
         }
         let def = content::craft_def(c);
         self.spend(def.inputs)?;
+        self.add_batches(c, 1.0);
+        Ok(Vec::new())
+    }
+
+    /// Every batch the stocks cover, worked out rather than called for one at a
+    /// time: a recipe's price never climbs, so a store can owe more batches than
+    /// any run of calls could reach.
+    ///
+    /// The stocks are not checked again before spending. At these heights a whole
+    /// count of batches can round a hair past the stock, and the count is already
+    /// what the stock covers. @spec SIM-ECO-064
+    fn craft_all(&mut self, c: CraftId) -> Result<Vec<Event>, CommandError> {
+        let inputs = content::craft_def(c).inputs;
+        let batches = inputs
+            .iter()
+            .map(|(r, amount)| ((self.stock(*r) + EPSILON) / amount).floor())
+            .fold(f64::INFINITY, f64::min);
+        if !self.craft_unlocked(c) || batches < 1.0 {
+            // Refused exactly as one batch is: a stock short of every batch is
+            // short of this one too.
+            return self.craft(c);
+        }
+        for (r, amount) in inputs {
+            let ix = r.ix();
+            self.resources[ix] = (self.resources[ix] - amount * batches).max(0.0);
+        }
+        self.add_batches(c, batches);
+        Ok(Vec::new())
+    }
+
+    /// What making `batches` of a recipe yields: 1 × (1 + craft ratio) each, up
+    /// to the output's cap. @spec SIM-ECO-033, SIM-ECO-064
+    fn add_batches(&mut self, c: CraftId, batches: f64) {
         let output = content::craft_output(c);
         let batch = 1.0 * (1.0 + self.craft_ratio_for(c));
         let ix = output.ix();
-        self.resources[ix] = (self.resources[ix] + batch).min(self.cap(output));
-        Ok(Vec::new())
+        self.resources[ix] = (self.resources[ix] + batches * batch).min(self.cap(output));
     }
 
     /// Observe a pending, unexpired sky event for its yields; anything else

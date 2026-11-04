@@ -9,6 +9,7 @@ mod achievements;
 mod blurb_truth;
 mod blurbs;
 mod bulktime;
+mod craft_all;
 mod curiosity;
 mod draw_schedule;
 mod economy;

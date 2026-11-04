@@ -2773,6 +2773,15 @@ fn one_unit(row: &Row) -> Command {
     }
 }
 
+/// What `X` asks of a row it runs on: on a recipe's make row, one call that
+/// makes every batch; on any other, its one unit up to the shell-side cap.
+fn x_run(row: &Row) -> Outcome {
+    match one_unit(row) {
+        Command::Craft(c) => Outcome::Repeat(Command::CraftAll(c), 1),
+        unit => Outcome::Repeat(unit, MAX_AFFORDABLE_CAP),
+    }
+}
+
 /// The command a row would put through the core on Enter, if it has one.
 fn row_command(row: &Row) -> Option<Command> {
     match &row.kind {
@@ -3185,7 +3194,8 @@ fn a_count_prompt_whose_row_has_left_its_list_closes_with_no_effect_and_says_so(
 /// `X` runs on every row that is not heavy, not already the player's, and
 /// takes a count or is repeated N times, and on every count row — one unit per
 /// call: a repeat-N command as it stands, a count-taking command with a count
-/// of one, a count row's assign — repeatedly, not as a single call.
+/// of one, a count row's assign — repeatedly, not as a single call. A recipe's
+/// make row alone is one call, which makes every batch.
 ///
 /// @spec TUI-NAV-012
 #[test]
@@ -3194,10 +3204,9 @@ fn x_max_runs_every_row_that_takes_a_count_one_unit_per_call() {
     let state = rich();
     let (mut count_taking, mut seen) = (0, 0);
 
-    for (section, row) in every_row(&state)
-        .into_iter()
-        .filter(|(_, r)| opens_prompt(&state, r) && !r.heavy)
-    {
+    for (section, row) in every_row(&state).into_iter().filter(|(_, r)| {
+        opens_prompt(&state, r) && !r.heavy && !matches!(one_unit(r), Command::Craft(_))
+    }) {
         seen += 1;
         if is_count_taking(&row) {
             count_taking += 1;
@@ -3237,9 +3246,9 @@ fn x_runs_on(state: &GameState, row: &Row) -> bool {
     opens_prompt(state, row) && !row.heavy
 }
 
-/// The shell-side cap is ten thousand calls: every row `X` runs on asks for
-/// its one unit exactly that many times, and the constant the prompt's count
-/// is bounded by is that same number.
+/// The shell-side cap is ten thousand calls: every row `X` runs on but a
+/// recipe's make row asks for its one unit exactly that many times, and the
+/// constant the prompt's count is bounded by is that same number.
 ///
 /// @spec TUI-NAV-012
 #[test]
@@ -3254,7 +3263,7 @@ fn x_max_asks_for_exactly_ten_thousand_calls_on_every_row_it_runs_on() {
 
     for (section, row) in every_row(&state)
         .into_iter()
-        .filter(|(_, r)| x_runs_on(&state, r))
+        .filter(|(_, r)| x_runs_on(&state, r) && !matches!(one_unit(r), Command::Craft(_)))
     {
         seen += 1;
         let mut view = focused(section, row.key.clone());
@@ -3267,6 +3276,40 @@ fn x_max_asks_for_exactly_ten_thousand_calls_on_every_row_it_runs_on() {
         );
     }
     assert!(seen > 0, "fixture: no row X runs on is listed");
+}
+
+/// On a recipe's make row `X` is one call, asking the core for every batch the
+/// stocks cover: no cap to reach, whatever they stand at.
+///
+/// @spec TUI-NAV-012
+#[test]
+fn x_max_on_a_make_row_asks_the_core_once_for_every_batch() {
+    let _clock = now::held();
+    let state = rich();
+    let mut seen = BTreeSet::new();
+
+    for (section, row) in every_row(&state) {
+        if let RowKind::Act {
+            command: Command::Craft(c),
+            ..
+        } = row.kind
+        {
+            seen.insert(c as u32);
+            let mut view = focused(section, row.key.clone());
+            let out = update(Action::MaxAffordable, &mut view, &state);
+            assert_eq!(
+                out,
+                Outcome::Repeat(Command::CraftAll(c), 1),
+                "X on {:?} did not ask the core once for every batch",
+                row.key
+            );
+        }
+    }
+    assert_eq!(
+        seen.len(),
+        CraftId::ALL.len(),
+        "fixture: every recipe's make row is listed"
+    );
 }
 
 /// `X` makes no affordability pre-check, as Enter and `x` make none: with the
@@ -3303,7 +3346,7 @@ fn x_max_runs_on_rows_the_stock_cannot_cover() {
         let out = update(Action::MaxAffordable, &mut view, &state);
         assert_eq!(
             out,
-            Outcome::Repeat(one_unit(&row), MAX_AFFORDABLE_CAP),
+            x_run(&row),
             "X on the unaffordable {:?} was not attempted; X makes no affordability pre-check",
             row.key
         );
