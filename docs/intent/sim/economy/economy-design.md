@@ -148,7 +148,7 @@ A structure that could stand in two goes where the player would first look for i
 
 ## CRAFT — Crafting
 
-`Craft(id)` makes one batch: output = 1 × (1 + CraftRatio effects). All-or-nothing input spend, epsilon-tolerant. Recipes (inputs per batch):
+`Craft(id)` makes one batch: output = 1 × (1 + CraftRatio effects). All-or-nothing input spend, epsilon-tolerant. `CraftAll(id)` makes every batch the stocks cover in one step, the count worked out by the core from the recipe's scarcest input: a recipe's price does not escalate and a stock can stand far past anything calling one batch at a time could reach. Recipes (inputs per batch):
 
 | Craft | Inputs |
 |---|---|
@@ -243,6 +243,7 @@ StorageFull rejection when the yield resource is at cap (unchanged rule).
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
+| Making as many as the stocks cover | One command that works out the count and makes them in one step | A batch per call up to a cap; a batch per call with no cap; a count the caller works out and passes | A cap silently stops short of what the stocks cover. With no cap, a stock can owe more calls than a frame can spare. A caller working out the count would hold the recipe's price rule outside the core |
 | How structures divide | One family each, by what the player comes to it for | By the good each makes; by the stage of play it opens at; by what it costs | A player looking for more room, or for energy, is asking what a structure is for. Sorting by its good scatters what answers one question and leaves many with no good at all. Sorting by stage answers a question nobody brings to the list, and changes nothing a player can use |
 | Where a structure's rule-held behaviour lives | A typed field per behaviour on the definition, read by the rule | A blurb on the structures that need one; constants beside each rule, with sentences written in the shell | A blurb repeats its figures in prose that can drift from the rule, and a blurb kind's fields go unstated, which would split one kind into two statement rules. Sentences in the shell over constants in the core are a second copy of the rule outside the tables. A field gives the rule and the statement one value to read, and describes a later structure for free |
 | How state-driven scaling is stated | A flag on the definition per scaling, read by the rule and worded as a qualifier without its factor | One flag for energy and production seasonality; stating each factor | Production seasonality and energy seasonality are different rules with different factors, so one flag would read as one rule. A factor stated beside a figure invites working out a yield the core owns, as the production qualifiers already decline to |

@@ -51,8 +51,9 @@ const ARM_DURATION: Duration = Duration::from_secs(8);
 const REPEAT_GATE: Duration = Duration::from_millis(100);
 
 /// The shell-side cap on how many times `X` may repeat-call a command, and on
-/// the count prompt's own count (TUI-NAV-068) — the same cap, so the prompt
-/// always shows the count `X` would have used. @spec TUI-NAV-012, TUI-NAV-068
+/// the count prompt's own count (TUI-NAV-068) — the same cap, so no run of calls
+/// goes higher than any other. A recipe's make row makes no run of calls: its
+/// `X` is one call to the core. @spec TUI-NAV-012, TUI-NAV-068
 pub const MAX_AFFORDABLE_CAP: u32 = 10_000;
 
 /// Fold an action into the view, yielding whatever the core must be told.
@@ -1052,8 +1053,8 @@ fn handle_increment_decrement(view: &mut ViewState, state: &GameState, up: bool)
 
 /// The count prompt takes digits only, and only up to the same cap that
 /// bounds `X`: a digit that would carry the count past it is refused, with a
-/// footer note, so the prompt's count never reads higher than `X` would ever
-/// run. The palette takes every printable character, digits and Space
+/// footer note, so the prompt's count never reads higher than a run of calls
+/// can go. The palette takes every printable character, digits and Space
 /// included, verbatim into its query. @spec TUI-NAV-037, TUI-NAV-068
 fn handle_type(view: &mut ViewState, c: char) -> Outcome {
     if let Some(prompt) = view.prompt.as_mut() {

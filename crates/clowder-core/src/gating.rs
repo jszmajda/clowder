@@ -140,10 +140,12 @@ impl GameState {
     /// action has no closed form. @spec SIM-ENG-033
     ///
     /// Only structures carry the escalating, purely-resource-gated shape a
-    /// closed form solves for; every other kind is one-shot (bounded by
-    /// `AlreadyYours` after a single purchase) or gated by something other
-    /// than stock (a kitten to assign, a seat to fill), so naming a count in
-    /// advance would either be trivial or misrepresent a non-resource block.
+    /// closed form solves for. A recipe's price never climbs, and `CraftAll`
+    /// answers it in the core without a count to name; every other kind is
+    /// one-shot (bounded by `AlreadyYours` after a single purchase) or gated by
+    /// something other than stock (a kitten to assign, a seat to fill), so
+    /// naming a count in advance would either be trivial or misrepresent a
+    /// non-resource block.
     pub fn max_affordable(&self, id: ContentId) -> Option<u32> {
         match id {
             ContentId::Structure(s) => Some(self.max_affordable_structure(s)),
