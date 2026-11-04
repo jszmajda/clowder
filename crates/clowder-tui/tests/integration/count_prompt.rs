@@ -2027,3 +2027,147 @@ fn an_open_prompt_draws_its_count_and_exact_preview_in_the_cost_fields_place() {
 fn cells(line: &[String], from: usize, to: usize) -> String {
     line[from..to].concat()
 }
+
+// ---------------------------------------------------------------------------
+// TUI-THEME-034 — the typed count stands out of the bar
+// ---------------------------------------------------------------------------
+
+/// The focused row of a frame drawn at `size`: each cell's symbol and style.
+fn focused_row_cells(
+    state: &GameState,
+    view: &ViewState,
+    size: (u16, u16),
+) -> Vec<(String, ratatui::style::Style)> {
+    let mut term = Terminal::new(TestBackend::new(size.0, size.1)).expect("a test terminal");
+    term.draw(|f| {
+        clowder_tui::render::frame(f, state, view, None);
+    })
+    .expect("a frame");
+    let buf = term.backend().buffer();
+    (0..buf.area.height)
+        .map(|y| {
+            (0..buf.area.width)
+                .map(|x| {
+                    let cell = &buf[(x, y)];
+                    (cell.symbol().to_string(), cell.style())
+                })
+                .collect::<Vec<_>>()
+        })
+        .find(|line| {
+            line.iter().any(|(symbol, style)| {
+                symbol == "▸"
+                    && style
+                        .add_modifier
+                        .contains(ratatui::style::Modifier::REVERSED)
+            })
+        })
+        .expect("fixture: the prompt's row is drawn")
+}
+
+/// On every row a prompt opens on, whatever colour its bar wears, and however the
+/// text had to fit, the count alone stands out of the bar in the terminal's own
+/// pair, and the row around it stays on the bar.
+/// @spec TUI-THEME-007, TUI-THEME-034
+#[test]
+fn the_typed_count_stands_out_of_the_bar_on_every_row() {
+    use ratatui::style::{Color, Modifier};
+    const DIGITS: [&str; 5] = ["", "0", "37", "250", "10000"];
+    const SIZES: [(u16, u16); 2] = [(80, 24), (200, 60)];
+    let state = rich();
+    let targets = prompt_rows(&state);
+    assert!(!targets.is_empty(), "fixture: some row takes a count");
+    let mut bars = BTreeSet::new();
+    for (section, row) in &targets {
+        for size in SIZES {
+            for digits in DIGITS {
+                let view = prompt_on(*section, row, digits, &state);
+                let cells = focused_row_cells(&state, &view, size);
+                let symbols: Vec<&str> = cells.iter().map(|(s, _)| s.as_str()).collect();
+                let at = symbols
+                    .iter()
+                    .rposition(|s| *s == "×")
+                    .unwrap_or_else(|| panic!("the count's × on {:?}", row.key));
+                let end = at + 1 + digits.len();
+                assert_eq!(
+                    symbols[at + 1..end].concat(),
+                    digits,
+                    "the digits directly after the ×, on {:?}",
+                    row.key
+                );
+                for (i, (symbol, style)) in cells[at..end].iter().enumerate() {
+                    assert!(
+                        !style.add_modifier.contains(Modifier::REVERSED),
+                        "{:?} at {size:?}, {digits:?}: {symbol:?} (+{i}) is still on the bar",
+                        row.key
+                    );
+                    for colour in [style.fg, style.bg] {
+                        assert!(
+                            matches!(colour, None | Some(Color::Reset)),
+                            "{:?} at {size:?}, {digits:?}: {symbol:?} wears {colour:?}, \
+                             not the terminal's own pair",
+                            row.key
+                        );
+                    }
+                }
+                let (cursor_symbol, cursor_style) = &cells
+                    .iter()
+                    .find(|(s, _)| s == "▸")
+                    .expect("the cursor's cell");
+                assert_eq!(cursor_symbol, "▸");
+                bars.insert(format!("{:?}", cursor_style.fg));
+                // The cell after the count is the bar again, preview or blank.
+                let (_, after) = &cells[end];
+                assert!(
+                    after.add_modifier.contains(Modifier::REVERSED),
+                    "{:?} at {size:?}, {digits:?}: the cell after the count left the bar",
+                    row.key
+                );
+            }
+        }
+    }
+    assert!(
+        bars.len() >= 2,
+        "fixture: the rows swept wear more than one bar colour: {bars:?}"
+    );
+}
+
+/// With nothing typed, the `×` alone still stands out, so the player has the
+/// place to look before the first digit.
+/// @spec TUI-RENDER-021, TUI-THEME-034
+#[test]
+fn the_empty_count_still_marks_its_place() {
+    use ratatui::style::Modifier;
+    let state = rich();
+    let (section, row) = prompt_rows(&state).remove(0);
+    let view = prompt_on(section, &row, "", &state);
+    let cells = focused_row_cells(&state, &view, (120, 40));
+    let (_, style) = cells
+        .iter()
+        .rfind(|(s, _)| s == "×")
+        .expect("the × with nothing typed");
+    assert!(!style.add_modifier.contains(Modifier::REVERSED));
+}
+
+/// A row with no prompt open stays whole on its bar, every cell of its line.
+/// @spec TUI-THEME-007
+#[test]
+fn a_row_with_no_prompt_keeps_its_whole_bar() {
+    use ratatui::style::Modifier;
+    let state = rich();
+    let (section, row) = prompt_rows(&state).remove(0);
+    let view = focused(section, row.key.clone());
+    let cells = focused_row_cells(&state, &view, (120, 40));
+    let first = cells
+        .iter()
+        .position(|(s, _)| s == "▸")
+        .expect("the cursor");
+    let reversed = |style: &ratatui::style::Style| style.add_modifier.contains(Modifier::REVERSED);
+    let last = cells
+        .iter()
+        .rposition(|(_, style)| reversed(style))
+        .expect("a bar");
+    assert!(
+        cells[first..=last].iter().all(|(_, style)| reversed(style)),
+        "no notch without a prompt"
+    );
+}

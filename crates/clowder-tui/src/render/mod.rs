@@ -49,6 +49,9 @@ pub(crate) struct Piece {
     /// A state colour worn by this run alone, as the `short` tag wears
     /// attention (TUI-THEME-015) — on a line that lets colour show.
     role: Option<Role>,
+    /// In the terminal's own pair, whatever the line wears: out of a reversal,
+    /// and out of the line's colour.
+    apart: bool,
 }
 
 impl Piece {
@@ -57,6 +60,15 @@ impl Piece {
             text: text.into(),
             coat: None,
             role: None,
+            apart: false,
+        }
+    }
+
+    /// Text set apart from its line in the terminal's own pair.
+    fn apart(text: impl Into<String>) -> Self {
+        Piece {
+            apart: true,
+            ..Piece::plain(text)
         }
     }
 
@@ -66,6 +78,7 @@ impl Piece {
             text: text.into(),
             coat: None,
             role: Some(role),
+            apart: false,
         }
     }
 
@@ -76,6 +89,7 @@ impl Piece {
             text: drawn.into(),
             coat: Some((r, full_chars)),
             role: None,
+            apart: false,
         }
     }
 }
@@ -115,6 +129,10 @@ pub(crate) fn line_from_pieces(
 ) -> Line<'static> {
     let mut cells: Vec<(char, Style)> = Vec::new();
     for piece in pieces {
+        if piece.apart {
+            cells.extend(piece.text.chars().map(|c| (c, Style::default())));
+            continue;
+        }
         match piece.coat {
             Some((r, full)) if coats => {
                 let colours = crate::theme::coat_colours(crate::theme::coat(r), full);
@@ -445,9 +463,11 @@ fn prompt_preview_parts(comps: &[(ResourceId, f64)]) -> Vec<(String, ResourceId)
 /// `keep` of them (all, with `None`), each its figure, a space, and the
 /// resource's name as a piece of its own, apart by `, `, with `, …` after
 /// them where any is left out — or `…` alone after the blank columns where
-/// none is kept. @spec TUI-NAV-067, TUI-RENDER-021, TUI-THEME-019
+/// none is kept. The count alone stands apart from the row's bar, what the eye
+/// is hunting while it types. @spec TUI-NAV-067, TUI-RENDER-021, TUI-THEME-019,
+/// TUI-THEME-034
 fn prompt_pieces(parts: &[(String, ResourceId)], digits: &str, keep: Option<usize>) -> Vec<Piece> {
-    let mut out = vec![Piece::plain(format!("×{digits}"))];
+    let mut out = vec![Piece::apart(format!("×{digits}"))];
     if parts.is_empty() {
         return out;
     }
