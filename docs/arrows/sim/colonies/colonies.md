@@ -51,3 +51,4 @@ Audited 2026-11-03, for what issue #34 changed. A napping caravan now brings its
 ## Work Required
 
 - #35: thin table and multiplier tests.
+- #47: a per-colony effect key no content feeds (SIM-TRADE-005).

@@ -4,7 +4,7 @@ The mystic leaf is the unicorn economy and everything glittering that follows fr
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-03 (commit `2cddde1e39c7`). 16 of 16 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-04 (commit `bd060172a216`). 16 of 16 active specs implemented, each cited by a test.
 
 ## References
 
@@ -50,6 +50,8 @@ Audited 2026-11-02, for what issue #30 changed. The two arch upgrades that dream
 
 Audited 2026-11-03, for what issue #32 changed. The code that sums this segment's effect contributions moved behind the per-key source lists (SIM-ENG-084), annotations with it; its specs did not change. Each contribution is held by a bit-for-bit comparison against a walk of every source, and a real late save replayed by the previous build and this one ended in the same bytes. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
+Audited 2026-11-04, for what issue #15 changed. Three effect keys no content fed left the rules and their specs (SIM-UNI-001, SIM-UNI-003, SIM-UNI-007): the two the issue named, and the third with the same shape in this segment. Each read one in play, so no outcome moved. The starshard refine keeps its multiplier, which Arch upgrades feed.
+
 ## Work Required
 
-- #15: two effect keys no content feeds (SIM-UNI-001, SIM-UNI-003).
+None.

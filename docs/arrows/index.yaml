@@ -150,7 +150,7 @@ arrows:
     parent: sim
     sampled: 2026-11-04
     audited: 2026-11-04
-    audited_sha: 031e89bf46a64dac3af73ebc27a3037cc98ac006
+    audited_sha: bd060172a216605a14e1c192d02a8a5028f4a2aa
     blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md
@@ -179,15 +179,15 @@ arrows:
     next: "#41: thin tests"
     drift: null
   mystic:
-    status: PARTIAL
+    status: OK
     parent: sim
-    sampled: 2026-11-03
-    audited: 2026-11-03
-    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
+    sampled: 2026-11-04
+    audited: 2026-11-04
+    audited_sha: bd060172a216605a14e1c192d02a8a5028f4a2aa
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/mystic/mystic.md
-    next: "#15: sourceless effect keys"
+    next: null
     drift: null
   navigation:
     status: OK

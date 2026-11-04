@@ -4,7 +4,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 ## Status
 
-**OK** — last audited 2026-11-04 (commit `031e89bf46a6`). 83 of 83 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-04 (commit `bd060172a216`). 84 of 84 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/engine/engine-specs.md` — 83 specs, prefix `SIM-ENG`
+- `docs/intent/sim/engine/engine-specs.md` — 84 specs, prefix `SIM-ENG`
 
 ### Tests
 - `crates/clowder-core/tests/integration/draw_schedule.rs`
@@ -60,9 +60,9 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-ENG-001 – SIM-ENG-084 | 83 | 0 | 0 |
+| All | SIM-ENG-001 – SIM-ENG-085 | 84 | 0 | 0 |
 
-**Summary:** 83 of 83 active specs implemented.
+**Summary:** 84 of 84 active specs implemented.
 
 ## Key Findings
 
@@ -79,6 +79,8 @@ Audited 2026-11-03, for what issue #36 changed. The tinkerers' bench counts its 
 Audited 2026-11-03, for what issue #37 changed. The journal's types no longer carry annotations; what decides, the recording and its window, already cited SIM-ENG-027 and SIM-ENG-029. No spec changed. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-04, for what issue #44 changed. No rule of this segment changed: the gating and the store-link queries each gained an arm treating the new command as the one-batch command is treated, and the closed-form max's comment now says how a recipe stands to it.
+
+Audited 2026-11-04, for what issue #15 changed. An effect key now arrives with the content that feeds it (SIM-ENG-085), held by a test over every key family. The one family excepted, per-colony standing, belongs to sim/colonies and is filed as #47. The key slots closed up; the test that every key has its own place still holds them.
 
 ## Work Required
 
