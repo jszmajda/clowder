@@ -223,15 +223,15 @@ arrows:
     next: null
     drift: null
   render:
-    status: PARTIAL
+    status: OK
     parent: tui
     sampled: 2026-11-04
     audited: 2026-11-04
-    audited_sha: 9d87540cb436904ac3bdbb3db30e35b6c90329df
+    audited_sha: 8ea2ab82bb22f43d642706a418305d6126b30d6d
     blocks: []
     blockedBy: [navigation, runtime, theme]
     detail: tui/render/render.md
-    next: "#21: one untested clause"
+    next: null
     drift: null
   runtime:
     status: PARTIAL
@@ -245,15 +245,15 @@ arrows:
     next: "#29: thin tests"
     drift: null
   theme:
-    status: PARTIAL
+    status: OK
     parent: tui
     sampled: 2026-11-04
     audited: 2026-11-04
-    audited_sha: 9d87540cb436904ac3bdbb3db30e35b6c90329df
+    audited_sha: 8ea2ab82bb22f43d642706a418305d6126b30d6d
     blocks: [render]
     blockedBy: []
     detail: tui/theme/theme.md
-    next: "#21: thin tests"
+    next: null
     drift: null
 
 unmapped:

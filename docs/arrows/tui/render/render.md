@@ -4,7 +4,7 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-04 (commit `9d87540cb436`). 36 of 36 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-04 (commit `8ea2ab82bb22`). 36 of 36 active specs implemented, each cited by a test.
 
 ## References
 
@@ -65,6 +65,8 @@ Audited 2026-11-03, for what issue #39 changed. A click now holds its section's 
 
 Audited 2026-11-04, for what issue #45 changed. A count prompt's count keeps its place and its layout (TUI-RENDER-021), its text and every fit unchanged, and is only drawn apart (TUI-THEME-034). Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
+Audited 2026-11-04, for what issue #21 changed. The clause cutting the bench's seats could not be reached: the place fits the seats at six digits each, which the test now pins, far past a meadow's figures. It left the spec, the design, and the code (TUI-RENDER-028).
+
 ## Work Required
 
-- #21: the last clause of TUI-RENDER-028 is untested and may be unreachable.
+None.

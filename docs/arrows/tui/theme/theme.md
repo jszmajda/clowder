@@ -4,7 +4,7 @@ This leaf owns every colour decision in clowder: the palette, what each colour i
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-04 (commit `9d87540cb436`). 34 of 34 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-04 (commit `8ea2ab82bb22`). 34 of 34 active specs implemented, each cited by a test.
 
 ## References
 
@@ -63,6 +63,8 @@ Audited 2026-11-01. First full audit, by the same method as render's. Every colo
 
 Audited 2026-11-04, for what issue #45 changed. A count prompt's count stands out of the bar in the terminal's own pair (TUI-THEME-034), the one run a reversed list row leaves out (TUI-THEME-007), so it needs no colour of its own, claims no state, and clears every bar in either polarity. It is tested cell by cell on every row a prompt opens on, and each test was checked by breaking what it guards; how it looks has not been judged by eye. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
+Audited 2026-11-04, for what issue #21 changed. The tests that asserted less than their specs now read drawn frames. Colour by state rather than item is read off every content row of every section, and a store's coat across its stock, cap, and rate (TUI-THEME-003). A frame with its colour removed still says each state (TUI-THEME-010). The chip sweeps cover all six chips at every width (TUI-THEME-011, TUI-THEME-015). The notice is counted, so saying it twice fails (TUI-THEME-012). Coats are held on an open prompt's preview and a unit-price line (TUI-THEME-019), and on every kind of description that carries a blurb (TUI-THEME-022). Each was broken once in a scratch copy; eighteen mutations were caught, one only after the state-by-item fixture was widened to meadows with everything learned, and two more on later items confirmed that. The mood spec gained its annotation (TUI-THEME-005).
+
 ## Work Required
 
-- #21: tests that assert less than their spec says (TUI-THEME-003, TUI-THEME-010, TUI-THEME-011, TUI-THEME-012, TUI-THEME-015, TUI-THEME-019, TUI-THEME-022).
+None.
