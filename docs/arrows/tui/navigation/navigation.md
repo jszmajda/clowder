@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-03 (commit `ce32a57b5421`). 203 of 203 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-04 (commit `031e89bf46a6`). 203 of 203 active specs implemented, each cited by a test.
 
 ## References
 
@@ -100,6 +100,8 @@ Audited 2026-11-03, for what issue #37 changed. What the core answers as held be
 Audited 2026-11-03, for what issue #38 changed. The Meadow's structures stand in one ordinary group per family (TUI-NAV-097, TUI-NAV-098, TUI-NAV-100), so `[`/`]` stop at each and a header stands only over a listed row (TUI-NAV-099). The list is no shorter, so what stands below it is still off-screen until the cursor or a group key reaches it. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-03, for what issue #39 changed. A press on a row now also holds that section's list where the frame aimed at drew it (TUI-NAV-129), so the clicked row stays under the pointer; the wheel's rule is unchanged (TUI-NAV-130). Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-04, for what issue #44 changed. `X` on a recipe's make row is now one call that makes every batch the stocks cover (TUI-NAV-012); every other row keeps its run of calls and its cap. The census of commands a row must reach names the new command as having no row of its own (TUI-NAV-039). The shell-cap comments now say what holds on both kinds of row.
 
 ## Work Required
 

@@ -137,9 +137,9 @@ arrows:
   economy:
     status: OK
     parent: sim
-    sampled: 2026-11-03
-    audited: 2026-11-03
-    audited_sha: 5e255644179a98d8685bd60516896e75fb53cbb9
+    sampled: 2026-11-04
+    audited: 2026-11-04
+    audited_sha: 031e89bf46a64dac3af73ebc27a3037cc98ac006
     blocks: [curiosity, expeditions, kittens]
     blockedBy: [engine]
     detail: sim/economy/economy.md
@@ -148,9 +148,9 @@ arrows:
   engine:
     status: OK
     parent: sim
-    sampled: 2026-11-03
-    audited: 2026-11-03
-    audited_sha: e1a0720b63e584b549f04d0b7d61f1980767aaa3
+    sampled: 2026-11-04
+    audited: 2026-11-04
+    audited_sha: 031e89bf46a64dac3af73ebc27a3037cc98ac006
     blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md
@@ -192,9 +192,9 @@ arrows:
   navigation:
     status: OK
     parent: tui
-    sampled: 2026-11-03
-    audited: 2026-11-03
-    audited_sha: ce32a57b5421739e88e24593861f66ec1918af9f
+    sampled: 2026-11-04
+    audited: 2026-11-04
+    audited_sha: 031e89bf46a64dac3af73ebc27a3037cc98ac006
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md

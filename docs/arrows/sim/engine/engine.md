@@ -4,7 +4,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 ## Status
 
-**OK** — last audited 2026-11-03 (commit `e1a0720b63e5`). 83 of 83 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-04 (commit `031e89bf46a6`). 83 of 83 active specs implemented, each cited by a test.
 
 ## References
 
@@ -77,6 +77,8 @@ Audited 2026-11-03, for what issue #32 changed. An effect sum now reads only the
 Audited 2026-11-03, for what issue #36 changed. The tinkerers' bench counts its seats saturating, so a copy count at the top of its range cannot overflow the sum (SIM-ENG-073). No spec changed. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-03, for what issue #37 changed. The journal's types no longer carry annotations; what decides, the recording and its window, already cited SIM-ENG-027 and SIM-ENG-029. No spec changed. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-04, for what issue #44 changed. No rule of this segment changed: the gating and the store-link queries each gained an arm treating the new command as the one-batch command is treated, and the closed-form max's comment now says how a recipe stands to it.
 
 ## Work Required
 
