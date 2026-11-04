@@ -6,6 +6,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 
 ### New
 
+- **Rows that spend now say what they cost.** Actions that take from your stores show their price in the list and the info pane, as everything else you can buy does.
 - **You can take back something you built.** Pressing `-` on a structure's row offers to take one down and says what you'd get back. Confirm with `Enter`. You get back part of its price, and nobody who lives or works there is turned out.
 - **A trip that finds everyone asleep may still bring a little something.** Now and then, a small gift comes home where before there was nothing, and the info pane says how often.
 - **The sidebar shows what the row under the cursor does to your stores.** A small mark beside a store says whether the row would raise it, lower it, or both, so there's no more matching names by eye. The help screen explains the marks.
