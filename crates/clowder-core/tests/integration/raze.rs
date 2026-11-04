@@ -85,6 +85,29 @@ fn a_return_stops_at_the_cap_with_the_copy_gone_and_lowers_nothing() {
     assert_eq!(above.stock(r), cap * 2.0 + 1.0, "a stock is never lowered");
 }
 
+/// Room is judged with the copy gone: a structure priced in a store it also gives
+/// room to returns nothing to a store already at the cap it would then have.
+///
+/// @spec SIM-ECO-065
+#[test]
+fn a_returns_room_is_judged_with_the_copy_gone() {
+    let (st, r) = StructureId::ALL
+        .into_iter()
+        .find_map(|st| {
+            let (with, without) = (standing(st, 3, 1), standing(st, 2, 1));
+            price_at(st, 2)
+                .iter()
+                .find(|(r, _)| without.cap(*r).is_finite() && without.cap(*r) < with.cap(*r))
+                .map(|(r, _)| (st, *r))
+        })
+        .expect("fixture: a structure priced in a store it gives room to");
+    let mut s = standing(st, 3, 19);
+    let cap_after = standing(st, 2, 1).cap(r);
+    s.resources[r.ix()] = cap_after;
+    s.apply(Command::Raze(st)).unwrap();
+    assert_eq!(s.stock(r), cap_after, "no room with the copy gone");
+}
+
 /// With no copy standing, the command is refused and nothing changes.
 ///
 /// @spec SIM-ECO-065
@@ -157,7 +180,7 @@ fn a_kitten_past_the_new_room_stays() {
     assert!(!homes.is_empty(), "fixture: the kittens have homes");
     let roster = s.kittens.clone();
     for st in homes {
-        while s.structures[st.ix()] > 0 {
+        for _ in 0..s.structures[st.ix()] {
             s.apply(Command::Raze(st)).unwrap();
         }
     }
@@ -195,7 +218,7 @@ fn a_tinkerer_past_the_new_seats_stays_bound() {
     let bound = |s: &GameState| s.kittens.iter().filter(|k| k.tinkering.is_some()).count();
     assert_eq!(bound(&s), 2, "fixture: two seated");
 
-    while s.structures[seats.ix()] > 0 {
+    for _ in 0..s.structures[seats.ix()] {
         s.apply(Command::Raze(seats)).unwrap();
     }
     assert_eq!(bound(&s), 2, "nobody is unbound");

@@ -130,7 +130,7 @@ Twelve read-only queries carry that boundary:
 - `KittenArrived { name }`, `KittenWanderedOff { name }`, `KittenReturned { name }`
 - `JobAssigned { name, job }`, `JobUnassigned { name, job }` — assignment names the kitten (kittens leaf: identity makes assignment delightful)
 - `SeasonChanged { season }`, `NewYear { year }`
-- `StructureBuilt { id, count }`, `IdeaResearched { id }`
+- `StructureBuilt { id, count }`, `StructureRazed { id, count }`, `IdeaResearched { id }`
 - `ZoomiesStarted { until_tick }`, `ZoomiesEnded`
 - `KittenMood { mood }` — emitted only on mood-tier transitions (content, not spam)
 - `Flavor { template_id, kitten: Option<name> }` — pure-delight events with no mechanical effect; templates are content-table entries the shell renders

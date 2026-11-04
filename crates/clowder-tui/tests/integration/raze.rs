@@ -112,8 +112,8 @@ fn only_a_distinct_enter_commits() {
     assert!(v.armed.is_none(), "the commit ends the arming");
 }
 
-/// The Enter that committed, held on, does not build a copy back; a distinct one
-/// builds as it always does.
+/// The Enter that committed, held on at the terminal's repeat rate, does not build
+/// a copy back however long it is held; a distinct press builds as it always does.
 ///
 /// @spec TUI-NAV-204
 #[test]
@@ -125,21 +125,32 @@ fn the_enter_that_commits_held_on_does_not_build_one_back() {
     now::advance(DISTINCT);
     update(Action::Activate, &mut v, &s);
 
-    now::advance(Duration::from_millis(30));
+    for _ in 0..60 {
+        now::advance(Duration::from_millis(30));
+        assert_eq!(
+            update(Action::Activate, &mut v, &s),
+            Outcome::Handled,
+            "held on: nothing"
+        );
+    }
+    now::advance(DISTINCT);
     assert_eq!(
         update(Action::Activate, &mut v, &s),
-        Outcome::Handled,
-        "held on: nothing"
+        Outcome::Apply(Command::Build(st)),
+        "a distinct press builds as it always does"
     );
-    now::advance(DISTINCT);
-    let mut later = 0;
-    for _ in 0..3 {
-        if update(Action::Activate, &mut v, &s) == Outcome::Apply(Command::Build(st)) {
-            later += 1;
-        }
-        now::advance(DISTINCT);
-    }
-    assert!(later > 0, "a distinct press builds as it always does");
+}
+
+/// `+` arms nothing: only one fewer asks to take one down.
+///
+/// @spec TUI-NAV-204
+#[test]
+fn the_key_for_one_more_arms_nothing() {
+    let _clock = now::held();
+    let (s, key, _) = meadow(2);
+    let mut v = on(&key);
+    update(Action::Increment, &mut v, &s);
+    assert!(v.armed.is_none());
 }
 
 /// A further press of either key leaves the arming as it stands: it neither

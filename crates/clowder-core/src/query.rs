@@ -734,14 +734,13 @@ impl GameState {
             .next_cost(s)
             .into_iter()
             .map(|(r, price)| {
-                let room = (after.cap(r) - after.stock(r)).max(0.0);
+                let room = after.cap(r) - after.stock(r);
                 (r, (price * crate::content::RAZE_RETURN_SHARE).min(room))
             })
+            // A store at or over its cap has no room, so takes nothing.
             .filter(|(_, amount)| *amount > 0.0)
             .collect();
-        for (r, amount) in &returned {
-            after.resources[r.ix()] += amount;
-        }
+        // What comes home stops at the cap, so it never adds to what is trimmed.
         let trimmed = ResourceId::ALL
             .into_iter()
             .map(|r| (r, after.stock(r) - after.cap(r)))
