@@ -4,7 +4,7 @@ Kittens are the heart of the game and the reason the cozy invariants exist. This
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-03 (commit `3c6da3bc5aae`). 42 of 42 active specs implemented, each cited by a test.
+**PARTIAL** — last audited 2026-11-04 (commit `c095c32c7b64`). 42 of 42 active specs implemented, each cited by a test.
 
 ## References
 
@@ -49,7 +49,8 @@ Audited 2026-11-03. First full audit, made for issue #32, which changed the job 
 
 Audited 2026-11-03, for what issue #36 changed. Housing capacity sums saturating, for the same reason, and a kitten's rank reads through the save's one integer reader rather than a deserializer of its own (SAVE-032), with no spec here changed. Hand-read by the agent that made these changes, with no second reader.
 
+Audited 2026-11-04, for what issue #40 changed. A jamboree now reaches exactly its stated production ticks (SIM-KIT-025), measured by what it does to a worker's yield, where it had reached one fewer: 999 of 1000, and 1999 of 2000 extended. A new one ends one past the arithmetic end, as the zoomies do (SIM-ENG-012), and an extension adds only its own length. Each test was checked by breaking the line it guards. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
 ## Work Required
 
-- #40: one timed effect runs one tick short (SIM-KIT-025).
 - #41: thin tests and shape annotations; SIM-KIT-001 and SIM-KIT-033 cite nothing in source.

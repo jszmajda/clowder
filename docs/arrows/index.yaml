@@ -170,13 +170,13 @@ arrows:
   kittens:
     status: PARTIAL
     parent: sim
-    sampled: 2026-11-03
-    audited: 2026-11-03
-    audited_sha: 3c6da3bc5aaecb24296fbf5feda3ff7936345a7f
+    sampled: 2026-11-04
+    audited: 2026-11-04
+    audited_sha: c095c32c7b644ffe1161f4b3d227d73cf93e053e
     blocks: [ceremonies, colonies, mystic]
     blockedBy: [economy]
     detail: sim/kittens/kittens.md
-    next: "#40, #41: a timed effect one tick short, thin tests"
+    next: "#41: thin tests"
     drift: null
   mystic:
     status: PARTIAL
