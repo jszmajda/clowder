@@ -146,6 +146,12 @@ Every structure belongs to one family, named for what the player comes to it for
 
 A structure that could stand in two goes where the player would first look for it. An outpost is an outpost whatever else it does, since where it stands is what it costs to reach: a Treehouse houses kittens and a Solar Array makes energy, and both are outposts.
 
+### Taking one down
+
+A player who built too many can take one back. `Raze(id)` removes one copy and returns a quarter of what that copy would cost to build back now, each component credited up to its store's cap as the cap stands with the copy gone. What the copy gave ends as the count falls, and the next one costs what the count now says; the structure stays revealed and can be built again. With no copy standing, the command is refused and nothing changes.
+
+Nobody is turned out. The roster, its jobs, and the tinkerers' bindings all stand: a kitten past the new room stays, and the next arrival waits for room; a tinkerer past the new seats stays bound, and the next binding waits for a seat. A store standing above its new cap is trimmed as any store is, at the next clamp, and the core reports that before the player commits (engine leaf: What taking one down would do).
+
 ## CRAFT — Crafting
 
 `Craft(id)` makes one batch: output = 1 × (1 + CraftRatio effects). All-or-nothing input spend, epsilon-tolerant. `CraftAll(id)` makes every batch the stocks cover in one step, the count worked out by the core from the recipe's scarcest input: a recipe's price does not escalate and a stock can stand far past anything calling one batch at a time could reach. Recipes (inputs per batch):
@@ -243,6 +249,8 @@ StorageFull rejection when the yield resource is at cap (unchanged rule).
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |----------|--------|------------------------|-----------|
+| What taking a structure down returns | A quarter of what that copy costs to build back now | Nothing; all of it; a quarter of what was paid | Nothing makes correcting a mistake a penalty, and all of it makes building free to try. The price it would cost now needs no ledger of prices paid, and never returns more than building it back costs, so no build and take-down can gain anything |
+| Who a lost bed or seat turns out | Nobody | Sending kittens away; unbinding tinkerers | The player chose to take down a building, not to lose a kitten or their work (HLD tenet 1) |
 | Making as many as the stocks cover | One command that works out the count and makes them in one step | A batch per call up to a cap; a batch per call with no cap; a count the caller works out and passes | A cap silently stops short of what the stocks cover. With no cap, a stock can owe more calls than a frame can spare. A caller working out the count would hold the recipe's price rule outside the core |
 | How structures divide | One family each, by what the player comes to it for | By the good each makes; by the stage of play it opens at; by what it costs | A player looking for more room, or for energy, is asking what a structure is for. Sorting by its good scatters what answers one question and leaves many with no good at all. Sorting by stage answers a question nobody brings to the list, and changes nothing a player can use |
 | Where a structure's rule-held behaviour lives | A typed field per behaviour on the definition, read by the rule | A blurb on the structures that need one; constants beside each rule, with sentences written in the shell | A blurb repeats its figures in prose that can drift from the rule, and a blurb kind's fields go unstated, which would split one kind into two statement rules. Sentences in the shell over constants in the core are a second copy of the rule outside the tables. A field gives the rule and the statement one value to read, and describes a later structure for free |
