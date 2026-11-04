@@ -2,9 +2,9 @@
 
 ## The Currency Chain
 
-- [x] **SIM-UNI-001**: When HoldParade is applied after the Parade Routes idea (SIM-CUR) is researched, with at least 2500 unicorns, the system shall spend 2500 unicorns and add the sum, over every structure, of its Parade rainbows (SIM-UNI-013) × copies, × (1 + parade-ratio effects), rainbows; before the idea it rejects with Locked, and below 2500 unicorns with InsufficientResources.
+- [x] **SIM-UNI-001**: When HoldParade is applied after the Parade Routes idea (SIM-CUR) is researched, with at least 2500 unicorns, the system shall spend 2500 unicorns and add the sum, over every structure, of its Parade rainbows (SIM-UNI-013) × copies, rainbows; before the idea it rejects with Locked, and below 2500 unicorns with InsufficientResources.
 - [x] **SIM-UNI-002**: The system shall multiply Unicorn Meadow production by (1 + Σ unicornsRatio effects from Arch upgrades), applied as the mystic tier's own multiplier (not the global material layers).
-- [x] **SIM-UNI-003**: When RefineStarshard is applied with at least 25 prisms, the system shall spend 25 prisms and add 1 × (1 + starshard-refine effects) starshards; RefineEcho with at least 25 starshards shall spend 25 and add 1 × (1 + echo-refine effects) echoes.
+- [x] **SIM-UNI-003**: When RefineStarshard is applied with at least 25 prisms, the system shall spend 25 prisms and add 1 × (1 + starshard-refine effects) starshards; RefineEcho with at least 25 starshards shall spend 25 and add 1 echo.
 - [x] **SIM-UNI-004**: When CondenseJar is applied after the Jar-condensing arch is bought, with at least 10000 rainbows and Jar cap remaining, the system shall spend 10000 rainbows and add 1 Jar of Purrs (clamped to cap); with no Jar cap remaining it rejects with StorageFull and changes nothing.
 
 ## Rainbow Arches
@@ -15,7 +15,7 @@
 
 - [x] **SIM-UNI-006**: At each day boundary, the system shall roll a prism descent with probability equal to the summed prism-descent effects (each structure's prism-descent chance (SIM-UNI-014) × copies, plus Arch-upgrade bonuses) × the Prism Sight ratio where that tradition is held (SIM-MOVE-015), adding one prism on success, in the fixed random-event draw order.
 - [x] **SIM-UNI-011**: When the Parade Routes idea is researched, the system shall grant one Rainbow Arch structure free (so Parades yield rainbows and prisms can descend without a bootstrap deadlock).
-- [x] **SIM-UNI-007**: While the Memory Arch upgrade is owned (which enables the dreamcorn engine), the system shall accrue dream-drift per tick as the sum, over every structure, of its dream-drift (SIM-UNI-015) × copies, × (1 + dream-boost effects), multiplied by 0.25 while any dreamcorn already exists; each whole 1 of dream-drift shall leave the drift and turn one prism into one dreamcorn — never the last prism, the drift banking meanwhile and paying out once a prism beyond the last is held.
+- [x] **SIM-UNI-007**: While the Memory Arch upgrade is owned (which enables the dreamcorn engine), the system shall accrue dream-drift per tick as the sum, over every structure, of its dream-drift (SIM-UNI-015) × copies, multiplied by 0.25 while any dreamcorn already exists; each whole 1 of dream-drift shall leave the drift and turn one prism into one dreamcorn — never the last prism, the drift banking meanwhile and paying out once a prism beyond the last is held.
 - [x] **SIM-UNI-008**: As time passes, the system shall reduce the dreamcorn stock only as a Promise's daily upkeep, its other falls being a player-chosen spend or the Move's reset (SIM-MOVE-004), and dreaming shall never delete a prism below one.
 
 ## Promises

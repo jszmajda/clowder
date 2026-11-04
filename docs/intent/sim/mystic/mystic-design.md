@@ -14,10 +14,10 @@ The mystic leaf is the unicorn economy and everything glittering that follows fr
 | Currency | Gained by | Role |
 |---|---|---|
 | **unicorns** | Unicorn Meadow (economy, +0.001/t × mystic multipliers), Pounces | held for Parades; Meadow production is multiplied by this leaf's `unicornsRatio` effects |
-| **rainbows** | **Parade** (`HoldParade`): 2500 unicorns → 2500 rainbows per Rainbow Arch built, × (1 + parade ratio) | buy Arch upgrades |
+| **rainbows** | **Parade** (`HoldParade`): 2500 unicorns → 2500 rainbows per Rainbow Arch built | buy Arch upgrades |
 | **prisms** | rare descents (day-boundary event; base chance from each Rainbow Arch *structure* plus Arch *upgrades*) | refined into starshards; or drift into dreams |
 | **starshards** | **refine** 25 prisms → 1 starshard × (1 + shard_refine) | dreamtime currency (skips), gate craft for high research |
-| **echoes** | refine 25 starshards → 1 echo × (1 + echo-refine effects) | cryptotheology-analog currency (ceremonies/dreamtime) |
+| **echoes** | refine 25 starshards → 1 echo | cryptotheology-analog currency (ceremonies/dreamtime) |
 | **dreamcorns** | **dreaming**: while dream-drift is positive, prisms fall asleep into dreamcorns | fuel Promises |
 | **Jars of Purrs** | condense 10000 rainbows → 1 Jar (capped by mystic content) | the condensed-joy currency; a rare cap raiser |
 
@@ -25,7 +25,7 @@ Every conversion is an *offering that returns more than it takes* or a *transfor
 
 ## Rainbow Arches
 
-Arches (economy structure, gated by the Parade Routes idea) are the Parade exchange rate — `rainbows_per_parade = 2500 × arches_built × (1 + parade_ratio)`. **Researching Parade Routes grants the first Rainbow Arch free** (the SIM-TRADE-008 precedent), so the first Parade already returns rainbows and the arch's base prism-descent chance seeds the prism supply — the loop bootstraps without a chicken-and-egg. Arch upgrades (`BuyArch`, rainbow + prism priced, ~8):
+Arches (economy structure, gated by the Parade Routes idea) are the Parade exchange rate — `rainbows_per_parade = 2500 × arches_built`. **Researching Parade Routes grants the first Rainbow Arch free** (the SIM-TRADE-008 precedent), so the first Parade already returns rainbows and the arch's base prism-descent chance seeds the prism supply — the loop bootstraps without a chicken-and-egg. Arch upgrades (`BuyArch`, rainbow + prism priced, ~8):
 
 | # | Arch upgrade | Cost | Effect |
 |---|---|---|---|
@@ -46,7 +46,7 @@ Each arch upgrade carries a **blurb**: a short joke and then its effect in plain
 
 The Rainbow Arch structure's three rates (the rainbows a copy brings to a Parade, the chance it adds to a day's prism descent, and the dream-drift it accrues) are fields of its definition that the rules here read (economy leaf: BLD).
 
-The **Memory Arch upgrade** turns the clowder's Rainbow Arches into a dreamcorn engine: buying it *enables* dreaming, and the drift rate then **scales with the number of Rainbow Arch structures built**, so the engine grows as the player raises more arches. `dream_drift` accrues per tick as `+0.000001 × Rainbow Arch structures × (1 + dream_boost)`, reduced ×0.25 while any dreamcorn is already dreaming (the inspiration's corruption self-throttle, softened) — *this is a slowdown of the drift rate, never a loss*. When `dream_drift ≥ 1`, one dreaming prism becomes a dreamcorn (`prisms −1, dreamcorns +1`), but **never the last prism** (a prism must stay awake to keep the dream going — the cozy floor). Dreamcorns are the softest, sleepiest resource; they are never consumed except by a Promise's upkeep, and even then they are only *kept asleep*, not spent away.
+The **Memory Arch upgrade** turns the clowder's Rainbow Arches into a dreamcorn engine: buying it *enables* dreaming, and the drift rate then **scales with the number of Rainbow Arch structures built**, so the engine grows as the player raises more arches. `dream_drift` accrues per tick as `+0.000001 × Rainbow Arch structures`, reduced ×0.25 while any dreamcorn is already dreaming (the inspiration's corruption self-throttle, softened) — *this is a slowdown of the drift rate, never a loss*. When `dream_drift ≥ 1`, one dreaming prism becomes a dreamcorn (`prisms −1, dreamcorns +1`), but **never the last prism** (a prism must stay awake to keep the dream going — the cozy floor). Dreamcorns are the softest, sleepiest resource; they are never consumed except by a Promise's upkeep, and even then they are only *kept asleep*, not spent away.
 
 ## Promises to the Night Court
 
@@ -62,6 +62,7 @@ Condensing 10000 rainbows into 1 Jar of Purrs is the condensed-contentment curre
 |----------|--------|------------------------|-----------|
 | Parade exchange rate from arches | rainbows_per_parade scales with Arches built | Fixed rate; rate as an upgrade | The inspiration's ziggurat-count-as-tears-rate pattern; makes Arches doubly valuable (rate + upgrades) |
 | What a Promise grants | Global production +0.05% | The same plus storage, warmth, and craft ratios | A quiet Promise suspends its effect, and a suspended storage ratio would trim stocks to the lower cap: confiscation by clamp, which Tenet 1 rules out (the Porch's kite ratchet exists to avoid the same thing). The other channels add no decision at this size |
+| Which conversions a multiplier scales | Only the starshard refine, which Arch upgrades feed | A multiplier on the Parade, the echo refine, and the dream drift as well, waiting on content | A multiplier nothing feeds is a rule no test can exercise and a scaling the player can never meet; one arrives with the content that feeds it |
 | Dreaming has a floor | The last prism never sleeps | Allow full conversion | Cozy: something must stay awake to dream; also keeps a prism faucet alive |
 | Dreamcorn engine scales with Rainbow Arch structures | Memory Arch upgrade enables it; rate = per-arch drift × Rainbow Arch structure count | Flat rate gated on the once-bought Memory Arch upgrade | A once-bought flat trickle never grows, so reaching the dreamcorn endgame (Everdream Arch → Jar cap) took ~10× the design horizon; scaling with the buildable arch count makes the engine a build target that keeps pace with play |
 | Promises go quiet, never break | Suspend + auto-resume on upkeep | Permanent destruction (Fracture) | Tenet 1 — depth needs upkeep tension, not catastrophic permanent loss |
