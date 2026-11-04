@@ -9,6 +9,7 @@ mod achievements;
 mod blurb_truth;
 mod blurbs;
 mod bulktime;
+mod colonies_tables;
 mod craft_all;
 mod curiosity;
 mod curiosity_tables;

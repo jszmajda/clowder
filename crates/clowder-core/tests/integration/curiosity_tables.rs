@@ -13,53 +13,12 @@ use std::collections::BTreeSet;
 
 const DESIGN: &str = include_str!("../../../../docs/intent/sim/curiosity/curiosity-design.md");
 
-/// The numbered rows between two headings of the design, each as its cells.
-fn rows_between(from: &str, to: &str) -> Vec<Vec<String>> {
-    let start = DESIGN.find(from).expect("the design has the heading");
-    let end = start
-        + DESIGN[start..]
-            .find(to)
-            .expect("the design has the heading");
-    let mut rows: Vec<Vec<String>> = DESIGN[start..end]
-        .lines()
-        .filter(|l| {
-            l.strip_prefix("| ")
-                .is_some_and(|r| r.starts_with(|c: char| c.is_ascii_digit()))
-        })
-        .map(|l| {
-            l.trim_matches('|')
-                .split('|')
-                .map(|c| c.trim().to_string())
-                .collect()
-        })
-        .collect();
-    rows.sort_by_key(|r| r[0].parse::<usize>().expect("a row's number"));
-    rows
-}
-
 fn idea_rows() -> Vec<Vec<String>> {
-    rows_between("## The Idea Tree", "## Refinements")
+    table_rows(DESIGN, "## The Idea Tree", "## Refinements")
 }
 
 fn refinement_rows() -> Vec<Vec<String>> {
-    rows_between("## Refinements", "## House Rules")
-}
-
-/// The resource a table's word names, as the design spells it: lower case, and
-/// singular or plural.
-fn resource_named(word: &str) -> ResourceId {
-    let word: String = word
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect::<String>()
-        .to_lowercase();
-    ResourceId::ALL
-        .into_iter()
-        .find(|r| {
-            let id = format!("{r:?}").to_lowercase();
-            id == word || id == format!("{word}s") || id == format!("{word}es")
-        })
-        .unwrap_or_else(|| panic!("no resource is named {word:?}"))
+    table_rows(DESIGN, "## Refinements", "## House Rules")
 }
 
 /// An amount and its resource: `15 schemes`.
@@ -237,9 +196,13 @@ fn price_of(text: &str) -> (f64, Vec<(ResourceId, f64)>) {
     )
 }
 
+/// A row's words for what a refinement does, the effect keys that say it, and the
+/// structure they scale by.
+type RowEffects = (&'static str, Vec<(Effect, f64)>, Option<StructureId>);
+
 /// What each row of the design says a refinement does, and the effect keys that
 /// say it: the row's own words, so neither can change without the other.
-fn effects_by_row() -> Vec<(&'static str, Vec<(Effect, f64)>, Option<StructureId>)> {
+fn effects_by_row() -> Vec<RowEffects> {
     use Effect as E;
     use JobId as J;
     use ResourceId as R;

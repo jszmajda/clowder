@@ -995,7 +995,7 @@ impl GameState {
                         + content::FOX_MOONSTONE_AMOUNT_PER_KITE * kites)
                         * (1.0 + st).max(0.0);
                     let fuzz = 1.0 + (self.rng.uniform() * 2.0 - 1.0) * content::TRADE_FUZZ_WIDTH;
-                    let brought = amount * trade_ratio * bonus_mult * fuzz;
+                    let brought = amount * trade_ratio * fuzz;
                     self.resources[ResourceId::Moonstone.ix()] += brought;
                     if brought > 0.0 {
                         learned.insert(ResourceId::Moonstone);

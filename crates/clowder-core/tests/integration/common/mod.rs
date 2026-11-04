@@ -303,3 +303,42 @@ pub fn all_earned(s: &mut GameState) {
         s.achievements.insert(id, when);
     }
 }
+
+/// The numbered rows of a design doc between two headings, each as its cells, in
+/// number order.
+pub fn table_rows(doc: &str, from: &str, to: &str) -> Vec<Vec<String>> {
+    let start = doc.find(from).expect("the design has the heading");
+    let end = start + doc[start..].find(to).expect("the design has the heading");
+    let mut rows: Vec<Vec<String>> = doc[start..end]
+        .lines()
+        .filter(|l| {
+            l.strip_prefix("| ")
+                .is_some_and(|r| r.starts_with(|c: char| c.is_ascii_digit()))
+        })
+        .map(|l| {
+            l.trim_matches('|')
+                .split('|')
+                .map(|c| c.trim().to_string())
+                .collect()
+        })
+        .collect();
+    rows.sort_by_key(|r| r[0].parse::<usize>().expect("a row's number"));
+    rows
+}
+
+/// The resource a table's word names, as a design spells it: lower case, and
+/// singular or plural.
+pub fn resource_named(word: &str) -> ResourceId {
+    let word: String = word
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>()
+        .to_lowercase();
+    ResourceId::ALL
+        .into_iter()
+        .find(|r| {
+            let id = format!("{r:?}").to_lowercase();
+            id == word || id == format!("{word}s") || id == format!("{word}es")
+        })
+        .unwrap_or_else(|| panic!("no resource is named {word:?}"))
+}
