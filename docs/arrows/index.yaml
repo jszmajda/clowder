@@ -113,15 +113,15 @@ arrows:
     next: null
     drift: null
   curiosity:
-    status: PARTIAL
+    status: OK
     parent: sim
-    sampled: 2026-11-03
-    audited: 2026-11-03
-    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
+    sampled: 2026-11-04
+    audited: 2026-11-04
+    audited_sha: c20801cda7650bae2262970e73fcc5e4d74a269b
     blocks: [ceremonies, colonies, mystic]
     blockedBy: [economy]
     detail: sim/curiosity/curiosity.md
-    next: "#31: thin table tests"
+    next: null
     drift: null
   dreamtime:
     status: OK
