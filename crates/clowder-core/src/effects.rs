@@ -78,14 +78,6 @@ pub enum Effect {
     UnicornsRatio,
     /// +refine on the 25 prisms → 1 starshard conversion. @spec SIM-UNI-003
     StarshardRefine,
-    /// +refine on the 25 starshards → 1 echo conversion. @spec SIM-UNI-003
-    EchoRefine,
-    /// +% on Parade rainbow yield. @spec SIM-UNI-001
-    ParadeRatio,
-    /// +% on the dreamcorn engine's dream-drift rate (dormant baseline — no
-    /// content grants it yet; keeps the SIM-UNI-007 formula honest). Summed like
-    /// any other key; contributes 0 until content lands. @spec SIM-UNI-007
-    DreamBoost,
     /// Dedicated per-colony standing bonus (dormant baseline). @spec SIM-TRADE-005
     StandingFor(ColonyId),
     // ---- Wave 5 (prestige / adventures) ----

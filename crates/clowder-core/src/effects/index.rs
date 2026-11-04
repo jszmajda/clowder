@@ -57,7 +57,7 @@ const RESOURCES: usize = ResourceId::ALL.len();
 const STRUCTURES: usize = StructureId::ALL.len();
 
 /// The keys that name nothing come first, then each family that names something.
-const PLAIN_KEYS: usize = 36;
+const PLAIN_KEYS: usize = 33;
 const RESOURCE_RATIO: usize = PLAIN_KEYS;
 const STRUCTURE_RATIO: usize = RESOURCE_RATIO + RESOURCES;
 const JOB_RATIO: usize = STRUCTURE_RATIO + STRUCTURES;
@@ -96,21 +96,18 @@ fn slot(key: Effect) -> usize {
         RainbowShowerChance => 18,
         UnicornsRatio => 19,
         StarshardRefine => 20,
-        EchoRefine => 21,
-        ParadeRatio => 22,
-        DreamBoost => 23,
-        GlobalPriceRatioDelta => 24,
-        KittenGrowthRatio => 25,
-        StandingRatio => 26,
-        MasterSkillMultiplier => 27,
-        EnergyConsumptionRatio => 28,
-        MessAccrualRatio => 29,
-        OutdoorProductionRatio => 30,
-        LongSunCapBonus => 31,
-        DejaVuChance => 32,
-        ReverieYield => 33,
-        HeatEfficiency => 34,
-        HeatDissipation => 35,
+        GlobalPriceRatioDelta => 21,
+        KittenGrowthRatio => 22,
+        StandingRatio => 23,
+        MasterSkillMultiplier => 24,
+        EnergyConsumptionRatio => 25,
+        MessAccrualRatio => 26,
+        OutdoorProductionRatio => 27,
+        LongSunCapBonus => 28,
+        DejaVuChance => 29,
+        ReverieYield => 30,
+        HeatEfficiency => 31,
+        HeatDissipation => 32,
         ResourceRatio(r) => RESOURCE_RATIO + r.ix(),
         StructureRatio(s) => STRUCTURE_RATIO + s.ix(),
         JobRatio(j) => JOB_RATIO + j as usize,
@@ -151,9 +148,6 @@ pub(super) fn every_key() -> Vec<Effect> {
         RainbowShowerChance,
         UnicornsRatio,
         StarshardRefine,
-        EchoRefine,
-        ParadeRatio,
-        DreamBoost,
         GlobalPriceRatioDelta,
         KittenGrowthRatio,
         StandingRatio,
@@ -410,13 +404,35 @@ mod tests {
         }
     }
 
+    /// Every key family has a source for at least one of its parameters: a key
+    /// nothing can feed is a multiplier that is always one, which no spec should
+    /// state and no test can exercise. The per-colony standing family waits on
+    /// #47. @spec SIM-ENG-085
+    #[test]
+    fn every_key_family_has_something_to_feed_it() {
+        let mut fed: std::collections::BTreeMap<String, bool> = Default::default();
+        for key in every_key() {
+            let name = format!("{key:?}");
+            let family = name.split('(').next().unwrap_or(&name).to_string();
+            *fed.entry(family).or_default() |= !sources(key).is_empty();
+        }
+        let unfed: Vec<&str> = fed
+            .iter()
+            .filter(|(_, fed)| !**fed)
+            .map(|(family, _)| family.as_str())
+            .collect();
+        assert_eq!(unfed, ["StandingFor"], "key families nothing can feed");
+    }
+
     /// Most keys carry nothing, so the lists save most of a walk over every
     /// source; and the keys that do are never left with more than their own.
     /// @spec SIM-ENG-084
     #[test]
     fn a_key_lists_only_the_sources_that_can_carry_it() {
-        assert!(sources(Effect::DreamBoost).is_empty(), "a dormant key");
-        assert!(sources(Effect::StandingFor(ColonyId::ALL[0])).is_empty());
+        assert!(
+            sources(Effect::StandingFor(ColonyId::ALL[0])).is_empty(),
+            "a key that carries nothing lists nothing"
+        );
         for key in every_key() {
             for source in sources(key) {
                 let carries = match *source {

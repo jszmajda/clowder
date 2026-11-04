@@ -968,8 +968,7 @@ impl GameState {
 
     /// Per-tick dreaming: the Memory Arch upgrade turns the clowder's Rainbow
     /// Arch *structures* into a dreamcorn engine — dream-drift accrues per tick
-    /// as each structure's dream-drift × its copies × (1 + dream-boost effects),
-    /// throttled ×0.25 while any dreamcorn already dreams; at ≥ 1 a prism naps
+    /// as each structure's dream-drift × its copies, throttled ×0.25 while any dreamcorn already dreams; at ≥ 1 a prism naps
     /// into a dreamcorn — never the last prism. A Sky Arch adds a steady prism
     /// drift.
     // @spec SIM-UNI-007, SIM-UNI-008
@@ -999,8 +998,7 @@ impl GameState {
         } else {
             1.0
         };
-        let boost = 1.0 + self.effect(crate::effects::Effect::DreamBoost);
-        self.dream_drift += drift * boost * throttle;
+        self.dream_drift += drift * throttle;
         // A prism must stay awake to keep the dream going (the cozy floor).
         while self.dream_drift >= 1.0 && self.stock(ResourceId::Prisms) >= 2.0 - EPSILON {
             self.dream_drift -= 1.0;

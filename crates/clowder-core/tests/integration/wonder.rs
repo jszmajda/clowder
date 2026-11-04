@@ -525,8 +525,8 @@ fn hold_parade_trades_unicorns_for_arch_scaled_rainbows() {
         CommandError::Locked
     );
 
-    // After the idea, with ≥ 2500 unicorns: spend 2500, gain 2500 × arches ×
-    // parade_ratio rainbows (base parade_ratio = 1).
+    // After the idea, with ≥ 2500 unicorns: spend 2500, gain 2500 × arches
+    // rainbows.
     let mut s = GameState::new(322);
     s.ideas.insert(IdeaId::ParadeRoutes);
     grant(&mut s, StructureId::RainbowArch, 2);
@@ -630,7 +630,7 @@ fn refining_condenses_prisms_and_starshards_upward() {
         CommandError::InsufficientResources { .. }
     ));
 
-    // 25 starshards → 1 × (1 + echo-refine) echoes; base echo-refine 0 → 1.0.
+    // 25 starshards → 1 echo.
     let mut s = GameState::new(329);
     give(&mut s, ResourceId::Starshards, 25.0);
     s.apply(Command::RefineEcho).unwrap();
@@ -1657,15 +1657,14 @@ fn condensing_with_no_jar_cap_left_is_refused_and_spends_nothing() {
 
 // @spec SIM-UNI-007, SIM-UNI-015
 #[test]
-fn dream_drift_accrues_each_copys_field_times_the_dream_boost() {
+fn dream_drift_accrues_each_copys_field() {
     let per_copy = content::structure_def(StructureId::RainbowArch).dream_drift;
     let mut s = GameState::new(361);
     s.arches_bought.insert(ArchId::MemoryArch);
     grant(&mut s, StructureId::RainbowArch, 7);
     off_boundary(&mut s);
-    let boost = 1.0 + s.effect(Effect::DreamBoost);
     s.tick();
-    assert!((s.dream_drift - per_copy * 7.0 * boost).abs() < 1e-15);
+    assert!((s.dream_drift - per_copy * 7.0).abs() < 1e-15);
 }
 
 // @spec SIM-UNI-007, SIM-UNI-008

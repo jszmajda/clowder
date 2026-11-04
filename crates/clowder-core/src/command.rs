@@ -827,15 +827,14 @@ impl GameState {
     // ---- Mystic (SIM-UNI) ----
 
     /// Hold a Unicorn Parade: 2500 unicorns → each structure's Parade rainbows
-    /// × its copies × (1 + parade ratio) rainbows. No RNG.
+    /// × its copies. No RNG.
     // @spec SIM-UNI-001
     fn hold_parade(&mut self) -> Result<Vec<Event>, CommandError> {
         if !self.ideas.contains(&IdeaId::ParadeRoutes) {
             return Err(CommandError::Locked);
         }
         self.spend(&[(ResourceId::Unicorns, content::PARADE_UNICORN_COST)])?;
-        let ratio = 1.0 + self.effect(crate::effects::Effect::ParadeRatio);
-        let rainbows = self.structure_sum(|d| d.parade_rainbows) * ratio;
+        let rainbows = self.structure_sum(|d| d.parade_rainbows);
         self.resources[ResourceId::Rainbows.ix()] += rainbows;
         Ok(vec![Event::ParadeHeld { rainbows }])
     }
@@ -864,12 +863,11 @@ impl GameState {
         Ok(vec![Event::StarshardRefined])
     }
 
-    /// Refine 25 starshards → 1 × (1 + echo-refine) echoes.
+    /// Refine 25 starshards → 1 echo.
     // @spec SIM-UNI-003
     fn refine_echo(&mut self) -> Result<Vec<Event>, CommandError> {
         self.spend(&[(ResourceId::Starshards, content::REFINE_INPUT)])?;
-        let yield_ = 1.0 + self.effect(crate::effects::Effect::EchoRefine);
-        self.resources[ResourceId::Echoes.ix()] += yield_;
+        self.resources[ResourceId::Echoes.ix()] += 1.0;
         Ok(vec![Event::EchoRefined])
     }
 
