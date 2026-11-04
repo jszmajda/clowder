@@ -12,7 +12,7 @@
 
 use std::time::Duration;
 
-use clowder_core::{Command, GameState, LockReason};
+use clowder_core::{Command, GameState, LockReason, StructureId};
 
 use super::action::{Action, CountSemantics};
 use super::mnemonics;
@@ -678,6 +678,22 @@ fn handle_activate(view: &mut ViewState, state: &GameState) -> Outcome {
 /// activation of the cursor's row and by a live mnemonic, which reaches the
 /// same row without moving the cursor there. @spec TUI-NAV-002, TUI-NAV-046
 fn activate_row(view: &mut ViewState, state: &GameState, row: &Row) -> Outcome {
+    // A row armed to take a copy down commits that, not its own command, and the
+    // press that commits held on does not fall through to build one back.
+    // @spec TUI-NAV-204
+    let now = crate::runtime::now::instant();
+    let razing = view.armed.as_ref().and_then(|a| match a.command {
+        Command::Raze(_) if a.key == row.key && now < a.expires_at => Some(a.command),
+        _ => None,
+    });
+    if let Some(command) = razing {
+        let out = activate_heavy(view, &row.key, command);
+        if matches!(out, Outcome::Apply(_)) {
+            guard_after_field(view);
+        }
+        return out;
+    }
+
     if owned_one_shot(state, row) {
         set_footer(view, "You already have that.");
         return Outcome::Handled;
@@ -1048,8 +1064,36 @@ fn handle_increment_decrement(view: &mut ViewState, state: &GameState, up: bool)
             increment,
             decrement,
         } => fire_once(view, if up { *increment } else { *decrement }),
+        RowKind::Act {
+            command: Command::Build(s),
+            ..
+        } if !up => arm_raze(view, state, &row.key, *s),
         _ => Outcome::Handled,
     }
+}
+
+/// `-` on a structure's row: arms taking one down where a copy stands, and leaves
+/// an arming already live as it stands, so pressing again neither commits nor buys
+/// it more time. @spec TUI-NAV-204
+fn arm_raze(view: &mut ViewState, state: &GameState, key: &RowKey, s: StructureId) -> Outcome {
+    if state.structures[s.ix()] == 0 {
+        set_footer(view, "there are none of these to take down");
+        return Outcome::Handled;
+    }
+    let now = crate::runtime::now::instant();
+    let live = view
+        .armed
+        .as_ref()
+        .is_some_and(|a| &a.key == key && a.command == Command::Raze(s) && now < a.expires_at);
+    if !live {
+        view.armed = Some(ArmedRow {
+            key: key.clone(),
+            command: Command::Raze(s),
+            expires_at: now + ARM_DURATION,
+        });
+        view.last_repeat = Some(now);
+    }
+    Outcome::Handled
 }
 
 // ---------------------------------------------------------------------------

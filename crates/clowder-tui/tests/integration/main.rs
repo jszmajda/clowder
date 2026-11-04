@@ -31,6 +31,7 @@ mod palette;
 mod pen_pals;
 mod persist;
 mod pointer;
+mod raze;
 mod readouts;
 mod report_queue;
 mod resize;

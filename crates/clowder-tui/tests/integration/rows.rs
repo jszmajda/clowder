@@ -48,6 +48,7 @@ fn variant(c: &Command) -> &'static str {
         Command::ResearchIdea(_) => "ResearchIdea",
         Command::Craft(_) => "Craft",
         Command::CraftAll(_) => "CraftAll",
+        Command::Raze(_) => "Raze",
         Command::ObserveSky => "ObserveSky",
         Command::SetSpeed(_) => "SetSpeed",
         Command::Pounce(_) => "Pounce",
@@ -85,8 +86,9 @@ fn variant(c: &Command) -> &'static str {
 
 /// One instance of every `Command` variant a row may carry. Paired with the
 /// exhaustive match in `variant`, this is the enumeration TUI-NAV-039's coverage
-/// claim quantifies over. `CraftAll` alone stays out: it has no row of its own,
-/// being what `X` sends from a recipe's make row (TUI-NAV-012).
+/// claim quantifies over. `CraftAll` and `Raze` stay out: neither has a row of its
+/// own, being what `X` sends from a recipe's make row (TUI-NAV-012) and what `-`
+/// arms from a structure's row (TUI-NAV-204).
 fn one_of_every_command_variant() -> Vec<Command> {
     vec![
         Command::GatherCatnip,

@@ -1208,7 +1208,7 @@ const HELP_ENTRIES: &[&str] = &[
     "Toggle the inspector",
     "Open the count prompt",
     "x max affordable",
-    "Increment / decrement a count row",
+    "Count up / down; - takes down a building",
     "Find-anything palette",
     "Journal: full scrollback",
     "Achievements: what the clowder",

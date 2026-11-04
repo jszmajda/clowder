@@ -650,6 +650,33 @@ pub(crate) fn consequence_summary(state: &GameState, armed: &ArmedRow) -> Vec<St
                 format!("wakes in year {wake}"),
             ]
         }
+        // @spec TUI-NAV-205
+        Command::Raze(s) => {
+            let Some(report) = state.raze_report(s) else {
+                return Vec::new();
+            };
+            let mut lines = vec![format!(
+                "Take down one {}: {} left",
+                content::structure_def(s).name,
+                report.left
+            )];
+            let amount = |(r, n): &(ResourceId, f64)| {
+                format!("{} {}", fmt::exact(*n), resource_label(*r).to_lowercase())
+            };
+            lines.extend(
+                report
+                    .returned
+                    .iter()
+                    .map(|g| format!("returns {}", amount(g))),
+            );
+            lines.extend(
+                report
+                    .trimmed
+                    .iter()
+                    .map(|g| format!("trims {}", amount(g))),
+            );
+            lines
+        }
         _ => Vec::new(),
     }
 }

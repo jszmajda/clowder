@@ -678,6 +678,14 @@ fn focused_row(state: &GameState, view: &ViewState) -> Option<Row> {
 /// showing the moment the arming itself ends, whether by expiry or by its
 /// row leaving every list. @spec TUI-NAV-023, TUI-NAV-024, TUI-NAV-045,
 /// TUI-NAV-046, TUI-NAV-066, TUI-NAV-074, TUI-NAV-076, TUI-NAV-077
+/// Whether a row builds a structure of which a copy stands to take down.
+fn copies_standing(state: &GameState, row: &crate::nav::rows::Row) -> bool {
+    matches!(
+        row.kind,
+        RowKind::Act { command: clowder_core::Command::Build(s), .. } if state.structures[s.ix()] > 0
+    )
+}
+
 pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState, stores_hidden: bool) {
     const HELP: &str = "? help";
 
@@ -724,6 +732,18 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState, sto
                                     vec![
                                         "Enter build",
                                         "x amount",
+                                        "Space details",
+                                        "↑↓ choose",
+                                        "Tab next",
+                                    ]
+                                }
+                                CountSemantics::RepeatN if copies_standing(state, &row) => {
+                                    // @spec TUI-NAV-206
+                                    vec![
+                                        "Enter build",
+                                        "x amount",
+                                        "X max",
+                                        "- take down",
                                         "Space details",
                                         "↑↓ choose",
                                         "Tab next",

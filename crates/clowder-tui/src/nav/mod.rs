@@ -65,6 +65,7 @@ pub fn plain_error(e: &clowder_core::CommandError) -> String {
         E::NoIdleKittens => "nobody's free to take that on".into(),
         E::NoSeats => "no room at the bench".into(),
         E::NoWorkersAssigned => "nobody's doing that yet".into(),
+        E::NothingToRaze => "there are none of these to take down".into(),
         E::StorageFull => "nowhere to put it — that store is full".into(),
         // The store is named in the stores' own words, in lower case, and
         // marked as a blurb marks a resource, so the hint bar's row can draw

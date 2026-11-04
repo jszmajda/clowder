@@ -187,6 +187,12 @@ fn event_words(event: &Event) -> String {
                 clowder_core::content::structure_def(*id).name
             )
         }
+        E::StructureRazed { id, count } => {
+            format!(
+                "one {} taken down (×{count} left)",
+                clowder_core::content::structure_def(*id).name
+            )
+        }
         E::IdeaResearched { id } => {
             format!("figured out {}", clowder_core::content::idea_def(*id).name)
         }
@@ -801,7 +807,7 @@ pub fn help(f: &mut Frame, area: Rect) {
         ("Space / i", "Toggle the inspector"),
         ("x", "Open the count prompt; Enter applies xN"),
         ("X", "Row's action x max affordable"),
-        ("+ / -", "Increment / decrement a count row"),
+        ("+ / -", "Count up / down; - takes down a building"),
         ("/", "Find-anything palette over revealed content"),
         ("e", "Journal: full scrollback + pinned reports"),
         ("a", "Achievements: what the clowder has earned"),
