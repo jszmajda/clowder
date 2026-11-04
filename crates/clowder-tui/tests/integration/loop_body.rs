@@ -11,22 +11,20 @@
 //! input bound observable at all: both are properties of one method that a
 //! signature reaching for real input could only ever assert against itself.
 //!
-//! One clause has no seam even so — that a burst of resizes collapses to the
-//! last. `Terminal::resize` never reaches the backend, and the next `draw`
-//! re-derives the size from it, so the coalescing leaves nothing outside
-//! `step` to observe. It is stated here rather than asserted falsely.
-//!
 //! @spec TUI-RUN-014, TUI-RUN-015, TUI-RUN-016, TUI-RUN-017, TUI-RUN-026,
 //! TUI-RUN-064, TUI-RUN-065
 
 use clowder_tui::nav::ViewState;
 use clowder_tui::runtime::clock::Reading;
 use clowder_tui::runtime::now;
-use clowder_tui::runtime::{App, TickAccumulator};
+use clowder_tui::runtime::persist::AUTOSAVE_INTERVAL;
+use clowder_tui::runtime::{App, TickAccumulator, Wake, Waking};
 
 use clowder_core::{AchievementId, Earned, GameState};
-use ratatui::backend::TestBackend;
+use ratatui::backend::{Backend, ClearType, TestBackend, WindowSize};
+use ratatui::layout::{Position, Size};
 use ratatui::Terminal;
+use std::io;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -202,7 +200,7 @@ fn a_step_keeps_the_layout_it_drew_for_the_next_frame() {
     );
 }
 
-/// Autosave is on a wall-clock cadence, so a step taken well inside the
+/// Autosave is on a cadence, so a step taken well inside the
 /// interval must not write. The complement — that it *does* write once the
 /// interval has passed — is covered by pushing `last_save` into the past.
 /// @spec TUI-RUN-026
@@ -255,6 +253,186 @@ fn a_failed_autosave_does_not_end_the_session() {
         a.save_failed,
         "the failure was noticed, so it can be said once and not again"
     );
+}
+
+/// The cadence runs on the monotonic clock: a suspend makes no save due, however
+/// long, and the same span in play does.
+/// @spec TUI-RUN-026
+#[test]
+fn a_suspend_does_not_make_an_autosave_due() {
+    let _clock = now::held();
+    let path = scratch("suspend-cadence");
+    let mut term = Terminal::new(TestBackend::new(90, 26)).unwrap();
+    let mut a = app(path.clone());
+    a.last_save = now::instant();
+
+    now::suspend(AUTOSAVE_INTERVAL * 3);
+    a.step(&mut term, elapsed(0.0), &[]).unwrap();
+    assert!(!path.exists(), "a suspend made an autosave due");
+
+    now::advance(AUTOSAVE_INTERVAL);
+    a.step(&mut term, elapsed(0.0), &[]).unwrap();
+    assert!(path.exists(), "the interval in play made no autosave due");
+}
+
+/// A failure is said once, however many cadences it lasts, and is tried again
+/// at each cadence and at nothing between: an obstacle that clears mid-interval
+/// waits for the next cadence, and a later failure is a new one, said again.
+/// @spec TUI-RUN-028
+#[test]
+fn a_failed_autosave_is_said_once_and_retried_only_at_its_cadence() {
+    let _clock = now::held();
+    let dir = scratch("failed-cadence");
+    let root = dir.parent().unwrap().to_path_buf();
+    // A file where the save's directory belongs: writing there always fails.
+    let blocked = root.join("blocked");
+    std::fs::write(&blocked, b"not a directory").unwrap();
+    let path = blocked.join("save.json");
+
+    let mut term = Terminal::new(TestBackend::new(90, 26)).unwrap();
+    let mut a = app(path.clone());
+    a.last_save = now::instant();
+    let said = |a: &App| {
+        a.view
+            .footer
+            .as_ref()
+            .is_some_and(|(text, _)| text.contains("could not save"))
+    };
+
+    now::advance(AUTOSAVE_INTERVAL);
+    a.step(&mut term, elapsed(0.0), &[]).unwrap();
+    assert!(said(&a), "the first failure is said");
+    a.view.footer = None;
+
+    now::advance(AUTOSAVE_INTERVAL);
+    a.step(&mut term, elapsed(0.0), &[]).unwrap();
+    assert!(!said(&a), "a failure lasting two cadences is said once");
+
+    std::fs::remove_file(&blocked).unwrap();
+    now::advance(AUTOSAVE_INTERVAL / 2);
+    a.step(&mut term, elapsed(0.0), &[]).unwrap();
+    assert!(!path.exists(), "no retry between cadences");
+
+    now::advance(AUTOSAVE_INTERVAL / 2);
+    a.step(&mut term, elapsed(0.0), &[]).unwrap();
+    assert!(path.exists(), "the next cadence retries, and it works");
+    assert!(!a.save_failed, "the failure is over");
+
+    std::fs::remove_dir_all(&blocked).unwrap();
+    std::fs::write(&blocked, b"not a directory").unwrap();
+    now::advance(AUTOSAVE_INTERVAL);
+    a.step(&mut term, elapsed(0.0), &[]).unwrap();
+    assert!(said(&a), "a later failure is a new one, said again");
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-016 — a burst of resizes collapses to the last
+// ---------------------------------------------------------------------------
+
+/// A backend that counts each time it is cleared, which a resize does once.
+struct CountingClears {
+    inner: TestBackend,
+    clears: std::rc::Rc<std::cell::Cell<u32>>,
+}
+
+impl Backend for CountingClears {
+    fn draw<'a, I>(&mut self, content: I) -> io::Result<()>
+    where
+        I: Iterator<Item = (u16, u16, &'a ratatui::buffer::Cell)>,
+    {
+        self.inner.draw(content)
+    }
+    fn hide_cursor(&mut self) -> io::Result<()> {
+        self.inner.hide_cursor()
+    }
+    fn show_cursor(&mut self) -> io::Result<()> {
+        self.inner.show_cursor()
+    }
+    fn get_cursor_position(&mut self) -> io::Result<Position> {
+        self.inner.get_cursor_position()
+    }
+    fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> io::Result<()> {
+        self.inner.set_cursor_position(position)
+    }
+    fn clear(&mut self) -> io::Result<()> {
+        self.clears.set(self.clears.get() + 1);
+        self.inner.clear()
+    }
+    fn clear_region(&mut self, clear_type: ClearType) -> io::Result<()> {
+        self.clears.set(self.clears.get() + 1);
+        self.inner.clear_region(clear_type)
+    }
+    fn size(&self) -> io::Result<Size> {
+        self.inner.size()
+    }
+    fn window_size(&mut self) -> io::Result<WindowSize> {
+        self.inner.window_size()
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+fn counted_terminal() -> (Terminal<CountingClears>, std::rc::Rc<std::cell::Cell<u32>>) {
+    let clears = std::rc::Rc::new(std::cell::Cell::new(0));
+    let backend = CountingClears {
+        inner: TestBackend::new(90, 26),
+        clears: clears.clone(),
+    };
+    (Terminal::new(backend).unwrap(), clears)
+}
+
+/// A drag across the terminal's edge: ending at the backend's own size, so the
+/// frame's draw has nothing of its own to correct.
+fn a_burst_of_resizes() -> Vec<crossterm::event::Event> {
+    use crossterm::event::Event::Resize;
+    vec![
+        Resize(120, 40),
+        Resize(100, 30),
+        Resize(95, 28),
+        Resize(90, 26),
+    ]
+}
+
+/// Only the final size of a frame's burst is applied, in play.
+/// @spec TUI-RUN-016
+#[test]
+fn a_burst_of_resizes_applies_once_in_play() {
+    let (mut term, clears) = counted_terminal();
+    let mut a = app(scratch("resize-play"));
+    clears.set(0);
+    a.step(&mut term, elapsed(0.0), &a_burst_of_resizes())
+        .unwrap();
+    assert_eq!(clears.get(), 1, "each resize of a burst was applied");
+}
+
+/// Only the final size of a frame's burst is applied, while waking too.
+/// @spec TUI-RUN-016
+#[test]
+fn a_burst_of_resizes_applies_once_while_waking() {
+    let (mut term, clears) = counted_terminal();
+    let a = app(scratch("resize-wake"));
+    let reading = Reading {
+        monotonic: Duration::ZERO,
+        wall: Duration::from_secs(3_600),
+    };
+    let absence = reading.absence().expect("fixture: an hour is an absence");
+    let waking = Waking::of_absence(a, reading, absence).bounded(1);
+    clears.set(0);
+    let next = waking
+        .first_frame(&mut term, &a_burst_of_resizes())
+        .expect("the frame draws");
+    assert_eq!(clears.get(), 1, "each resize of a burst was applied");
+
+    let Wake::Waking(waking) = next else {
+        panic!("fixture: a wake of one tick a frame is still waking");
+    };
+    clears.set(0);
+    let next = waking
+        .step(&mut term, elapsed(0.0), &a_burst_of_resizes())
+        .expect("the frame draws");
+    assert_eq!(clears.get(), 1, "each resize of a burst was applied");
+    assert!(matches!(next, Wake::Waking(_)), "fixture: still waking");
 }
 
 // ---------------------------------------------------------------------------

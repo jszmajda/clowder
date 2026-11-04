@@ -793,6 +793,44 @@ fn shutdown_while_waking_saves_the_set_down_catch_up_and_the_banked_time() {
     }
 }
 
+/// A quit key ends its frame before that frame's advance, so a quit in the frame
+/// that would have finished the catch-up is still a quit while waking: the wake
+/// is set down, and the next load tells the absence.
+/// @spec TUI-RUN-039
+#[test]
+fn a_quit_in_the_frame_that_would_finish_the_wake_sets_it_down() {
+    let json = save_of(&meadow(39_003, 1.0));
+    let now = SAVED_AT + 600; // 2400 ticks
+    let path = scratch("quit-finishing");
+    let mut t = term(100, 30);
+    let w = waking(Wake::begin_bounded(catch_up(&json, now), path.clone(), &mut t, 2_000).unwrap());
+    let remaining = w.remaining_ticks();
+    assert!(
+        remaining > 0 && remaining <= 2_000,
+        "fixture: the next advance would finish, with {remaining} left"
+    );
+
+    let w = waking(step(
+        w,
+        &mut t,
+        still(),
+        &[press(KeyCode::Char('q'), KeyModifiers::NONE)],
+    ));
+    assert!(w.quitting, "answered by quitting");
+    assert_eq!(w.remaining_ticks(), remaining, "no advance after the quit");
+    w.shut_down().unwrap();
+
+    let contents = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(decode_save(&path).owed_ticks, remaining);
+    let Advance::Finished(next) = begin_load(&contents, 0).unwrap().advance(u64::MAX) else {
+        panic!("an unbounded advance finishes");
+    };
+    assert_eq!(
+        next.report.elapsed_seconds, 600,
+        "the next load tells the whole absence"
+    );
+}
+
 /// The save a mid-wake shutdown leaves wakes through the rest at the next
 /// load and tells the absence once.
 /// @spec TUI-RUN-039
@@ -1297,7 +1335,7 @@ fn a_capped_gap_while_waking_carries_its_flag_through_a_set_down() {
 }
 
 // ---------------------------------------------------------------------------
-// TUI-RUN-076..079 — a long gap in a running game wakes as a load does
+// TUI-RUN-076, TUI-RUN-077, TUI-RUN-078, TUI-RUN-079 — a long gap in a running game wakes as a load does
 // ---------------------------------------------------------------------------
 
 /// A game in play, as a session would have it.
@@ -1338,6 +1376,23 @@ fn gap(
         .bounded(bound)
         .first_frame(t, input)
         .expect("a wake against a TestBackend does not fail")
+}
+
+/// A quit key in the frame a long absence ends in answers before that frame's
+/// advance, however far its bound would have taken the wake.
+/// @spec TUI-RUN-039, TUI-RUN-078
+#[test]
+fn a_quit_in_the_first_frame_of_a_long_absence_sets_it_down() {
+    let mut t = term(100, 30);
+    let app = playing(meadow(39_004, 1.0), "quit-first-frame");
+    let quit = press(KeyCode::Char('q'), KeyModifiers::NONE);
+    let w = waking(gap(app, 3_600, u64::MAX, &mut t, &[quit]));
+    assert!(w.quitting, "answered by quitting");
+    assert_eq!(
+        w.remaining_ticks(),
+        w.total_ticks(),
+        "the quit's frame replayed nothing"
+    );
 }
 
 fn finish(mut wake: Wake, t: &mut Terminal<TestBackend>) -> App {

@@ -25,6 +25,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 ### Fixed
 
 - **Quitting while waking no longer hides what the time away earned.** Achievements from the part already replayed still count as new when you come back.
+- **Quitting as waking ends no longer loses the tale.** A quit in the very last moment of waking used to skip telling you what happened while you were away. You now hear it next time you open the game.
 - **`X` makes everything the stocks cover.** With very full stores, making something in bulk stopped partway without saying so. It now makes the lot in one press.
 - **One timed effect runs its full length.** It ended a moment before it said it would.
 - **Coming back to a big clowder takes far less waiting.** Waking up after a long time away from a meadow that has grown large now takes a fraction of the time it did, and it wakes to exactly what it would have before.

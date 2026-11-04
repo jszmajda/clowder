@@ -4,8 +4,7 @@
 //!
 //! Mirrors `App::step`'s shape for the same reason: events and the clock
 //! reading arrive as arguments rather than being read here, so a wake runs
-//! headless in tests exactly as play does. @spec TUI-RUN-033..039,
-//! TUI-NAV-102, TUI-NAV-103
+//! headless in tests exactly as play does.
 
 use std::collections::BTreeSet;
 use std::io;
@@ -174,6 +173,9 @@ impl Waking {
                 waking: self,
             }));
         }
+        if self.quitting {
+            return Ok(Wake::Waking(self));
+        }
         self.advance_and_draw(terminal)
     }
 
@@ -195,7 +197,9 @@ impl Waking {
     /// One waking frame: quitting answers alone, every other key is
     /// discarded, the real time passing is banked at the save's speed through
     /// the ordinary accumulator (no live tick runs), and the catch-up
-    /// advances by at most this wake's bound. @spec TUI-RUN-035, TUI-RUN-036,
+    /// advances by at most this wake's bound. A quit key ends the frame there,
+    /// so it is always taken while waking, even in the frame that would have
+    /// finished the catch-up. @spec TUI-RUN-035, TUI-RUN-036, TUI-RUN-039,
     /// TUI-NAV-103
     pub fn step<B: Backend>(
         mut self,
@@ -216,27 +220,35 @@ impl Waking {
         // to run as live ticks once the game opens.
         self.observe(reading);
 
+        if self.quitting {
+            return Ok(Wake::Waking(self));
+        }
         self.advance_and_draw(terminal)
     }
 
-    /// What a waking frame's input can do: quitting answers, a resize applies,
-    /// and nothing else does anything. @spec TUI-NAV-103, TUI-RUN-078
+    /// What a waking frame's input can do: quitting answers, the last of its
+    /// resizes applies, and nothing else does anything. @spec TUI-NAV-103,
+    /// TUI-RUN-016, TUI-RUN-078
     fn answer<B: Backend>(
         &mut self,
         terminal: &mut Terminal<B>,
         input: &[Event],
     ) -> io::Result<()> {
+        let mut last_resize = None;
         for event in input {
             match event {
                 Event::Key(key) if is_quit_key(*key) => self.quitting = true,
                 // Only the final size matters, as for the awake loop.
-                Event::Resize(w, h) => terminal.resize(Rect::new(0, 0, *w, *h))?,
+                Event::Resize(w, h) => last_resize = Some(Rect::new(0, 0, *w, *h)),
                 // Every other key is discarded, not held: it would otherwise
                 // act on a meadow the player has not yet seen.
                 _ => {}
             }
         }
-        Ok(())
+        match last_resize {
+            Some(area) => terminal.resize(area),
+            None => Ok(()),
+        }
     }
 
     /// Bank an interval at the save's speed; one long enough to be an absence

@@ -30,12 +30,9 @@
 //! TUI-RUN-013 means the shell reads the file itself and only then hands the
 //! contents to `load_string`.
 //!
-//! TUI-RUN-026's cadence half is likewise unobservable: `persist::autosave_due`
-//! takes no arguments and returns a bool, so it has no input to vary and no
-//! state to advance — the elapsed interval it judges cannot be supplied, and
-//! sleeping out a real autosave interval is not a test. What *is* checked below
-//! is the other half of that spec: that what the shell writes is a save the
-//! core can read back.
+//! TUI-RUN-026's cadence is held in `loop_body.rs`. What is checked below is the
+//! other half of that spec: that what the shell writes is a save the core can
+//! read back.
 
 use clowder_tui::nav;
 use clowder_tui::runtime;

@@ -1,7 +1,7 @@
 //! The boundary between the operating system and the pure core: terminal
 //! lifecycle, the loop, time, autosave, and the failure policy for a save that
 //! will not load. The only place in clowder that reads a clock, touches the
-//! filesystem, or handles a signal. @spec TUI-RUN-001..031, TUI-RUN-046..059
+//! filesystem, or handles a signal.
 
 pub mod clock;
 pub mod lock;
@@ -60,7 +60,8 @@ pub struct App {
 /// Start up, run the loop, shut down. Returns a non-success code only for a
 /// refusal to start — a lock held by a live session, a save from a newer
 /// version, or a save that cannot be read at all.
-/// @spec TUI-RUN-001, TUI-RUN-007, TUI-RUN-011, TUI-RUN-013
+/// @spec TUI-RUN-001, TUI-RUN-007, TUI-RUN-009, TUI-RUN-010, TUI-RUN-011,
+/// TUI-RUN-012, TUI-RUN-013, TUI-RUN-029
 pub fn run() -> ExitCode {
     // TUI-RUN-009. The refusal below tells the player about --force, so the
     // binary had better honour it.

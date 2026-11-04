@@ -30,11 +30,8 @@
 //! `LockError` carries the holding pid and no message. No terminal is needed:
 //! the lock is decided before one is taken.
 //!
-//! **What is deliberately not tested here.** TUI-RUN-029's literal ordering claim ("acquire before reading the save") likewise lives in
-//! `runtime::run`, which enters raw mode and belongs to another chunk; what is
-//! checked here are the claim's observable consequences: the lock cannot depend
-//! on the save being present or readable, simultaneous launches cannot both
-//! pass, and a launch that refuses after acquiring leaves nothing behind.
+//! The game is run in a session of its own, so a launch that gets past the lock
+//! finds no terminal to take and stops there, whichever terminal runs the suite.
 
 #[path = "../../src/runtime/lock.rs"]
 #[allow(dead_code)]
@@ -713,6 +710,12 @@ fn lock_naming(genuine: &str, pid: u32, start: u64) -> String {
     out
 }
 
+#[cfg(unix)]
+extern "C" {
+    /// POSIX `setsid(2)`.
+    fn setsid() -> i32;
+}
+
 struct Launch {
     stderr: String,
     success: bool,
@@ -722,7 +725,29 @@ struct Launch {
 /// Run the real game under `home` in `zone`, killing it at a deadline, so a
 /// launch that never comes back is a failure rather than a hung suite.
 fn launch_in_zone(home: &Path, zone: &str) -> Launch {
-    let mut child = std::process::Command::new(CLOWDER)
+    launch_with(home, zone, &[])
+}
+
+/// As [`launch_in_zone`], with arguments.
+fn launch_with(home: &Path, zone: &str, args: &[&str]) -> Launch {
+    let mut command = std::process::Command::new(CLOWDER);
+    command.args(args);
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        // SAFETY: `setsid` is async-signal-safe, and the closure does nothing
+        // else. Without a session of its own, a launch past the lock would take
+        // the terminal running this suite.
+        unsafe {
+            command.pre_exec(|| {
+                if setsid() == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+    }
+    let mut child = command
         .env_clear()
         .env("HOME", home)
         .env("XDG_DATA_HOME", home.join(".local/share"))
@@ -1064,5 +1089,98 @@ fn the_game_states_the_failure_when_it_cannot_clear_a_lock() {
         launch.stderr.contains("session lock"),
         "the launch should state the failure, said: {}",
         launch.stderr
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-RUN-009, TUI-RUN-029 — through the game itself
+// ---------------------------------------------------------------------------
+
+/// `--force` reaches the lock: a launch given it passes a live holder, and goes
+/// on as far as a session with no terminal can.
+///
+/// @spec TUI-RUN-009
+#[test]
+fn the_game_given_the_override_passes_a_live_holder() {
+    let home = scratch_dir("force-through-the-game");
+    let save = save_under(&home);
+    let _held = SessionLock::acquire(&save, false).expect("an unlocked save should lock");
+    let dir = save.parent().unwrap();
+
+    let refused = launch_in_zone(&home, "UTC");
+    assert!(
+        refused.stderr.contains("already open"),
+        "fixture: without the override the launch refuses, said: {}",
+        refused.stderr
+    );
+
+    let forced = launch_with(&home, "UTC", &["--force"]);
+    assert!(!forced.timed_out, "the launch never came back");
+    assert!(
+        !forced.stderr.contains("already open"),
+        "the override was given and the launch still refused: {}",
+        forced.stderr
+    );
+    assert!(
+        forced.stderr.contains("prepare the terminal"),
+        "the launch should have stopped only for want of a terminal, said: {}",
+        forced.stderr
+    );
+    assert!(
+        beside_the_save(dir, &save).is_empty(),
+        "the forced launch took the lock, and let it go as it left"
+    );
+}
+
+/// The lock comes before the save is read: a launch refused by a live holder has
+/// not seen the save, so one it could not parse stays exactly where it is.
+///
+/// @spec TUI-RUN-029
+#[test]
+fn a_launch_refused_by_a_holder_never_reads_the_save() {
+    const GARBAGE: &[u8] = b"not a save at all";
+    let home = scratch_dir("refused-before-reading");
+    let save = save_under(&home);
+    let _held = SessionLock::acquire(&save, false).expect("an unlocked save should lock");
+    let dir = save.parent().unwrap();
+    fs::write(&save, GARBAGE).unwrap();
+    let before = beside_the_save(dir, &save);
+
+    let launch = launch_in_zone(&home, "UTC");
+    assert_refused_naming(&launch, std::process::id(), "UTC");
+    assert_eq!(
+        fs::read(&save).unwrap(),
+        GARBAGE,
+        "the save was read and moved aside before the lock refused"
+    );
+    assert_eq!(
+        beside_the_save(dir, &save),
+        before,
+        "nothing was set aside beside the save"
+    );
+}
+
+/// A refusal taken after the lock was acquired lets it go: a save from a newer
+/// clowder refuses the launch, and the next launch finds no lock.
+///
+/// @spec TUI-RUN-029
+#[test]
+fn a_refusal_after_the_lock_leaves_no_lock_behind() {
+    let home = scratch_dir("refused-after-locking");
+    let save = save_under(&home);
+    let dir = save.parent().unwrap();
+    fs::create_dir_all(dir).unwrap();
+    fs::write(&save, format!("{{\"save_version\": {}}}", u32::MAX)).unwrap();
+
+    let launch = launch_in_zone(&home, "UTC");
+    assert!(!launch.success, "the launch should not have started");
+    assert!(
+        launch.stderr.contains("newer"),
+        "fixture: the refusal is the newer save's, said: {}",
+        launch.stderr
+    );
+    assert!(
+        beside_the_save(dir, &save).is_empty(),
+        "the refusal left a lock behind"
     );
 }

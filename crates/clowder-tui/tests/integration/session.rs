@@ -1556,7 +1556,7 @@ fn a_key_behind_fewer_mouse_events_than_the_mouse_bound_is_taken_in_their_frame(
         vec![mouse],
         "while waking: the quit key behind the burst should be taken in its frame"
     );
-    run.expect_the_wake_set_down_after(2, "a burst then the quit key, while waking");
+    run.expect_the_wake_set_down_after(1, "a burst then the quit key, while waking");
 }
 
 // ---------------------------------------------------------------------------
@@ -1633,6 +1633,29 @@ fn a_suspend_counts_whatever_ends_the_session_just_after_it() {
             "{what} just after a resume should leave the night in the save"
         );
     }
+}
+
+/// A quit with more banked than a frame runs saves what is banked: the state
+/// stands where the frame left it, and the rest is owed to the next load.
+/// @spec TUI-RUN-031
+#[test]
+fn a_quit_with_a_backlog_saves_it_owed_rather_than_draining_it() {
+    const FAST: f64 = 32.0;
+    let _clock = now::held();
+    let mut state = GameState::new(PLAY_SEED);
+    state.speed = FAST;
+    let setup = Setup {
+        startup: Startup::NewGame(state),
+        ..play(scratch("no-drain"))
+    };
+    let run = play_out(setup, vec![ready(quit_key()).and_a_suspend(A_NAP)]);
+    let saved = run.saved("a quit with a backlog");
+    let banked = banked_for(&[(A_NAP, FAST)]);
+    assert!(
+        saved.owed_ticks > 0,
+        "the backlog of {banked} ticks was drained before the save"
+    );
+    assert_eq!(saved.state.ticks + saved.owed_ticks, banked);
 }
 
 /// A span since the last reading counts even where no frame follows to read it.
@@ -1897,7 +1920,7 @@ fn a_suspend_counts_whatever_ends_a_wake_just_after_it() {
     let speed = GameState::new(WAKE_SEED).speed;
     let banked = banked_for(&[(A_NIGHT, speed)]);
     let endings: [(&str, Cue, usize); 4] = [
-        ("a quit key", ready(quit_key()), 2),
+        ("a quit key", ready(quit_key()), 1),
         ("a signal", quiet().and_a_signal(), 2),
         ("a wait that fails", wait_fails(io::ErrorKind::Other), 1),
         ("a read that fails", read_fails(io::ErrorKind::Other), 1),

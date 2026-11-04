@@ -12,7 +12,6 @@
 //! must satisfy — suspend detection, a backwards wall clock, the shared
 //! absence cap — are precisely the ones that need headless tests at arbitrary
 //! instants, and a component that reads the clock itself cannot have them.
-//! @spec TUI-RUN-018..025, TUI-RUN-030
 
 use std::time::Duration;
 
@@ -68,13 +67,10 @@ impl Reading {
 /// converted at the speed in force when their time elapsed. Rescaling those
 /// would retroactively rewrite history the player already lived through.
 ///
-/// The third exists because the backlog alone cannot answer how much real time
-/// it represents. Dividing ticks by the *current* speed is wrong whenever the
-/// backlog accrued at a different one — a backlog banked at the fastest speed
-/// and saved at the slowest would back-date by thirty-two times the true
-/// interval, and could spuriously cross the absence cap. Banking the span as
-/// it accrues makes the answer exact regardless of speed history.
-/// @spec TUI-RUN-019, TUI-RUN-027, TUI-RUN-030
+/// The third is the real time the backlog represents, banked as it accrues,
+/// because dividing ticks by the *current* speed is wrong whenever the backlog
+/// accrued at a different one. Nothing in the game reads it (TUI-RUN-032).
+/// @spec TUI-RUN-019, TUI-RUN-030
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct TickAccumulator {
     /// A fraction of one tick, already converted at the speed in force when
@@ -83,7 +79,7 @@ pub struct TickAccumulator {
     fractional: f64,
     /// Whole ticks converted but not yet run. @spec TUI-RUN-019
     backlog: u64,
-    /// Real time the unrun backlog represents, in seconds. @spec TUI-RUN-027
+    /// Real time the unrun backlog represents, in seconds. @spec TUI-RUN-032
     unrun_seconds: f64,
 }
 
@@ -91,7 +87,7 @@ impl TickAccumulator {
     /// Fold an interval into banked time. Uses the larger of the two clocks'
     /// elapsed — the excess of wall over monotonic being absence the monotonic
     /// clock did not see — and caps the result at the shared absence limit.
-    /// @spec TUI-RUN-018, TUI-RUN-021..024
+    /// @spec TUI-RUN-018
     pub fn observe(&mut self, reading: Reading, speed: f64) {
         // @spec TUI-RUN-018, TUI-RUN-021, TUI-RUN-022, TUI-RUN-023, TUI-RUN-024
         // TUI-RUN-024: one shared absence cap with the load path.
@@ -120,7 +116,7 @@ impl TickAccumulator {
     /// the bound, having measured what a frame can afford — the accumulator
     /// cannot know what a tick costs. @spec TUI-RUN-025
     pub fn take(&mut self, max_ticks: u64) -> u64 {
-        // @spec TUI-RUN-025, TUI-RUN-031, TUI-RUN-032
+        // @spec TUI-RUN-025, TUI-RUN-032
         let n = max_ticks.min(self.backlog);
         if n > 0 {
             // The banked span was accrued per-conversion, possibly at
@@ -134,13 +130,7 @@ impl TickAccumulator {
         n
     }
 
-    /// The real-time span the unrun backlog represents.
-    ///
-    /// A save is stamped with the instant the *simulation* has reached — now
-    /// less this — because a banked save stamped with the wall clock would
-    /// tell the next load it was caught up when it was not, and that load
-    /// computes its own elapsed from that origin. The owed interval would
-    /// simply vanish. @spec TUI-RUN-027
+    /// The real-time span the unrun backlog represents. @spec TUI-RUN-032
     pub fn unrun_span(&self) -> Duration {
         Duration::from_secs_f64(self.unrun_seconds.max(0.0))
     }

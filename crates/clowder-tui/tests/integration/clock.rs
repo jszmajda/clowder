@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use clock::{Reading, TickAccumulator};
 use clowder_core::content::TICKS_PER_SECOND;
-use clowder_core::{load_string, save_string, GameState, CATCHUP_CAP_SECONDS};
+use clowder_core::CATCHUP_CAP_SECONDS;
 
 const TPS: u64 = TICKS_PER_SECOND;
 const TPS_F: f64 = TPS as f64;
@@ -264,6 +264,17 @@ fn the_monotonic_clock_drives_accumulation_when_the_wall_clock_does_not_move() {
         4.0,
         "the span follows the monotonic reading",
     );
+}
+
+/// A wall clock stepped forward reads as a suspend does, and is credited as one:
+/// nothing the two clocks say can tell them apart.
+/// @spec TUI-RUN-021, TUI-RUN-022
+#[test]
+fn a_wall_clock_stepped_forward_is_credited_as_a_suspend() {
+    let step = Duration::from_secs(3_600);
+    let mut stepped = TickAccumulator::default();
+    stepped.observe(reading(Duration::from_secs(1), step), 1.0);
+    assert_eq!(stepped.backlog(), 3_600 * TPS, "the hour is credited");
 }
 
 /// No observed time, no ticks: the accumulator never invents an interval.
@@ -629,9 +640,8 @@ fn a_derived_span_would_cross_the_absence_cap_on_an_absence_that_never_happened(
 // TUI-RUN-031 — shutdown does not wait for the sim to catch up
 // ---------------------------------------------------------------------------
 
-/// Reporting the unrun interval must not require draining it: shutdown asks
-/// the accumulator what is owed and leaves immediately.
-/// @spec TUI-RUN-031
+/// Asking what is owed runs nothing.
+/// @spec TUI-RUN-032
 #[test]
 fn an_outstanding_backlog_is_reported_without_being_drained() {
     let mut acc = TickAccumulator::default();
@@ -645,45 +655,4 @@ fn an_outstanding_backlog_is_reported_without_being_drained() {
     );
     assert_eq!(acc.unrun_span(), span, "asking twice gives the same answer");
     assert_eq!(acc.backlog(), before, "asking does not run anything");
-}
-
-/// The seam between the banked backlog and the core's load path. Back-dating
-/// the save stamp by the unrun span makes the owed interval run exactly once,
-/// at the next load — neither lost nor counted twice.
-/// @spec TUI-RUN-031, TUI-RUN-032
-#[test]
-fn back_dating_by_the_unrun_span_carries_the_backlog_into_the_next_load() {
-    let mut state = GameState::new(11);
-    state.speed = 1.0;
-    assert_eq!(state.ticks, 0, "fixture: a fresh game has run no ticks");
-
-    // A minute of absence accrues, and shutdown arrives before any of it runs.
-    let mut acc = TickAccumulator::default();
-    acc.observe(steady(Duration::from_secs(60)), 1.0);
-    let owed = acc.backlog();
-    assert_eq!(owed, 60 * TPS);
-
-    let now_unix = 1_800_000_000u64;
-    let saved_at = now_unix - acc.unrun_span().as_secs();
-    assert_eq!(
-        saved_at,
-        now_unix - 60,
-        "the stamp names the instant the sim actually reached"
-    );
-
-    let loaded = load_string(&save_string(&state, saved_at), now_unix)
-        .expect("a freshly written save loads");
-    assert_eq!(
-        loaded.state.ticks, owed,
-        "the unrun interval runs exactly once at the next load — not lost, not doubled"
-    );
-
-    // Why back-dating exists: a wall-clock stamp on a banked save tells the
-    // next load it is caught up, and the owed interval simply vanishes.
-    let naive = load_string(&save_string(&state, now_unix), now_unix)
-        .expect("a freshly written save loads");
-    assert_eq!(
-        naive.state.ticks, 0,
-        "a wall-clock stamp would swallow the owed interval"
-    );
 }
