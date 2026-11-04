@@ -1586,7 +1586,7 @@ fn gives_count_field(section: Section) -> bool {
 /// Whether a section can list a row whose description states a next cost
 /// (TUI-NAV-078, TUI-NAV-073). Judged by the section alone.
 fn gives_cost_field(section: Section) -> bool {
-    !matches!(section, Section::Sky | Section::Legacy)
+    !matches!(section, Section::Legacy)
 }
 
 /// The owned count the inspector states for a row, if it states one.
@@ -1625,7 +1625,9 @@ fn stated_cost(state: &GameState, row: &Row) -> Option<Vec<(ResourceId, f64)>> {
         (RowKey::Colony(c, "penpal"), _) => {
             vec![(ResourceId::Charm, state.pen_pal(*c)?.price)]
         }
-        (_, RowKind::Act { command, .. }) => state.unit_price(command)?,
+        (_, RowKind::Act { command, .. }) => state
+            .unit_price(command)
+            .or_else(|| state.act_price(command))?,
         _ => return None,
     };
     (!cost.is_empty()).then_some(cost)

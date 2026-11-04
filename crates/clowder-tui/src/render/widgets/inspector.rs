@@ -1287,9 +1287,13 @@ fn draw_body(
                     lines.extend(pen_pal_lines(*c, &report));
                 }
             } else if let RowKind::Act { command, .. } = &row.kind {
-                if let Some(unit) = state.unit_price(command) {
+                // @spec TUI-NAV-073, TUI-NAV-207
+                let price = state
+                    .unit_price(command)
+                    .or_else(|| state.act_price(command));
+                if let Some(price) = price {
                     lines.push(Vec::new());
-                    lines.extend(unit_cost_lines(state, &unit));
+                    lines.extend(unit_cost_lines(state, &price));
                 }
             }
             if let RowKey::Colony(c, "trade") = &row.key {

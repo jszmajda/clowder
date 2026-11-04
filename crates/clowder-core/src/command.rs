@@ -193,6 +193,45 @@ impl GameState {
         }
     }
 
+    /// What a fixed act takes from the stores if applied now: an amount of its own,
+    /// or for the act that spends a whole store, that store's stock. Nothing for an
+    /// act spending no store or priced elsewhere, or with its gate closed.
+    /// @spec SIM-ENG-087
+    pub fn act_price(&self, cmd: &Command) -> Option<Vec<(ResourceId, f64)>> {
+        use ResourceId as R;
+        if !self.command_gate_open(cmd) {
+            return None;
+        }
+        Some(match *cmd {
+            Command::Forage => vec![(R::Catnip, content::FORAGE_COST)],
+            Command::HostJamboree => vec![
+                (R::Pep, content::JAMBOREE_PEP),
+                (R::Charm, content::JAMBOREE_CHARM),
+                (R::Quills, content::JAMBOREE_QUILLS),
+            ],
+            Command::Bask => {
+                let warmth = self.stock(R::Warmth);
+                if warmth <= EPSILON {
+                    return None;
+                }
+                vec![(R::Warmth, warmth)]
+            }
+            Command::HoldParade => vec![(R::Unicorns, content::PARADE_UNICORN_COST)],
+            Command::RefineStarshard => vec![(R::Prisms, content::REFINE_INPUT)],
+            Command::RefineEcho => vec![(R::Starshards, content::REFINE_INPUT)],
+            Command::CondenseJar => vec![(R::Rainbows, content::JAR_RAINBOW_COST)],
+            Command::MakePromise => vec![(R::Echoes, content::PROMISE_ECHO_COST)],
+            Command::ScoutPicnic => vec![(R::Pep, content::SCOUT_PEP_COST)],
+            Command::SummonStarWhale => vec![
+                (R::Curiosity, content::WHALE_SUMMON_CURIOSITY),
+                (R::Echoes, content::WHALE_SUMMON_ECHOES),
+            ],
+            Command::FeedWhale => vec![(R::Dreamcorns, content::WHALE_LULLABY_DREAMCORNS)],
+            Command::LaunchExpedition(site) => content::site_def(site).mission_fuel.to_vec(),
+            _ => return None,
+        })
+    }
+
     /// What a fixed act spends, by name: an act with no definition holds its
     /// spends here, beside the rules below, for the store-links query. A test
     /// holds each to what its rule really moves. @spec SIM-ENG-080, SIM-ENG-082

@@ -2925,7 +2925,8 @@ fn every_purchasable_item_states_its_blurb() {
 /// an adventure's row, whose definition carries a blurb, in `adventures.rs`):
 /// no statement, no stand-in, no price, no reason — save, on a row the list
 /// draws with a label in its name's place, that label (TUI-NAV-091). (Pounce
-/// and Trade rows state the core's one-unit price instead, TUI-NAV-073.)
+/// and Trade rows state the core's one-unit price instead, TUI-NAV-073, and a
+/// fixed act its price, TUI-NAV-207.)
 /// Quantified over every such row a full meadow lists.
 /// @spec TUI-NAV-018, TUI-NAV-091
 #[test]
@@ -2948,7 +2949,8 @@ fn a_row_with_no_definition_states_only_its_name() {
                 if matches!(
                     command,
                     clowder_core::Command::Pounce(_) | clowder_core::Command::Trade(..)
-                ) {
+                ) || state.act_price(command).is_some()
+                {
                     continue;
                 }
             }

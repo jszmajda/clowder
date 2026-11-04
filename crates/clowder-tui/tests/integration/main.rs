@@ -6,6 +6,7 @@
 //! signals to its own process, so each stays a test target of its own.
 
 mod achievements;
+mod act_prices;
 mod act_results;
 mod adventures;
 mod armed_summary;

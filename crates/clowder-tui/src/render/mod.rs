@@ -306,7 +306,7 @@ fn section_gives_count(section: Section) -> bool {
 /// Whether a section's list gives a next-cost field (TUI-NAV-078,
 /// TUI-NAV-073), judged by the section alone. @spec TUI-RENDER-020
 fn section_gives_cost(section: Section) -> bool {
-    !matches!(section, Section::Sky | Section::Legacy)
+    !matches!(section, Section::Legacy)
 }
 
 /// The owned count the inspector states for a row, if it states one — the
@@ -332,8 +332,8 @@ fn stated_count(state: &GameState, row: &Row) -> Option<u64> {
 /// The next cost the inspector states for a row, if it states one: the
 /// core's price for one more on a row that takes a content item — none on a
 /// tinkerer row, where the item is already the player's, or where the price
-/// names no component — and the one-unit price on a Pounce or Trade row.
-/// @spec TUI-NAV-078, TUI-NAV-073
+/// names no component — the one-unit price on a Pounce or Trade row, and a fixed
+/// act's price. @spec TUI-NAV-078, TUI-NAV-073, TUI-NAV-207
 fn stated_cost(state: &GameState, row: &Row) -> Option<Vec<(ResourceId, f64)>> {
     let cost = match (&row.key, &row.kind) {
         (RowKey::Content(_, "tinker"), _) => return None,
@@ -345,7 +345,9 @@ fn stated_cost(state: &GameState, row: &Row) -> Option<Vec<(ResourceId, f64)>> {
             }
             state.cost_of_next(*id, 1)
         }
-        (_, RowKind::Act { command, .. }) => state.unit_price(command)?,
+        (_, RowKind::Act { command, .. }) => state
+            .unit_price(command)
+            .or_else(|| state.act_price(command))?,
         _ => return None,
     };
     (!cost.is_empty()).then_some(cost)
