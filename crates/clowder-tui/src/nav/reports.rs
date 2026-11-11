@@ -51,6 +51,9 @@ fn queue(view: &mut ViewState, state: &GameState, report: &OfflineReport, nap_ye
 /// one a long gap began in play. A catch-up never runs through `update`, so this
 /// is its own entry point rather than a case inside the reducer. @spec TUI-NAV-027
 pub fn queue_load_report(view: &mut ViewState, loaded: &LoadedGame) {
+    // What the absence revealed is marked whether or not the core kept the
+    // report. @spec TUI-NAV-214
+    super::update::note_report_reveals(view, &loaded.report);
     queue(view, &loaded.state, &loaded.report, None);
 }
 
@@ -61,6 +64,8 @@ pub fn queue_load_report(view: &mut ViewState, loaded: &LoadedGame) {
 pub fn queue_command_reports(view: &mut ViewState, state: &GameState, events: &[Event]) {
     for event in events {
         if let Event::Napped { years, report } = event {
+            // @spec TUI-NAV-214
+            super::update::note_report_reveals(view, report);
             queue(view, state, report, Some(*years));
         }
     }

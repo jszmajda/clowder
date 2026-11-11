@@ -677,8 +677,17 @@ fn a_reports_pinned_entry_names_what_it_revealed() {
         kitten < first && first < second && second < seasons,
         "the reveals stand after the kittens and before the seasons, in the report's order:\n{text}"
     );
-    let lines_with = |needle: &str| text.lines().filter(|l| l.contains(needle)).count();
-    assert_eq!(lines_with("looks possible"), 2, "a line each:\n{text}");
+    // Within the pinned entry alone: the scrollback below it holds the
+    // fixture's own lines.
+    let entry = &text[at("away for")..seasons];
+    assert_eq!(
+        entry
+            .lines()
+            .filter(|l| l.contains("looks possible"))
+            .count(),
+        2,
+        "a line each:\n{entry}"
+    );
 }
 
 // ---------------------------------------------------------------------------

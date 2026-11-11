@@ -336,7 +336,12 @@ impl CatchUp {
                 self.partial.earned.as_slice(),
             ]
             .concat(),
-            revealed: Vec::new(),
+            // @spec SAVE-041
+            revealed: [
+                self.carried.revealed.as_slice(),
+                self.partial.revealed.as_slice(),
+            ]
+            .concat(),
         }
     }
 
@@ -790,6 +795,8 @@ pub(crate) fn fold_event(report: &mut OfflineReport, event: Event) {
         Event::KittenReturned { name } => bump(&mut report.returned, &name),
         Event::SeasonChanged { .. } => report.seasons_passed += 1,
         Event::AchievementEarned { id } => report.earned.push(id),
+        // @spec SAVE-041
+        Event::Revealed { id } => report.revealed.push(id),
         _ => {}
     }
 }

@@ -199,17 +199,7 @@ fn event_words(event: &Event) -> String {
         E::ZoomiesStarted { .. } => "the zoomies!".into(),
         E::ZoomiesEnded => "the zoomies pass".into(),
         E::KittenMood { tier } => format!("the clowder is {}", format!("{tier:?}").to_lowercase()),
-        // A reveal names what it revealed and the tab that lists it, digit
-        // and name, so the line answers what and where. @spec TUI-NAV-209
-        E::Revealed { id } => {
-            let section = crate::nav::Section::listing(*id);
-            format!(
-                "{} looks possible \u{b7} {} {}",
-                crate::render::content_name(*id),
-                section.digit(),
-                section.title()
-            )
-        }
+        E::Revealed { id } => reveal_words(*id),
         E::SkyEventVisible => "something bright crossed the sky".into(),
         E::SpeedChanged { speed } => format!("speed ×{speed}"),
         E::ElderAppointed { name } => format!("{name} is the Elder now"),
@@ -240,6 +230,19 @@ fn event_words(event: &Event) -> String {
             spaced_words(&head)
         }
     }
+}
+
+/// A reveal names what it revealed and the tab that lists it, digit and
+/// name, so the line answers what and where — on the ticker, in the Journal,
+/// and in a report's pinned entry alike. @spec TUI-NAV-209, TUI-NAV-215
+fn reveal_words(id: clowder_core::ContentId) -> String {
+    let section = crate::nav::Section::listing(id);
+    format!(
+        "{} looks possible \u{b7} {} {}",
+        crate::render::content_name(id),
+        section.digit(),
+        section.title()
+    )
 }
 
 /// "PromiseQuieted" -> "promise quieted".
@@ -582,7 +585,7 @@ fn journal_lines(state: &GameState, view: &ViewState) -> Vec<Line<'static>> {
 /// itself, with a gentle note, where the core stopped counting); every
 /// resource whose stock changed, signed, gains before decreases, each group
 /// largest first; each kitten who arrived, wandered, or came home, by name;
-/// and the seasons passed. Unlike the banner, this tells everything the
+/// each structure and idea revealed; and the seasons passed. Unlike the banner, this tells everything the
 /// report holds — dismissing the banner must lose nothing. Each changed
 /// store is named in its coat.
 /// @spec TUI-NAV-027, TUI-NAV-056, TUI-THEME-024
@@ -639,6 +642,12 @@ fn away_report_lines(report: &OfflineReport) -> Vec<Line<'static>> {
         } else {
             format!("  {name} came home.")
         }));
+    }
+    // What the replay revealed, in the order revealed, worded as a reveal's
+    // line is: the Journal holds no line of its own for a reveal a replay
+    // folded away. @spec TUI-NAV-215
+    for id in &report.revealed {
+        lines.push(Line::raw(format!("  {}", reveal_words(*id))));
     }
     if report.seasons_passed > 0 {
         lines.push(Line::raw(format!(

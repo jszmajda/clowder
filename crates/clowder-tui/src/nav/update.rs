@@ -12,7 +12,7 @@
 
 use std::time::Duration;
 
-use clowder_core::{Command, ContentId, Event, GameState, LockReason, StructureId};
+use clowder_core::{Command, ContentId, Event, GameState, LockReason, OfflineReport, StructureId};
 
 use super::action::{Action, CountSemantics};
 use super::mnemonics;
@@ -257,17 +257,31 @@ pub fn reset_hidden_tabs(view: &mut ViewState, state: &GameState) {
 /// shell none of them. @spec TUI-NAV-211, TUI-NAV-213
 pub fn note_reveals(view: &mut ViewState, events: &[Event]) {
     for event in events {
-        let Event::Revealed { id } = event else {
-            continue;
-        };
-        if !matches!(id, ContentId::Structure(_) | ContentId::Idea(_)) {
-            continue;
+        if let Event::Revealed { id } = event {
+            mark_reveal(view, *id);
         }
-        view.new_rows.insert(*id);
-        let section = Section::listing(*id);
-        if view.section != Some(section) {
-            view.seen[section.index()].visited = false;
-        }
+    }
+}
+
+/// Mark the rows a report handed back says its replay revealed, as a tick's
+/// reveals are marked: a catch-up's or a nap's, retained or not, a load's
+/// once its opening has taken focus. @spec TUI-NAV-214
+pub fn note_report_reveals(view: &mut ViewState, report: &OfflineReport) {
+    for id in &report.revealed {
+        mark_reveal(view, *id);
+    }
+}
+
+/// One reveal: its row new until the cursor rests on it, and its section's
+/// tab badged unless that section is in focus. @spec TUI-NAV-211, TUI-NAV-213
+fn mark_reveal(view: &mut ViewState, id: ContentId) {
+    if !matches!(id, ContentId::Structure(_) | ContentId::Idea(_)) {
+        return;
+    }
+    view.new_rows.insert(id);
+    let section = Section::listing(id);
+    if view.section != Some(section) {
+        view.seen[section.index()].visited = false;
     }
 }
 
