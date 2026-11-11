@@ -5,7 +5,7 @@
 use std::collections::BTreeSet;
 use std::time::Instant;
 
-use clowder_core::{AchievementId, Command, ResourceId};
+use clowder_core::{AchievementId, Command, ContentId, ResourceId};
 
 use super::rows::RowKey;
 use super::section::Section;
@@ -148,6 +148,10 @@ pub struct ViewState {
     /// `✦N earned` counts. Nothing of it is saved, so a restart begins it
     /// again from the record. @spec TUI-NAV-174, TUI-NAV-020
     pub achievements_seen: BTreeSet<AchievementId>,
+    /// The items whose rows a reveal in play has marked new and the cursor
+    /// has not yet rested on. Every sitting begins with none, and nothing of
+    /// it is saved. @spec TUI-NAV-211, TUI-NAV-212
+    pub new_rows: BTreeSet<ContentId>,
     /// The achievements the open overlay marks ` new`: those unseen when it
     /// opened, and those earned while it stands open. Cleared when it closes.
     /// @spec TUI-NAV-175

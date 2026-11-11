@@ -27,6 +27,7 @@ mod lock;
 mod loop_body;
 mod loop_order;
 mod neighbour_offers;
+mod new_rows;
 mod overlays;
 mod palette;
 mod pen_pals;
