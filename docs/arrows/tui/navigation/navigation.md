@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-11 (commit `8f62315c606c`). 215 of 215 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-11 (commit `63d0158f4215`). 216 of 216 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/navigation/navigation-specs.md` — 215 specs, prefix `TUI-NAV`
+- `docs/intent/tui/navigation/navigation-specs.md` — 216 specs, prefix `TUI-NAV`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/act_prices.rs`
@@ -81,9 +81,9 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-NAV-001 – TUI-NAV-215 | 215 | 0 | 0 |
+| All | TUI-NAV-001 – TUI-NAV-216 | 216 | 0 | 0 |
 
-**Summary:** 215 of 215 active specs implemented.
+**Summary:** 216 of 216 active specs implemented.
 
 ## Key Findings
 
@@ -118,6 +118,8 @@ Audited 2026-11-11, for what issue #49 changed. A reveal's line names the item a
 Audited 2026-11-11, for what issue #50 changed. A click and a wheel step move only the cursor, and the list follows it by the render leaf's rule (TUI-NAV-129, TUI-NAV-130). The click no longer writes a line of its own, and a test now holds that a click changes no list's line. The design's wording on where a list stands after a click, and its Decisions row, follow the render leaf. Every spec marked implemented has a test citing it, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-11, for what issue #51 changed. A report handed back marks the rows its replay revealed and badges their tabs, a load's once the opening has taken focus (TUI-NAV-214). The opening now takes what it finds as known, save those (TUI-NAV-024). The pinned entry names each reveal in the words of a reveal's line (TUI-NAV-215, TUI-NAV-027). The test that a catch-up marks nothing now holds the opposite, and a nap is tested through the report seam the loop calls. The deferred item for #51 is resolved and removed, and the one left is renumbered. Every spec marked implemented has a test citing it, and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-11, for what issue #52 changed. Every kind's reveal now marks its row, the reveals of applied commands included, each command of an `X` run among them (TUI-NAV-211). A two-state item's line names its kind's tab (TUI-NAV-209), and a test holds that every content row stands in its kind's section (TUI-NAV-216). The report and pinned-entry specs cover every kind (TUI-NAV-214, TUI-NAV-215). The last deferred item is resolved and removed. Every spec marked implemented has a test citing it, and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

@@ -6426,7 +6426,7 @@ fn a_row_finishing_under_the_cursor_hands_it_to_the_row_that_closes_up() {
         for section in Section::ALL {
             let i = section.index();
             assert!(
-                !(a.view.seen[i].visited && !seen[i].visited),
+                seen[i].visited || !a.view.seen[i].visited,
                 "the move counted as a visit to {section:?}"
             );
         }

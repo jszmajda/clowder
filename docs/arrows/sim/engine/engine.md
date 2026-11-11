@@ -4,7 +4,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 ## Status
 
-**OK** — last audited 2026-11-11 (commit `fc38c25a40d4`). 86 of 86 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-11 (commit `63d0158f4215`). 87 of 87 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/engine/engine-specs.md` — 86 specs, prefix `SIM-ENG`
+- `docs/intent/sim/engine/engine-specs.md` — 87 specs, prefix `SIM-ENG`
 
 ### Tests
 - `crates/clowder-core/tests/integration/act_price.rs`
@@ -42,6 +42,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 - `crates/clowder-core/tests/integration/unit_price.rs`
 - `crates/clowder-core/tests/integration/wonder.rs`
 - `crates/clowder-tui/tests/integration/update.rs`
+- `crates/clowder-core/tests/integration/arrivals.rs`
 
 ### Code
 - `crates/clowder-core/src/command.rs`
@@ -62,9 +63,9 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-ENG-001 – SIM-ENG-087 | 86 | 0 | 0 |
+| All | SIM-ENG-001 – SIM-ENG-088 | 87 | 0 | 0 |
 
-**Summary:** 86 of 86 active specs implemented.
+**Summary:** 87 of 87 active specs implemented.
 
 ## Key Findings
 
@@ -91,6 +92,8 @@ Audited 2026-11-04, for what issue #46 changed. A query prices each act that tak
 Audited 2026-11-11, for what issue #47 changed. The guard over every key family now passes with no exception (SIM-ENG-085), the one family it excepted having left the vocabulary and the key slots having closed up.
 
 Audited 2026-11-11, for what issue #48 changed. The fixed-act price now points to the kittens leaf for a promotion's price (SIM-ENG-087), and the design's list of refusals names every one the core returns, two it had missed among them.
+
+Audited 2026-11-11, for what issue #52 changed. An item of a kind without a reveal ladder now emits a `Revealed` event when an applied command, or an adventure's completion, leaves it present after being absent (SIM-ENG-088). Each command's arrivals are judged against what was present as it began, and a completion's against what was present just before it. A first try kept a set between commands, built at a new game and on load, and the full suite showed it going stale under fixtures built by hand: the next command announced what it had not opened. The look a command began with is kept while it runs and kept out of a state's equality, so a nap's report and its command never both announce one arrival. Tests cover a researched idea's openings (each announced once), a command that opens nothing, a first Move, an adventure's completion, a nap whose sleep completes one, and plain ticks. The design's claim that every gate but the reveal ladder opens on a command now names the one exception: a tradition an adventure's completion opens, priced in wisdom, which names no store. The release catch-up guards were rerun. Every spec marked implemented has a test citing it, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

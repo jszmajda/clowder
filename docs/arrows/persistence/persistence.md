@@ -4,7 +4,7 @@ Persistence turns the deterministic sim into a game that survives closing the te
 
 ## Status
 
-**OK** — last audited 2026-11-11 (commit `8f62315c606c`). 41 of 41 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-11 (commit `63d0158f4215`). 41 of 41 active specs implemented, each cited by a test.
 
 ## References
 
@@ -64,6 +64,8 @@ Audited 2026-11-03, for what issue #37 changed, which closes what the first audi
 Audited 2026-11-04, for what issue #43 changed. Saves move to version 12 so a journal holding the new event reads as too new to an older binary rather than corrupt, and a v11 fixture holds that migrating changes no field (SAVE-040).
 
 Audited 2026-11-11, for what issue #51 changed. A replay's report now lists the structures and ideas it revealed, in order. A set-down wake carries the list into the load that finishes it, and a nap's report lists its own through the same fold (SAVE-041). This is not a save version step, by the design's rule for a report that gains data: an older binary drops the detail unread. Tests cover a load, a set-down wake, and a nap. The release catch-up guards were run on the change against their bounds. Every spec marked implemented has a test citing it, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-11, for what issue #52 changed. A report's list of reveals now covers every kind (SAVE-041), since items without a reveal ladder announce their arrival too. The fold was already kind-blind, so no code changed here. Load now builds the engine's derived set of present items after its normalization, before any catch-up tick. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 
