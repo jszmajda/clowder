@@ -4,7 +4,7 @@ This leaf owns the boundary between the operating system and the pure core: term
 
 ## Status
 
-**OK** — last audited 2026-11-11 (commit `a414659672bc`). 68 of 68 active specs implemented, each cited by a test; 1 deferred.
+**OK** — last audited 2026-11-11 (commit `9c1932d81d1c`). 68 of 68 active specs implemented, each cited by a test; 1 deferred.
 
 ## References
 
@@ -64,6 +64,8 @@ Audited 2026-11-03, for what issue #33 changed. A reading spanning the core's mi
 Audited 2026-11-04, for what issue #29 changed. Two behaviours moved: a burst of resizes while waking applies once (TUI-RUN-016), and a quit key ends its waking frame before the advance, so the finishing frame is still a quit while waking (TUI-RUN-039). The open questions are pinned in the specs and design: a wall clock stepped forward is credited as a suspend (TUI-RUN-021, TUI-RUN-022); autosave keeps to the monotonic clock (TUI-RUN-026); two launches are kept apart wherever the filesystem grants the advisory lock (TUI-RUN-029). The last question, what an in-process absence owes a report, was already settled by TUI-RUN-024 and TUI-RUN-076. Tests now reach the once-gate and cadence of a failed save (TUI-RUN-028), a backlog left undrained (TUI-RUN-031), and the override and the lock's order through the game itself (TUI-RUN-009, TUI-RUN-029). The speed-key item the issue named was already held by `session.rs`, and the override text by `lock.rs`. Annotation ranges are gone and every spec is cited by name; annotations moved off an unused type, since deleted, and onto what decides, and a test of the rejected back-dating scheme went with them. Thirteen mutations were each caught. TUI-RUN-032 stays deferred as its own text explains.
 
 Audited 2026-11-11, for what issue #49 changed. The loop now hands the events of the ticks it runs in play to navigation, which marks what they reveal (navigation leaf: New rows). The loop's step 3 in the design says so. No runtime spec changed, and a catch-up's replay still hands navigation nothing. TUI-RUN-032 was reviewed: it is implemented and tested, and its own note keeps it deferred because nothing reads it, so nothing is left open. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-11, for what issue #50 changed. After each frame it draws, the loop keeps the line the frame's list began on, read from the pointer record (render leaf: The List Viewport). Step 5 of the loop in the design says so. No runtime spec changed. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

@@ -17,6 +17,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 
 ### Changed
 
+- **Lists scroll the way other windows do.** In a long list, turning back moves the highlight and leaves the list where it is. The list only scrolls once the highlight reaches its edge, and the wheel works the same way. Jumping somewhere far, like to the next group, still puts the highlight a few rows down so you can see what's below it.
 - **The count you type stands out.** The digits on the highlighted row now sit in a notch cut out of the highlight, so they're easy to spot whatever colour the row is.
 - **A click leaves the list where it is.** Clicking a row moves the cursor there and the row stays under the pointer. Only a row at the very edge moves the list, by one, to show what's next, and the arrows and wheel carry on from there without a jump.
 - **The long list of things to build is divided up.** It now falls into named groups by what each thing is for, so there's something to read down by, and `[` and `]` jump between them. A group only appears once it has something in it.

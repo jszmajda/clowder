@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-11 (commit `a414659672bc`). 213 of 213 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-11 (commit `9c1932d81d1c`). 213 of 213 active specs implemented, each cited by a test.
 
 ## References
 
@@ -54,6 +54,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 - `crates/clowder-tui/tests/integration/update.rs`
 - `crates/clowder-tui/tests/integration/waking.rs`
 - `crates/clowder-tui/tests/integration/new_rows.rs`
+- `crates/clowder-tui/tests/integration/scroll.rs`
 
 ### Code
 - `crates/clowder-tui/src/nav/action.rs`
@@ -113,6 +114,8 @@ Audited 2026-11-04, for what issue #46 changed. An action row the core prices as
 Audited 2026-11-11, for what issue #48 changed. A kitten's row states its next rank's price beneath the kitten's name and before its card (TUI-NAV-208), and the row keeps its one word. A refusal for short exp names it. Two older tests that read a kitten's inspector as the name alone now set the price aside, and the row-wide test that every row which spends says so now includes kittens.
 
 Audited 2026-11-11, for what issue #49 changed. A reveal's line names the item and the tab that lists it (TUI-NAV-209). A row a tick reveals in play is marked until the cursor rests on it at a frame's end (TUI-NAV-211, TUI-NAV-212), and a reveal out of focus badges its section's tab (TUI-NAV-213). A test over every structure and idea holds that each revealed one is listed in its section (TUI-NAV-210). Tests drive real ticks through the loop, and one shows a catch-up's reveals mark nothing. The audit removed a per-section watermark that every visit wrote and nothing read; its comment described a chip count the design had dropped. Two follow-ups are deferred in the design and filed: reveals during an absence or a nap (#51), and items a gate brings into a known section (#52). Every spec marked implemented has a test citing it, and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-11, for what issue #50 changed. A click and a wheel step move only the cursor, and the list follows it by the render leaf's rule (TUI-NAV-129, TUI-NAV-130). The click no longer writes a line of its own, and a test now holds that a click changes no list's line. The design's wording on where a list stands after a click, and its Decisions row, follow the render leaf. Every spec marked implemented has a test citing it, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

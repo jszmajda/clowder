@@ -257,7 +257,7 @@ fn walking_back_the_list_stands_still_until_the_cursor_reaches_the_top() {
         let (_, top, bottom) = list_space(&app, size);
         let body = bottom - top + 1;
         let turned_at = cursor_y(&app, size);
-        let mut moved_at = turned_at;
+        let mut moved_at;
         loop {
             let before = drawn(&app, size);
             let from = index_of(&app, &cursor_key(&app));
