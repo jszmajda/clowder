@@ -810,8 +810,11 @@ impl App {
         // @spec TUI-RUN-017, TUI-RUN-025
         self.observe(reading, speed_for_this_interval);
         let owed = self.clock.take(Self::MAX_TICKS_PER_FRAME);
+        // What the ticks reveal is marked as it happens; these are ticks of
+        // play, never a catch-up's bulk replay. @spec TUI-NAV-211, TUI-NAV-213
         for _ in 0..owed {
-            self.state.tick();
+            let events = self.state.tick();
+            crate::nav::note_reveals(&mut self.view, &events);
         }
 
         // A tick (or a command this frame applied) can remove a row an
@@ -829,6 +832,9 @@ impl App {
         // And an achievement earned beneath the open scrapbook is seen as it
         // is drawn. @spec TUI-NAV-174
         crate::nav::show_achievements(&mut self.view, &self.state);
+        // Last of all, once the frame's keys, ticks, and landings are done: a
+        // new row the cursor now rests on has been found. @spec TUI-NAV-212
+        crate::nav::see_new_row(&mut self.view, &self.state);
 
         // ---- 4. autosave ----------------------------------------------------
         // @spec TUI-RUN-026, TUI-RUN-028

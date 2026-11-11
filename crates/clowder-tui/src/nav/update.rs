@@ -12,14 +12,14 @@
 
 use std::time::Duration;
 
-use clowder_core::{Command, GameState, LockReason, StructureId};
+use clowder_core::{Command, ContentId, Event, GameState, LockReason, StructureId};
 
 use super::action::{Action, CountSemantics};
 use super::mnemonics;
 use super::palette;
 use super::rows::{
-    done_count, drawn_rows, has_tab, ideas_place, lists_selectable, rows, tab_sections, Row,
-    RowKey, RowKind,
+    cursor_index, done_count, drawn_rows, has_tab, ideas_place, lists_selectable, rows,
+    tab_sections, Row, RowKey, RowKind,
 };
 use super::section::Section;
 use super::view::{ArmedRow, CountPrompt, Overlay, SeenMark, ViewState};
@@ -249,6 +249,48 @@ pub fn reset_hidden_tabs(view: &mut ViewState, state: &GameState) {
         if !has_tab(state, view.section, section) {
             view.seen[section.index()].visited = false;
         }
+    }
+}
+
+/// Mark the rows a tick's reveals bring: each structure or idea the events
+/// reveal is new until the cursor rests on it, and a reveal in a section other
+/// than the one in focus badges that section's tab until it is next visited,
+/// as a tab's appearance does. Handed only the events of ticks the game runs
+/// in play: a catch-up or a nap folds its ticks into a report and hands the
+/// shell none of them. @spec TUI-NAV-211, TUI-NAV-213
+pub fn note_reveals(view: &mut ViewState, events: &[Event]) {
+    for event in events {
+        let Event::Revealed { id } = event else {
+            continue;
+        };
+        if !matches!(id, ContentId::Structure(_) | ContentId::Idea(_)) {
+            continue;
+        }
+        view.new_rows.insert(*id);
+        let section = Section::listing(*id);
+        if view.section != Some(section) {
+            view.seen[section.index()].visited = false;
+        }
+    }
+}
+
+/// Clear the new mark of the row the cursor rests on in the section in focus,
+/// whatever brought it there. Run once a frame, after the frame's keys and
+/// ticks, so a row the cursor only passed over within the frame keeps its
+/// mark. @spec TUI-NAV-212
+pub fn see_new_row(view: &mut ViewState, state: &GameState) {
+    if view.new_rows.is_empty() {
+        return;
+    }
+    let Some(section) = view.section else {
+        return;
+    };
+    let list = drawn_rows(state, section, view);
+    let rests = cursor_index(&list, view.focus[section.index()].as_ref())
+        .and_then(|i| list.get(i))
+        .map(|r| r.key.clone());
+    if let Some(RowKey::Content(id, _)) = rests {
+        view.new_rows.remove(&id);
     }
 }
 

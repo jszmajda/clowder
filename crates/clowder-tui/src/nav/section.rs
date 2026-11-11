@@ -3,6 +3,8 @@
 //! key the player already knows never changes meaning.
 //! @spec TUI-NAV-005, TUI-NAV-006
 
+use clowder_core::ContentId;
+
 /// The ten sections, in digit order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Section {
@@ -53,6 +55,22 @@ impl Section {
     /// The section a digit jumps to, if any. @spec TUI-NAV-005
     pub fn from_digit(c: char) -> Option<Section> {
         Self::ALL.iter().copied().find(|s| s.digit() == c)
+    }
+
+    /// The section that lists `id`'s kind, by the section table's fixed map:
+    /// the section whose rows take that kind's command. A reveal's line names
+    /// it, and a reveal badges its tab. @spec TUI-NAV-209, TUI-NAV-213
+    pub fn listing(id: ContentId) -> Section {
+        match id {
+            ContentId::Structure(_) => Section::Meadow,
+            ContentId::Job(_) => Section::Clowder,
+            ContentId::Idea(_) | ContentId::Refinement(_) | ContentId::Rule(_) => Section::Ideas,
+            ContentId::Craft(_) => Section::Crafts,
+            ContentId::Rite(_) => Section::Sunbeams,
+            ContentId::Arch(_) => Section::Wonders,
+            ContentId::DreamLoom(_) => Section::Dreams,
+            ContentId::Tradition(_) => Section::Legacy,
+        }
     }
 
     /// The tab label. Section names are content, so a tab exists only while

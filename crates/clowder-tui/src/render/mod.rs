@@ -795,10 +795,8 @@ fn draw_list(
     // TUI-RENDER-011: rows scrolled off above need saying too, or a cursor
     // deep in a long list looks like the top of it.
     if win.start > 0 {
-        lines.push(Line::from(Span::styled(
-            format!("{} more above", win.start),
-            style_for(Role::Dim),
-        )));
+        let new = new_among(&all[..win.start], view);
+        lines.push(overflow_note(format!("{} more above", win.start), new));
     }
     for (i, row) in all.iter().enumerate().skip(win.start).take(win.len) {
         let focused = i == cursor && row.selectable();
@@ -819,14 +817,19 @@ fn draw_list(
         if row.selectable() && y < area.bottom() as usize {
             drawn_at.push((Rect::new(area.x, y as u16, area.width, 1), row.key.clone()));
         }
-        lines.push(row_line(
+        let line = row_line(
             state,
             row,
             focused,
             area.width as usize,
             section,
             on_this_row,
-        ));
+        );
+        lines.push(if !focused && is_new(row, view) {
+            with_new_mark(line)
+        } else {
+            line
+        });
         // The row an arming holds expands in place, on the lines directly
         // beneath it — never anywhere else, and only while the arming still
         // holds. The expansion carries attention's colour so the row's own
@@ -842,14 +845,62 @@ fn draw_list(
         }
     }
     if win.hidden > 0 {
-        lines.push(Line::from(Span::styled(
-            format!("{} more below", win.hidden),
-            style_for(Role::Dim),
-        )));
+        let new = new_among(&all[win.start + win.len..], view);
+        lines.push(overflow_note(format!("{} more below", win.hidden), new));
     }
 
     f.render_widget(Paragraph::new(lines), area);
     (drawn_at, win.start)
+}
+
+/// Whether `row` is about an item a reveal has marked new (TUI-NAV-211).
+fn is_new(row: &Row, view: &ViewState) -> bool {
+    matches!(&row.key, RowKey::Content(id, _) if view.new_rows.contains(id))
+}
+
+/// How many of `rows` are marked new.
+fn new_among(rows: &[Row], view: &ViewState) -> usize {
+    rows.iter().filter(|r| is_new(r, view)).count()
+}
+
+/// A new row draws `★` in its cursor column, the first of the two columns
+/// before its marker, in `milestone` and that glyph alone, moving no other
+/// character of the row. Only a row the cursor is not on is handed here, and
+/// that column of it is always blank. @spec TUI-RENDER-037, TUI-THEME-032
+fn with_new_mark(line: Line<'static>) -> Line<'static> {
+    let mut spans = line.spans.into_iter();
+    let Some(first) = spans.next() else {
+        return Line::default();
+    };
+    let mut rest = first.content.chars();
+    if rest.next() != Some(' ') {
+        // Not a row's blank cursor column; leave the line as drawn.
+        let mut out = vec![first.clone()];
+        out.extend(spans);
+        return Line::from(out);
+    }
+    let star = first.style.patch(style_for(Role::Milestone));
+    let mut out = vec![
+        Span::styled("\u{2605}", star),
+        Span::styled(rest.as_str().to_string(), first.style),
+    ];
+    out.extend(spans);
+    Line::from(out)
+}
+
+/// An overflow note, in `dim`, ending ` · ★N new` where N of the rows past
+/// its end are new — the `★` in `milestone`, that glyph alone.
+/// @spec TUI-RENDER-011, TUI-RENDER-038, TUI-THEME-032
+fn overflow_note(text: String, new: usize) -> Line<'static> {
+    let dim = style_for(Role::Dim);
+    if new == 0 {
+        return Line::from(Span::styled(text, dim));
+    }
+    Line::from(vec![
+        Span::styled(format!("{text} \u{b7} "), dim),
+        Span::styled("\u{2605}", style_for(Role::Milestone)),
+        Span::styled(format!("{new} new"), dim),
+    ])
 }
 
 /// One list row, drawn as the design's anatomy: cursor, availability marker,

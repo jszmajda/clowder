@@ -211,7 +211,11 @@ fn tick_frame(app: &mut App, term: &mut Terminal<TestBackend>) {
         &[],
     )
     .expect("a step against a TestBackend does not fail");
-    assert_eq!(app.state.ticks, before + 1, "fixture: the frame ran one tick");
+    assert_eq!(
+        app.state.ticks,
+        before + 1,
+        "fixture: the frame ran one tick"
+    );
 }
 
 fn press(code: KeyCode) -> TermEvent {
@@ -687,7 +691,12 @@ fn nothing_but_the_cursor_resting_clears_the_mark() {
 
     frame(&mut app, &mut term, &[digit(Section::Clowder)]);
     frame(&mut app, &mut term, &[digit(Section::Meadow)]);
-    marked(&term, WIDE_W, WIDE_H, "leaving the section and visiting it again");
+    marked(
+        &term,
+        WIDE_W,
+        WIDE_H,
+        "leaving the section and visiting it again",
+    );
 
     frame(&mut app, &mut term, &[press_char('e')]);
     frame(&mut app, &mut term, &[press(KeyCode::Esc)]);
@@ -757,7 +766,11 @@ fn a_reveal_elsewhere_badges_that_sections_tab_until_its_visit() {
 #[test]
 fn a_reveal_in_the_focused_section_badges_no_tab() {
     let (mut app, mut term, _e) = revealed_in_play("focused", WIDE_W, WIDE_H);
-    assert_eq!(app.view.section, Some(Section::Meadow), "fixture: on the Meadow");
+    assert_eq!(
+        app.view.section,
+        Some(Section::Meadow),
+        "fixture: on the Meadow"
+    );
     frame(&mut app, &mut term, &[digit(Section::Clowder)]);
     assert!(
         !badged(&app.state, &app.view).contains(&Section::Meadow),

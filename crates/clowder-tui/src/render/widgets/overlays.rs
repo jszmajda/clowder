@@ -199,7 +199,17 @@ fn event_words(event: &Event) -> String {
         E::ZoomiesStarted { .. } => "the zoomies!".into(),
         E::ZoomiesEnded => "the zoomies pass".into(),
         E::KittenMood { tier } => format!("the clowder is {}", format!("{tier:?}").to_lowercase()),
-        E::Revealed { .. } => "something new looks possible".into(),
+        // A reveal names what it revealed and the tab that lists it, digit
+        // and name, so the line answers what and where. @spec TUI-NAV-209
+        E::Revealed { id } => {
+            let section = crate::nav::Section::listing(*id);
+            format!(
+                "{} looks possible \u{b7} {} {}",
+                crate::render::content_name(*id),
+                section.digit(),
+                section.title()
+            )
+        }
         E::SkyEventVisible => "something bright crossed the sky".into(),
         E::SpeedChanged { speed } => format!("speed ×{speed}"),
         E::ElderAppointed { name } => format!("{name} is the Elder now"),
