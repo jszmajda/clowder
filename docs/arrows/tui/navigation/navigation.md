@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-04 (commit `f6326095a28b`). 207 of 207 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-11 (commit `fc38c25a40d4`). 208 of 208 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/navigation/navigation-specs.md` — 207 specs, prefix `TUI-NAV`
+- `docs/intent/tui/navigation/navigation-specs.md` — 208 specs, prefix `TUI-NAV`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/act_prices.rs`
@@ -79,9 +79,9 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-NAV-001 – TUI-NAV-207 | 207 | 0 | 0 |
+| All | TUI-NAV-001 – TUI-NAV-208 | 208 | 0 | 0 |
 
-**Summary:** 207 of 207 active specs implemented.
+**Summary:** 208 of 208 active specs implemented.
 
 ## Key Findings
 
@@ -108,6 +108,8 @@ Audited 2026-11-04, for what issue #44 changed. `X` on a recipe's make row is no
 Audited 2026-11-04, for what issue #43 changed. `-` and `Backspace` arm taking a copy down from a structure's row (TUI-NAV-204), the armed row states the core's report (TUI-NAV-205), and the hint bar and help name it (TUI-NAV-206). The new command has no row of its own, as TUI-NAV-039 now says. Twenty-three mutations across this and the sim segments were each caught; the first run exposed test loops a broken count could hang, which are now bounded.
 
 Audited 2026-11-04, for what issue #46 changed. An action row the core prices as a fixed act states the price in the inspector, with need and have (TUI-NAV-207). A test reads every action row against what applying its command takes, so a row that spends and says nothing fails. On screen there were eleven such rows, two more than the code scan the issue started from. Twelve mutations across this and the sim engine were each caught.
+
+Audited 2026-11-11, for what issue #48 changed. A kitten's row states its next rank's price beneath the kitten's name and before its card (TUI-NAV-208), and the row keeps its one word. A refusal for short exp names it. Two older tests that read a kitten's inspector as the name alone now set the price aside, and the row-wide test that every row which spends says so now includes kittens.
 
 ## Work Required
 

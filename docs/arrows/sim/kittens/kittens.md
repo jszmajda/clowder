@@ -4,7 +4,7 @@ Kittens are the heart of the game and the reason the cozy invariants exist. This
 
 ## Status
 
-**OK** — last audited 2026-11-04 (commit `a734bb551137`). 42 of 42 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-11 (commit `fc38c25a40d4`). 43 of 43 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ Kittens are the heart of the game and the reason the cozy invariants exist. This
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/kittens/kittens-specs.md` — 42 specs, prefix `SIM-KIT`
+- `docs/intent/sim/kittens/kittens-specs.md` — 43 specs, prefix `SIM-KIT`
 
 ### Tests
 - `crates/clowder-core/tests/integration/kittens.rs`
@@ -38,9 +38,9 @@ Kittens are the heart of the game and the reason the cozy invariants exist. This
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-KIT-001 – SIM-KIT-042 | 42 | 0 | 0 |
+| All | SIM-KIT-001 – SIM-KIT-043 | 43 | 0 | 0 |
 
-**Summary:** 42 of 42 active specs implemented.
+**Summary:** 43 of 43 active specs implemented.
 
 ## Key Findings
 
@@ -51,6 +51,8 @@ Audited 2026-11-03, for what issue #36 changed. Housing capacity sums saturating
 Audited 2026-11-04, for what issue #40 changed. A jamboree now reaches exactly its stated production ticks (SIM-KIT-025), measured by what it does to a worker's yield, where it had reached one fewer: 999 of 1000, and 1999 of 2000 extended. A new one ends one past the arithmetic end, as the zoomies do (SIM-ENG-012), and an extension adds only its own length. Each test was checked by breaking the line it guards. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-04, for what issue #41 changed. A twin in `profiles.rs` walks the profile draw as its spec orders it from the published hash, so any reordered draw, or a changed hash or byte order, lands a profile elsewhere (SIM-KIT-032). Tests now hold each numeral of a name past the pool (SIM-KIT-002), the upper tier edges (SIM-KIT-014), a return with no stamp (SIM-KIT-017), and each trait in play (SIM-KIT-024). Annotations moved off the types that list outcomes onto the rules that decide. The two uncited specs are settled: SIM-KIT-001 is cited at the two places a kitten changes place or leaves the roster; SIM-KIT-033 is a property of every rule, with no one line that decides it, so its test in `profiles.rs` is its pin and it has no citation in source. Twenty-three mutations were each caught, one only after a test bound was tightened.
+
+Audited 2026-11-11, for what issue #48 changed. The core reports a kitten's next-rank price and the exp it holds (SIM-KIT-043), and the promotion rule reads those same figures. A promotion short of exp alone is refused naming the exp and how much more (SIM-KIT-021). Mutations of each figure and of the refusals were each caught.
 
 ## Work Required
 
