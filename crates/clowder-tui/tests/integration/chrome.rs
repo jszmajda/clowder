@@ -173,30 +173,27 @@ fn every_section_revealed() -> GameState {
 /// Watermarks that say the player has just looked at every section: the
 /// baseline against which "content revealed since you last looked" means
 /// anything at all.
-fn all_caught_up(state: &GameState) -> [SeenMark; 10] {
+fn all_caught_up() -> [SeenMark; 10] {
     let mut marks = [SeenMark::default(); 10];
     for section in Section::ALL {
-        marks[section.index()] = SeenMark {
-            visited: true,
-            revealed_at_last_visit: rows(state, section).len(),
-        };
+        marks[section.index()] = SeenMark { visited: true };
     }
     marks
 }
 
 /// A view over a state with nothing outstanding: every section seen, no report
 /// unread, no prompt, no overlay, no armed row.
-fn calm_view(state: &GameState) -> ViewState {
+fn calm_view() -> ViewState {
     ViewState {
         section: Some(Section::Meadow),
-        seen: all_caught_up(state),
+        seen: all_caught_up(),
         ..Default::default()
     }
 }
 
 /// A view focused on one row of one section, with nothing else outstanding.
 fn focus_on(state: &GameState, section: Section, key: RowKey) -> ViewState {
-    let mut v = calm_view(state);
+    let mut v = calm_view();
     v.section = Some(section);
     v.focus[section.index()] = Some(key);
     unfold_focus(state, &mut v);
@@ -527,7 +524,7 @@ fn live_chips_fixture(live: [bool; 4], idle: usize, new: usize) -> (GameState, V
     state.kittens = roster;
     state.pending_sky_event = if live[1] { Some(state.ticks + 5) } else { None };
 
-    let mut view = calm_view(&state);
+    let mut view = calm_view();
     if live[2] {
         let others = unfocused_tabs(&state, &view);
         assert!(
@@ -576,7 +573,7 @@ fn all_four_live() -> (GameState, ViewState) {
     state.kittens = roster;
     state.pending_sky_event = Some(state.ticks + 5);
 
-    let mut view = calm_view(&state);
+    let mut view = calm_view();
     // The Clowder section's tab wears `★` — it has appeared on the bar since
     // the player last looked — which is what `★N new` counts.
     view.seen[Section::Clowder.index()].visited = false;
@@ -605,7 +602,7 @@ fn all_four_live() -> (GameState, ViewState) {
 #[test]
 fn every_piece_of_the_chrome_is_drawn_at_every_supported_size() {
     let state = every_section_revealed();
-    let view = calm_view(&state);
+    let view = calm_view();
 
     for (w, h) in [(FLOOR_W, FLOOR_H), (100, 30), (120, 40), (WIDE_W, WIDE_H)] {
         let (header, tabs, sidebar, hints) = regions(w, h);
@@ -654,7 +651,7 @@ fn the_header_carries_every_fact_the_glance_contract_names() {
         s.kittens = employed(3);
         s
     };
-    let reference = header_line(&base, &calm_view(&base), WIDE_W);
+    let reference = header_line(&base, &calm_view(), WIDE_W);
 
     let moved: [(&str, GameState); 5] = [
         ("the generation", {
@@ -685,7 +682,7 @@ fn the_header_carries_every_fact_the_glance_contract_names() {
     ];
 
     for (fact, state) in moved {
-        let drawn = header_line(&state, &calm_view(&state), WIDE_W);
+        let drawn = header_line(&state, &calm_view(), WIDE_W);
         assert_ne!(
             drawn, reference,
             "{fact} changed and the header did not. TUI-NAV-019 names it as one of the facts the \
@@ -703,7 +700,7 @@ fn the_header_carries_every_fact_the_glance_contract_names() {
         while s.season() != season {
             s.ticks += content::TICKS_PER_DAY * content::DAYS_PER_SEASON;
         }
-        let drawn = header_line(&s, &calm_view(&s), WIDE_W);
+        let drawn = header_line(&s, &calm_view(), WIDE_W);
         assert!(
             says(&drawn, &format!("{season:?}")),
             "the header does not name the season in {season:?}; it read {drawn:?}. Colour is \
@@ -775,7 +772,7 @@ fn an_empty_chip_cluster_is_what_nothing_needing_you_looks_like() {
     ];
 
     for (what, state) in cases {
-        let view = calm_view(&state);
+        let view = calm_view();
         let line = header_line(&state, &view, WIDE_W);
         for chip in CHIPS {
             assert!(
@@ -803,7 +800,7 @@ fn the_idle_chip_is_a_glyph_a_count_and_a_word() {
     let mut state = every_section_revealed();
     state.kittens = idle_here(4);
     state.kittens.extend(employed(2));
-    let view = calm_view(&state);
+    let view = calm_view();
 
     let line = header_line(&state, &view, WIDE_W);
     assert!(
@@ -843,7 +840,7 @@ fn the_sky_chip_shows_only_while_the_window_is_open() {
     let mut none = every_section_revealed();
     none.pending_sky_event = None;
 
-    let open_line = header_line(&open, &calm_view(&open), WIDE_W);
+    let open_line = header_line(&open, &calm_view(), WIDE_W);
     assert!(
         chip_shown(&open_line, SKY),
         "a sky-event window is open and the header showed no {} chip; the window expires \
@@ -853,7 +850,7 @@ fn the_sky_chip_shows_only_while_the_window_is_open() {
     );
 
     for (what, state) in [("a faded window", faded), ("no window at all", none)] {
-        let line = header_line(&state, &calm_view(&state), WIDE_W);
+        let line = header_line(&state, &calm_view(), WIDE_W);
         assert!(
             !chip_shown(&line, SKY),
             "with {what} the header still showed the sky chip. A chip shows only while its \
@@ -873,7 +870,7 @@ fn the_sky_chip_shows_only_while_the_window_is_open() {
 #[test]
 fn the_new_content_chip_counts_the_tabs_wearing_a_badge() {
     let state = every_section_revealed();
-    let base = calm_view(&state);
+    let base = calm_view();
     let others = unfocused_tabs(&state, &base);
     assert!(
         others.len() >= 9,
@@ -974,7 +971,7 @@ fn the_idle_chip_shows_exactly_while_a_counted_kitten_waits() {
             roster.extend(idle_away(away));
             roster.extend(employed(working));
             state.kittens = roster;
-            let line = header_line(&state, &calm_view(&state), WIDE_W);
+            let line = header_line(&state, &calm_view(), WIDE_W);
             if waiting == 0 {
                 assert!(
                     !chip_shown(&line, IDLE),
@@ -1013,7 +1010,7 @@ fn the_sky_chip_shows_exactly_until_the_tick_reaches_the_recorded_expiry() {
     for (what, pending, live) in cases {
         let mut state = base.clone();
         state.pending_sky_event = pending;
-        let line = header_line(&state, &calm_view(&state), WIDE_W);
+        let line = header_line(&state, &calm_view(), WIDE_W);
         assert_eq!(
             chip_shown(&line, SKY),
             live,
@@ -1082,7 +1079,7 @@ fn the_away_chip_shows_exactly_while_any_queued_report_is_unread() {
         ),
     ];
     for (what, reports, naps, live) in cases {
-        let mut view = calm_view(&state);
+        let mut view = calm_view();
         view.reports = reports;
         view.nap_years = naps;
         let line = header_line(&state, &view, WIDE_W);
@@ -1131,7 +1128,7 @@ fn the_live_chips_stand_right_aligned_in_their_fixed_order_two_columns_apart() {
 fn the_away_chip_shows_while_a_report_is_unread() {
     let state = every_section_revealed();
 
-    let mut unread = calm_view(&state);
+    let mut unread = calm_view();
     unread.reports = vec![PendingReport {
         entry: 0,
         dismissed: false,
@@ -1143,7 +1140,7 @@ fn the_away_chip_shows_while_a_report_is_unread() {
         chip_name(AWAY)
     );
 
-    let mut read = calm_view(&state);
+    let mut read = calm_view();
     read.reports = vec![PendingReport {
         entry: 0,
         dismissed: true,
@@ -1171,7 +1168,7 @@ fn the_idle_chip_counts_only_kittens_who_are_here_to_be_assigned() {
     roster.extend(idle_away(5));
     roster.extend(employed(2));
     state.kittens = roster;
-    let view = calm_view(&state);
+    let view = calm_view();
 
     let line = header_line(&state, &view, WIDE_W);
     assert_eq!(
@@ -1195,7 +1192,7 @@ fn an_idle_chip_never_asks_for_a_kitten_who_is_not_here() {
     let mut roster = idle_away(6);
     roster.extend(employed(2));
     state.kittens = roster;
-    let view = calm_view(&state);
+    let view = calm_view();
 
     let line = header_line(&state, &view, WIDE_W);
     assert!(
@@ -1412,7 +1409,7 @@ fn a_badged_tab_leaving_the_bar_lowers_the_new_chip_by_one() {
     let before_state = prepare(&with_sky);
     let after_state = prepare(&quiet_sky);
 
-    let mut view = calm_view(&before_state);
+    let mut view = calm_view();
     view.seen[leaving[0].index()].visited = false;
     view.seen[staying[0].index()].visited = false;
     view.reports = vec![PendingReport {
@@ -2087,7 +2084,7 @@ fn permitted_symbol(c: char) -> bool {
 fn every_symbol_the_chrome_draws_is_a_single_width_character() {
     let (busy, busy_view) = all_four_live();
     let fresh = GameState::new(3);
-    let fresh_view = calm_view(&fresh);
+    let fresh_view = calm_view();
 
     let mut checked = 0usize;
     for (state, view) in [(&busy, &busy_view), (&fresh, &fresh_view)] {
@@ -2177,7 +2174,7 @@ fn the_mood_is_a_word_that_survives_the_colour_being_stripped() {
         .into_iter()
         .map(|tier| {
             let state = moody(tier);
-            let view = calm_view(&state);
+            let view = calm_view();
             (tier, header_line(&state, &view, WIDE_W))
         })
         .collect();
@@ -2357,7 +2354,7 @@ fn affordability_colour_stands_only_on_a_line_carrying_its_marker() {
 
     let (mut saw_ready, mut saw_partial) = (false, false);
     for section in Section::ALL {
-        let mut view = calm_view(&state);
+        let mut view = calm_view();
         view.section = Some(section);
         let mut term = terminal(WIDE_W, WIDE_H);
         term.draw(|f| {
@@ -2553,7 +2550,7 @@ fn compressed_run_meadows() -> Vec<(&'static str, GameState, ViewState)> {
     roster.extend(employed(3));
     mixed.kittens = roster;
     mixed.pending_sky_event = Some(mixed.ticks + 5);
-    let mut view = calm_view(&mixed);
+    let mut view = calm_view();
     view.seen[Section::Clowder.index()].visited = false;
     view.reports = vec![PendingReport {
         entry: 0,
@@ -2589,7 +2586,7 @@ fn compressed_run_meadows() -> Vec<(&'static str, GameState, ViewState)> {
                 .then_some(state)
         })
         .expect("fixture: some structure can be revealed, short, and partly covered");
-    let view = calm_view(&teased);
+    let view = calm_view();
     out.push(("a meadow with a Teased row half paid for", teased, view));
 
     out
@@ -3248,7 +3245,7 @@ fn a_footer_note_is_drawn_in_the_inherited_foreground() {
         for inspector in [false, true] {
             for note in &notes {
                 for (w, h) in [(FLOOR_W, FLOOR_H), (99, 30), (120, 40), (WIDE_W, WIDE_H)] {
-                    let mut view = calm_view(&state);
+                    let mut view = calm_view();
                     view.section = Some(section);
                     view.inspector_wanted = inspector;
                     view.footer = Some((note.clone(), Instant::now() + Duration::from_secs(600)));
@@ -3300,7 +3297,7 @@ fn calm_meadow() -> (GameState, ViewState) {
     }
     state.kittens = employed(6);
     state.pending_sky_event = None;
-    let view = calm_view(&state);
+    let view = calm_view();
     (state, view)
 }
 
@@ -3580,7 +3577,7 @@ fn a_section_has_its_tab_exactly_while_it_lists_a_selectable_row_or_holds_focus(
 
     for (what, state) in reveal_corpus() {
         for focus in Section::ALL {
-            let mut view = calm_view(&state);
+            let mut view = calm_view();
             view.section = Some(focus);
 
             let expected: Vec<char> = Section::ALL
@@ -3649,7 +3646,7 @@ fn name_head(section: Section) -> String {
 #[test]
 fn a_wide_tab_bar_names_every_section_beside_its_digit() {
     let state = every_section_revealed();
-    let view = calm_view(&state);
+    let view = calm_view();
     let line = tab_line(&state, &view, WIDE_W);
 
     for section in Section::ALL {
@@ -3683,12 +3680,9 @@ fn a_narrow_tab_bar_compacts_to_digits_and_still_reaches_every_tab() {
     let focused = Section::Meadow;
     let badged = Section::Sky;
 
-    let mut view = calm_view(&state);
+    let mut view = calm_view();
     view.section = Some(focused);
-    view.seen[badged.index()] = SeenMark {
-        visited: false,
-        revealed_at_last_visit: 0,
-    };
+    view.seen[badged.index()] = SeenMark { visited: false };
 
     let widest: usize = Section::ALL.into_iter().map(|s| s.title().len() + 2).sum();
     assert!(
@@ -3737,12 +3731,9 @@ fn a_narrow_tab_bar_compacts_to_digits_and_still_reaches_every_tab() {
 #[test]
 fn no_tab_name_is_ever_cut_mid_word() {
     let state = every_section_revealed();
-    let mut view = calm_view(&state);
+    let mut view = calm_view();
     view.section = Some(Section::Ideas);
-    view.seen[Section::Dreams.index()] = SeenMark {
-        visited: false,
-        revealed_at_last_visit: 0,
-    };
+    view.seen[Section::Dreams.index()] = SeenMark { visited: false };
 
     for w in FLOOR_W..=WIDE_W {
         let line = tab_line(&state, &view, w);
@@ -3774,7 +3765,7 @@ fn no_tab_name_is_ever_cut_mid_word() {
 #[test]
 fn every_revealed_tab_is_reachable_at_every_width() {
     let state = every_section_revealed();
-    let view = calm_view(&state);
+    let view = calm_view();
 
     for w in FLOOR_W..=WIDE_W {
         let line = tab_line(&state, &view, w);
@@ -3939,7 +3930,7 @@ fn only_the_focused_tabs_label_is_reversed_in_the_full_form_and_the_compact_stri
                 empty_focus_seen = true;
             }
             for badge_neighbour in [false, true] {
-                let mut view = calm_view(&state);
+                let mut view = calm_view();
                 view.section = Some(focus);
                 if badge_neighbour {
                     if let Some(s) = next_tab(&state, focus) {
@@ -4008,7 +3999,7 @@ fn the_focused_tabs_reversal_adds_no_column_to_the_bar() {
     type FullForm = (Section, BTreeSet<u16>, Vec<(u16, String)>);
     let mut baseline: Option<FullForm> = None;
     for focus in Section::ALL {
-        let mut view = calm_view(&state);
+        let mut view = calm_view();
         view.section = Some(focus);
         assert_eq!(
             tab_sections(&state, Some(focus)),
@@ -4067,7 +4058,7 @@ fn the_focused_tabs_reversal_adds_no_column_to_the_bar() {
 /// the section with a heavy row — that row armed. Each keeps `focus` as the
 /// section beneath.
 fn focus_contexts(state: &GameState, focus: Section) -> Vec<(&'static str, ViewState)> {
-    let mut base = calm_view(state);
+    let mut base = calm_view();
     base.section = Some(focus);
     let first_row = rows(state, focus)
         .into_iter()
@@ -4873,7 +4864,7 @@ fn the_hint_bar_names_every_live_mnemonic_but_the_focused_rows_own_in_its_place(
             for focus in contexts {
                 let view = match &focus {
                     Some(k) => focus_on(state, section, k.clone()),
-                    None => calm_view(state),
+                    None => calm_view(),
                 };
                 let view = ViewState {
                     section: Some(section),
@@ -5432,7 +5423,7 @@ fn on_a_new_game_the_meadow_is_the_only_section_with_a_tab() {
         with_rows.len()
     );
 
-    let view = calm_view(&state);
+    let view = calm_view();
     let line = tab_line(&state, &view, WIDE_W);
 
     assert!(
@@ -6375,7 +6366,7 @@ fn is_done(state: &GameState, row: &Row) -> bool {
 /// A view on the Ideas screen with the cursor where a player entering it
 /// would find it, its done group open or folded.
 fn on_ideas(state: &GameState, open: bool) -> ViewState {
-    let mut v = calm_view(state);
+    let mut v = calm_view();
     update(Action::SectionJump(Section::Ideas), &mut v, state);
     if open {
         press_done_key(state, &mut v);
@@ -6838,7 +6829,7 @@ fn a_refusal_short_of_a_store_names_it_in_words_and_in_its_coat() {
             clowder_tui::nav::plain_error(&clowder_core::CommandError::InsufficientResources {
                 missing: vec![(r, 5.0)],
             });
-        let mut view = calm_view(&state);
+        let mut view = calm_view();
         view.section = Some(Section::Meadow);
         view.footer = Some((note, Instant::now() + Duration::from_secs(600)));
         let (w, h) = (WIDE_W, WIDE_H);

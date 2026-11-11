@@ -5279,12 +5279,6 @@ fn the_palettes_jump_is_navigation_and_leaves_the_layout_alone() {
             landed.title()
         );
         assert_eq!(
-            view.seen[landed.index()].revealed_at_last_visit,
-            rows(&state, landed).len(),
-            "the palette's jump visited {} without catching its watermark up to what it lists",
-            landed.title()
-        );
-        assert_eq!(
             view.inspector_wanted, inspector_wanted,
             "the palette's jump changed whether the inspector is asked for; it moves the cursor, \
              not the layout"

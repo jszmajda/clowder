@@ -293,7 +293,9 @@ fn meadow_rows(state: &GameState) -> Vec<Row> {
     let mut out = headed_group(state, "things to do", verbs);
 
     // Each structure in the group of its family, the core saying which, so the
-    // long list has landmarks and `[`/`]` have stops. @spec TUI-NAV-097, TUI-NAV-098
+    // long list has landmarks and `[`/`]` have stops. Every structure the core
+    // reports revealed is listed here, so a reveal's line and mark always have
+    // its row. @spec TUI-NAV-097, TUI-NAV-098, TUI-NAV-210
     for family in StructureFamily::ALL {
         let mut structures = Vec::new();
         for s in StructureId::ALL {
@@ -410,7 +412,8 @@ fn finished(state: &GameState, id: ContentId) -> bool {
 
 /// The Ideas section: its three kinds' unfinished rows in table order, then
 /// one done group of every finished row, ideas first, then refinements, then
-/// rules. @spec TUI-NAV-009, TUI-NAV-097, TUI-NAV-098, TUI-NAV-110
+/// rules. Every idea the core reports revealed is listed here.
+/// @spec TUI-NAV-009, TUI-NAV-097, TUI-NAV-098, TUI-NAV-110, TUI-NAV-210
 fn ideas_rows(state: &GameState) -> Vec<Row> {
     let (mut ideas, mut refinements, mut rules) = (Vec::new(), Vec::new(), Vec::new());
     let (mut done_ideas, mut done_refinements, mut done_rules) =

@@ -225,24 +225,21 @@ fn far_row() -> RowKey {
 ///
 /// No report is pending here: an unread one takes a row from the body
 /// (TUI-RENDER-003), and the banner has its own tests below.
-fn looking_at(state: &GameState, key: RowKey) -> ViewState {
+fn looking_at(key: RowKey) -> ViewState {
     let mut v = ViewState {
         section: Some(Section::Meadow),
         ..Default::default()
     };
     v.focus[Section::Meadow.index()] = Some(key);
-    v.seen[Section::Meadow.index()] = SeenMark {
-        visited: true,
-        revealed_at_last_visit: rows(state, Section::Meadow).len(),
-    };
+    v.seen[Section::Meadow.index()] = SeenMark { visited: true };
     v
 }
 
 /// The same view, with the inspector asked for.
-fn inspecting(state: &GameState, key: RowKey) -> ViewState {
+fn inspecting(key: RowKey) -> ViewState {
     ViewState {
         inspector_wanted: true,
-        ..looking_at(state, key)
+        ..looking_at(key)
     }
 }
 
@@ -254,7 +251,7 @@ fn returning(state: &GameState) -> ViewState {
             entry: away_entry(state),
             dismissed: false,
         }],
-        ..looking_at(state, near_row())
+        ..looking_at(near_row())
     }
 }
 
@@ -523,7 +520,7 @@ fn assert_chrome_unchanged(a: &Drawn, b: &Drawn, what: &str) {
 #[test]
 fn every_piece_of_the_chrome_is_the_widget_that_owns_it() {
     let state = settled();
-    let view = looking_at(&state, near_row());
+    let view = looking_at(near_row());
     let other = ViewState::default();
 
     for size in SIZES {
@@ -595,7 +592,7 @@ fn every_piece_of_the_chrome_is_the_widget_that_owns_it() {
 #[test]
 fn no_piece_of_the_chrome_is_left_blank_at_any_supported_size() {
     let state = settled();
-    let view = looking_at(&state, near_row());
+    let view = looking_at(near_row());
 
     for (w, h) in SIZES {
         let d = cold(&state, &view, w, h);
@@ -630,7 +627,7 @@ fn the_inspector_pane_is_the_inspector_widget_following_the_cursor() {
     for size in WIDE_SIZES {
         let (w, h) = size;
         for key in [near_row(), far_row()] {
-            let view = looking_at(&state, key.clone());
+            let view = looking_at(key.clone());
             let d = cold(&state, &view, w, h);
             let pane = pane_rect(&d.layout)
                 .unwrap_or_else(|| panic!("at {w}x{h} the layout must give the inspector a pane"));
@@ -642,8 +639,8 @@ fn the_inspector_pane_is_the_inspector_widget_following_the_cursor() {
 
         // Two cursors, one width: the pane must say different things, or it is
         // not following the cursor at all.
-        let near = cold(&state, &looking_at(&state, near_row()), w, h);
-        let far = cold(&state, &looking_at(&state, far_row()), w, h);
+        let near = cold(&state, &looking_at(near_row()), w, h);
+        let far = cold(&state, &looking_at(far_row()), w, h);
         let pane = pane_rect(&near.layout).expect("a pane at this width");
         assert_ne!(
             region_text(&near.buffer, pane),
@@ -663,8 +660,8 @@ fn asking_for_the_inspector_where_a_pane_exists_changes_nothing() {
     let state = settled();
 
     for (w, h) in WIDE_SIZES {
-        let unasked = cold(&state, &looking_at(&state, near_row()), w, h);
-        let asked = cold(&state, &inspecting(&state, near_row()), w, h);
+        let unasked = cold(&state, &looking_at(near_row()), w, h);
+        let asked = cold(&state, &inspecting(near_row()), w, h);
         assert_eq!(
             region_lines(&asked.buffer, asked.buffer.area),
             region_lines(&unasked.buffer, unasked.buffer.area),
@@ -689,9 +686,9 @@ fn the_frame_places_the_inspector_by_the_width_and_the_players_call() {
         let (w, h) = size;
         for wanted in [false, true] {
             let view = if wanted {
-                inspecting(&state, near_row())
+                inspecting(near_row())
             } else {
-                looking_at(&state, near_row())
+                looking_at(near_row())
             };
             let d = cold(&state, &view, w, h);
             let main = main_rect(&d.layout);
@@ -739,11 +736,11 @@ fn the_frame_places_the_inspector_by_the_width_and_the_players_call() {
 #[test]
 fn the_swapped_inspector_takes_the_lists_space_and_nothing_else() {
     let state = settled();
-    let listing = cold(&state, &looking_at(&state, near_row()), FLOOR_W, FLOOR_H);
-    let swapped = cold(&state, &inspecting(&state, near_row()), FLOOR_W, FLOOR_H);
+    let listing = cold(&state, &looking_at(near_row()), FLOOR_W, FLOOR_H);
+    let swapped = cold(&state, &inspecting(near_row()), FLOOR_W, FLOOR_H);
     let size = (FLOOR_W, FLOOR_H);
     let main = main_rect(&swapped.layout);
-    let view = inspecting(&state, near_row());
+    let view = inspecting(near_row());
 
     // The swap draws into the space the pane divider (TUI-RENDER-016) leaves.
     let space = left_by_dividers(&swapped.layout);
@@ -800,8 +797,8 @@ fn the_swapped_inspector_takes_the_lists_space_and_nothing_else() {
 fn the_swapped_inspector_follows_the_underlying_cursor() {
     let state = settled();
     let size = (FLOOR_W, FLOOR_H);
-    let near_view = inspecting(&state, near_row());
-    let far_view = inspecting(&state, far_row());
+    let near_view = inspecting(near_row());
+    let far_view = inspecting(far_row());
 
     let near = cold(&state, &near_view, FLOOR_W, FLOOR_H);
     let far = cold(&state, &far_view, FLOOR_W, FLOOR_H);
@@ -845,7 +842,7 @@ fn a_palette_jump_inside_the_narrow_swap_keeps_the_swap_on_the_landed_row() {
     let state = settled();
     let target = StructureId::ALL[44];
 
-    let mut view = inspecting(&state, near_row());
+    let mut view = inspecting(near_row());
     update(Action::OpenPalette, &mut view, &state);
     for c in structure_def(target).name.chars() {
         update(Action::Type(c), &mut view, &state);
@@ -869,8 +866,8 @@ fn a_palette_jump_inside_the_narrow_swap_keeps_the_swap_on_the_landed_row() {
 
     let jumped = cold(&state, &view, FLOOR_W, FLOOR_H);
     let main = main_rect(&jumped.layout);
-    let expected = cold(&state, &inspecting(&state, far_row()), FLOOR_W, FLOOR_H);
-    let listing = cold(&state, &looking_at(&state, far_row()), FLOOR_W, FLOOR_H);
+    let expected = cold(&state, &inspecting(far_row()), FLOOR_W, FLOOR_H);
+    let listing = cold(&state, &looking_at(far_row()), FLOOR_W, FLOOR_H);
     assert_eq!(
         region_text(&jumped.buffer, main),
         region_text(&expected.buffer, main_rect(&expected.layout)),
@@ -899,7 +896,7 @@ fn returning_from_the_swap_shows_the_list_where_the_cursor_moved_to() {
 
     let mut term = terminal(FLOOR_W, FLOOR_H);
     // Listing, cursor on the near row.
-    let opened = draw(&mut term, &state, &looking_at(&state, near_row()), None);
+    let opened = draw(&mut term, &state, &looking_at(near_row()), None);
     assert!(
         drawn_anywhere(&opened, &started),
         "fixture: the list should open on the focused row"
@@ -909,14 +906,14 @@ fn returning_from_the_swap_shows_the_list_where_the_cursor_moved_to() {
     let inspecting_near = draw(
         &mut term,
         &state,
-        &inspecting(&state, near_row()),
+        &inspecting(near_row()),
         Some(&opened.layout),
     );
     // The cursor moves while the inspector is up.
     let inspecting_far = draw(
         &mut term,
         &state,
-        &inspecting(&state, far_row()),
+        &inspecting(far_row()),
         Some(&inspecting_near.layout),
     );
     assert_ne!(
@@ -929,7 +926,7 @@ fn returning_from_the_swap_shows_the_list_where_the_cursor_moved_to() {
     let returned = draw(
         &mut term,
         &state,
-        &looking_at(&state, far_row()),
+        &looking_at(far_row()),
         Some(&inspecting_far.layout),
     );
 
@@ -942,7 +939,7 @@ fn returning_from_the_swap_shows_the_list_where_the_cursor_moved_to() {
         "the list came back at the row the cursor started on; the cursor keys moved the \
          underlying cursor, so the viewport that returns is the one that cursor derives"
     );
-    let never_swapped = cold(&state, &looking_at(&state, far_row()), FLOOR_W, FLOOR_H);
+    let never_swapped = cold(&state, &looking_at(far_row()), FLOOR_W, FLOOR_H);
     assert_eq!(
         region_lines(&returned.buffer, returned.buffer.area),
         region_lines(&never_swapped.buffer, never_swapped.buffer.area),
@@ -965,10 +962,10 @@ fn an_open_journal_is_the_journal_widgets_drawing() {
 
     for size in SIZES {
         let (w, h) = size;
-        let bare = cold(&state, &looking_at(&state, near_row()), w, h);
+        let bare = cold(&state, &looking_at(near_row()), w, h);
         let view = ViewState {
             overlay: Some(Overlay::Journal { anchor: 0 }),
-            ..looking_at(&state, near_row())
+            ..looking_at(near_row())
         };
         let d = cold(&state, &view, w, h);
 
@@ -997,7 +994,7 @@ fn the_journals_scroll_anchor_reaches_the_widget() {
     let state = settled();
     let at = |anchor: usize| ViewState {
         overlay: Some(Overlay::Journal { anchor }),
-        ..looking_at(&state, near_row())
+        ..looking_at(near_row())
     };
 
     let top = cold(&state, &at(0), FLOOR_W, FLOOR_H);
@@ -1021,10 +1018,10 @@ fn an_open_help_overlay_is_the_help_widgets_drawing() {
 
     for size in SIZES {
         let (w, h) = size;
-        let bare = cold(&state, &looking_at(&state, near_row()), w, h);
+        let bare = cold(&state, &looking_at(near_row()), w, h);
         let view = ViewState {
             overlay: Some(Overlay::Help),
-            ..looking_at(&state, near_row())
+            ..looking_at(near_row())
         };
         let d = cold(&state, &view, w, h);
 
@@ -1049,7 +1046,7 @@ fn the_help_overlay_at_every_size_cuts_no_entry() {
     let state = settled();
     let plain = ViewState {
         overlay: Some(Overlay::Help),
-        ..looking_at(&state, near_row())
+        ..looking_at(near_row())
     };
     let banner = ViewState {
         overlay: Some(Overlay::Help),
@@ -1100,7 +1097,7 @@ fn the_help_overlay_with_room_draws_one_entry_to_a_line() {
     let state = settled();
     let view = ViewState {
         overlay: Some(Overlay::Help),
-        ..looking_at(&state, near_row())
+        ..looking_at(near_row())
     };
     let d = cold(&state, &view, 120, 60);
     let lines = region_lines(&d.buffer, d.buffer.area);
@@ -1147,7 +1144,7 @@ fn the_help_overlay_packs_the_legend_before_the_key_map() {
     let state = settled();
     let view = ViewState {
         overlay: Some(Overlay::Help),
-        ..looking_at(&state, near_row())
+        ..looking_at(near_row())
     };
     let d = cold(&state, &view, 100, 32);
     let lines = region_lines(&d.buffer, d.buffer.area);
@@ -1246,13 +1243,13 @@ fn an_open_palette_is_the_palette_widgets_drawing() {
 
     for size in SIZES {
         let (w, h) = size;
-        let bare = cold(&state, &looking_at(&state, near_row()), w, h);
+        let bare = cold(&state, &looking_at(near_row()), w, h);
         let view = ViewState {
             overlay: Some(Overlay::Palette {
                 query: query.clone(),
                 selected: 0,
             }),
-            ..looking_at(&state, near_row())
+            ..looking_at(near_row())
         };
         let d = cold(&state, &view, w, h);
 
@@ -1280,7 +1277,7 @@ fn the_palettes_live_query_reaches_the_widget() {
             query: query.to_string(),
             selected: 0,
         }),
-        ..looking_at(&state, near_row())
+        ..looking_at(near_row())
     };
 
     let empty = cold(&state, &with(""), FLOOR_W, FLOOR_H);
@@ -1381,7 +1378,7 @@ fn a_dismissed_report_leaves_no_banner_behind() {
 #[test]
 fn below_the_floor_the_frame_routes_nothing_but_the_card() {
     let state = settled();
-    let view = looking_at(&state, near_row());
+    let view = looking_at(near_row());
 
     for (w, h) in [(FLOOR_W - 1, FLOOR_H), (FLOOR_W, FLOOR_H - 1), (40, 12)] {
         let d = cold(&state, &view, w, h);
@@ -1419,14 +1416,14 @@ fn a_composed_frame_does_not_depend_on_the_frames_before_it() {
 
     let journal = ViewState {
         overlay: Some(Overlay::Journal { anchor: 2 }),
-        ..looking_at(&state, far_row())
+        ..looking_at(far_row())
     };
     let palette = ViewState {
         overlay: Some(Overlay::Palette {
             query: "a".to_string(),
             selected: 0,
         }),
-        ..looking_at(&state, near_row())
+        ..looking_at(near_row())
     };
 
     let mut term = terminal(FLOOR_W, FLOOR_H);
@@ -1434,8 +1431,8 @@ fn a_composed_frame_does_not_depend_on_the_frames_before_it() {
     for view in [
         &journal,
         &palette,
-        &inspecting(&state, far_row()),
-        &looking_at(&state, near_row()),
+        &inspecting(far_row()),
+        &looking_at(near_row()),
     ] {
         prev = Some(draw(&mut term, &state, view, prev.as_ref()).layout);
     }
@@ -1601,14 +1598,14 @@ fn armed_view(state: &GameState) -> ViewState {
 }
 
 /// A view with a count prompt open on the focused row, digits typed.
-fn prompting(state: &GameState, key: RowKey, wanted: bool) -> ViewState {
+fn prompting(key: RowKey, wanted: bool) -> ViewState {
     ViewState {
         inspector_wanted: wanted,
         prompt: Some(clowder_tui::nav::CountPrompt {
             digits: "12".to_string(),
             row: Some(key.clone()),
         }),
-        ..looking_at(state, key)
+        ..looking_at(key)
     }
 }
 
@@ -1619,17 +1616,14 @@ fn prompting(state: &GameState, key: RowKey, wanted: bool) -> ViewState {
 /// row.
 fn list_space_views(state: &GameState) -> Vec<(&'static str, ViewState)> {
     vec![
-        ("the list near its top", looking_at(state, near_row())),
-        ("the list deep in its scroll", looking_at(state, far_row())),
-        (
-            "the list with a prompt open",
-            prompting(state, near_row(), false),
-        ),
+        ("the list near its top", looking_at(near_row())),
+        ("the list deep in its scroll", looking_at(far_row())),
+        ("the list with a prompt open", prompting(near_row(), false)),
         ("the list with a row armed", armed_view(state)),
-        ("the inspector asked for", inspecting(state, near_row())),
+        ("the inspector asked for", inspecting(near_row())),
         (
             "the inspector asked for with a prompt open",
-            prompting(state, far_row(), true),
+            prompting(far_row(), true),
         ),
         ("a banner showing", returning(state)),
     ]
@@ -1742,7 +1736,7 @@ fn a_divider_stands_at_each_boundary_between_side_by_side_panes_and_nowhere_else
 #[test]
 fn inside_a_dead_band_the_dividers_follow_the_layout_on_screen() {
     let state = far_along();
-    let view = looking_at(&state, near_row());
+    let view = looking_at(near_row());
     let mut widths: Vec<u16> = (FLOOR_W..=130).rev().collect();
     widths.extend(FLOOR_W..=130);
 
@@ -1791,9 +1785,9 @@ fn whatever_holds_the_lists_space_fits_its_lines_to_the_width_the_dividers_leave
     for h in [FLOOR_H, 40] {
         for w in FLOOR_W..100 {
             for view in [
-                inspecting(&state, near_row()),
-                inspecting(&state, far_row()),
-                prompting(&state, far_row(), true),
+                inspecting(near_row()),
+                inspecting(far_row()),
+                prompting(far_row(), true),
             ] {
                 let d = cold(&state, &view, w, h);
                 let space = left_by_dividers(&d.layout);
@@ -1817,12 +1811,9 @@ fn whatever_holds_the_lists_space_fits_its_lines_to_the_width_the_dividers_leave
 
     // The list.
     let list_views = [
-        ("the list near its top", looking_at(&state, near_row())),
-        ("the list deep in its scroll", looking_at(&state, far_row())),
-        (
-            "the list with a prompt open",
-            prompting(&state, near_row(), false),
-        ),
+        ("the list near its top", looking_at(near_row())),
+        ("the list deep in its scroll", looking_at(far_row())),
+        ("the list with a prompt open", prompting(near_row(), false)),
         ("the list with a row armed", armed_view(&state)),
     ];
     for h in [FLOOR_H, 40] {
@@ -1920,10 +1911,7 @@ fn no_divider_cuts_through_a_full_screen_overlay() {
     for h in [FLOOR_H, 40] {
         for w in FLOOR_W..=160 {
             for (what, overlay) in &overlays_open {
-                for base in [
-                    looking_at(&state, near_row()),
-                    inspecting(&state, near_row()),
-                ] {
+                for base in [looking_at(near_row()), inspecting(near_row())] {
                     let view = ViewState {
                         overlay: Some(overlay.clone()),
                         ..base

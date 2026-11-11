@@ -823,7 +823,6 @@ fn every_digit_jumps_to_the_section_it_was_assigned() {
 fn a_late_unlocking_sections_digit_never_changes_meaning() {
     let mut visited = bare();
     visited.seen[Section::Legacy.index()].visited = true;
-    visited.seen[Section::Legacy.index()].revealed_at_last_visit = 4;
 
     let contexts = [
         bare(),

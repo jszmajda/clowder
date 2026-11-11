@@ -758,6 +758,29 @@ fn a_reveal_elsewhere_badges_that_sections_tab_until_its_visit() {
         badged(&app.state, &app.view).contains(&Section::Ideas),
         "a visit elsewhere leaves another section's badge"
     );
+
+    // Entering the Ideas section lands its cursor as TUI-NAV-032 has it. A
+    // landing is a resting place like any other: the new idea's mark clears
+    // exactly where the landing chose its row, and stands otherwise.
+    frame(&mut app, &mut term, &[digit(Section::Ideas)]);
+    assert!(
+        !badged(&app.state, &app.view).contains(&Section::Ideas),
+        "a visit clears the Ideas tab's badge"
+    );
+    let landed_on_it = app.view.focus[Section::Ideas.index()] == Some(idea_key(e.idea));
+    assert_eq!(
+        app.view.new_rows.contains(&ContentId::Idea(e.idea)),
+        !landed_on_it,
+        "the new idea's mark should clear exactly where the landing rested on its row"
+    );
+    if !landed_on_it {
+        app.view.focus[Section::Ideas.index()] = Some(idea_key(e.idea));
+        frame(&mut app, &mut term, &[]);
+        assert!(
+            !app.view.new_rows.contains(&ContentId::Idea(e.idea)),
+            "the cursor resting on the new idea's row clears its mark"
+        );
+    }
 }
 
 /// A reveal in the section in focus badges no tab: moving away afterwards

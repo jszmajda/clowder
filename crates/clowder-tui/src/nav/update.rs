@@ -208,10 +208,7 @@ pub fn opening(view: &mut ViewState, state: &GameState) {
     for section in Section::ALL {
         if lists_selectable(state, section) {
             let idx = section.index();
-            view.seen[idx] = SeenMark {
-                visited: true,
-                revealed_at_last_visit: rows(state, section).len(),
-            };
+            view.seen[idx] = SeenMark { visited: true };
         }
     }
     view.done_open = false;
@@ -449,15 +446,11 @@ fn nudge_speed(view: &mut ViewState, state: &GameState, up: bool) -> Outcome {
 /// @spec TUI-NAV-008, TUI-NAV-032
 pub(super) fn enter_section(view: &mut ViewState, state: &GameState, section: Section) {
     view.section = Some(section);
-    let listed = rows(state, section).len();
     let list = drawn_rows(state, section, view);
     let idx = section.index();
 
-    // A visit marks the section seen and clears its new-content watermark.
-    view.seen[idx] = SeenMark {
-        visited: true,
-        revealed_at_last_visit: listed,
-    };
+    // A visit marks the section seen, clearing its tab's badge.
+    view.seen[idx] = SeenMark { visited: true };
     view.focus[idx] = landing_for(state, section, &list, view.focus[idx].as_ref());
 }
 

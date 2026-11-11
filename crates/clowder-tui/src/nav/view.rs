@@ -74,14 +74,13 @@ pub struct PendingReport {
     pub dismissed: bool,
 }
 
-/// What a section looked like when last visited, so new content can re-badge
-/// a section the player has already been to. A monotone "visited" flag could
-/// only ever badge once. @spec TUI-NAV-006, TUI-NAV-020, TUI-NAV-044
+/// Whether a section has been visited since its tab last appeared, or since a
+/// reveal last added a row to it out of focus. Cleared on either, so a tab can
+/// be badged again after a visit. @spec TUI-NAV-006, TUI-NAV-020, TUI-NAV-044,
+/// TUI-NAV-213
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SeenMark {
     pub visited: bool,
-    /// Count of revealed rows at last visit; anything beyond it is `★N new`.
-    pub revealed_at_last_visit: usize,
 }
 
 /// The whole of the shell's own state.
