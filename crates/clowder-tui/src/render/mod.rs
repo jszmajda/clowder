@@ -759,7 +759,14 @@ fn window_for(total: usize, cursor: usize, capacity: usize, held: Option<usize>)
     };
     let start = match held.filter(|line| near(*line)) {
         Some(held) => held_start(held, cursor, usable, max_start),
-        None => cursor.saturating_sub(MARGIN).min(max_start),
+        // Three lines down, then as little as keeps the cursor drawn in a pane
+        // too short for three lines above it.
+        None => held_start(
+            cursor.saturating_sub(MARGIN).min(max_start),
+            cursor,
+            usable,
+            max_start,
+        ),
     };
     let len = shown_from(start, usable, max_start);
     Window {
@@ -1555,22 +1562,23 @@ pub fn frame_recorded(
 }
 
 #[cfg(test)]
-mod held_viewport {
+mod kept_viewport {
     use super::window_for;
 
-    /// Whatever a list, a pane, a cursor, and a held line have come to, the
-    /// cursor's row is drawn, down to a pane of one line.
-    /// @spec TUI-RENDER-009, TUI-RENDER-036
+    /// Whatever a list, a pane, a cursor, and a kept line have come to, or
+    /// with no line kept, the cursor's row is drawn, down to a pane of one line.
+    /// @spec TUI-RENDER-009, TUI-RENDER-039
     #[test]
-    fn a_held_line_always_draws_the_cursor() {
+    fn the_cursor_is_always_drawn() {
         for total in 1..70 {
             for capacity in 1..40 {
                 for cursor in 0..total {
-                    for held in [0, 1, 2, cursor, cursor + 1, total / 2, total, total + 50] {
-                        let win = window_for(total, cursor, capacity, Some(held));
+                    let kept = [0, 1, 2, cursor, cursor + 1, total / 2, total, total + 50];
+                    for held in kept.into_iter().map(Some).chain([None]) {
+                        let win = window_for(total, cursor, capacity, held);
                         assert!(
                             win.start <= cursor && cursor < win.start + win.len,
-                            "{total} rows in {capacity} lines, cursor {cursor}, held {held}: \
+                            "{total} rows in {capacity} lines, cursor {cursor}, kept {held:?}: \
                              drew {} from {}",
                             win.len,
                             win.start
@@ -1582,35 +1590,61 @@ mod held_viewport {
         }
     }
 
-    /// Within a pane worth holding: a list stands still until the cursor reaches
-    /// its edge, then moves a line for a line, and never further.
-    /// @spec TUI-RENDER-036
+    /// The cursor walked a line a frame, each frame starting from where the
+    /// last began: the list moves only where the cursor stands beside the edge
+    /// it heads for, so a change of direction moves nothing, and then by a
+    /// line on screen.
+    /// @spec TUI-RENDER-009
     #[test]
-    fn a_held_list_moves_by_at_most_a_line_a_step() {
+    fn a_kept_list_stands_still_until_the_cursor_reaches_its_edge() {
         for total in 12..70 {
-            for capacity in 8..12 {
-                for held in 0..total {
-                    let mut previous = window_for(total, 0, capacity, Some(held)).start;
-                    for cursor in 1..total {
-                        let start = window_for(total, cursor, capacity, Some(held)).start;
+            for capacity in 8..20 {
+                let mut start = window_for(total, 0, capacity, None).start;
+                let mut walk: Vec<usize> = (1..total).collect();
+                walk.extend((0..total - 1).rev());
+                let mut cursor = 0;
+                for next in walk {
+                    let down = next > cursor;
+                    let was = window_for(total, cursor, capacity, Some(start));
+                    let now = window_for(total, next, capacity, Some(start));
+                    // Two where the overflow note above first appears or last
+                    // goes, which takes a line of its own: on screen, every
+                    // row still moves by one.
+                    assert!(
+                        now.start.abs_diff(start) <= 2,
+                        "{total} rows in {capacity} lines: stepping {cursor} to {next} moved the \
+                         list from {start} to {}",
+                        now.start
+                    );
+                    if now.start != start {
+                        // Moved: the cursor had reached the line beside the edge
+                        // it was heading for.
+                        let beside = if down {
+                            next + 1 >= was.start + was.len
+                        } else {
+                            next <= was.start
+                        };
                         assert!(
-                            start.abs_diff(previous) <= 2,
-                            "{total} rows in {capacity} lines, held {held}: stepping to {cursor} \
-                             moved the list from {previous} to {start}"
+                            beside,
+                            "{total} rows in {capacity} lines: stepping {cursor} to {next} moved \
+                             the list before the cursor reached its edge"
                         );
-                        previous = start;
                     }
+                    start = now.start;
+                    cursor = next;
                 }
             }
         }
     }
 
-    /// A list no click has held keeps the cursor three rows down, as it always has.
-    /// @spec TUI-RENDER-009
+    /// A list with no line kept puts the cursor three lines down, as near as
+    /// its ends allow.
+    /// @spec TUI-RENDER-039
     #[test]
-    fn an_unheld_list_scrolls_as_it_did() {
+    fn a_list_with_no_line_puts_the_cursor_three_lines_down() {
         let win = window_for(60, 30, 20, None);
         assert_eq!(win.start, 27);
         assert_eq!(window_for(60, 2, 20, None).start, 0);
+        assert_eq!(window_for(60, 59, 20, None).start, 41);
     }
 }

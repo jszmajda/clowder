@@ -200,14 +200,26 @@ fn keys(a: &mut App, t: &mut Terminal<TestBackend>, input: &[Event]) {
         .expect("a step against a TestBackend does not fail");
 }
 
+/// The view a key left, with the line each list began on set aside: that is
+/// what the frames drew, and a frame that draws the swap draws no list.
 fn view_of(a: &App) -> String {
-    format!("{:?}", a.view)
+    bare(&a.view)
+}
+
+/// A view as text, the line each list began on set aside, as `view_of` sets it.
+fn bare(v: &ViewState) -> String {
+    let mut v = v.clone();
+    v.list_line = Default::default();
+    format!("{v:?}")
 }
 
 /// The view with every wall-clock instant pinned, so two sessions that read
 /// `Instant::now()` at different moments compare on everything else.
 fn shape(v: &ViewState, base: Instant) -> String {
     let mut v = v.clone();
+    // The line each list began on is what the frames drew, not what a key
+    // did: a frame that draws the swap draws no list and keeps no line.
+    v.list_line = Default::default();
     if let Some((_, until)) = v.footer.as_mut() {
         *until = base;
     }
@@ -378,7 +390,7 @@ fn each_esc_closes_exactly_the_topmost_transient_and_leaves_everything_beneath()
             keys(&mut a, &mut t, &[esc()]);
             assert_eq!(
                 view_of(&a),
-                format!("{expected:?}"),
+                bare(&expected),
                 "with {layers:?} open under {top:?}, the Esc that should close only {layer:?} \
                  changed something else, or closed something other than {layer:?}"
             );
@@ -428,7 +440,7 @@ fn each_repeat_of_a_held_esc_closes_exactly_one_transient() {
             keys(&mut a2, &mut t2, &held);
             assert_eq!(
                 view_of(&a2),
-                format!("{expected:?}"),
+                bare(&expected),
                 "an Esc held for {n} presses (one press, {} repeats) over {layers:?} did not \
                  close exactly the top {n} transients",
                 n - 1
@@ -444,7 +456,7 @@ fn each_repeat_of_a_held_esc_closes_exactly_one_transient() {
         keys(&mut a, &mut t, &held);
         assert_eq!(
             view_of(&a),
-            format!("{expected:?}"),
+            bare(&expected),
             "a held Esc's repeat past the last transient over {layers:?} changed something"
         );
     }
@@ -507,7 +519,7 @@ fn esc_judges_the_swap_by_the_layout_on_screen_with_the_dead_band_applied() {
             keys(&mut a, &mut t, &[esc()]);
             assert_eq!(
                 view_of(&a),
-                format!("{expected:?}"),
+                bare(&expected),
                 "narrowed from a pane to {w} columns ({}), with the inspector asked for and {}, \
                  Esc {}",
                 if in_band {
@@ -543,7 +555,7 @@ fn esc_judges_the_swap_by_the_layout_on_screen_with_the_dead_band_applied() {
         keys(&mut a, &mut t, &[esc()]);
         assert_eq!(
             view_of(&a),
-            format!("{expected:?}"),
+            bare(&expected),
             "at {w} columns with the swap on screen, Esc must return the list view and leave the \
              banner as it stood"
         );
@@ -1045,7 +1057,7 @@ fn while_the_pane_is_drawn_space_and_i_leave_the_call_and_leave_one_note() {
                     expected.footer = a.view.footer.clone();
                     assert_eq!(
                         view_of(&a),
-                        format!("{expected:?}"),
+                        bare(&expected),
                         "{what} at {w} columns, the persistent pane on screen, changed more than \
                          the footer note"
                     );
