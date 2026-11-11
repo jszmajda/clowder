@@ -38,6 +38,7 @@ mod readouts;
 mod report_queue;
 mod resize;
 mod rows;
+mod scroll;
 mod section_reveal;
 mod session;
 mod sidebar_links;

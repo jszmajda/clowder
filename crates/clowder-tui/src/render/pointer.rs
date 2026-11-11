@@ -9,7 +9,7 @@
 use clowder_core::ResourceId;
 use ratatui::layout::Rect;
 
-use crate::nav::{RowKey, Section};
+use crate::nav::{ListLine, RowKey, Section};
 
 /// Where one frame drew the stores sidebar's window: its region, the stores
 /// it drew from in their order, the place in that order of the first store it
@@ -32,8 +32,11 @@ pub struct PointerRecord {
     tabs: Vec<(Section, Rect)>,
     rows: Vec<(Rect, Section, RowKey)>,
     list: Option<(Rect, Section)>,
-    /// The line the drawn list began on, for a click to hold. @spec TUI-RENDER-036
+    /// The line the drawn list began on, by its place. @spec TUI-RENDER-025
     list_start: usize,
+    /// The same line by its identity, where the list drew any line.
+    /// @spec TUI-RENDER-025
+    list_start_key: Option<RowKey>,
     journal: Option<(Rect, Option<usize>)>,
     sidebar: Option<SidebarRecord>,
 }
@@ -61,9 +64,11 @@ impl PointerRecord {
         section: Section,
         rows: Vec<(Rect, RowKey)>,
         start: usize,
+        start_key: Option<RowKey>,
     ) {
         self.list = Some((space, section));
         self.list_start = start;
+        self.list_start_key = start_key;
         self.rows = rows.into_iter().map(|(r, k)| (r, section, k)).collect();
     }
 
@@ -105,12 +110,27 @@ impl PointerRecord {
             .map(|(_, s, k)| (*s, k.clone()))
     }
 
-    /// The section whose list's space this cell is in.
-    /// The line the drawn list began on.
+    /// The line the drawn list began on, by its place.
     pub fn list_start(&self) -> usize {
         self.list_start
     }
 
+    /// The section whose list the frame drew, and the line that list began
+    /// on, by its identity and its place; none where the frame drew no list
+    /// or the list drew no line. @spec TUI-RENDER-025
+    pub fn list_line(&self) -> Option<(Section, ListLine)> {
+        let (_, section) = self.list.as_ref()?;
+        let key = self.list_start_key.clone()?;
+        Some((
+            *section,
+            ListLine {
+                key,
+                place: self.list_start,
+            },
+        ))
+    }
+
+    /// The section whose list's space this cell is in.
     pub fn list_at(&self, x: u16, y: u16) -> Option<Section> {
         self.list
             .as_ref()

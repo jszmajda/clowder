@@ -83,6 +83,15 @@ pub struct SeenMark {
     pub visited: bool,
 }
 
+/// The line a list began on in a frame: the row or group header it is, and
+/// its place in the list then, which stands in where that line has left the
+/// list. @spec TUI-RENDER-009, TUI-RENDER-025
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListLine {
+    pub key: RowKey,
+    pub place: usize,
+}
+
 /// The whole of the shell's own state.
 #[derive(Debug, Clone, Default)]
 pub struct ViewState {
@@ -90,10 +99,11 @@ pub struct ViewState {
     /// Remembered focus per section, by identity. Indexed by
     /// `Section::index()`. @spec TUI-NAV-008
     pub focus: [Option<RowKey>; 10],
-    /// The line a click held each section's list at, where one has: only where
-    /// each frame's derivation of the viewport starts, never used as it stands.
-    /// @spec TUI-RENDER-036
-    pub list_held: [Option<usize>; 10],
+    /// The line each section's list began on in the last frame that drew it,
+    /// kept by the loop from that frame's pointer record: only where the next
+    /// frame's derivation of the list starts, never used as it stands. Every
+    /// sitting begins with none. @spec TUI-RENDER-009
+    pub list_line: [Option<ListLine>; 10],
     /// Whether the player has called for the inspector. Whether that shows as
     /// a pane or a swap is the layout's to say each frame — not stored, so it
     /// cannot disagree after a resize.

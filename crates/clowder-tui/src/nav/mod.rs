@@ -20,10 +20,10 @@ pub use reports::{queue_command_reports, queue_load_report};
 pub use rows::{row_still_listed, Row, RowKey, RowKind};
 pub use section::Section;
 pub use update::{
-    dismiss, expire_unlisted_arming, note_reveals, opening, relist_focus, reset_hidden_tabs,
-    see_new_row, show_achievements, toggle_inspector, update, Outcome,
+    dismiss, expire_unlisted_arming, keep_list_line, note_reveals, opening, relist_focus,
+    reset_hidden_tabs, see_new_row, show_achievements, toggle_inspector, update, Outcome,
 };
-pub use view::{ArmedRow, CountPrompt, Overlay, PendingReport, SeenMark, ViewState};
+pub use view::{ArmedRow, CountPrompt, ListLine, Overlay, PendingReport, SeenMark, ViewState};
 
 /// An identifier as lower-case words: "JarsOfPurrs" -> "jars of purrs".
 fn spaced_lower(tag: &str) -> String {

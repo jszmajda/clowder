@@ -181,7 +181,9 @@ pub fn pointer_event(
                     view.focus[idx] = Some(key);
                     // The player is pointing at a row they can see: the list
                     // stands where this frame drew it. @spec TUI-NAV-129, TUI-RENDER-036
-                    view.list_held[idx] = Some(record.list_start());
+                    if let Some((_, line)) = record.list_line() {
+                        view.list_line[idx] = Some(line);
+                    }
                     guard_after_field(view);
                 }
             }

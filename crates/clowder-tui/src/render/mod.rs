@@ -773,7 +773,7 @@ fn draw_list(
     state: &GameState,
     section: Section,
     view: &ViewState,
-) -> (Vec<(Rect, RowKey)>, usize) {
+) -> (Vec<(Rect, RowKey)>, usize, Option<RowKey>) {
     let cursor_key = view.focus.get(section.index()).and_then(|k| k.as_ref());
     let prompt = view.prompt.as_ref();
     let armed = view.armed.as_ref();
@@ -786,7 +786,8 @@ fn draw_list(
     let armed = armed.filter(|a| armed_is_live(a));
 
     let capacity = area.height as usize;
-    let win = window_for(all.len(), cursor, capacity, view.list_held[section.index()]);
+    let held = view.list_line[section.index()].as_ref().map(|l| l.place);
+    let win = window_for(all.len(), cursor, capacity, held);
 
     let mut lines: Vec<Line<'static>> = Vec::with_capacity(win.len + 2);
     // Where each row drew, whole line, for the frame's pointer record.
@@ -850,7 +851,8 @@ fn draw_list(
     }
 
     f.render_widget(Paragraph::new(lines), area);
-    (drawn_at, win.start)
+    let start_key = all.get(win.start).map(|r| r.key.clone());
+    (drawn_at, win.start, start_key)
 }
 
 /// Whether `row` is about an item a reveal has marked new (TUI-NAV-211).
@@ -1463,8 +1465,8 @@ pub fn frame_recorded(
                 if view.inspector_wanted {
                     widgets::inspector::draw(f, space, state, view);
                 } else {
-                    let (drawn, start) = draw_list(f, space, state, section, view);
-                    record.record_list(space, section, drawn, start);
+                    let (drawn, start, start_key) = draw_list(f, space, state, section, view);
+                    record.record_list(space, section, drawn, start, start_key);
                 }
                 draw_dividers(f, &[main.x], main.y, main.height, state.season());
             }
@@ -1475,8 +1477,8 @@ pub fn frame_recorded(
             } => {
                 record.record_sidebar(widgets::chrome::sidebar(f, sidebar, state, view));
                 let space = left_between_dividers(list);
-                let (drawn, start) = draw_list(f, space, state, section, view);
-                record.record_list(space, section, drawn, start);
+                let (drawn, start, start_key) = draw_list(f, space, state, section, view);
+                record.record_list(space, section, drawn, start, start_key);
                 // TUI-NAV-035's count-prompt substitution belongs to the
                 // narrow-mode swap alone — "while the inspector holds the
                 // list's space" — so the persistent pane never loses its next

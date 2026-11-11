@@ -540,13 +540,17 @@ fn the_frame_returns_the_layout_it_drew() {
 }
 
 // ---------------------------------------------------------------------------
-// TUI-RENDER-009 — the scroll position is derived from the cursor
+// TUI-RENDER-039 — a list with no line kept is placed from the cursor
+//
+// These frames are drawn cold, from views that keep no line for the list, as
+// the first frame of a sitting draws it. How a kept line moves from frame to
+// frame is the loop's, and is tested through it (scroll.rs).
 // ---------------------------------------------------------------------------
 
 /// However deep in the list the cursor sits, the row it is on is drawn. A list
 /// of a hundred rows in a viewport of thirty-six is the ordinary case, not an
 /// edge one.
-/// @spec TUI-RENDER-009
+/// @spec TUI-RENDER-039
 #[test]
 fn the_cursor_is_visible_however_deep_in_the_list_it_sits() {
     let state = long_meadow();
@@ -570,7 +574,7 @@ fn the_cursor_is_visible_however_deep_in_the_list_it_sits() {
 /// A margin above and below: the cursor is kept visible *with company*, never
 /// pressed against an edge while the list continues past it. Both neighbours of
 /// the focused row are drawn wherever the list has rows on both sides.
-/// @spec TUI-RENDER-009
+/// @spec TUI-RENDER-039
 #[test]
 fn the_rows_either_side_of_the_cursor_are_drawn_too() {
     let state = long_meadow();
@@ -600,7 +604,7 @@ fn the_rows_either_side_of_the_cursor_are_drawn_too() {
 /// reveal inserts rows *above* the cursor between one frame and the next. A
 /// stored offset would still be pointing where it was and would leave the
 /// cursor off screen; a derived one cannot.
-/// @spec TUI-RENDER-009
+/// @spec TUI-RENDER-039, TUI-RENDER-009
 #[test]
 fn a_reveal_that_inserts_rows_above_the_cursor_cannot_hide_it() {
     let last = *StructureId::ALL.last().expect("structures exist");
@@ -642,7 +646,7 @@ fn a_reveal_that_inserts_rows_above_the_cursor_cannot_hide_it() {
 
 /// The other reason: a resize changes the body's height under a cursor that has
 /// not moved. Every supported height must still show it.
-/// @spec TUI-RENDER-009
+/// @spec TUI-RENDER-039, TUI-RENDER-009
 #[test]
 fn a_resize_that_changes_the_body_height_cannot_hide_the_cursor() {
     // A deep row with a short name: this is the one test that draws at the
@@ -676,10 +680,11 @@ fn a_resize_that_changes_the_body_height_cannot_hide_the_cursor() {
     }
 }
 
-/// Derived means derived from the cursor *alone*: how the cursor got there is
-/// not an input. A viewport reached by walking the list is the viewport a cold
-/// frame draws for the same cursor — which is only true if no offset was kept.
-/// @spec TUI-RENDER-009
+/// With no line kept, where the list begins depends on the cursor *alone*:
+/// the frames drawn before are not an input. A frame is a pure function of
+/// the state and the view, so a view that keeps no line draws what a cold
+/// frame draws for the same cursor, whatever was drawn before it.
+/// @spec TUI-RENDER-039
 #[test]
 fn the_scroll_position_depends_on_the_cursor_and_not_on_how_it_was_reached() {
     let state = long_meadow();
@@ -703,7 +708,7 @@ fn the_scroll_position_depends_on_the_cursor_and_not_on_how_it_was_reached() {
 
 /// The viewport is a window that moves with the cursor: the rows far from it
 /// are not merely off the bottom of the pane, they are not drawn anywhere.
-/// @spec TUI-RENDER-009, TUI-RENDER-015
+/// @spec TUI-RENDER-039, TUI-RENDER-015
 #[test]
 fn only_the_rows_around_the_cursor_are_drawn() {
     let state = long_meadow();

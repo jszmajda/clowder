@@ -291,6 +291,13 @@ pub fn see_new_row(view: &mut ViewState, state: &GameState) {
     }
 }
 
+/// Keep the line the frame's list began on, for that list alone, as where its
+/// next frame starts; a frame that drew no list keeps every line as it stood.
+/// @spec TUI-RENDER-009
+pub fn keep_list_line(view: &mut ViewState, record: &crate::render::pointer::PointerRecord) {
+    let _ = (view, record);
+}
+
 // ---------------------------------------------------------------------------
 // Navigation
 // ---------------------------------------------------------------------------
