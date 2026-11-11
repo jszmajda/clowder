@@ -17,7 +17,7 @@
 
 ## Standing & Pen Pals
 
-- [x] **SIM-TRADE-005**: The system shall compute a colony's standing as its start value plus its Pen Pal contribution plus any dedicated per-colony standing effects (the Charming Elder and Gift Stands raise trade ratio, a separate knob); a shy colony (negative standing) shall only ever warm toward neutral and never become an enemy. The global standing ratio (SIM-MOVE-012) shall multiply a colony's standing by (1 + ratio) where its start value is not below zero, and where it is shall lift the colony's standing by ratio × the start value's size, held between the start value and zero.
+- [x] **SIM-TRADE-005**: The system shall compute a colony's standing as its start value plus its Pen Pal contribution (the Charming Elder and Gift Stands raise trade ratio, a separate knob); a shy colony (negative standing) shall only ever warm toward neutral and never become an enemy. The global standing ratio (SIM-MOVE-012) shall multiply a colony's standing by (1 + ratio) where its start value is not below zero, and where it is shall lift the colony's standing by ratio × the start value's size, held between the start value and zero.
 - [x] **SIM-TRADE-006**: When SendPenPal(colony) is applied after the Pen Pal Networks idea is researched, for a discovered colony, with charm 100 × 1.15^level affordable, the system shall spend the charm and raise the colony's Pen Pal level, which warms its standing by 0.01 per level (the warmth letters add soft-capped at 0.75) and opens the goods it keeps for that level; Star Whales accept no Pen Pals.
 
 ## Discovery
