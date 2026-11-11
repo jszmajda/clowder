@@ -1090,16 +1090,13 @@ fn foxes_moonstone_scales_with_kites() {
 // @spec SIM-TRADE-005
 #[test]
 fn standing_starts_from_the_table_warms_with_pen_pals_and_never_turns_enemy() {
-    // Standing = start + Pen Pal contribution + dedicated standing effects.
+    // Standing = start + Pen Pal contribution.
     let s = GameState::new(349);
     assert!((s.standing(ColonyId::Otters) - 0.25).abs() < 1e-9);
     assert!((s.standing(ColonyId::Raccoons) - 0.0).abs() < 1e-9);
     assert!((s.standing(ColonyId::Foxes) - (-0.15)).abs() < 1e-9);
     assert!((s.standing(ColonyId::Rabbits) - 0.15).abs() < 1e-9);
     assert!((s.standing(ColonyId::Owls) - (-0.10)).abs() < 1e-9);
-
-    // The StandingFor(colony) effect key exists and is dormant at zero baseline.
-    assert!((s.effect(Effect::StandingFor(ColonyId::Otters)) - 0.0).abs() < 1e-9);
 
     // A shy colony only ever warms toward neutral: with deep Pen Pal ties the
     // Foxes' standing rises above its −0.15 floor but is capped at 0 (neutral).

@@ -3,8 +3,8 @@
 
 use crate::content;
 use crate::state::{
-    AdventureId, ArchId, ColonyId, CraftId, GameState, JobId, KittenTrait, ResourceId, RiteId,
-    Season, StructureId, TraditionId,
+    AdventureId, ArchId, CraftId, GameState, JobId, KittenTrait, ResourceId, RiteId, Season,
+    StructureId, TraditionId,
 };
 
 mod index;
@@ -78,8 +78,6 @@ pub enum Effect {
     UnicornsRatio,
     /// +refine on the 25 prisms → 1 starshard conversion. @spec SIM-UNI-003
     StarshardRefine,
-    /// Dedicated per-colony standing bonus (dormant baseline). @spec SIM-TRADE-005
-    StandingFor(ColonyId),
     // ---- Wave 5 (prestige / adventures) ----
     /// Summed structure-price reduction from Traditions, DR-clamped in
     /// next_cost. @spec SIM-MOVE-013

@@ -2065,14 +2065,13 @@ impl GameState {
         )
     }
 
-    /// A colony's standing: start + Pen Pal warming + dedicated standing
-    /// effects. A shy colony (negative start) only ever warms toward neutral,
-    /// clamped between its start floor and 0. @spec SIM-TRADE-005
+    /// A colony's standing: start + Pen Pal warming. A shy colony (negative
+    /// start) only ever warms toward neutral, clamped between its start floor
+    /// and 0. @spec SIM-TRADE-005
     pub fn standing(&self, colony: ColonyId) -> f64 {
         let def = content::colony_def(colony);
         let warm = (content::PENPAL_STANDING_PER * self.penpal[colony.ix()] as f64)
-            .min(content::PENPAL_STANDING_CAP)
-            + self.effect(crate::effects::Effect::StandingFor(colony));
+            .min(content::PENPAL_STANDING_CAP);
         let raw = def.start_standing + warm;
         // Good Neighbours (a global StandingRatio) warms standing everywhere:
         // multiplying up a warm colony, and lifting a shy one toward neutral.

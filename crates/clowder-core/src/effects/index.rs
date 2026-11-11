@@ -13,7 +13,7 @@ use std::sync::OnceLock;
 use super::{arch_effect, loom_effect, rite_effect, tradition_effect, trait_effect, Effect};
 use crate::content;
 use crate::state::{
-    AdventureId, ArchId, ColonyId, CraftId, DreamLoomId, IdeaId, JobId, KittenTrait, RefinementId,
+    AdventureId, ArchId, CraftId, DreamLoomId, IdeaId, JobId, KittenTrait, RefinementId,
     ResourceId, RiteId, RuleId, Season, StructureId, TraditionId,
 };
 
@@ -66,8 +66,7 @@ const CRAFT_RATIO_FOR: usize = MAX_CAP + RESOURCES;
 const STRUCTURE_OUTPUT_ADD: usize = CRAFT_RATIO_FOR + CraftId::ALL.len();
 const STRUCTURE_MESS_DELTA: usize = STRUCTURE_OUTPUT_ADD + STRUCTURES * RESOURCES;
 const MAX_CAP_RATIO: usize = STRUCTURE_MESS_DELTA + STRUCTURES;
-const STANDING_FOR: usize = MAX_CAP_RATIO + RESOURCES;
-const SEASON_RESOURCE_RATIO: usize = STANDING_FOR + ColonyId::ALL.len();
+const SEASON_RESOURCE_RATIO: usize = MAX_CAP_RATIO + RESOURCES;
 const KEY_COUNT: usize = SEASON_RESOURCE_RATIO + Season::ALL.len() * RESOURCES;
 
 /// A key's own place in the index. Exhaustive, so a new key cannot be left out.
@@ -116,7 +115,6 @@ fn slot(key: Effect) -> usize {
         StructureOutputAdd(s, r) => STRUCTURE_OUTPUT_ADD + s.ix() * RESOURCES + r.ix(),
         StructureMessDelta(s) => STRUCTURE_MESS_DELTA + s.ix(),
         MaxCapRatio(r) => MAX_CAP_RATIO + r.ix(),
-        StandingFor(c) => STANDING_FOR + c.ix(),
         SeasonResourceRatio(season, r) => {
             SEASON_RESOURCE_RATIO + season as usize * RESOURCES + r.ix()
         }
@@ -171,7 +169,6 @@ pub(super) fn every_key() -> Vec<Effect> {
     }
     keys.extend(JobId::ALL.map(JobRatio));
     keys.extend(CraftId::ALL.map(CraftRatioFor));
-    keys.extend(ColonyId::ALL.map(StandingFor));
     keys
 }
 
@@ -415,8 +412,7 @@ mod tests {
 
     /// Every key family has a source for at least one of its parameters: a key
     /// nothing can feed is a multiplier that is always one, which no spec should
-    /// state and no test can exercise. The per-colony standing family waits on
-    /// #47. @spec SIM-ENG-085
+    /// state and no test can exercise. @spec SIM-ENG-085
     #[test]
     fn every_key_family_has_something_to_feed_it() {
         let mut fed: std::collections::BTreeMap<String, bool> = Default::default();
@@ -430,7 +426,7 @@ mod tests {
             .filter(|(_, fed)| !**fed)
             .map(|(family, _)| family.as_str())
             .collect();
-        assert_eq!(unfed, ["StandingFor"], "key families nothing can feed");
+        assert!(unfed.is_empty(), "key families nothing can feed: {unfed:?}");
     }
 
     /// Most keys carry nothing, so the lists save most of a walk over every
@@ -439,8 +435,8 @@ mod tests {
     #[test]
     fn a_key_lists_only_the_sources_that_can_carry_it() {
         assert!(
-            sources(Effect::StandingFor(ColonyId::ALL[0])).is_empty(),
-            "a key that carries nothing lists nothing"
+            every_key().into_iter().any(|key| sources(key).is_empty()),
+            "fixture: a key that carries nothing lists nothing"
         );
         for key in every_key() {
             for source in sources(key) {
