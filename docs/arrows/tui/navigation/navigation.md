@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-11 (commit `9c1932d81d1c`). 213 of 213 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-11 (commit `8f62315c606c`). 215 of 215 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/navigation/navigation-specs.md` — 213 specs, prefix `TUI-NAV`
+- `docs/intent/tui/navigation/navigation-specs.md` — 215 specs, prefix `TUI-NAV`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/act_prices.rs`
@@ -81,9 +81,9 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-NAV-001 – TUI-NAV-213 | 213 | 0 | 0 |
+| All | TUI-NAV-001 – TUI-NAV-215 | 215 | 0 | 0 |
 
-**Summary:** 213 of 213 active specs implemented.
+**Summary:** 215 of 215 active specs implemented.
 
 ## Key Findings
 
@@ -116,6 +116,8 @@ Audited 2026-11-11, for what issue #48 changed. A kitten's row states its next r
 Audited 2026-11-11, for what issue #49 changed. A reveal's line names the item and the tab that lists it (TUI-NAV-209). A row a tick reveals in play is marked until the cursor rests on it at a frame's end (TUI-NAV-211, TUI-NAV-212), and a reveal out of focus badges its section's tab (TUI-NAV-213). A test over every structure and idea holds that each revealed one is listed in its section (TUI-NAV-210). Tests drive real ticks through the loop, and one shows a catch-up's reveals mark nothing. The audit removed a per-section watermark that every visit wrote and nothing read; its comment described a chip count the design had dropped. Two follow-ups are deferred in the design and filed: reveals during an absence or a nap (#51), and items a gate brings into a known section (#52). Every spec marked implemented has a test citing it, and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-11, for what issue #50 changed. A click and a wheel step move only the cursor, and the list follows it by the render leaf's rule (TUI-NAV-129, TUI-NAV-130). The click no longer writes a line of its own, and a test now holds that a click changes no list's line. The design's wording on where a list stands after a click, and its Decisions row, follow the render leaf. Every spec marked implemented has a test citing it, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-11, for what issue #51 changed. A report handed back marks the rows its replay revealed and badges their tabs, a load's once the opening has taken focus (TUI-NAV-214). The opening now takes what it finds as known, save those (TUI-NAV-024). The pinned entry names each reveal in the words of a reveal's line (TUI-NAV-215, TUI-NAV-027). The test that a catch-up marks nothing now holds the opposite, and a nap is tested through the report seam the loop calls. The deferred item for #51 is resolved and removed, and the one left is renumbered. Every spec marked implemented has a test citing it, and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

@@ -4,7 +4,7 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 
 ## Status
 
-**OK** — last audited 2026-11-11 (commit `9c1932d81d1c`). 39 of 39 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-11 (commit `8f62315c606c`). 39 of 39 active specs implemented, each cited by a test.
 
 ## References
 
@@ -78,6 +78,8 @@ Audited 2026-11-04, for what issue #46 changed. The cost field draws a fixed act
 Audited 2026-11-11, for what issue #49 changed. A new row draws `★` in its cursor column and moves no other character (TUI-RENDER-037), which a test checks by comparing the row with and without the mark. An overflow note counts the new rows past its end (TUI-RENDER-038). The References now also list the two navigation files that hold a clicked list's line (TUI-RENDER-036), which the last regeneration had missed. Every spec marked implemented has a test citing it, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-11, for what issue #50 changed. Each list now begins where its last frame began, moved as little as keeps the cursor and a line either side drawn, so a change of direction moves only the cursor (TUI-RENDER-009). The line is kept by the loop from each frame's pointer record (TUI-RENDER-025), by its identity, so a row revealed above the list slides nothing in view. With no line kept, or after a jump further than a step, the cursor is drawn three lines down (TUI-RENDER-039). A click needs no hold of its own (TUI-RENDER-036). The old click hold was the source of the reported behavior: the keys measured from wherever the last click had been. The new tests drive the loop frame by frame, by key and by wheel. frame.rs's cold-frame scroll tests now cite TUI-RENDER-039. The full suite also found that the three-lines-down placement left the cursor off a pane under four lines tall. That formula came from the old path for a list no click had held, and nothing had tested it that small; it now settles as a kept line does. Every spec marked implemented has a test citing it, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-11, for what issue #51 changed. No render spec changed. The pinned entry's lines, drawn in this segment's overlay code, now include a report's reveals, worded by the same function as a reveal's ticker line, under the navigation leaf's TUI-NAV-215. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 
