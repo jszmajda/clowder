@@ -1636,6 +1636,26 @@ pub struct GameState {
     /// @spec SIM-ENG-055
     #[serde(skip)]
     pub(crate) unrevealed_resources: Vec<ResourceId>,
+    /// Derived: the items of the kinds without a reveal ladder present when the
+    /// command being applied began, moved on by any adventure completing inside
+    /// it, so an arrival a nap's replay already announced is not announced
+    /// again by the nap. Taken afresh as each command begins, never
+    /// serialized, and kept out of a state's equality, being a record of a
+    /// look rather than anything about the meadow. @spec SIM-ENG-088
+    #[serde(skip)]
+    pub(crate) last_present: LastPresent,
+}
+
+/// The set behind `GameState::last_present`: equal to any other, so two
+/// states that differ only in when the core last looked compare equal.
+/// @spec SIM-ENG-088
+#[derive(Debug, Clone, Default)]
+pub(crate) struct LastPresent(pub(crate) BTreeSet<ContentId>);
+
+impl PartialEq for LastPresent {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
 }
 
 fn default_speed() -> f64 {
@@ -1714,7 +1734,37 @@ impl GameState {
             unrevealed_structs: StructureId::ALL.to_vec(),
             unrevealed_ideas: IdeaId::ALL.to_vec(),
             unrevealed_resources: ResourceId::ALL.to_vec(),
+            last_present: LastPresent::default(),
         }
+    }
+
+    /// Look at what is present of the kinds without a reveal ladder as a
+    /// command begins: the baseline its arrivals are judged against.
+    /// @spec SIM-ENG-088
+    pub(crate) fn look_before_command(&mut self) {
+        self.last_present = LastPresent(self.present_unladdered());
+    }
+
+    /// The items of the kinds without a reveal ladder present now.
+    fn present_unladdered(&self) -> BTreeSet<ContentId> {
+        every_content_id()
+            .into_iter()
+            .filter(|id| !id.is_reveal_tracked() && self.availability(*id) != Availability::Hidden)
+            .collect()
+    }
+
+    /// Announce each item of the kinds without a reveal ladder that is present
+    /// now and was not at the last look, with one `Revealed` event, and take
+    /// what is present now as the next look. Run after every applied command,
+    /// against the look taken as it began, and after an adventure's
+    /// completion, against the look taken just before it: the sites where
+    /// these gates open. @spec SIM-ENG-088
+    pub(crate) fn announce_arrivals(&mut self, events: &mut Vec<crate::events::Event>) {
+        let now = self.present_unladdered();
+        for id in now.difference(&self.last_present.0) {
+            events.push(crate::events::Event::Revealed { id: *id });
+        }
+        self.last_present = LastPresent(now);
     }
 
     /// Rebuild the unrevealed worklists as the exact complement of `revealed`,
@@ -1968,10 +2018,16 @@ impl GameState {
         {
             return;
         }
+        // Just before it: a completion is judged against what it found.
+        // @spec SIM-ENG-088
+        self.last_present = LastPresent(self.present_unladdered());
         self.adventure_done = true;
         self.adventure_completions[a.ix()] += 1;
         self.adventure_rewards[a.ix()] += content::adventure_def(a).reward_per;
         events.push(crate::events::Event::AdventureCompleted { id: a });
+        // A completion opens the tradition its reward unlocks, the one such
+        // gate a tick opens. @spec SIM-ENG-088
+        self.announce_arrivals(events);
     }
 
     /// The stacked structure-price multiplier from price-reduction Traditions:
@@ -2746,6 +2802,7 @@ mod move_classification {
             unrevealed_ideas: _,
             revealed_resources: _,
             unrevealed_resources: _,
+            last_present: _,
 
             // ---- preserved, and named as legacies by the spec ----
             rng: _,

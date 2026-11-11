@@ -6421,7 +6421,15 @@ fn a_row_finishing_under_the_cursor_hands_it_to_the_row_that_closes_up() {
             }],
             "the move retired the banner"
         );
-        assert_eq!(a.view.seen, seen, "the move counted as a visit");
+        // A visit marks its section seen; a reveal the command brought may
+        // badge another, which is no visit. @spec TUI-NAV-213
+        for section in Section::ALL {
+            let i = section.index();
+            assert!(
+                !(a.view.seen[i].visited && !seen[i].visited),
+                "the move counted as a visit to {section:?}"
+            );
+        }
     }
     assert!(
         after_seen > 0,

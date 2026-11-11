@@ -73,7 +73,9 @@ pub enum Event {
         template: usize,
         kitten: Option<String>,
     },
-    /// A content item became permanently visible. @spec SIM-ENG-023
+    /// A content item became visible: a structure or an idea permanently, as
+    /// it climbs the reveal ladder, and an item of any other kind as its gate
+    /// opens. @spec SIM-ENG-023, SIM-ENG-088
     Revealed {
         id: ContentId,
     },

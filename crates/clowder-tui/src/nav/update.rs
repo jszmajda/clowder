@@ -249,12 +249,13 @@ pub fn reset_hidden_tabs(view: &mut ViewState, state: &GameState) {
     }
 }
 
-/// Mark the rows a tick's reveals bring: each structure or idea the events
-/// reveal is new until the cursor rests on it, and a reveal in a section other
-/// than the one in focus badges that section's tab until it is next visited,
-/// as a tab's appearance does. Handed only the events of ticks the game runs
-/// in play: a catch-up or a nap folds its ticks into a report and hands the
-/// shell none of them. @spec TUI-NAV-211, TUI-NAV-213
+/// Mark the rows the reveals among `events` bring: each item revealed is new
+/// until the cursor rests on it, and a reveal in a section other than the one
+/// in focus badges that section's tab until it is next visited, as a tab's
+/// appearance does. Handed the events of the ticks the game runs in play and
+/// of every command the player applies; a catch-up or a nap folds its ticks
+/// into a report, which `note_report_reveals` reads. @spec TUI-NAV-211,
+/// TUI-NAV-213
 pub fn note_reveals(view: &mut ViewState, events: &[Event]) {
     for event in events {
         if let Event::Revealed { id } = event {
@@ -272,12 +273,10 @@ pub fn note_report_reveals(view: &mut ViewState, report: &OfflineReport) {
     }
 }
 
-/// One reveal: its row new until the cursor rests on it, and its section's
-/// tab badged unless that section is in focus. @spec TUI-NAV-211, TUI-NAV-213
+/// One reveal, of whatever kind: its row new until the cursor rests on it,
+/// and its section's tab badged unless that section is in focus.
+/// @spec TUI-NAV-211, TUI-NAV-213
 fn mark_reveal(view: &mut ViewState, id: ContentId) {
-    if !matches!(id, ContentId::Structure(_) | ContentId::Idea(_)) {
-        return;
-    }
     view.new_rows.insert(id);
     let section = Section::listing(id);
     if view.section != Some(section) {

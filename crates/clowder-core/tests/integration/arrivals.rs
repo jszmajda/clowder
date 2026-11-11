@@ -203,3 +203,46 @@ fn ticks_announce_no_arrival() {
     let events = run_days(&mut s, 5);
     assert!(arrivals(&events).is_empty(), "{:?}", arrivals(&events));
 }
+
+/// A nap whose sleep completes an adventure announces the tradition it opens
+/// once, in the nap's report, and the nap's command does not announce it again.
+// @spec SIM-ENG-088, SAVE-041
+#[test]
+fn a_nap_announces_what_its_sleep_opened_once() {
+    let a = AdventureId::TidyMeadow;
+    let t = content::adventure_def(a).unlocks.expect("fixture");
+    let mut s = GameState::new(92);
+    s.generation = 1;
+    s.active_adventure = Some(a);
+    s.ideas.insert(IdeaId::DeepNapTheory);
+    for r in ResourceId::ALL {
+        s.resources[r.ix()] = 1.0e9;
+    }
+    let mut s = reloaded(&s);
+    let events = s.apply(Command::DeepNap(2)).expect("the nap is affordable");
+    assert!(
+        s.adventure_completions[a.ix()] > 0,
+        "fixture: the year slept through was tidy"
+    );
+    let report = events
+        .iter()
+        .find_map(|e| match e {
+            Event::Napped { report, .. } => Some(report.clone()),
+            _ => None,
+        })
+        .expect("a nap returns its report");
+    assert_eq!(
+        report
+            .revealed
+            .iter()
+            .filter(|id| **id == ContentId::Tradition(t))
+            .count(),
+        1,
+        "the report tells the tradition's arrival once"
+    );
+    assert!(
+        !arrivals(&events).contains(&ContentId::Tradition(t)),
+        "and the nap's own events do not tell it again: {:?}",
+        arrivals(&events)
+    );
+}

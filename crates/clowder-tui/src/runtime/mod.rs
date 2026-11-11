@@ -726,6 +726,9 @@ impl App {
                             // leaves no footer note of its own.
                             // @spec TUI-NAV-027, TUI-NAV-050, TUI-NAV-107, TUI-NAV-155
                             Ok(events) => {
+                                // What the command opened is marked as it
+                                // happens. @spec TUI-NAV-211
+                                crate::nav::note_reveals(&mut self.view, &events);
                                 crate::nav::queue_command_reports(
                                     &mut self.view,
                                     &self.state,
@@ -753,7 +756,12 @@ impl App {
                             let mut rejection = None;
                             for _ in 0..n {
                                 match self.state.apply(cmd) {
-                                    Ok(_) => done += 1,
+                                    Ok(events) => {
+                                        // Each command of the run marks what
+                                        // it opened. @spec TUI-NAV-211
+                                        crate::nav::note_reveals(&mut self.view, &events);
+                                        done += 1;
+                                    }
                                     Err(e) => {
                                         rejection = Some(e);
                                         break;

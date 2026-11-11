@@ -131,11 +131,16 @@ impl GameState {
     // @spec SIM-ENG-028
     pub fn apply(&mut self, cmd: Command) -> Result<Vec<Event>, CommandError> {
         let pace_only = matches!(cmd, Command::SetSpeed(_));
+        // @spec SIM-ENG-088
+        self.look_before_command();
         let mut events = self.apply_inner(cmd)?;
         // An applied command leaves every holding and every stated price
         // recorded; a refused one returned above and revealed nothing.
         // @spec SIM-ENG-050, SIM-ENG-054
         self.record_reveals();
+        // What the command opened of the kinds without a reveal ladder
+        // arrives. @spec SIM-ENG-088
+        self.announce_arrivals(&mut events);
         // A command that tells of nothing happening is no occasion to look —
         // appointing the Elder who already sits must change nothing — and
         // speed is the pace the meadow is watched at, never something that
