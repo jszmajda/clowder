@@ -1295,6 +1295,19 @@ fn draw_body(
                     lines.push(Vec::new());
                     lines.extend(unit_cost_lines(state, &price));
                 }
+                // A kitten's next rank: the shinies as a next cost, and the
+                // kitten's own exp beside them. @spec TUI-NAV-208
+                if let Command::Promote(ix) = command {
+                    if let Some(p) = state.promotion_price(*ix) {
+                        lines.push(Vec::new());
+                        lines.extend(unit_cost_lines(state, &[(ResourceId::Shinies, p.shinies)]));
+                        lines.push(plain(format!(
+                            "Experience: need {}, has {}",
+                            fmt::exact(p.exp),
+                            fmt::exact(p.exp_held)
+                        )));
+                    }
+                }
             }
             if let RowKey::Colony(c, "trade") = &row.key {
                 lines.extend(offer_lines(state, *c));

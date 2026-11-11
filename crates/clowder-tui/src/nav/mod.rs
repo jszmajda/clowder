@@ -78,5 +78,9 @@ pub fn plain_error(e: &clowder_core::CommandError) -> String {
             ),
             None => "not enough to hand".into(),
         },
+        E::NotEnoughExperience { short } => format!(
+            "not enough experience — needs {} more",
+            crate::render::fmt::compact(*short)
+        ),
     }
 }

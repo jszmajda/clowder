@@ -979,6 +979,16 @@ fn list_and_inspector_in_frame(
     (list.map(|r| region_lines(buf, r)), inspector)
 }
 
+/// The lines above a kitten's next rank's price, which comes after its name and
+/// any Elder's line: what TUI-NAV-208 adds to the row is that rule's, not this
+/// one's, and a narrow pane may wrap it onto several lines.
+fn without_the_price(lines: Vec<String>) -> Vec<String> {
+    lines
+        .into_iter()
+        .take_while(|l| !l.starts_with("Shinies: need") && !l.starts_with("Shinies:"))
+        .collect()
+}
+
 /// While the cursor is on the row of the kitten the core holds as the Elder,
 /// the inspector states that the kitten is the Elder as one line directly
 /// beneath the kitten's name — the whole mark, `◆ Elder` — and nothing more:
@@ -1032,10 +1042,10 @@ fn the_inspector_states_the_elders_mark_beneath_the_name_on_the_elders_row_alone
             let view = looking_at(Section::Clowder, key.clone());
             let whr = format!("at {w} columns, on kitten {k}'s row");
 
-            // With no Elder: the name, and nothing else. A kitten's row has
-            // no definition, no count, and no cost to state.
+            // With no Elder: the name, and nothing else but its next rank's
+            // price (TUI-NAV-208). A kitten's row has no definition and no count.
             let (_, plain) = list_and_inspector_in_frame(&base, &view, w, TALL);
-            let plain = above_the_card(plain);
+            let plain = without_the_price(above_the_card(plain));
             assert!(
                 plain.join(" ") == *name || plain.concat() == *name,
                 "fixture: {whr} with the core holding no Elder, the inspector states the kitten's \
@@ -1053,7 +1063,7 @@ fn the_inspector_states_the_elders_mark_beneath_the_name_on_the_elders_row_alone
             let mut elsewhere = base.clone();
             elsewhere.elder = Some(other);
             let (_, shown) = list_and_inspector_in_frame(&elsewhere, &view, w, TALL);
-            let shown = above_the_card(shown);
+            let shown = without_the_price(above_the_card(shown));
             assert_eq!(
                 shown, plain,
                 "{whr} with kitten {other} the Elder: this kitten is not the Elder, so the \
@@ -1065,7 +1075,7 @@ fn the_inspector_states_the_elders_mark_beneath_the_name_on_the_elders_row_alone
             let mut own = base.clone();
             own.elder = Some(k);
             let (list, shown) = list_and_inspector_in_frame(&own, &view, w, TALL);
-            let shown = above_the_card(shown);
+            let shown = without_the_price(above_the_card(shown));
             let mut expected = plain.clone();
             expected.push(ELDER_MARK.to_string());
             assert_eq!(
@@ -2926,7 +2936,8 @@ fn every_purchasable_item_states_its_blurb() {
 /// no statement, no stand-in, no price, no reason — save, on a row the list
 /// draws with a label in its name's place, that label (TUI-NAV-091). (Pounce
 /// and Trade rows state the core's one-unit price instead, TUI-NAV-073, and a
-/// fixed act its price, TUI-NAV-207.)
+/// fixed act its price, TUI-NAV-207, and a kitten's row its next rank's,
+/// TUI-NAV-208.)
 /// Quantified over every such row a full meadow lists.
 /// @spec TUI-NAV-018, TUI-NAV-091
 #[test]
@@ -2937,6 +2948,7 @@ fn a_row_with_no_definition_states_only_its_name() {
             if matches!(
                 row.key,
                 RowKey::Content(..)
+                    | RowKey::Kitten(..)
                     | RowKey::Resource(_)
                     | RowKey::Bench
                     | RowKey::Energy

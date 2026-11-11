@@ -106,16 +106,16 @@ fn action_rows(s: &GameState) -> Vec<(Section, Row, Command)> {
 }
 
 /// Every action row that takes something from the stores says so in the inspector,
-/// with need and have, read against what applying it does. A kitten's row waits on
-/// #48, and a nap's price is previewed when its length is typed (TUI-NAV-067).
+/// with need and have, read against what applying it does, a kitten's row among
+/// them. A nap's price is previewed when its length is typed (TUI-NAV-067).
 ///
-/// @spec TUI-NAV-207
+/// @spec TUI-NAV-207, TUI-NAV-208
 #[test]
 fn every_row_that_takes_from_the_stores_states_it_in_the_inspector() {
     let s = rich();
     let mut stated = 0;
     for (section, row, command) in action_rows(&s) {
-        if matches!(row.key, RowKey::Kitten(..)) || matches!(command, Command::DeepNap(_)) {
+        if matches!(command, Command::DeepNap(_)) {
             continue;
         }
         if matches!(row.key, RowKey::Content(..)) {
@@ -212,4 +212,54 @@ fn a_row_with_nothing_to_state_states_nothing() {
         .expect("fixture: the row is listed");
     let text = pane(&s, &looking_at(section, &row.key));
     assert!(!text.contains(": need"), "nothing to state:\n{text}");
+}
+
+/// A kitten's row states its next rank's price beneath the kitten's name: the
+/// shinies with need and have, the exp with need and has, before the card.
+///
+/// @spec TUI-NAV-208
+#[test]
+fn a_kittens_row_states_its_next_rank() {
+    let mut s = rich();
+    s.kittens[0].exp = 120.0;
+    s.resources[ResourceId::Shinies.ix()] = 7.0;
+    let price = s.promotion_price(0).expect("a kitten stands at 0");
+    let (section, row, _) = action_rows(&s)
+        .into_iter()
+        .find(|(_, r, _)| matches!(r.key, RowKey::Kitten(0, _)))
+        .expect("fixture: the kitten's row is listed");
+    let text = pane(&s, &looking_at(section, &row.key));
+    let shinies = format!(
+        "Shinies: need {}, have {}",
+        fmt::exact(price.shinies),
+        fmt::exact(7.0)
+    );
+    let exp = format!(
+        "Experience: need {}, has {}",
+        fmt::exact(price.exp),
+        fmt::exact(120.0)
+    );
+    let at = |needle: &str| {
+        text.find(needle)
+            .unwrap_or_else(|| panic!("{needle:?} is not stated:\n{text}"))
+    };
+    let card = text.find("about").expect("fixture: the card is drawn");
+    assert!(
+        at(&shinies) < card && at(&exp) < card,
+        "before the card:\n{text}"
+    );
+}
+
+/// A refusal for short exp names it in plain words, with how much more.
+///
+/// @spec TUI-NAV-208, TUI-NAV-014
+#[test]
+fn a_refusal_for_short_exp_names_it() {
+    let words = clowder_tui::nav::plain_error(&clowder_core::CommandError::NotEnoughExperience {
+        short: 380.0,
+    });
+    assert!(
+        words.contains("experience") && words.contains("380"),
+        "{words}"
+    );
 }

@@ -360,10 +360,13 @@ fn promote_spends_exp_and_shinies_and_ranks_up() {
     );
     assert_eq!(s.stock(ResourceId::Shinies), 49.0);
 
-    s.kittens[0].exp = 874.0; // exp short, shinies plenty
+    s.kittens[0].exp = 874.0; // exp short, shinies plenty: the exp is named
     give(&mut s, ResourceId::Shinies, 50.0);
     let err = s.apply(Command::Promote(0)).unwrap_err();
-    assert!(matches!(err, CommandError::InsufficientResources { .. }));
+    assert!(
+        matches!(err, CommandError::NotEnoughExperience { short } if (short - 1.0).abs() < 1e-9),
+        "{err:?}"
+    );
     assert_eq!(s.stock(ResourceId::Shinies), 50.0);
 
     s.kittens[0].exp = 875.0;

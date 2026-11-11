@@ -115,6 +115,11 @@ pub enum CommandError {
     InsufficientResources {
         missing: Vec<(ResourceId, f64)>,
     },
+    /// A promotion's stores suffice but the kitten's exp does not, by `short`.
+    /// @spec SIM-KIT-021
+    NotEnoughExperience {
+        short: f64,
+    },
 }
 
 impl GameState {
@@ -661,19 +666,20 @@ impl GameState {
     /// 25 × (rank+1) shinies, both all-or-nothing.
     // @spec SIM-KIT-021
     fn promote(&mut self, ix: usize) -> Result<Vec<Event>, CommandError> {
-        let Some(kitten) = self.kittens.get(ix) else {
+        let Some(price) = self.promotion_price(ix) else {
             return Err(CommandError::UnknownId);
         };
-        let rank = kitten.rank;
-        let exp_cost = content::PROMOTE_EXP_BASE * content::PROMOTE_EXP_RATIO.powi(rank as i32);
-        let shinies_cost = content::PROMOTE_SHINIES_STEP * (rank as f64 + 1.0);
+        let (exp_cost, shinies_cost) = (price.exp, price.shinies);
         let shinies = self.stock(ResourceId::Shinies);
-        let mut missing = Vec::new();
         if shinies + EPSILON < shinies_cost {
-            missing.push((ResourceId::Shinies, shinies_cost - shinies));
+            return Err(CommandError::InsufficientResources {
+                missing: vec![(ResourceId::Shinies, shinies_cost - shinies)],
+            });
         }
-        if kitten.exp + EPSILON < exp_cost || !missing.is_empty() {
-            return Err(CommandError::InsufficientResources { missing });
+        if price.exp_held + EPSILON < exp_cost {
+            return Err(CommandError::NotEnoughExperience {
+                short: exp_cost - price.exp_held,
+            });
         }
         self.resources[ResourceId::Shinies.ix()] = (shinies - shinies_cost).max(0.0);
         let kitten = &mut self.kittens[ix];

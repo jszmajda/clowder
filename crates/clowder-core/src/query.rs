@@ -283,6 +283,14 @@ pub enum Arrival {
     CarriedAlong,
 }
 
+/// What a kitten's next rank costs, and the exp it holds toward it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PromotionPrice {
+    pub shinies: f64,
+    pub exp: f64,
+    pub exp_held: f64,
+}
+
 /// What taking one copy of a structure down would do.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RazeReport {
@@ -721,6 +729,19 @@ impl GameState {
                 .collect(),
             tells_by_name: self.standing(c) > 0.0,
         }
+    }
+
+    /// The price of a rostered kitten's next rank, and the exp it holds; nothing
+    /// for an index no kitten holds. @spec SIM-KIT-043, SIM-KIT-021
+    pub fn promotion_price(&self, ix: usize) -> Option<PromotionPrice> {
+        let kitten = self.kittens.get(ix)?;
+        let rank = f64::from(kitten.rank);
+        Some(PromotionPrice {
+            shinies: crate::content::PROMOTE_SHINIES_STEP * (rank + 1.0),
+            exp: crate::content::PROMOTE_EXP_BASE
+                * crate::content::PROMOTE_EXP_RATIO.powi(i32::from(kitten.rank)),
+            exp_held: kitten.exp,
+        })
     }
 
     /// What applying `Raze` to a structure now would do, with no copy standing

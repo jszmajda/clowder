@@ -667,3 +667,69 @@ fn a_kitten_away_with_no_stamp_is_the_first_back() {
         );
     }
 }
+
+/// A meadow with one kitten of `rank`, holding `exp`, and `shinies` in stock.
+fn ready_to_rise(rank: u8, exp: f64, shinies: f64) -> GameState {
+    let mut s = GameState::new(200);
+    adopt(&mut s, 1);
+    s.kittens[0].rank = rank;
+    s.kittens[0].exp = exp;
+    s.resources[ResourceId::Shinies.ix()] = shinies;
+    s
+}
+
+/// The core reports a kitten's next-rank price, both figures, and the exp it
+/// holds, for every rank; and nothing for an index no kitten holds.
+///
+/// @spec SIM-KIT-043
+#[test]
+fn a_kittens_next_rank_price_is_reported() {
+    for rank in 0..6u8 {
+        let s = ready_to_rise(rank, 123.0, 0.0);
+        let price = s.promotion_price(0).expect("a kitten stands at 0");
+        assert_eq!(price.shinies, 25.0 * (f64::from(rank) + 1.0), "rank {rank}");
+        assert!(
+            (price.exp - 500.0 * 1.75f64.powi(i32::from(rank))).abs() < 1e-9,
+            "rank {rank}"
+        );
+        assert_eq!(price.exp_held, 123.0, "rank {rank}");
+    }
+    assert!(ready_to_rise(0, 0.0, 0.0).promotion_price(1).is_none());
+}
+
+/// A promotion holding just its price succeeds; short of shinies it names them;
+/// short of exp alone it names the exp and how much more; short of both, the
+/// shinies.
+///
+/// @spec SIM-KIT-021, SIM-KIT-043
+#[test]
+fn a_promotion_refused_names_what_falls_short() {
+    for rank in [0u8, 3] {
+        let price = ready_to_rise(rank, 0.0, 0.0).promotion_price(0).unwrap();
+        let (exp, shinies) = (price.exp, price.shinies);
+
+        let mut just = ready_to_rise(rank, exp, shinies);
+        just.apply(Command::Promote(0)).unwrap();
+        assert_eq!(just.kittens[0].rank, rank + 1);
+
+        let mut no_shinies = ready_to_rise(rank, exp, shinies - 1.0);
+        assert!(matches!(
+            no_shinies.apply(Command::Promote(0)),
+            Err(CommandError::InsufficientResources { missing }) if missing[0].0 == ResourceId::Shinies
+        ));
+
+        let mut no_exp = ready_to_rise(rank, exp - 1.0, shinies);
+        match no_exp.apply(Command::Promote(0)) {
+            Err(CommandError::NotEnoughExperience { short }) => {
+                assert!((short - 1.0).abs() < 1e-9, "short by {short}")
+            }
+            other => panic!("rank {rank}: expected the exp named, got {other:?}"),
+        }
+
+        let mut neither = ready_to_rise(rank, exp - 1.0, shinies - 1.0);
+        assert!(matches!(
+            neither.apply(Command::Promote(0)),
+            Err(CommandError::InsufficientResources { .. })
+        ));
+    }
+}
