@@ -39,6 +39,7 @@ loop
      marks what they reveal (navigation leaf: New rows)
   4. autosave if the cadence has elapsed
   5. render one frame from the current snapshot, keeping its pointer record
+     and, from it, the line its list began on (render leaf: The List Viewport)
 
 shutdown (any path)
   read both clocks · save · restore terminal (mouse reporting, alternate
