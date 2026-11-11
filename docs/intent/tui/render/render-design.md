@@ -68,6 +68,10 @@ A group header scrolls like any other line. Pinning the current group to the top
 
 When the list is longer than the viewport, the frame says so — a position indicator rather than a scrollbar, since a single column of scrollbar is both harder to read and more expensive in a narrow pane than a short "n more below".
 
+**A new row's mark.** A row begins with two columns before its marker: the cursor's `▸` and a blank on the row under the cursor, and two blanks on every other row. A row the navigation leaf marks new (New rows) draws `★` in place of the first blank while the cursor is not on it, in `milestone` and that glyph alone, and moves no other character of the row. A focused row draws the cursor and never the mark, since the cursor's arrival is what clears it. A row armed or holding a count prompt draws the mark as any other row does, since neither is ever new while the cursor is away from it.
+
+**What lies past an end.** Each overflow note says how many rows lie past its end: `12 more below`, `3 more above`. Where some of them are new, the note ends ` · ★N new`, N how many of the rows past that end are new, so a reveal scrolled out of sight is still pointed at from the edge it lies past. The `★` wears `milestone` and the rest of the note `dim`, as the note always does. The count reads the same rows the note counts: a folded done group's rows are not drawn, and a new row is never folded, since a row is finished only once the player has taken it.
+
 ## The Pointer Record
 
 A pointer event is resolved against the frame the player was looking at (navigation leaf: The Pointer), and only the drawing knows where that frame put each thing. So every frame, as it draws, yields a **pointer record**: the terminal size it was drawn at, and the cells of each thing on it that a pointer can address, each naming what it is.

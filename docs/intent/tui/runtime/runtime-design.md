@@ -34,7 +34,9 @@ loop
      up to this input; hand keys, pointer events, and resizes to the
      navigation layer in the order they arrived — keys return commands to
      apply to the core, pointer events never do
-  3. advance the sim: convert elapsed real time × speed into whole ticks
+  3. advance the sim: convert elapsed real time × speed into whole ticks,
+     handing the events those ticks emit to the navigation layer, which
+     marks what they reveal (navigation leaf: New rows)
   4. autosave if the cadence has elapsed
   5. render one frame from the current snapshot, keeping its pointer record
 
