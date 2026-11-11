@@ -179,11 +179,10 @@ pub fn pointer_event(
                 if listed && here != Some(&key) {
                     view.armed = None;
                     view.focus[idx] = Some(key);
-                    // The player is pointing at a row they can see: the list
-                    // stands where this frame drew it. @spec TUI-NAV-129, TUI-RENDER-036
-                    if let Some((_, line)) = record.list_line() {
-                        view.list_line[idx] = Some(line);
-                    }
+                    // The player is pointing at a row they can see, and the
+                    // list already stands where this frame drew it: the loop
+                    // kept that frame's line, so the press moves only the
+                    // cursor. @spec TUI-NAV-129, TUI-RENDER-036
                     guard_after_field(view);
                 }
             }

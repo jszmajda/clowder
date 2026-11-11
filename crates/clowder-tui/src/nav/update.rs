@@ -295,7 +295,9 @@ pub fn see_new_row(view: &mut ViewState, state: &GameState) {
 /// next frame starts; a frame that drew no list keeps every line as it stood.
 /// @spec TUI-RENDER-009
 pub fn keep_list_line(view: &mut ViewState, record: &crate::render::pointer::PointerRecord) {
-    let _ = (view, record);
+    if let Some((section, line)) = record.list_line() {
+        view.list_line[section.index()] = Some(line);
+    }
 }
 
 // ---------------------------------------------------------------------------

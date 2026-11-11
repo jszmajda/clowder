@@ -870,6 +870,9 @@ impl App {
         })?;
         if let Some((layout, record)) = used {
             self.prev_layout = Some(layout);
+            // The line the frame's list began on is where that list's next
+            // frame starts. @spec TUI-RENDER-009
+            crate::nav::keep_list_line(&mut self.view, &record);
             // @spec TUI-RUN-065
             self.pointer_record = Some(record);
         }

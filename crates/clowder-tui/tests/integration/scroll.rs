@@ -255,16 +255,17 @@ fn walking_back_the_list_stands_still_until_the_cursor_reaches_the_top() {
         let mut term = terminal(size);
         scrolled_down(&mut app, &mut term, size);
         let (_, top, bottom) = list_space(&app, size);
-        let body = usize::from(bottom - top + 1);
-        let mut still_steps = 0;
+        let body = bottom - top + 1;
+        let turned_at = cursor_y(&app, size);
+        let mut moved_at = turned_at;
         loop {
             let before = drawn(&app, size);
             let from = index_of(&app, &cursor_key(&app));
             let at_edge = lines_before_cursor(&app) <= 1;
+            moved_at = cursor_y(&app, size);
             frame(&mut app, &mut term, &[press(KeyCode::Up)]);
             let after = drawn(&app, size);
             if after == before {
-                still_steps += 1;
                 continue;
             }
             assert!(
@@ -284,9 +285,10 @@ fn walking_back_the_list_stands_still_until_the_cursor_reaches_the_top() {
             break;
         }
         assert!(
-            still_steps + 6 >= body,
-            "at {size:?}, the cursor crossed only {still_steps} lines of a {body}-line pane before \
-             the list moved; it should cross nearly all of it"
+            turned_at - moved_at + 6 >= body,
+            "at {size:?}, the cursor crossed only {} lines of a {body}-line pane before the list \
+             moved; it should cross nearly all of it",
+            turned_at - moved_at
         );
     }
 }
@@ -413,20 +415,47 @@ fn a_jump_puts_the_cursor_three_lines_down() {
         let mut term = terminal(size);
         frame(&mut app, &mut term, &[]);
         let list = drawn_rows(&app.state, Section::Meadow, &app.view);
-        let far = list
+        let rows: Vec<RowKey> = list
             .iter()
-            .rev()
-            .find(|r| r.kind != RowKind::Group)
-            .expect("rows")
-            .key
-            .clone();
+            .filter(|r| r.kind != RowKind::Group)
+            .map(|r| r.key.clone())
+            .collect();
+        // Far from the top, and far from the list's end.
+        let far = rows[rows.len() / 2].clone();
         app.view.focus[Section::Meadow.index()] = Some(far);
         frame(&mut app, &mut term, &[]);
         assert_eq!(
             lines_before_cursor(&app),
-            3.min(index_of(&app, &cursor_key(&app))),
-            "at {size:?}, a cursor jumped far down is drawn three lines down, as near as the \
-             list's end allows"
+            3,
+            "at {size:?}, a cursor jumped far down is drawn three lines down"
+        );
+
+        // And back up again, far from where the list now stands.
+        app.view.focus[Section::Meadow.index()] = Some(rows[5].clone());
+        frame(&mut app, &mut term, &[]);
+        assert_eq!(
+            lines_before_cursor(&app),
+            3.min(index_of(&app, &rows[5])),
+            "at {size:?}, a cursor jumped far up is drawn three lines down, as near as the \
+             list's top allows"
+        );
+
+        // A step past the edge is no jump: the cursor stands beside the edge.
+        frame(&mut app, &mut term, &[]);
+        let drawn_now = drawn(&app, size);
+        let last = drawn_now.last().expect("rows drawn").1.clone();
+        let past = rows[rows.iter().position(|k| *k == last).expect("listed") + 1].clone();
+        app.view.focus[Section::Meadow.index()] = Some(past.clone());
+        frame(&mut app, &mut term, &[]);
+        let (_, top, bottom) = list_space(&app, size);
+        let below = drawn(&app, size)
+            .iter()
+            .filter(|(y, _)| *y > cursor_y(&app, size) && *y <= bottom)
+            .count();
+        assert!(
+            below <= 1 && cursor_y(&app, size) > top + 3,
+            "at {size:?}, a cursor one step past the bottom edge stands beside it, not three lines \
+             down"
         );
     }
 }

@@ -690,36 +690,47 @@ struct Window {
     hidden: usize,
 }
 
-/// Where a held list begins this frame: the line a click held, moved as little
-/// as draws the cursor's row with one row beside it on each side where rows lie
-/// past it. Worked out afresh against the cursor each frame, so a line held
-/// before a reveal or a resize cannot leave the cursor off the screen, and a
-/// step of the cursor cannot move the list further than the lines it passed.
-/// @spec TUI-RENDER-036
+/// Where a list begins this frame from the line it began on last: that line,
+/// moved as little as draws the cursor's row with one line beside it on each
+/// side where lines lie past it. Worked out afresh against the cursor each
+/// frame, so a line kept before a reveal or a resize cannot leave the cursor
+/// off the screen, a change of direction moves nothing, and a step of the
+/// cursor cannot move the list further than the lines it passed.
+/// @spec TUI-RENDER-009, TUI-RENDER-036
 fn held_start(held: usize, cursor: usize, usable: usize, max_start: usize) -> usize {
-    // Between the list's ends, a line goes to each overflow note.
-    let between = usable.saturating_sub(1).max(1);
-    let shown = |start: usize| {
-        if start > 0 && start < max_start {
-            between
-        } else {
-            usable
-        }
-    };
+    let between = between_notes(usable);
     let mut start = held.min(max_start);
     if cursor <= start {
         start = cursor.saturating_sub(1);
     }
-    if start < max_start && cursor + 1 >= start + shown(start) {
+    if start < max_start && cursor + 1 >= start + shown_from(start, usable, max_start) {
         start = (cursor + 2).saturating_sub(between).min(max_start);
     }
-    // A pane too short for a row beside the cursor still draws the cursor.
+    // A pane too short for a line beside the cursor still draws the cursor.
     start.min(cursor)
 }
 
-/// Derive the visible slice of a row list from the cursor and any line a click
-/// held — never a stored offset used as it stands — keeping a small margin above
-/// and below where the list has rows to spare. @spec TUI-RENDER-009, TUI-RENDER-036
+/// The lines a window holds between two overflow notes.
+fn between_notes(usable: usize) -> usize {
+    usable.saturating_sub(1).max(1)
+}
+
+/// How many of the list's lines a window beginning at `start` draws: one
+/// note's line fewer where rows lie past both of its ends.
+fn shown_from(start: usize, usable: usize, max_start: usize) -> usize {
+    if start > 0 && start < max_start {
+        between_notes(usable)
+    } else {
+        usable
+    }
+}
+
+/// Derive the visible slice of a row list from the cursor and the line the
+/// list last began on, where one is kept — never a stored offset used as it
+/// stands. The list starts from that line while the cursor stands within two
+/// lines of what it shows, the most a step can carry it; where no line is
+/// kept, or the cursor has jumped further, its row is drawn three lines down.
+/// @spec TUI-RENDER-009, TUI-RENDER-039
 fn window_for(total: usize, cursor: usize, capacity: usize, held: Option<usize>) -> Window {
     if capacity == 0 || total == 0 {
         return Window {
@@ -742,15 +753,15 @@ fn window_for(total: usize, cursor: usize, capacity: usize, held: Option<usize>)
     const MARGIN: usize = 3;
 
     let max_start = total - usable;
-    let start = match held {
+    let near = |line: usize| {
+        let from = line.min(max_start);
+        cursor + 2 >= from && cursor <= from + shown_from(from, usable, max_start) + 1
+    };
+    let start = match held.filter(|line| near(*line)) {
         Some(held) => held_start(held, cursor, usable, max_start),
         None => cursor.saturating_sub(MARGIN).min(max_start),
     };
-    let len = if start > 0 && start < max_start {
-        usable.saturating_sub(1).max(1)
-    } else {
-        usable
-    };
+    let len = shown_from(start, usable, max_start);
     Window {
         start,
         len,
@@ -786,7 +797,12 @@ fn draw_list(
     let armed = armed.filter(|a| armed_is_live(a));
 
     let capacity = area.height as usize;
-    let held = view.list_line[section.index()].as_ref().map(|l| l.place);
+    // The line the list began on last, found by its identity where it is
+    // still listed, so a row revealed above it slides nothing in view.
+    // @spec TUI-RENDER-009
+    let held = view.list_line[section.index()]
+        .as_ref()
+        .map(|l| all.iter().position(|r| r.key == l.key).unwrap_or(l.place));
     let win = window_for(all.len(), cursor, capacity, held);
 
     let mut lines: Vec<Line<'static>> = Vec::with_capacity(win.len + 2);
