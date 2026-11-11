@@ -4,7 +4,7 @@ Colonies are clowder's trade and diplomacy: eight neighbouring animal colonies t
 
 ## Status
 
-**PARTIAL** — last audited 2026-11-04 (commit `0187df88228b`). 14 of 14 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-11 (commit `7809d445ebcb`). 14 of 14 active specs implemented, each cited by a test.
 
 ## References
 
@@ -29,7 +29,6 @@ Colonies are clowder's trade and diplomacy: eight neighbouring animal colonies t
 ### Code
 - `crates/clowder-core/src/command.rs`
 - `crates/clowder-core/src/content.rs`
-- `crates/clowder-core/src/effects.rs`
 - `crates/clowder-core/src/events.rs`
 - `crates/clowder-core/src/gating.rs`
 - `crates/clowder-core/src/query.rs`
@@ -51,6 +50,8 @@ Audited 2026-11-03, for what issue #34 changed. A napping caravan now brings its
 
 Audited 2026-11-04, for what issue #35 changed. `colonies_tables.rs` reads the design's table row by row (SIM-TRADE-003) and pins a caravan's yield: bounds on every draw and how often each outcome falls, for the fuzz, season, trade ratio, bonus, and nap (SIM-TRADE-002); each figure of the kite-scaled good (SIM-TRADE-004); and a kept good withheld and then returned on a real trade (SIM-TRADE-006). A shy colony's standing is held at or below neutral, so no bonus outcome could reach the one good only a shy colony brings: that clause left SIM-TRADE-004 and its rule. Twenty mutations were each caught. The segment stays PARTIAL for #47 alone.
 
+Audited 2026-11-11, for what issue #47 changed. A colony's standing sums its start and its Pen Pal warmth, and the per-colony key nothing fed left the rule, the spec, and the design (SIM-TRADE-005). The rule read zero where the key stood, so no outcome moved.
+
 ## Work Required
 
-- #47: a per-colony effect key no content feeds (SIM-TRADE-005).
+None.

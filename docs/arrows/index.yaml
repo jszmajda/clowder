@@ -91,15 +91,15 @@ arrows:
     next: null
     drift: null
   colonies:
-    status: PARTIAL
+    status: OK
     parent: sim
-    sampled: 2026-11-04
-    audited: 2026-11-04
-    audited_sha: 0187df88228b4de3ac8ab40192d9c2d64f1890ab
+    sampled: 2026-11-11
+    audited: 2026-11-11
+    audited_sha: 7809d445ebcb7c9e20ae627ca09d73c3440343a9
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/colonies/colonies.md
-    next: "#47: a key nothing feeds"
+    next: null
     drift: null
   cosmic:
     status: OK
@@ -148,9 +148,9 @@ arrows:
   engine:
     status: OK
     parent: sim
-    sampled: 2026-11-04
-    audited: 2026-11-04
-    audited_sha: f6326095a28bd647903510e2c6c19d0ecaa541f4
+    sampled: 2026-11-11
+    audited: 2026-11-11
+    audited_sha: 7809d445ebcb7c9e20ae627ca09d73c3440343a9
     blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md

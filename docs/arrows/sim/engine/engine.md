@@ -4,7 +4,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 ## Status
 
-**OK** — last audited 2026-11-04 (commit `f6326095a28b`). 86 of 86 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-11 (commit `7809d445ebcb`). 86 of 86 active specs implemented, each cited by a test.
 
 ## References
 
@@ -87,6 +87,8 @@ Audited 2026-11-04, for what issue #15 changed. An effect key now arrives with t
 Audited 2026-11-04, for what issue #43 changed. A query reports what taking a copy down would do (SIM-ENG-086), and the command and the query share one rule: the command applies what the query reports.
 
 Audited 2026-11-04, for what issue #46 changed. A query prices each act that takes no count and spends from the stores what nothing else prices (SIM-ENG-087). Tests read each price against what applying the act takes, hold each fixed amount at the line where the act is refused, and classify every command exhaustively, so a new one must be decided. A kitten's promotion is left out and filed as #48.
+
+Audited 2026-11-11, for what issue #47 changed. The guard over every key family now passes with no exception (SIM-ENG-085), the one family it excepted having left the vocabulary and the key slots having closed up.
 
 ## Work Required
 
