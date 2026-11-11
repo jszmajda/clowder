@@ -3498,3 +3498,125 @@ fn a_wake_set_down_leaves_what_was_already_known_as_known() {
         "and nothing the absence earned"
     );
 }
+
+// =====================================================================
+// SAVE-041 — a report lists what its replay revealed
+// =====================================================================
+
+/// A meadow whose next tick reveals exactly one structure and one idea, and
+/// the two: everything else revealed and every other idea known, so nothing
+/// else can reveal. The idea is the last, which leaves the nap's own idea known.
+fn about_to_reveal() -> (GameState, StructureId, IdeaId) {
+    let idea = *IdeaId::ALL.last().expect("ideas exist");
+    assert_ne!(idea, IdeaId::DeepNapTheory, "fixture: naps stay open");
+    for structure in StructureId::ALL {
+        let mut s = GameState::new(41);
+        for r in ResourceId::ALL {
+            s.resources[r.ix()] = 1.0e9;
+        }
+        for b in StructureId::ALL {
+            s.structures[b.ix()] = 2;
+        }
+        s.ideas = IdeaId::ALL.iter().copied().filter(|i| *i != idea).collect();
+        s.revealed = StructureId::ALL
+            .iter()
+            .filter(|b| **b != structure)
+            .map(|b| ContentId::Structure(*b))
+            .chain(
+                IdeaId::ALL
+                    .iter()
+                    .filter(|i| **i != idea)
+                    .map(|i| ContentId::Idea(*i)),
+            )
+            .collect();
+        // Through a save, so the core rebuilds what it derives from the set.
+        let s = load_string(&save_string(&s, 0), 0).unwrap().state;
+        let reveals: Vec<ContentId> = s
+            .clone()
+            .tick()
+            .into_iter()
+            .filter_map(|e| match e {
+                Event::Revealed { id } => Some(id),
+                _ => None,
+            })
+            .collect();
+        if reveals == [ContentId::Structure(structure), ContentId::Idea(idea)] {
+            return (s, structure, idea);
+        }
+    }
+    panic!("fixture: no structure reveals beside the last idea on the next tick");
+}
+
+/// A load's report lists what its replay revealed, in the order revealed; and
+/// one that revealed nothing writes no field for it.
+// @spec SAVE-041
+#[test]
+fn a_report_lists_what_its_replay_revealed() {
+    let (s, structure, idea) = about_to_reveal();
+    let loaded = load_string(&save_string(&s, 0), 300).unwrap();
+    assert_eq!(
+        loaded.report.revealed,
+        vec![ContentId::Structure(structure), ContentId::Idea(idea)],
+        "the report lists the replay's reveals, in the order revealed"
+    );
+
+    let none = OfflineReport::default();
+    let written = serde_json::to_string(&none).unwrap();
+    assert!(!written.contains("revealed"), "no field: {written}");
+}
+
+/// A wake set down part way carries what it revealed, and the load that
+/// finishes it tells the whole absence's reveals, as one sitting would.
+// @spec SAVE-041, SAVE-022
+#[test]
+fn a_wake_set_down_carries_what_the_absence_revealed() {
+    let (s, _, _) = about_to_reveal();
+    let json = save_string(&s, 0);
+    let whole = load_string(&json, 300).unwrap();
+    assert_eq!(
+        whole.report.revealed.len(),
+        2,
+        "fixture: the absence revealed two"
+    );
+
+    let Advance::Pending(part_way) = begin_load(&json, 300).unwrap().advance(1) else {
+        panic!("fixture: most of the absence is still owed");
+    };
+    let set_down = part_way.set_down();
+    assert_eq!(
+        set_down.report_so_far.revealed, whole.report.revealed,
+        "the first tick revealed both, and the report so far says so"
+    );
+    let saved = save_string_carrying(
+        &set_down.state,
+        300,
+        set_down.owed_ticks,
+        Some(&set_down.report_so_far),
+    );
+    let Advance::Finished(game) = begin_load(&saved, 300).unwrap().advance(u64::MAX) else {
+        panic!("advancing through everything finishes");
+    };
+    assert_eq!(
+        game.report.revealed, whole.report.revealed,
+        "told as one absence"
+    );
+}
+
+/// A nap's report lists what its sleep revealed, by the same fold.
+// @spec SAVE-041
+#[test]
+fn a_naps_report_lists_what_it_revealed() {
+    let (mut s, structure, idea) = about_to_reveal();
+    let events = s.apply(Command::DeepNap(1)).expect("the nap is affordable");
+    let report = events
+        .iter()
+        .find_map(|e| match e {
+            Event::Napped { report, .. } => Some(report.clone()),
+            _ => None,
+        })
+        .expect("a nap returns its report");
+    assert_eq!(
+        report.revealed,
+        vec![ContentId::Structure(structure), ContentId::Idea(idea)]
+    );
+}

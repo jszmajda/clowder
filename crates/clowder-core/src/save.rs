@@ -101,6 +101,11 @@ pub struct OfflineReport {
     /// report that earned nothing writes no field for it. @spec SAVE-039
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub earned: Vec<AchievementId>,
+    /// The structures and ideas the replay revealed, in the order revealed.
+    /// Most reports list none, so a report that revealed nothing writes no
+    /// field for it. @spec SAVE-041
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub revealed: Vec<crate::state::ContentId>,
 }
 
 impl Default for OfflineReport {
@@ -114,6 +119,7 @@ impl Default for OfflineReport {
             returned: Vec::new(),
             seasons_passed: 0,
             earned: Vec::new(),
+            revealed: Vec::new(),
         }
     }
 }
@@ -330,6 +336,7 @@ impl CatchUp {
                 self.partial.earned.as_slice(),
             ]
             .concat(),
+            revealed: Vec::new(),
         }
     }
 

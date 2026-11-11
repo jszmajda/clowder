@@ -4,7 +4,7 @@
 //! a list's overflow note counts the new rows past its ends.
 //!
 //! @spec TUI-NAV-209, TUI-NAV-210, TUI-NAV-211, TUI-NAV-212, TUI-NAV-213,
-//! TUI-RENDER-037, TUI-RENDER-038, TUI-THEME-032
+//! TUI-NAV-214, TUI-NAV-215, TUI-RENDER-037, TUI-RENDER-038, TUI-THEME-032
 //!
 //! **Why through the loop.** A row is new from the tick whose reveal scan
 //! reveals its item, and only for the ticks the game runs in play. So the
@@ -546,12 +546,12 @@ fn the_mark_moves_no_other_character_of_its_row() {
     }
 }
 
-/// A reveal inside a load's catch-up marks nothing: the catch-up replays its
-/// ticks as a bulk fast-forward, and the game opens taking what it finds as
-/// known.
-/// @spec TUI-NAV-211
+/// A reveal inside a load's catch-up is marked once the game opens, from the
+/// load's report: the row draws `★`, and the tab of a section other than the
+/// one the opening focuses is badged, while the focused one is not.
+/// @spec TUI-NAV-214, TUI-NAV-024
 #[test]
-fn a_reveal_inside_a_catch_up_marks_no_row() {
+fn a_reveal_inside_a_catch_up_is_marked_once_the_game_opens() {
     let e = eve();
     let saved_at = 1_000_000u64;
     let text = save_string(&e.state, saved_at);
@@ -559,7 +559,7 @@ fn a_reveal_inside_a_catch_up_marks_no_row() {
     let mut term = terminal(WIDE_W, WIDE_H);
     let mut wake = Wake::begin(catch_up, save_path("catch-up"), &mut term).expect("wakes");
     let mut frames = 0;
-    let app = loop {
+    let mut app = loop {
         match wake {
             Wake::Awake(app) => break app,
             Wake::Waking(w) => {
@@ -575,8 +575,12 @@ fn a_reveal_inside_a_catch_up_marks_no_row() {
             .contains(&ContentId::Structure(e.structure)),
         "fixture: the catch-up revealed the structure"
     );
-    let mut app = app;
     frame(&mut app, &mut term, &[]);
+    assert_eq!(
+        app.view.section,
+        Some(Section::Meadow),
+        "the opening's focus"
+    );
     assert_eq!(
         cursor_column(
             term.backend().buffer(),
@@ -584,13 +588,97 @@ fn a_reveal_inside_a_catch_up_marks_no_row() {
             WIDE_H,
             structure_name(e.structure)
         ),
-        " ",
-        "a reveal inside a catch-up marks no row"
+        "★",
+        "a reveal inside a catch-up is marked once the game opens"
+    );
+    assert_eq!(
+        badged(&app.state, &app.view),
+        vec![Section::Ideas],
+        "the tab of the section the absence revealed a row in is badged, the focused one not"
     );
     assert!(
-        badged(&app.state, &app.view).is_empty(),
-        "a reveal inside a catch-up badges no tab"
+        app.view.new_rows.contains(&ContentId::Idea(e.idea)),
+        "the idea's row is marked too"
     );
+}
+
+/// A nap's reveals are marked from the report its command hands back, and
+/// the tab of each section they stand in, other than the focused one, is
+/// badged.
+/// @spec TUI-NAV-214
+#[test]
+fn a_naps_reveals_are_marked_from_its_report() {
+    let e = eve();
+    assert!(
+        e.state.ideas.contains(&IdeaId::DeepNapTheory),
+        "fixture: naps are open"
+    );
+    let mut state = e.state.clone();
+    let mut view = ViewState::default();
+    opening(&mut view, &state);
+    let events = state
+        .apply(clowder_core::Command::DeepNap(1))
+        .expect("the nap is affordable");
+    clowder_tui::nav::queue_command_reports(&mut view, &state, &events);
+    assert!(
+        view.new_rows.contains(&ContentId::Structure(e.structure))
+            && view.new_rows.contains(&ContentId::Idea(e.idea)),
+        "a nap's reveals are marked: {:?}",
+        view.new_rows
+    );
+    assert_eq!(
+        badged(&state, &view),
+        vec![Section::Ideas],
+        "the Ideas tab is badged; the focused Meadow's is not"
+    );
+}
+
+/// A report's pinned entry names each structure and idea it revealed, a line
+/// each, in the report's order, after the kittens and before the seasons, in
+/// the words of a reveal's line.
+/// @spec TUI-NAV-215, TUI-NAV-027
+#[test]
+fn a_reports_pinned_entry_names_what_it_revealed() {
+    let mut s = far_along();
+    let structure = StructureId::ALL[0];
+    let idea = IdeaId::ALL[0];
+    let report = clowder_core::OfflineReport {
+        elapsed_seconds: 3 * 86_400,
+        arrived: vec![("Biscuit".to_string(), 1)],
+        seasons_passed: 2,
+        revealed: vec![ContentId::Structure(structure), ContentId::Idea(idea)],
+        ..clowder_core::OfflineReport::default()
+    };
+    s.journal.record_away(s.ticks, &report);
+    let view = ViewState {
+        section: Some(Section::Meadow),
+        overlay: Some(Overlay::Journal { anchor: 0 }),
+        journal_pinned: vec![s.journal.kept.len() - 1],
+        ..ViewState::default()
+    };
+    let text = journal_text(&s, &view);
+    let at = |needle: &str| {
+        text.find(needle)
+            .unwrap_or_else(|| panic!("the entry has no {needle:?}:\n{text}"))
+    };
+    let kitten = at("Biscuit arrived");
+    let first = at(&format!(
+        "{} looks possible · {}",
+        structure_name(structure),
+        tab_words(Section::Meadow)
+    ));
+    let second = at(&format!(
+        "{} looks possible · {}",
+        idea_name(idea),
+        tab_words(Section::Ideas)
+    ));
+    let seasons = at("2 seasons passed");
+    assert!(
+        kitten < first && first < second && second < seasons,
+        "the reveals stand after the kittens and before the seasons, in the report's order:\n{text}"
+    );
+    let lines_with = |needle: &str| text.lines().filter(|l| l.contains(needle)).count();
+    assert_eq!(lines_with("looks possible"), 2, "a line each:\n{text}");
 }
 
 // ---------------------------------------------------------------------------
