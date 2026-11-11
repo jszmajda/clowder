@@ -4,7 +4,8 @@
 //! a list's overflow note counts the new rows past its ends.
 //!
 //! @spec TUI-NAV-209, TUI-NAV-210, TUI-NAV-211, TUI-NAV-212, TUI-NAV-213,
-//! TUI-NAV-214, TUI-NAV-215, TUI-RENDER-037, TUI-RENDER-038, TUI-THEME-032
+//! TUI-NAV-214, TUI-NAV-215, TUI-NAV-216, TUI-RENDER-037, TUI-RENDER-038,
+//! TUI-THEME-032
 //!
 //! **Why through the loop.** A row is new from the tick whose reveal scan
 //! reveals its item, and only for the ticks the game runs in play. So the
@@ -18,8 +19,8 @@ use std::time::{Duration, Instant};
 
 use clowder_core::content::{idea_def, structure_def};
 use clowder_core::{
-    begin_load, content, load_string, save_string, ColonyId, ContentId, Event, GameState, IdeaId,
-    JobId, Kitten, KittenTrait, Location, ResourceId, StructureId,
+    begin_load, content, load_string, save_string, ColonyId, ContentId, CraftId, Event, GameState,
+    IdeaId, JobId, Kitten, KittenTrait, Location, ResourceId, StructureId,
 };
 use clowder_tui::nav::rows::{drawn_rows, rows, RowKind};
 use clowder_tui::nav::{opening, Overlay, RowKey, Section, ViewState};
@@ -368,6 +369,11 @@ fn a_reveals_line_names_the_item_and_the_tab_that_lists_it() {
             Section::Meadow,
         ),
         (ContentId::Idea(idea), idea_name(idea), Section::Ideas),
+        (
+            ContentId::Craft(CraftId::ALL[0]),
+            clowder_core::content::craft_def(CraftId::ALL[0]).name,
+            Section::Crafts,
+        ),
     ];
     for (id, name, section) in cases {
         let mut s = s0.clone();
@@ -957,4 +963,168 @@ fn a_lists_note_counts_the_new_rows_past_its_end() {
         Role::Milestone.color().expect("milestone has a colour"),
         "the note's ★ wears milestone"
     );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-216: each kind in its section
+// ---------------------------------------------------------------------------
+
+/// Every content row any section lists stands in the section the section
+/// table gives its kind, the one a reveal's line names.
+/// @spec TUI-NAV-216
+#[test]
+fn every_content_row_stands_in_its_kinds_section() {
+    let s = far_along();
+    let mut kinds = std::collections::HashSet::new();
+    for section in Section::ALL {
+        for row in rows(&s, section) {
+            if let RowKey::Content(id, _) = row.key {
+                assert_eq!(
+                    Section::listing(id),
+                    section,
+                    "{id:?} is listed in {section:?}, not the section its kind is given"
+                );
+                kinds.insert(std::mem::discriminant(&id));
+            }
+        }
+    }
+    assert!(
+        kinds.len() >= 9,
+        "fixture: rows of nearly every kind are listed ({})",
+        kinds.len()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-211: a command's reveals
+// ---------------------------------------------------------------------------
+
+/// The arrivals of kinds without a reveal ladder among `events`.
+fn arrivals(events: &[Event]) -> Vec<ContentId> {
+    events
+        .iter()
+        .filter_map(|e| match e {
+            Event::Revealed { id } if !id.is_reveal_tracked() => Some(*id),
+            _ => None,
+        })
+        .collect()
+}
+
+/// An idea left unknown in a meadow far along, whose research opens an item
+/// listed outside the Ideas section, with the meadow and what it opens.
+fn an_idea_that_opens_elsewhere() -> (GameState, IdeaId, Vec<ContentId>) {
+    for idea in IdeaId::ALL {
+        let mut s = far_along();
+        s.ideas.remove(&idea);
+        let s = reloaded(&s);
+        let mut probe = s.clone();
+        let Ok(events) = probe.apply(clowder_core::Command::ResearchIdea(idea)) else {
+            continue;
+        };
+        let opened = arrivals(&events);
+        if opened
+            .iter()
+            .any(|id| Section::listing(*id) != Section::Ideas)
+        {
+            return (s, idea, opened);
+        }
+    }
+    panic!("fixture: no idea opens an item outside the Ideas section");
+}
+
+/// Researching an idea with Enter marks each item the command opened, and
+/// badges each section it opened one in, other than the one in focus.
+/// @spec TUI-NAV-211, TUI-NAV-213
+#[test]
+fn a_commands_arrivals_are_marked_and_their_tabs_badged() {
+    let (s, idea, opened) = an_idea_that_opens_elsewhere();
+    let mut app = opened_app(s);
+    let mut term = terminal(WIDE_W, WIDE_H);
+    frame(&mut app, &mut term, &[digit(Section::Ideas)]);
+    app.view.focus[Section::Ideas.index()] = Some(idea_key(idea));
+    frame(&mut app, &mut term, &[]);
+    assert!(
+        badged(&app.state, &app.view).is_empty(),
+        "fixture: nothing badged"
+    );
+    frame(&mut app, &mut term, &[press(KeyCode::Enter)]);
+    assert!(
+        app.state.ideas.contains(&idea),
+        "fixture: Enter researched the idea"
+    );
+    for id in &opened {
+        assert!(
+            app.view.new_rows.contains(id),
+            "{id:?}, opened by the command, is not marked"
+        );
+    }
+    let mut elsewhere: Vec<Section> = opened
+        .iter()
+        .map(|id| Section::listing(*id))
+        .filter(|s| *s != Section::Ideas)
+        .collect();
+    elsewhere.sort();
+    elsewhere.dedup();
+    let b = badged(&app.state, &app.view);
+    for section in elsewhere {
+        assert!(
+            b.contains(&section),
+            "{section:?}, where the command opened an item, is not badged: {b:?}"
+        );
+    }
+    assert!(
+        !b.contains(&Section::Ideas),
+        "the focused section is not badged"
+    );
+}
+
+/// A run of commands, as `X` sends, marks what each of them opened.
+/// @spec TUI-NAV-211
+#[test]
+fn a_run_of_commands_marks_what_it_opened() {
+    let job = JobId::ALL
+        .into_iter()
+        .find(|j| {
+            matches!(
+                clowder_core::content::job_def(*j).gate,
+                clowder_core::content::JobGate::RequiresBox
+            )
+        })
+        .expect("fixture: a job waits on the box");
+    let mut s = far_along();
+    s.structures[StructureId::CardboardBox.ix()] = 0;
+    let s = reloaded(&s);
+    assert_eq!(
+        s.availability(ContentId::Job(job)),
+        clowder_core::Availability::Hidden,
+        "fixture: the job waits on a box"
+    );
+    let mut app = opened_app(s);
+    let mut term = terminal(WIDE_W, WIDE_H);
+    app.view.focus[Section::Meadow.index()] = Some(structure_key(StructureId::CardboardBox));
+    frame(&mut app, &mut term, &[]);
+    frame(
+        &mut app,
+        &mut term,
+        &[TermEvent::Key(KeyEvent::new(
+            KeyCode::Char('X'),
+            KeyModifiers::SHIFT,
+        ))],
+    );
+    assert!(
+        app.state.structures[StructureId::CardboardBox.ix()] > 1,
+        "fixture: X built boxes"
+    );
+    assert!(
+        app.view.new_rows.contains(&ContentId::Job(job)),
+        "the job a run of builds opened is marked"
+    );
+    assert!(
+        badged(&app.state, &app.view).contains(&Section::Clowder),
+        "and its section's tab is badged"
+    );
+}
+
+fn opened_app(state: GameState) -> App {
+    opened(state, "commands")
 }

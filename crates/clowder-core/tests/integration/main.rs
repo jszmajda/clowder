@@ -7,6 +7,7 @@ mod common;
 
 mod achievements;
 mod act_price;
+mod arrivals;
 mod blurb_truth;
 mod blurbs;
 mod bulktime;
