@@ -6,6 +6,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 
 ### New
 
+- **Something new is easy to find.** When something new appears, the ticker and the journal now say what it is and which tab it's on. Its row gets a `★` until your cursor reaches it, and its tab gets a `★` until you visit. If the row is scrolled out of view, the note at the list's edge counts it.
 - **A kitten's next step up says what it takes.** The info pane now shows what promoting a kitten will cost, and a promotion short of the kitten's own experience says so.
 - **Rows that spend now say what they cost.** Actions that take from your stores show their price in the list and the info pane, as everything else you can buy does.
 - **You can take back something you built.** Pressing `-` on a structure's row offers to take one down and says what you'd get back. Confirm with `Enter`. You get back part of its price, and nobody who lives or works there is turned out.

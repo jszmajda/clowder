@@ -4,7 +4,7 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 
 ## Status
 
-**OK** — last audited 2026-11-04 (commit `f6326095a28b`). 36 of 36 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-11 (commit `a414659672bc`). 38 of 38 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/render/render-specs.md` — 36 specs, prefix `TUI-RENDER`
+- `docs/intent/tui/render/render-specs.md` — 38 specs, prefix `TUI-RENDER`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/act_prices.rs`
@@ -30,6 +30,7 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 - `crates/clowder-tui/tests/integration/inspector.rs`
 - `crates/clowder-tui/tests/integration/kitten_card.rs`
 - `crates/clowder-tui/tests/integration/layout.rs`
+- `crates/clowder-tui/tests/integration/new_rows.rs`
 - `crates/clowder-tui/tests/integration/pointer.rs`
 - `crates/clowder-tui/tests/integration/readouts.rs`
 - `crates/clowder-tui/tests/integration/resize.rs`
@@ -38,7 +39,9 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 - `crates/clowder-tui/tests/integration/store_card.rs`
 
 ### Code
+- `crates/clowder-tui/src/nav/pointer.rs`
 - `crates/clowder-tui/src/nav/rows.rs`
+- `crates/clowder-tui/src/nav/view.rs`
 - `crates/clowder-tui/src/render/fmt.rs`
 - `crates/clowder-tui/src/render/layout.rs`
 - `crates/clowder-tui/src/render/mod.rs`
@@ -54,9 +57,9 @@ This leaf owns everything between a `GameState` snapshot and the cells on screen
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-RENDER-001 – TUI-RENDER-036 | 36 | 0 | 0 |
+| All | TUI-RENDER-001 – TUI-RENDER-038 | 38 | 0 | 0 |
 
-**Summary:** 36 of 36 active specs implemented.
+**Summary:** 38 of 38 active specs implemented.
 
 ## Key Findings
 
@@ -69,6 +72,8 @@ Audited 2026-11-04, for what issue #45 changed. A count prompt's count keeps its
 Audited 2026-11-04, for what issue #21 changed. The clause cutting the bench's seats could not be reached: the place fits the seats at six digits each, which the test now pins, far past a meadow's figures. It left the spec, the design, and the code (TUI-RENDER-028).
 
 Audited 2026-11-04, for what issue #46 changed. The cost field draws a fixed act's price as it draws any other (TUI-RENDER-020), and the Sky list now gives the field, since rows it lists state that heading.
+
+Audited 2026-11-11, for what issue #49 changed. A new row draws `★` in its cursor column and moves no other character (TUI-RENDER-037), which a test checks by comparing the row with and without the mark. An overflow note counts the new rows past its end (TUI-RENDER-038). The References now also list the two navigation files that hold a clicked list's line (TUI-RENDER-036), which the last regeneration had missed. Every spec marked implemented has a test citing it, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

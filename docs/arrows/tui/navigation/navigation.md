@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-11 (commit `fc38c25a40d4`). 208 of 208 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-11 (commit `a414659672bc`). 213 of 213 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/navigation/navigation-specs.md` — 208 specs, prefix `TUI-NAV`
+- `docs/intent/tui/navigation/navigation-specs.md` — 213 specs, prefix `TUI-NAV`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/act_prices.rs`
@@ -53,6 +53,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 - `crates/clowder-tui/tests/integration/transients.rs`
 - `crates/clowder-tui/tests/integration/update.rs`
 - `crates/clowder-tui/tests/integration/waking.rs`
+- `crates/clowder-tui/tests/integration/new_rows.rs`
 
 ### Code
 - `crates/clowder-tui/src/nav/action.rs`
@@ -79,9 +80,9 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-NAV-001 – TUI-NAV-208 | 208 | 0 | 0 |
+| All | TUI-NAV-001 – TUI-NAV-213 | 213 | 0 | 0 |
 
-**Summary:** 208 of 208 active specs implemented.
+**Summary:** 213 of 213 active specs implemented.
 
 ## Key Findings
 
@@ -110,6 +111,8 @@ Audited 2026-11-04, for what issue #43 changed. `-` and `Backspace` arm taking a
 Audited 2026-11-04, for what issue #46 changed. An action row the core prices as a fixed act states the price in the inspector, with need and have (TUI-NAV-207). A test reads every action row against what applying its command takes, so a row that spends and says nothing fails. On screen there were eleven such rows, two more than the code scan the issue started from. Twelve mutations across this and the sim engine were each caught.
 
 Audited 2026-11-11, for what issue #48 changed. A kitten's row states its next rank's price beneath the kitten's name and before its card (TUI-NAV-208), and the row keeps its one word. A refusal for short exp names it. Two older tests that read a kitten's inspector as the name alone now set the price aside, and the row-wide test that every row which spends says so now includes kittens.
+
+Audited 2026-11-11, for what issue #49 changed. A reveal's line names the item and the tab that lists it (TUI-NAV-209). A row a tick reveals in play is marked until the cursor rests on it at a frame's end (TUI-NAV-211, TUI-NAV-212), and a reveal out of focus badges its section's tab (TUI-NAV-213). A test over every structure and idea holds that each revealed one is listed in its section (TUI-NAV-210). Tests drive real ticks through the loop, and one shows a catch-up's reveals mark nothing. The audit removed a per-section watermark that every visit wrote and nothing read; its comment described a chip count the design had dropped. Two follow-ups are deferred in the design and filed: reveals during an absence or a nap (#51), and items a gate brings into a known section (#52). Every spec marked implemented has a test citing it, and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

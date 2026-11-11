@@ -194,7 +194,7 @@ arrows:
     parent: tui
     sampled: 2026-11-11
     audited: 2026-11-11
-    audited_sha: fc38c25a40d4e0d66607b9893eb8c87c5b179cd0
+    audited_sha: a414659672bcb166b1df6966033ce4c26374380a
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
@@ -225,9 +225,9 @@ arrows:
   render:
     status: OK
     parent: tui
-    sampled: 2026-11-04
-    audited: 2026-11-04
-    audited_sha: f6326095a28bd647903510e2c6c19d0ecaa541f4
+    sampled: 2026-11-11
+    audited: 2026-11-11
+    audited_sha: a414659672bcb166b1df6966033ce4c26374380a
     blocks: []
     blockedBy: [navigation, runtime, theme]
     detail: tui/render/render.md
@@ -236,9 +236,9 @@ arrows:
   runtime:
     status: OK
     parent: tui
-    sampled: 2026-11-04
-    audited: 2026-11-04
-    audited_sha: 657a00c9835bd7da2b9979a92e18e818440bdf50
+    sampled: 2026-11-11
+    audited: 2026-11-11
+    audited_sha: a414659672bcb166b1df6966033ce4c26374380a
     blocks: [render]
     blockedBy: [navigation, persistence]
     detail: tui/runtime/runtime.md
@@ -247,9 +247,9 @@ arrows:
   theme:
     status: OK
     parent: tui
-    sampled: 2026-11-04
-    audited: 2026-11-04
-    audited_sha: 8ea2ab82bb22f43d642706a418305d6126b30d6d
+    sampled: 2026-11-11
+    audited: 2026-11-11
+    audited_sha: a414659672bcb166b1df6966033ce4c26374380a
     blocks: [render]
     blockedBy: []
     detail: tui/theme/theme.md
