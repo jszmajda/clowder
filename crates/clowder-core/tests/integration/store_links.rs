@@ -125,6 +125,9 @@ fn a_structures_links_read_its_price_and_its_definition() {
         if d.parade_rainbows > 0.0 {
             assert!(raised(link(&s, &cmd, ResourceId::Rainbows)), "{b:?}");
         }
+        if d.parade_prisms > 0.0 {
+            assert!(raised(link(&s, &cmd, ResourceId::Prisms)), "{b:?}");
+        }
         if d.prism_descent > 0.0 {
             assert!(raised(link(&s, &cmd, ResourceId::Prisms)), "{b:?}");
         }

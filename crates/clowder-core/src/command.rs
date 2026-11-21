@@ -894,7 +894,7 @@ impl GameState {
     // ---- Mystic (SIM-UNI) ----
 
     /// Hold a Unicorn Parade: 2500 unicorns → each structure's Parade rainbows
-    /// × its copies. No RNG.
+    /// and Parade prisms × its copies. No RNG.
     // @spec SIM-UNI-001
     fn hold_parade(&mut self) -> Result<Vec<Event>, CommandError> {
         if !self.ideas.contains(&IdeaId::ParadeRoutes) {
@@ -903,6 +903,7 @@ impl GameState {
         self.spend(&[(ResourceId::Unicorns, content::PARADE_UNICORN_COST)])?;
         let rainbows = self.structure_sum(|d| d.parade_rainbows);
         self.resources[ResourceId::Rainbows.ix()] += rainbows;
+        self.resources[ResourceId::Prisms.ix()] += self.structure_sum(|d| d.parade_prisms);
         Ok(vec![Event::ParadeHeld { rainbows }])
     }
 

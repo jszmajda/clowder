@@ -38,6 +38,15 @@ fn only_the_rainbow_arch_brings_rainbows_to_a_parade() {
     );
 }
 
+/// @spec SIM-UNI-017
+#[test]
+fn only_the_rainbow_arch_brings_prisms_to_a_parade() {
+    assert_eq!(
+        holders(|d| d.parade_prisms),
+        vec![(StructureId::RainbowArch, 10.0)]
+    );
+}
+
 /// @spec SIM-UNI-014
 #[test]
 fn only_the_rainbow_arch_adds_to_a_days_prism_descent() {
@@ -230,6 +239,20 @@ fn a_parade_brings_each_copys_field_of_rainbows() {
     let before = s.stock(ResourceId::Rainbows);
     s.apply(Command::HoldParade).unwrap();
     assert_eq!(s.stock(ResourceId::Rainbows) - before, per_copy * 3.0);
+}
+
+/// A Parade brings the field's prisms per copy, beside the rainbows.
+/// @spec SIM-UNI-001, SIM-UNI-017
+#[test]
+fn a_parade_brings_each_copys_field_of_prisms() {
+    let per_copy = structure_def(StructureId::RainbowArch).parade_prisms;
+    let mut s = GameState::new(1);
+    s.ideas.insert(IdeaId::ParadeRoutes);
+    grant(&mut s, StructureId::RainbowArch, 3);
+    give(&mut s, ResourceId::Unicorns, content::PARADE_UNICORN_COST);
+    let before = s.stock(ResourceId::Prisms);
+    s.apply(Command::HoldParade).unwrap();
+    assert_eq!(s.stock(ResourceId::Prisms) - before, per_copy * 3.0);
 }
 
 /// @spec SIM-UNI-006

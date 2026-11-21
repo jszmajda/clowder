@@ -317,8 +317,8 @@ pub const REFINE_INPUT: f64 = 25.0; // 25 prisms → 1 starshard, 25 starshards 
 pub const JAR_RAINBOW_COST: f64 = 10000.0;
 // @spec SIM-UNI-007
 pub const DREAM_DRIFT_THROTTLE: f64 = 0.25; // while any dreamcorn already dreams
-pub const SKY_ARCH_PRISM_DRIFT: f64 = 0.00002; // per tick, the Sky Arch's steady drift
-                                               // @spec SIM-UNI-005
+pub const SKY_ARCH_PRISM_DRIFT: f64 = 0.0002; // per tick, the Sky Arch's steady drift
+                                              // @spec SIM-UNI-005
 pub const RAINBOW_SHOWER_AMOUNT: f64 = 5000.0;
 /// Prism Sight's brightening of the prism and rainbow chances. @spec SIM-MOVE-015
 pub const PRISM_SIGHT_RATIO: f64 = 1.1; // a windfall on a shower day
@@ -459,6 +459,8 @@ pub struct StructureDef {
     pub year_craft: Option<YearCraft>,
     /// Rainbows each copy brings to a Parade. @spec SIM-UNI-013
     pub parade_rainbows: f64,
+    /// Prisms each copy brings to a Parade. @spec SIM-UNI-017
+    pub parade_prisms: f64,
     /// Chance each copy adds to a day's prism descent. @spec SIM-UNI-014
     pub prism_descent: f64,
     /// Dream-drift each copy accrues per tick. @spec SIM-UNI-015
@@ -521,6 +523,7 @@ const BLD: StructureDef = StructureDef {
     trade_ratio: 0.0,
     year_craft: None,
     parade_rainbows: 0.0,
+    parade_prisms: 0.0,
     prism_descent: 0.0,
     dream_drift: 0.0,
     move_carry: 0.0,
@@ -1048,11 +1051,13 @@ static STRUCTURES: [StructureDef; STRUCTURE_COUNT] = [
     },
     // 38: Rainbow Arch — cross-leaf (mystic rules).
     // @spec SIM-ECO-028, SIM-UNI-005, SIM-UNI-013, SIM-UNI-014, SIM-UNI-015
+    // @spec SIM-UNI-017
     StructureDef {
         name: "Rainbow Arch",
         base_costs: &[(ResourceId::Rainbows, 5000.0), (ResourceId::Cairns, 25.0)],
         ratio: 1.15,
         parade_rainbows: 2500.0,
+        parade_prisms: 10.0,
         prism_descent: 0.0002,
         dream_drift: 0.000001,
         gate: StructureGate::Idea(IdeaId::ParadeRoutes),
@@ -4118,6 +4123,8 @@ pub fn arch_def(a: ArchId) -> &'static ArchDef {
 }
 
 // @spec SIM-UNI-012
+// The ladder's prices, sized against the Parade supply: they decide its pacing
+// and keep its stardust within storage. @spec SIM-UNI-018, SIM-UNI-019, SIM-UNI-020
 static ARCHES: [ArchDef; 8] = [
     ArchDef {
         name: "Ribbon Arch",
@@ -4140,7 +4147,7 @@ static ARCHES: [ArchDef; 8] = [
     ArchDef {
         name: "Sky Arch",
         needs: None,
-        blurb: "Tall enough to tickle the clouds. {unicorns|Unicorns} production +50%; {prisms|Prisms} drift down, +0.00002/t.",
+        blurb: "Tall enough to tickle the clouds. {unicorns|Unicorns} production +50%; {prisms|Prisms} drift down, +0.0002/t.",
         cost: &[
             (ResourceId::Rainbows, 125000.0),
             (ResourceId::Prisms, 500.0),
@@ -4162,7 +4169,7 @@ static ARCHES: [ArchDef; 8] = [
         blurb: "Lit from within, all night long. {unicorns|Unicorns} production +500%; {starshard|Starshards} refining +10%.",
         cost: &[
             (ResourceId::Shinies, 1250.0),
-            (ResourceId::Rainbows, 750_000.0),
+            (ResourceId::Rainbows, 3_000_000.0),
             (ResourceId::Prisms, 25000.0),
         ],
     },
@@ -4171,7 +4178,8 @@ static ARCHES: [ArchDef; 8] = [
         needs: Some(IdeaId::DreamTending),
         blurb: "Every parade it has seen, remembered. Rainbow Arches begin to dream {dreamcorns|Dreamcorns}, faster the more are built.",
         cost: &[
-            (ResourceId::Stardust, 2500.0),
+            (ResourceId::Stardust, 200.0),
+            (ResourceId::Rainbows, 6_000_000.0),
             (ResourceId::Prisms, 50000.0),
         ],
     },
@@ -4179,10 +4187,7 @@ static ARCHES: [ArchDef; 8] = [
         name: "Everdream Arch",
         needs: Some(IdeaId::DreamTending),
         blurb: "A doorway into the softest dream. Opens condensing {jars of purrs|JarsOfPurrs}, their cap +2, and three Promise slots.",
-        cost: &[
-            (ResourceId::Dreamcorns, 100.0),
-            (ResourceId::Cairns, 1000.0),
-        ],
+        cost: &[(ResourceId::Dreamcorns, 20.0), (ResourceId::Cairns, 1000.0)],
     },
 ];
 

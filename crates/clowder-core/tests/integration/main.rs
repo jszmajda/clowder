@@ -24,6 +24,7 @@ mod idea_unlocks;
 mod journal;
 mod kittens;
 mod legacy;
+mod mystic_pacing;
 mod neighbour_offers;
 mod persistence;
 mod profiles;

@@ -237,6 +237,9 @@ pub fn row_builds() -> u64 {
     BUILDS.with(std::cell::Cell::get)
 }
 
+/// Each section's rows: every content kind's rows stand in the section the
+/// section table gives that kind (`Section::listing`), and in no other.
+/// @spec TUI-NAV-216
 fn rows_ungated(state: &GameState, section: Section) -> Vec<Row> {
     match section {
         Section::Meadow => meadow_rows(state),

@@ -516,7 +516,7 @@ fn enlighten_spends_the_marginal_serenity_and_raises_the_tier() {
 
 // @spec SIM-UNI-001
 #[test]
-fn hold_parade_trades_unicorns_for_arch_scaled_rainbows() {
+fn hold_parade_trades_unicorns_for_arch_scaled_rainbows_and_prisms() {
     // Locked before the Parade Routes idea, even with unicorns marshalled.
     let mut s = GameState::new(321);
     give(&mut s, ResourceId::Unicorns, 2500.0);
@@ -526,7 +526,7 @@ fn hold_parade_trades_unicorns_for_arch_scaled_rainbows() {
     );
 
     // After the idea, with ≥ 2500 unicorns: spend 2500, gain 2500 × arches
-    // rainbows.
+    // rainbows and 10 × arches prisms.
     let mut s = GameState::new(322);
     s.ideas.insert(IdeaId::ParadeRoutes);
     grant(&mut s, StructureId::RainbowArch, 2);
@@ -540,6 +540,10 @@ fn hold_parade_trades_unicorns_for_arch_scaled_rainbows() {
     assert!(
         (s.stock(ResourceId::Rainbows) - 2500.0 * 2.0).abs() < 1e-9,
         "2500 × arches"
+    );
+    assert!(
+        (s.stock(ResourceId::Prisms) - 10.0 * 2.0).abs() < 1e-9,
+        "10 prisms × arches"
     );
     assert!(events.iter().any(|e| matches!(e, Event::ParadeHeld { .. })));
 
@@ -695,12 +699,23 @@ fn the_rainbow_arch_ladder_matches_the_design_table() {
         ),
         (
             ArchId::StarlitArch,
-            &[(Shinies, 1250.0), (Rainbows, 750_000.0), (Prisms, 25000.0)],
+            &[
+                (Shinies, 1250.0),
+                (Rainbows, 3_000_000.0),
+                (Prisms, 25000.0),
+            ],
         ),
-        (ArchId::MemoryArch, &[(Stardust, 2500.0), (Prisms, 50000.0)]),
+        (
+            ArchId::MemoryArch,
+            &[
+                (Stardust, 200.0),
+                (Rainbows, 6_000_000.0),
+                (Prisms, 50000.0),
+            ],
+        ),
         (
             ArchId::EverdreamArch,
-            &[(Dreamcorns, 100.0), (Cairns, 1000.0)],
+            &[(Dreamcorns, 20.0), (Cairns, 1000.0)],
         ),
     ];
     assert_eq!(ArchId::ALL.len(), 8);
@@ -1868,5 +1883,5 @@ fn the_rites_outside_the_stack_stay_single_purchase_under_enlightenment() {
 #[test]
 fn a_shower_and_the_sky_drift_hold_their_stated_values() {
     assert_eq!(content::RAINBOW_SHOWER_AMOUNT, 5000.0);
-    assert_eq!(content::SKY_ARCH_PRISM_DRIFT, 0.00002);
+    assert_eq!(content::SKY_ARCH_PRISM_DRIFT, 0.0002);
 }

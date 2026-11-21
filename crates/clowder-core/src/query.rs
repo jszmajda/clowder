@@ -182,7 +182,7 @@ const RULED_SOURCES: &[(Source, &[ResourceId])] = {
             &[R::Feathers, R::Bells, R::Shinies, R::Unicorns],
         ),
         (Source::Act(Act::ObserveSky), &[R::Curiosity, R::Skymaps]),
-        (Source::Act(Act::HoldParade), &[R::Rainbows]),
+        (Source::Act(Act::HoldParade), &[R::Rainbows, R::Prisms]),
         (Source::Act(Act::RefineStarshard), &[R::Starshards]),
         (Source::Act(Act::RefineEcho), &[R::Echoes]),
         (Source::Act(Act::CondenseJar), &[R::JarsOfPurrs]),
@@ -554,6 +554,9 @@ impl GameState {
                 }
                 if d.parade_rainbows > 0.0 {
                     raises.push(ResourceId::Rainbows);
+                }
+                if d.parade_prisms > 0.0 {
+                    raises.push(ResourceId::Prisms);
                 }
                 if d.prism_descent > 0.0 {
                     raises.push(ResourceId::Prisms);

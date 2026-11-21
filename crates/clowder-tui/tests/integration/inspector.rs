@@ -1949,6 +1949,9 @@ fn structure_fields(s: StructureId) -> Vec<(String, Vec<String>)> {
     if d.parade_rainbows != 0.0 {
         out.push(("parade rainbows".into(), vec![bare(d.parade_rainbows)]));
     }
+    if d.parade_prisms != 0.0 {
+        out.push(("parade prisms".into(), vec![bare(d.parade_prisms)]));
+    }
     if d.prism_descent != 0.0 {
         out.push(("prism descent".into(), vec![percent(d.prism_descent)]));
     }
@@ -2176,14 +2179,18 @@ fn a_structures_mess_is_stated_as_made_or_tidied_by_its_sign() {
 /// field departs from its baseline, on every structure the tables define.
 /// @spec TUI-NAV-181, TUI-NAV-182, TUI-NAV-183, TUI-NAV-184, TUI-NAV-185
 /// @spec TUI-NAV-186, TUI-NAV-187, TUI-NAV-189, TUI-NAV-191, TUI-NAV-196
-/// @spec TUI-NAV-203
+/// @spec TUI-NAV-203, TUI-NAV-217
 #[test]
 fn a_structures_rule_held_rates_are_stated_word_for_word_from_its_fields() {
     type Sentence = (fn(&tables::StructureDef) -> f64, fn(f64) -> String);
-    let sentences: [Sentence; 11] = [
+    let sentences: [Sentence; 12] = [
         (
             |d| d.parade_rainbows,
             |v| format!("Brings {} Rainbows per parade.", bare(v)),
+        ),
+        (
+            |d| d.parade_prisms,
+            |v| format!("Brings {} Prisms per parade.", bare(v)),
         ),
         (
             |d| d.prism_descent,
@@ -2280,6 +2287,36 @@ fn a_structures_rule_held_rates_are_stated_word_for_word_from_its_fields() {
         }
         assert!(stated > 0, "fixture: some structure carries each field");
     }
+}
+
+/// Where a definition brings both to a parade, the prisms are stated directly
+/// after the rainbows.
+/// @spec TUI-NAV-217
+#[test]
+fn a_parades_prisms_follow_its_rainbows() {
+    let mut stated = 0;
+    for s in StructureId::ALL {
+        let d = tables::structure_def(s);
+        if d.parade_rainbows == 0.0 || d.parade_prisms == 0.0 {
+            continue;
+        }
+        stated += 1;
+        let (_, shown) = structure_pane(s);
+        let flat = shown.split_whitespace().collect::<Vec<_>>().join(" ");
+        let want = format!(
+            "Brings {} Rainbows per parade. Brings {} Prisms per parade.",
+            bare(d.parade_rainbows),
+            bare(d.parade_prisms)
+        );
+        assert!(
+            flat.contains(&want),
+            "{s:?} must say {want:?}; read:\n{shown}"
+        );
+    }
+    assert!(
+        stated > 0,
+        "fixture: some structure brings both to a parade"
+    );
 }
 
 /// A year-close craft states its share, threshold, and most, then each pair.

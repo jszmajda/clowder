@@ -238,7 +238,7 @@ fn sentences(parts: Vec<Pieces>) -> Pieces {
 /// @spec TUI-NAV-181, TUI-NAV-182, TUI-NAV-183, TUI-NAV-184, TUI-NAV-185
 /// @spec TUI-NAV-186, TUI-NAV-187, TUI-NAV-188, TUI-NAV-189, TUI-NAV-190
 /// @spec TUI-NAV-191, TUI-NAV-192, TUI-NAV-193, TUI-NAV-194, TUI-NAV-195
-/// @spec TUI-NAV-196, TUI-NAV-203
+/// @spec TUI-NAV-196, TUI-NAV-203, TUI-NAV-217
 fn structure_statement(s: clowder_core::StructureId) -> Pieces {
     let d = content::structure_def(s);
     let mut parts: Vec<Pieces> = Vec::new();
@@ -469,6 +469,13 @@ fn structure_statement(s: clowder_core::StructureId) -> Pieces {
         parts.push(vec![
             Piece::plain(format!("Brings {} ", fmt::exact(d.parade_rainbows))),
             resource(ResourceId::Rainbows),
+            Piece::plain(" per parade."),
+        ]);
+    }
+    if d.parade_prisms != 0.0 {
+        parts.push(vec![
+            Piece::plain(format!("Brings {} ", fmt::exact(d.parade_prisms))),
+            resource(ResourceId::Prisms),
             Piece::plain(" per parade."),
         ]);
     }

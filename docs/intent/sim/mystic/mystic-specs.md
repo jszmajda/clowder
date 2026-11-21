@@ -2,14 +2,14 @@
 
 ## The Currency Chain
 
-- [ ] **SIM-UNI-001**: When HoldParade is applied after the Parade Routes idea (SIM-CUR) is researched, with at least 2500 unicorns, the system shall spend 2500 unicorns and add the sum, over every structure, of its Parade rainbows (SIM-UNI-013) × copies, rainbows, and the sum, over every structure, of its Parade prisms (SIM-UNI-017) × copies, prisms; before the idea it rejects with Locked, and below 2500 unicorns with InsufficientResources.
+- [x] **SIM-UNI-001**: When HoldParade is applied after the Parade Routes idea (SIM-CUR) is researched, with at least 2500 unicorns, the system shall spend 2500 unicorns and add the sum, over every structure, of its Parade rainbows (SIM-UNI-013) × copies, rainbows, and the sum, over every structure, of its Parade prisms (SIM-UNI-017) × copies, prisms; before the idea it rejects with Locked, and below 2500 unicorns with InsufficientResources.
 - [x] **SIM-UNI-002**: The system shall multiply Unicorn Meadow production by (1 + Σ unicornsRatio effects from Arch upgrades), applied as the mystic tier's own multiplier (not the global material layers).
 - [x] **SIM-UNI-003**: When RefineStarshard is applied with at least 25 prisms, the system shall spend 25 prisms and add 1 × (1 + starshard-refine effects) starshards; RefineEcho with at least 25 starshards shall spend 25 and add 1 echo.
 - [x] **SIM-UNI-004**: When CondenseJar is applied after the Jar-condensing arch is bought, with at least 10000 rainbows and Jar cap remaining, the system shall spend 10000 rainbows and add 1 Jar of Purrs (clamped to cap); with no Jar cap remaining it rejects with StorageFull and changes nothing.
 
 ## Rainbow Arches
 
-- [ ] **SIM-UNI-005**: The system shall define exactly the eight Rainbow Arch upgrades of the mystic design's ladder — rainbow/prism/other costs and effects — buyable once each via BuyArch (Locked before the Parade Routes idea, InsufficientResources when unaffordable), their effects flowing through the effect-key system save the Sky Arch's steady prism drift and the Memory Arch's enabling of dreaming, which the dreaming rule reads directly; a rainbow shower brings 5000 rainbows.
+- [x] **SIM-UNI-005**: The system shall define exactly the eight Rainbow Arch upgrades of the mystic design's ladder — rainbow/prism/other costs and effects — buyable once each via BuyArch (Locked before the Parade Routes idea, InsufficientResources when unaffordable), their effects flowing through the effect-key system save the Sky Arch's steady prism drift and the Memory Arch's enabling of dreaming, which the dreaming rule reads directly; a rainbow shower brings 5000 rainbows.
 
 ## Prisms, Dreaming & Dreamcorns
 
@@ -27,10 +27,10 @@
 - [x] **SIM-UNI-014**: The system shall give every structure definition the chance each copy adds to a day's prism descent — 0.02% for the Rainbow Arch and none for any other structure.
 - [x] **SIM-UNI-016**: The system shall keep the Memory Arch and Everdream Arch upgrades closed until the Dream Tending idea is researched, BuyArch rejecting with Locked and the availability query reporting them absent, the other six needing Parade Routes alone.
 - [x] **SIM-UNI-015**: The system shall give every structure definition the dream-drift each copy accrues per tick — 0.000001 for the Rainbow Arch and none for any other structure.
-- [ ] **SIM-UNI-017**: The system shall give every structure definition the prisms each copy brings to a Parade — 10 for the Rainbow Arch and none for any other structure.
+- [x] **SIM-UNI-017**: The system shall give every structure definition the prisms each copy brings to a Parade — 10 for the Rainbow Arch and none for any other structure.
 
 ## Pacing
 
-- [ ] **SIM-UNI-018**: The system shall pace the Rainbow Arch ladder so that the mystic design's reference clowder, played as that design describes, buys each Rainbow Arch upgrade no more than 10 days of 1× play after the upgrade before it (the first, after the Parade Routes idea), and the last no sooner than 3 weeks and no later than 7 weeks after the Parade Routes idea.
-- [ ] **SIM-UNI-019**: Once the mystic design's reference clowder holds every Rainbow Arch upgrade, the system shall bring it, in each day of 1× play, enough prisms to refine at least 4 echoes.
-- [ ] **SIM-UNI-020**: The system shall price no Rainbow Arch upgrade at more stardust than four times the stardust storage one Star Basin adds.
+- [x] **SIM-UNI-018**: The system shall pace the Rainbow Arch ladder so that the mystic design's reference clowder, played as that design describes, buys each Rainbow Arch upgrade no more than 10 days of 1× play after the upgrade before it (the first, after the Parade Routes idea), and the last no sooner than 3 weeks and no later than 7 weeks after the Parade Routes idea.
+- [x] **SIM-UNI-019**: Once the mystic design's reference clowder holds every Rainbow Arch upgrade, the system shall bring it, in each day of 1× play, enough prisms to refine at least 4 echoes.
+- [x] **SIM-UNI-020**: The system shall price no Rainbow Arch upgrade at more stardust than four times the stardust storage one Star Basin adds.
