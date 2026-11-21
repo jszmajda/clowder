@@ -4,7 +4,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 ## Status
 
-**OK** — last audited 2026-11-11 (commit `63d0158f4215`). 87 of 87 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-21 (commit `f191d2d545d5`). 87 of 87 active specs implemented, each cited by a test.
 
 ## References
 
@@ -94,6 +94,8 @@ Audited 2026-11-11, for what issue #47 changed. The guard over every key family 
 Audited 2026-11-11, for what issue #48 changed. The fixed-act price now points to the kittens leaf for a promotion's price (SIM-ENG-087), and the design's list of refusals names every one the core returns, two it had missed among them.
 
 Audited 2026-11-11, for what issue #52 changed. An item of a kind without a reveal ladder now emits a `Revealed` event when an applied command, or an adventure's completion, leaves it present after being absent (SIM-ENG-088). Each command's arrivals are judged against what was present as it began, and a completion's against what was present just before it. A first try kept a set between commands, built at a new game and on load, and the full suite showed it going stale under fixtures built by hand: the next command announced what it had not opened. The look a command began with is kept while it runs and kept out of a state's equality, so a nap's report and its command never both announce one arrival. Tests cover a researched idea's openings (each announced once), a command that opens nothing, a first Move, an adventure's completion, a nap whose sleep completes one, and plain ticks. The design's claim that every gate but the reveal ladder opens on a command now names the one exception: a tradition an adventure's completion opens, priced in wisdom, which names no store. The release catch-up guards were rerun. Every spec marked implemented has a test citing it, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-21, for what issue #53 changed. A structure definition's Parade prisms now count among the fields whose resource the store-links query reports raised (SIM-ENG-081). Holding a Parade is listed as a source of prisms beside rainbows in SIM-ENG-074's ruled sources, which the test raising every stock through every command holds. SIM-ENG-085's guard is the unit test beside the key index in `effects/index.rs`, so it is tested though no integration test cites it. SIM-ENG-076 stays a property of the content tables with no deciding code. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

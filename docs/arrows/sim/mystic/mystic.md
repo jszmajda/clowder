@@ -4,7 +4,7 @@ The mystic leaf is the unicorn economy and everything glittering that follows fr
 
 ## Status
 
-**OK** — last audited 2026-11-04 (commit `bd060172a216`). 16 of 16 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-21 (commit `f191d2d545d5`). 20 of 20 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,13 +16,14 @@ The mystic leaf is the unicorn economy and everything glittering that follows fr
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/mystic/mystic-specs.md` — 16 specs, prefix `SIM-UNI`
+- `docs/intent/sim/mystic/mystic-specs.md` — 20 specs, prefix `SIM-UNI`
 
 ### Tests
 - `crates/clowder-core/tests/integration/blurb_truth.rs`
 - `crates/clowder-core/tests/integration/blurbs.rs`
 - `crates/clowder-core/tests/integration/draw_schedule.rs`
 - `crates/clowder-core/tests/integration/idea_unlocks.rs`
+- `crates/clowder-core/tests/integration/mystic_pacing.rs`
 - `crates/clowder-core/tests/integration/structure_fields.rs`
 - `crates/clowder-core/tests/integration/wonder.rs`
 
@@ -38,9 +39,9 @@ The mystic leaf is the unicorn economy and everything glittering that follows fr
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-UNI-001 – SIM-UNI-016 | 16 | 0 | 0 |
+| All | SIM-UNI-001 – SIM-UNI-020 | 20 | 0 | 0 |
 
-**Summary:** 16 of 16 active specs implemented.
+**Summary:** 20 of 20 active specs implemented.
 
 ## Key Findings
 
@@ -51,6 +52,8 @@ Audited 2026-11-02, for what issue #30 changed. The two arch upgrades that dream
 Audited 2026-11-03, for what issue #32 changed. The code that sums this segment's effect contributions moved behind the per-key source lists (SIM-ENG-084), annotations with it; its specs did not change. Each contribution is held by a bit-for-bit comparison against a walk of every source, and a real late save replayed by the previous build and this one ended in the same bytes. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-04, for what issue #15 changed. Three effect keys no content fed left the rules and their specs (SIM-UNI-001, SIM-UNI-003, SIM-UNI-007): the two the issue named, and the third with the same shape in this segment. Each read one in play, so no outcome moved. The starshard refine keeps its multiplier, which Arch upgrades feed.
+
+Audited 2026-11-21, for what issue #53 changed. Parades now bring prisms in proportion to the Rainbow Arches built (SIM-UNI-001, SIM-UNI-017), the supply the ladder's prism column was sized against. Four ladder prices and the Sky Arch's drift moved to fit it (SIM-UNI-005), and three properties hold the result. The reference clowder buys each step within ten days and the whole ladder in three to seven weeks (SIM-UNI-018). The top of the ladder refines four echoes a day (SIM-UNI-019). No upgrade asks more stardust than four Star Basins store (SIM-UNI-020). The pacing is timed by a model that steps between Parades on the sim's own rates. A calibration test holds that model to a day of real ticks, and before the change it agreed with a release-build real-tick climb to within a day per step. On the old content the same model stalls the ladder at its fifth step, the failure the issue reported. The three properties are decided by the ladder's price table, which carries their annotation. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 
