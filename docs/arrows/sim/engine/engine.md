@@ -4,7 +4,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 ## Status
 
-**OK** — last audited 2026-11-21 (commit `20dc7ae0209d`). 87 of 87 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-21 (commit `6ecb1964855f`). 88 of 88 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 - `docs/intent/sim/sim-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/sim/engine/engine-specs.md` — 87 specs, prefix `SIM-ENG`
+- `docs/intent/sim/engine/engine-specs.md` — 88 specs, prefix `SIM-ENG`
 
 ### Tests
 - `crates/clowder-core/tests/integration/act_price.rs`
@@ -63,9 +63,9 @@ The engine is the spine of `clowder-core`: it owns the canonical `GameState`, th
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | SIM-ENG-001 – SIM-ENG-088 | 87 | 0 | 0 |
+| All | SIM-ENG-001 – SIM-ENG-089 | 88 | 0 | 0 |
 
-**Summary:** 87 of 87 active specs implemented.
+**Summary:** 88 of 88 active specs implemented.
 
 ## Key Findings
 
@@ -98,6 +98,8 @@ Audited 2026-11-11, for what issue #52 changed. An item of a kind without a reve
 Audited 2026-11-21, for what issue #53 changed. A structure definition's Parade prisms now count among the fields whose resource the store-links query reports raised (SIM-ENG-081). Holding a Parade is listed as a source of prisms beside rainbows in SIM-ENG-074's ruled sources, which the test raising every stock through every command holds. SIM-ENG-085's guard is the unit test beside the key index in `effects/index.rs`, so it is tested though no integration test cites it. SIM-ENG-076 stays a property of the content tables with no deciding code. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-21, for what issue #56 changed. A journal entry's away-report arm is boxed (SIM-ENG-027, SIM-ENG-029), so an entry no longer pads to the report's size, and the state clone each rate probe makes copies about a tenth as much journal. A box serializes as what it holds, so saves are unchanged. One test stopped cloning a `Copy` command. No spec changed. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-21, for what issue #57 changed. A new query reports what a price is short of (SIM-ENG-089): its components combined per resource, short beyond the spend's tolerance, in the order the price first names each. Every command's spend now refuses through it, which a test holds for each fixed act and each count-taking command's one unit, component by component. The design's count of its read-only queries now matches its list. SIM-ENG-085 and SIM-ENG-076 stand as the last audit recorded them. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

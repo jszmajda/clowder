@@ -4,7 +4,7 @@ The economy is the material world of the game: what exists, what it costs, what 
 
 ## Status
 
-**OK** — last audited 2026-11-21 (commit `f191d2d545d5`). 66 of 66 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-21 (commit `6ecb1964855f`). 66 of 66 active specs implemented, each cited by a test.
 
 ## References
 
@@ -64,6 +64,8 @@ Audited 2026-11-04, for what issue #44 changed. A recipe can now be made as many
 Audited 2026-11-04, for what issue #43 changed. A copy of a structure can be taken down, returning a quarter of what it would cost to build back, up to each store's cap with the copy gone (SIM-ECO-065), and nobody is turned out (SIM-ECO-066). Tests hold that for every structure, and that building one and taking it down never gains anything.
 
 Audited 2026-11-21, for what issue #53 changed. The design now names the prisms a Rainbow Arch brings to a Parade among a structure's per-copy rates, beside the rainbows. The field and the rule that reads it belong to the mystic leaf (SIM-UNI-017), so no economy spec changed. SIM-ECO-047, that every crafted good has a use, is a property of the content tables as a whole, so no code decides it and its tests are its pins. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-21, for what issue #57 changed. The spend's comparison moved into the engine's shortfall query (SIM-ENG-089), and the spend refuses through it unchanged: all-or-nothing, combined per resource, with the same tolerance (SIM-ECO-022). SIM-ECO-047 stands as the last audit recorded it. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

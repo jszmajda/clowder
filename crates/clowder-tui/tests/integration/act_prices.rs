@@ -282,7 +282,7 @@ fn stated_price(s: &GameState, row: &Row, command: &Command) -> Option<Vec<(Reso
 }
 
 /// The inspector's line for one component of a next cost.
-fn component_line<'a>(text: &'a str, r: ResourceId) -> &'a str {
+fn component_line(text: &str, r: ResourceId) -> &str {
     let head = format!("{}: need", store(r));
     text.lines()
         .find(|l| l.contains(&head))

@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-21 (commit `20dc7ae0209d`). 217 of 217 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-21 (commit `6ecb1964855f`). 218 of 218 active specs implemented, each cited by a test.
 
 ## References
 
@@ -16,7 +16,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 - `docs/intent/tui/tui-design.md` (parent sub-HLD)
 
 ### EARS
-- `docs/intent/tui/navigation/navigation-specs.md` — 217 specs, prefix `TUI-NAV`
+- `docs/intent/tui/navigation/navigation-specs.md` — 218 specs, prefix `TUI-NAV`
 
 ### Tests
 - `crates/clowder-tui/tests/integration/act_prices.rs`
@@ -81,9 +81,9 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 | Category | Spec IDs | Implemented | Deferred | Gaps |
 |----------|----------|-------------|----------|------|
-| All | TUI-NAV-001 – TUI-NAV-217 | 217 | 0 | 0 |
+| All | TUI-NAV-001 – TUI-NAV-218 | 218 | 0 | 0 |
 
-**Summary:** 217 of 217 active specs implemented.
+**Summary:** 218 of 218 active specs implemented.
 
 ## Key Findings
 
@@ -124,6 +124,8 @@ Audited 2026-11-11, for what issue #52 changed. Every kind's reveal now marks it
 Audited 2026-11-21, for what issue #53 changed. A structure's statement in the inspector now gives the prisms it brings to a Parade, directly after the rainbows (TUI-NAV-217). Tests hold the sentence word for word and its place beside the rainbows. The per-section row dispatch now carries TUI-NAV-216, the rule that keeps each kind's rows in its section, which had a test but no annotation at the code that decides it. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-21, for what issue #56 changed. The report queue and the active report read the journal's away-report through its box; what they show did not change. No spec changed. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-21, for what issue #57 changed. Every priced action row now marks its next cost from the core's shortfall for the price it states, and states the wait, the storage note, or the not-growing note with its where-it-comes-from line, as a content row does (TUI-NAV-218, with TUI-NAV-207, TUI-NAV-208 and TUI-NAV-163 edited to match). A row's price and marks are read once for the list's cost field and the inspector alike, through one line builder. A promotion's exp stays unmarked, with the reason in Decisions & Alternatives. The design's stale sentence saying other action rows state no price now says what they state. The test that pinned unmarked one-unit prices was rewritten to pin them marked. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 
