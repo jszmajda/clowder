@@ -1439,7 +1439,7 @@ fn a_long_gap_in_play_ends_as_a_load_of_that_absence_would() {
     else {
         panic!("the absence's report is retained");
     };
-    assert_eq!(report, &by_load.report);
+    assert_eq!(&**report, &by_load.report);
     assert_eq!(app.view.reports.len(), 1, "and queued for its banner");
 }
 

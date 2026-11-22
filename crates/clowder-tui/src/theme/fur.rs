@@ -77,7 +77,7 @@ pub fn fur_slot(pattern: FurPattern, part: FurPart, patch: Option<Patch>, col: u
     match pattern {
         FurPattern::Solid => 0,
         // The stripes run across the body.
-        FurPattern::Tabby => on(col % 2 == 0),
+        FurPattern::Tabby => on(col.is_multiple_of(2)),
         // The white bib and socks.
         FurPattern::Tuxedo => on(matches!(part, Chest | Paw)),
         // The white front and belly.

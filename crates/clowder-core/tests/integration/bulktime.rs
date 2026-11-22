@@ -95,7 +95,7 @@ fn away_reports(journal: &Journal) -> Vec<OfflineReport> {
         .iter_chronological()
         .into_iter()
         .filter_map(|entry| match &entry.item {
-            JournalItem::Away(report) => Some(report.clone()),
+            JournalItem::Away(report) => Some((**report).clone()),
             _ => None,
         })
         .collect()

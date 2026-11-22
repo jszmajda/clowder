@@ -752,7 +752,7 @@ fn no_rejected_command_of_any_kind_leaves_a_mark() {
         give(&mut s, ResourceId::Twigs, 5.0);
         let snapshot = s.clone();
 
-        if s.apply(cmd.clone()).is_err() {
+        if s.apply(cmd).is_err() {
             rejected += 1;
             assert_eq!(
                 s, snapshot,

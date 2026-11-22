@@ -592,7 +592,7 @@ fn away_entries(j: &Journal) -> Vec<(u64, OfflineReport)> {
     j.iter_chronological()
         .into_iter()
         .filter_map(|e| match &e.item {
-            JournalItem::Away(r) => Some((e.tick, r.clone())),
+            JournalItem::Away(r) => Some((e.tick, (**r).clone())),
             JournalItem::Happened(_) => None,
         })
         .collect()

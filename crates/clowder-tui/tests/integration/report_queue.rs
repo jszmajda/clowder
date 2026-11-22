@@ -425,7 +425,7 @@ fn whether_a_loads_report_gets_a_banner_is_judged_from_the_journal() {
     let mut state = meadow();
     state.journal.kept.push(clowder_core::JournalEntry {
         tick: state.ticks,
-        item: JournalItem::Away(short.clone()),
+        item: JournalItem::Away(Box::new(short.clone())),
     });
     let kept = LoadedGame {
         state,
@@ -715,7 +715,7 @@ fn unread_reports_are_pinned_at_the_journals_top_newest_first() {
         .iter()
         .rev()
         .find_map(|e| match &e.item {
-            JournalItem::Away(r) => Some(r.clone()),
+            JournalItem::Away(r) => Some((**r).clone()),
             _ => None,
         })
         .expect("the nap was retained");

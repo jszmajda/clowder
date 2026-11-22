@@ -17,11 +17,15 @@ const RECENT_CAPACITY: usize = 1_000;
 
 /// What a journal entry records. An away-report is not an `Event` — it is a
 /// fold of an interval rather than an occurrence at an instant, which is why
-/// it needs its own arm rather than a variant in the event vocabulary.
+/// it needs its own arm rather than a variant in the event vocabulary. The
+/// report is boxed: it is many times an event's size and rare in the journal,
+/// so unboxed it would pad every entry to its size, and the state (journal
+/// included) is cloned on every rate probe. A box serializes as what it holds,
+/// so a save is unchanged.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum JournalItem {
     Happened(Event),
-    Away(OfflineReport),
+    Away(Box<OfflineReport>),
 }
 
 /// One entry, stamped with the tick it occurred at so entries group by day.
@@ -84,7 +88,7 @@ impl Journal {
         }
         self.kept.push(JournalEntry {
             tick,
-            item: JournalItem::Away(report.clone()),
+            item: JournalItem::Away(Box::new(report.clone())),
         });
     }
 

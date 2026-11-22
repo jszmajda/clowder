@@ -980,7 +980,7 @@ pub fn palette(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState) {
 fn active_report<'a>(state: &'a GameState, view: &ViewState) -> Option<(usize, &'a OfflineReport)> {
     let pending = view.reports.iter().find(|r| !r.dismissed)?;
     match &state.journal.kept.get(pending.entry)?.item {
-        JournalItem::Away(report) => Some((pending.entry, report)),
+        JournalItem::Away(report) => Some((pending.entry, &**report)),
         JournalItem::Happened(_) => None,
     }
 }

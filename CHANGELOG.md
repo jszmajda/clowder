@@ -27,6 +27,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 - **The long list of things to build is divided up.** It now falls into named groups by what each thing is for, so there's something to read down by, and `[` and `]` jump between them. A group only appears once it has something in it.
 - **A long sleep with the game open tells its tale.** Closing your laptop with Clowder running now wakes it as a restart would: the waking screen if it was a long one, the report of what the time brought, and you left just where you were. The time also comes back in moments, where a very long sleep could take hours to work through.
 - **Saves have moved up a version.** A save written by this version won't open in an older one. Older saves still open here.
+- **The game keeps a lighter copy of its journal.** Each journal entry now takes only the room its own record needs, so the copies the game makes to work out rates cost less. Saves are unchanged.
 - **Drawing the sidebar costs less.** It does in one step what it used to repeat for every store, which matters most in a big clowder.
 - **Clowder sits lighter in its pane.** With nothing pressed, it now works out the screen about as often as something on it can change, rather than several times more. Keys answer as quickly as before; at faster speeds, figures move in slightly larger steps.
 - **Redrawing the screen costs less.** Each redraw works out what each tab lists once, rather than again for every part of the screen that asks.

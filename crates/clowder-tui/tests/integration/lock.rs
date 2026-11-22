@@ -35,9 +35,9 @@
 
 #[path = "../../src/runtime/lock.rs"]
 #[allow(dead_code)]
-mod lock;
+mod runtime_lock;
 
-use lock::{LockError, SessionLock};
+use runtime_lock::{LockError, SessionLock};
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -655,7 +655,7 @@ fn start_in_zone(pid: u32, zone: &str) -> u64 {
         .output()
         .expect("ps should run");
     let text = String::from_utf8_lossy(&out.stdout);
-    lock::encode_lstart(text.trim())
+    runtime_lock::encode_lstart(text.trim())
         .unwrap_or_else(|| panic!("ps should word a running process's start time, got {text:?}"))
 }
 

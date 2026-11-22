@@ -1734,7 +1734,7 @@ fn tales(saved: &SetDown) -> Vec<&clowder_core::OfflineReport> {
         .kept
         .iter()
         .filter_map(|e| match &e.item {
-            clowder_core::JournalItem::Away(r) => Some(r),
+            clowder_core::JournalItem::Away(r) => Some(&**r),
             _ => None,
         })
         .collect()

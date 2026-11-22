@@ -21,7 +21,7 @@ use super::view::{PendingReport, ViewState};
 /// declined to keep at all, answers `None`. @spec TUI-NAV-027
 fn retained_entry_index(state: &GameState, report: &OfflineReport) -> Option<usize> {
     state.journal.kept.iter().position(|entry| {
-        entry.tick == state.ticks && matches!(&entry.item, JournalItem::Away(r) if r == report)
+        entry.tick == state.ticks && matches!(&entry.item, JournalItem::Away(r) if **r == *report)
     })
 }
 

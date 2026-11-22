@@ -140,7 +140,7 @@ fn rule(p: FurPattern, col: usize, part: Part, patch: u8) -> usize {
     let on = |yes: bool| usize::from(yes);
     match p {
         FurPattern::Solid => 0,
-        FurPattern::Tabby => on(col % 2 == 0),
+        FurPattern::Tabby => on(col.is_multiple_of(2)),
         FurPattern::Tuxedo => on(matches!(part, Chest | Paw)),
         FurPattern::Bicolour => on(matches!(part, Chest | Under | Paw)),
         FurPattern::Tortoiseshell => on(patch == 1),
