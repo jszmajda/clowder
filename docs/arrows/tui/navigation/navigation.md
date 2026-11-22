@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-21 (commit `f191d2d545d5`). 217 of 217 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-21 (commit `20dc7ae0209d`). 217 of 217 active specs implemented, each cited by a test.
 
 ## References
 
@@ -122,6 +122,8 @@ Audited 2026-11-11, for what issue #51 changed. A report handed back marks the r
 Audited 2026-11-11, for what issue #52 changed. Every kind's reveal now marks its row, the reveals of applied commands included, each command of an `X` run among them (TUI-NAV-211). A two-state item's line names its kind's tab (TUI-NAV-209), and a test holds that every content row stands in its kind's section (TUI-NAV-216). The report and pinned-entry specs cover every kind (TUI-NAV-214, TUI-NAV-215). The last deferred item is resolved and removed. Every spec marked implemented has a test citing it, and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-21, for what issue #53 changed. A structure's statement in the inspector now gives the prisms it brings to a Parade, directly after the rainbows (TUI-NAV-217). Tests hold the sentence word for word and its place beside the rainbows. The per-section row dispatch now carries TUI-NAV-216, the rule that keeps each kind's rows in its section, which had a test but no annotation at the code that decides it. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-21, for what issue #56 changed. The report queue and the active report read the journal's away-report through its box; what they show did not change. No spec changed. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

@@ -4,7 +4,7 @@ Dreamtime is clowder's time layer, reimagined as *napping*: a well-rested clowde
 
 ## Status
 
-**OK** — last audited 2026-11-03 (commit `2cddde1e39c7`). 11 of 11 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-21 (commit `20dc7ae0209d`). 11 of 11 active specs implemented, each cited by a test.
 
 ## References
 
@@ -53,6 +53,8 @@ Audited 2026-11-01. First full audit, by the same route as the mystic leaf. It f
 Audited 2026-11-02, for what issue #30 changed. The Dream Loom opens on Dream Loomcraft rather than the idea after it, and BuyDreamLoom now refuses before that idea, so the command says what the row does (SIM-DREAM-006). It opens earlier than it did, so no save needs anything granted. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-03, for what issue #32 changed. The code that sums this segment's effect contributions moved behind the per-key source lists (SIM-ENG-084), annotations with it; its specs did not change. Each contribution is held by a bit-for-bit comparison against a walk of every source, and a real late save replayed by the previous build and this one ended in the same bytes. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-21, for what issue #56 changed. A bulk-time test now reads the journal's away-report through its box, with the same assertion. No spec changed. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

@@ -126,9 +126,9 @@ arrows:
   dreamtime:
     status: OK
     parent: sim
-    sampled: 2026-11-03
-    audited: 2026-11-03
-    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
+    sampled: 2026-11-21
+    audited: 2026-11-21
+    audited_sha: 20dc7ae0209d3aec17f53779bdc0cf965b8ed92d
     blocks: []
     blockedBy: [adventures, prestige]
     detail: sim/dreamtime/dreamtime.md
@@ -150,7 +150,7 @@ arrows:
     parent: sim
     sampled: 2026-11-21
     audited: 2026-11-21
-    audited_sha: f191d2d545d52f32304f4cab988485d566b1a535
+    audited_sha: 20dc7ae0209d3aec17f53779bdc0cf965b8ed92d
     blocks: [economy, navigation, persistence]
     blockedBy: []
     detail: sim/engine/engine.md
@@ -194,7 +194,7 @@ arrows:
     parent: tui
     sampled: 2026-11-21
     audited: 2026-11-21
-    audited_sha: f191d2d545d52f32304f4cab988485d566b1a535
+    audited_sha: 20dc7ae0209d3aec17f53779bdc0cf965b8ed92d
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
@@ -203,9 +203,9 @@ arrows:
   persistence:
     status: OK
     parent: null
-    sampled: 2026-11-11
-    audited: 2026-11-11
-    audited_sha: 63d0158f4215e0e41d066bbfa64c1d3f8c8c4070
+    sampled: 2026-11-21
+    audited: 2026-11-21
+    audited_sha: 20dc7ae0209d3aec17f53779bdc0cf965b8ed92d
     blocks: [runtime]
     blockedBy: [engine]
     detail: persistence/persistence.md
@@ -225,9 +225,9 @@ arrows:
   render:
     status: OK
     parent: tui
-    sampled: 2026-11-11
-    audited: 2026-11-11
-    audited_sha: 8f62315c606c67af5de1b96a32f9f0f855c65b99
+    sampled: 2026-11-21
+    audited: 2026-11-21
+    audited_sha: 20dc7ae0209d3aec17f53779bdc0cf965b8ed92d
     blocks: []
     blockedBy: [navigation, runtime, theme]
     detail: tui/render/render.md
@@ -236,9 +236,9 @@ arrows:
   runtime:
     status: OK
     parent: tui
-    sampled: 2026-11-11
-    audited: 2026-11-11
-    audited_sha: 63d0158f4215e0e41d066bbfa64c1d3f8c8c4070
+    sampled: 2026-11-21
+    audited: 2026-11-21
+    audited_sha: 20dc7ae0209d3aec17f53779bdc0cf965b8ed92d
     blocks: [render]
     blockedBy: [navigation, persistence]
     detail: tui/runtime/runtime.md
@@ -247,9 +247,9 @@ arrows:
   theme:
     status: OK
     parent: tui
-    sampled: 2026-11-11
-    audited: 2026-11-11
-    audited_sha: a414659672bcb166b1df6966033ce4c26374380a
+    sampled: 2026-11-21
+    audited: 2026-11-21
+    audited_sha: 20dc7ae0209d3aec17f53779bdc0cf965b8ed92d
     blocks: [render]
     blockedBy: []
     detail: tui/theme/theme.md

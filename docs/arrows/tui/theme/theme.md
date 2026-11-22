@@ -4,7 +4,7 @@ This leaf owns every colour decision in clowder: the palette, what each colour i
 
 ## Status
 
-**OK** — last audited 2026-11-11 (commit `a414659672bc`). 34 of 34 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-21 (commit `20dc7ae0209d`). 34 of 34 active specs implemented, each cited by a test.
 
 ## References
 
@@ -67,6 +67,8 @@ Audited 2026-11-04, for what issue #45 changed. A count prompt's count stands ou
 Audited 2026-11-04, for what issue #21 changed. The tests that asserted less than their specs now read drawn frames. Colour by state rather than item is read off every content row of every section, and a store's coat across its stock, cap, and rate (TUI-THEME-003). A frame with its colour removed still says each state (TUI-THEME-010). The chip sweeps cover all six chips at every width (TUI-THEME-011, TUI-THEME-015). The notice is counted, so saying it twice fails (TUI-THEME-012). Coats are held on an open prompt's preview and a unit-price line (TUI-THEME-019), and on every kind of description that carries a blurb (TUI-THEME-022). Each was broken once in a scratch copy; eighteen mutations were caught, one only after the state-by-item fixture was widened to meadows with everything learned, and two more on later items confirmed that. The mood spec gained its annotation (TUI-THEME-005).
 
 Audited 2026-11-11, for what issue #49 changed. A new row's mark and a list's count of new rows each wear `milestone` on the `★` alone (TUI-THEME-032), read off drawn cells. No colour value changed. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-21, for what issue #56 changed. A coat's stripe test takes the toolchain's `is_multiple_of`, in the theme and in its kitten-card test; the stripes are drawn as before. No spec changed. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

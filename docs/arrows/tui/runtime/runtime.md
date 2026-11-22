@@ -4,7 +4,7 @@ This leaf owns the boundary between the operating system and the pure core: term
 
 ## Status
 
-**OK** — last audited 2026-11-11 (commit `63d0158f4215`). 68 of 68 active specs implemented, each cited by a test; 1 deferred.
+**OK** — last audited 2026-11-21 (commit `20dc7ae0209d`). 68 of 68 active specs implemented, each cited by a test; 1 deferred.
 
 ## References
 
@@ -68,6 +68,8 @@ Audited 2026-11-11, for what issue #49 changed. The loop now hands the events of
 Audited 2026-11-11, for what issue #50 changed. After each frame it draws, the loop keeps the line the frame's list began on, read from the pointer record (render leaf: The List Viewport). Step 5 of the loop in the design says so. No runtime spec changed. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-11, for what issue #52 changed. The loop now hands navigation the events of every command it applies, each command of a run included, as it hands it the events of its ticks, so what a command opens is marked. No runtime spec changed. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-21, for what issue #56 changed. The lock test names the runtime's lock source it includes apart from its own module, and the session and waking tests read the journal's away-report through its box; their assertions are unchanged. No spec changed. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 
