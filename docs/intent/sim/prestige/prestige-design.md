@@ -60,7 +60,7 @@ The prestige shop (`BuyTradition`), Elder-Wisdom-priced, permanent across Moves 
 | 25 | Festival Spirit | 25 | a jamboree hosted while one runs adds its 100 days to it (kittens leaf) |
 | 26 | Second Wind | 50 | on a Move, one Traveling Basket kitten keeps its job assignment |
 | 27 | Forecaster | 25 | the season forecast is always available (no idea needed) |
-| 28 | Prism Sight | 125 | prism-descent and rainbow-shower chances ×1.1 (mystic leaf) |
+| 28 | Prism Sight | 125 | prism-descent and rainbow-shower chances, and the prisms a Parade brings, ×1.1 (mystic leaf) |
 | 29 | Adventurous Spirit | 40 | unlocks the Adventures surface (SIM-ADV) |
 | 30 | Tidy Paws | 50 | mess made −10% — shown and sold only once the Tidy Meadow adventure has been completed (the adventure's reward, SIM-ADV-007) |
 
@@ -84,6 +84,7 @@ An append-only archive: each Move copies the current roster into the Album under
 | Three legacies | Elder Wisdom (capped-linear), Warm Memories (sqrt), Passed-Down (burn) | Single prestige currency | Three timescales/curves is the inspiration's proven shape and gives the shop real texture |
 | Nine Lives ladder | 10 traditions, each +5% to a ratio that raises Wisdom's slope AND cap | Flat Wisdom cap | The near-endless sink that keeps prestige rewarding after dozens of Moves (the Sephirot analog) |
 | Traditions deep & generous | ~30 with visible milestones | A handful | The player-owner's stated delight is prestige unlocks; this shop is where that delight lives |
+| What Prism Sight brightens | The prism-descent and rainbow-shower chances and the prisms a Parade brings | The two chances alone; the chances alone at a lower price | Parades bring most of the clowder's prisms (mystic leaf: Where most prisms come from), so a bonus on the descents alone is worth a small fraction of its price, and a cheaper bonus that barely moves anything is still a poor buy. Scaling the Parade's prisms too keeps it at a tenth more of the supply it is priced for |
 
 ## Open Questions & Future Decisions
 
