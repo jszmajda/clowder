@@ -1595,6 +1595,31 @@ fn prism_sight_brightens_the_sky_events() {
     assert!((s.rainbow_shower_chance() - shower * 1.1).abs() < 1e-12);
 }
 
+/// Prism Sight brings a tenth more prisms to every Parade, and no more rainbows.
+/// @spec SIM-MOVE-015, SIM-UNI-001
+#[test]
+fn prism_sight_brightens_a_parades_prisms_only() {
+    let parade = |sight: bool| {
+        let mut s = GameState::new(1304);
+        s.ideas.insert(IdeaId::ParadeRoutes);
+        grant(&mut s, StructureId::RainbowArch, 3);
+        if sight {
+            s.traditions.insert(TraditionId::PrismSight);
+        }
+        give(&mut s, ResourceId::Unicorns, content::PARADE_UNICORN_COST);
+        s.apply(Command::HoldParade).unwrap();
+        (s.stock(ResourceId::Rainbows), s.stock(ResourceId::Prisms))
+    };
+    let (rainbows, prisms) = parade(false);
+    let (seen_rainbows, seen_prisms) = parade(true);
+    assert!(prisms > 0.0, "fixture: a Parade brings prisms");
+    assert!(
+        (seen_prisms - prisms * 1.1).abs() < 1e-9,
+        "{seen_prisms} vs {prisms}"
+    );
+    assert_eq!(seen_rainbows, rainbows, "the rainbows are not brightened");
+}
+
 /// A colony's correspondence as a frontend shows it: level, the next letter's
 /// price, standing and the letters' part of it, what one more letter adds,
 /// and the next level at which a good opens.

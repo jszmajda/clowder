@@ -19,6 +19,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 
 ### Changed
 
+- **A bonus that had faded is worth its price again.** One carried-over bonus lost most of its effect when the supply it boosts changed shape. It now reaches the new source too, and its description says so.
 - **A late climb no longer stalls.** A chain of upgrades whose later steps could stall for weeks or months now reaches each step in a few days. The things further on that draw on the same supply come within reach sooner, and the info pane says where the extra comes from.
 - **Lists scroll the way other windows do.** In a long list, turning back moves the highlight and leaves the list where it is. The list only scrolls once the highlight reaches its edge, and the wheel works the same way. Jumping somewhere far, like to the next group, still puts the highlight a few rows down so you can see what's below it.
 - **The count you type stands out.** The digits on the highlighted row now sit in a notch cut out of the highlight, so they're easy to spot whatever colour the row is.

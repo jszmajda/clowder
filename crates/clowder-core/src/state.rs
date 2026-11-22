@@ -2441,7 +2441,10 @@ impl GameState {
         self.effect(crate::effects::Effect::RainbowShowerChance) * self.prism_sight()
     }
 
-    fn prism_sight(&self) -> f64 {
+    /// Prism Sight's brightening, or 1 where it is not held: the one ratio
+    /// the descent, the shower, and a Parade's prisms are each scaled by.
+    /// @spec SIM-MOVE-015
+    pub(crate) fn prism_sight(&self) -> f64 {
         if self.traditions.contains(&TraditionId::PrismSight) {
             content::PRISM_SIGHT_RATIO
         } else {

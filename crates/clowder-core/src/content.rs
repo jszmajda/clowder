@@ -4491,7 +4491,7 @@ static TRADITIONS: [TraditionDef; 31] = [
     TraditionDef { cost_wisdom: 25.0, blurb: "Why stop? A jamboree hosted while one runs adds its 100 days to the party." },  // FestivalSpirit
     TraditionDef { cost_wisdom: 50.0, blurb: "Some cats bring their work home. On a Move, one carried kitten keeps its job." },  // SecondWind
     TraditionDef { cost_wisdom: 25.0, blurb: "Whiskers that twitch before the weather turns. The coming season is always shown, no idea needed." },  // Forecaster
-    TraditionDef { cost_wisdom: 125.0, blurb: "Eyes for sparkle. {Prism|Prisms} descents and showers of {rainbows|Rainbows} are 10% likelier." }, // PrismSight
+    TraditionDef { cost_wisdom: 125.0, blurb: "Eyes for sparkle. {Prism|Prisms} descents and showers of {rainbows|Rainbows} are 10% likelier, and parades bring 10% more {prisms|Prisms}." }, // PrismSight
     TraditionDef { cost_wisdom: 40.0, blurb: "What's past the fence? Opens Adventures." },  // AdventurousSpirit
     TraditionDef { cost_wisdom: 50.0, blurb: "Paws wiped at the door, every time. Buildings make 10% less mess." }, // TidyPaws
 ];
