@@ -183,7 +183,7 @@ arrows:
     parent: sim
     sampled: 2026-11-21
     audited: 2026-11-21
-    audited_sha: f191d2d545d52f32304f4cab988485d566b1a535
+    audited_sha: 625d7b8b84449c114a74793a22bf3b4a85706f6a
     blocks: [adventures, prestige]
     blockedBy: [curiosity, expeditions, kittens]
     detail: sim/mystic/mystic.md
@@ -214,9 +214,9 @@ arrows:
   prestige:
     status: OK
     parent: sim
-    sampled: 2026-11-03
-    audited: 2026-11-03
-    audited_sha: 2cddde1e39c796e7d3f1792e74739bd9adbb1407
+    sampled: 2026-11-21
+    audited: 2026-11-21
+    audited_sha: 625d7b8b84449c114a74793a22bf3b4a85706f6a
     blocks: [cosmic, dreamtime]
     blockedBy: [ceremonies, colonies, mystic]
     detail: sim/prestige/prestige.md

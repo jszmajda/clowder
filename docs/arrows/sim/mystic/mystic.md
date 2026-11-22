@@ -4,7 +4,7 @@ The mystic leaf is the unicorn economy and everything glittering that follows fr
 
 ## Status
 
-**OK** — last audited 2026-11-21 (commit `f191d2d545d5`). 20 of 20 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-21 (commit `625d7b8b8444`). 20 of 20 active specs implemented, each cited by a test.
 
 ## References
 
@@ -54,6 +54,8 @@ Audited 2026-11-03, for what issue #32 changed. The code that sums this segment'
 Audited 2026-11-04, for what issue #15 changed. Three effect keys no content fed left the rules and their specs (SIM-UNI-001, SIM-UNI-003, SIM-UNI-007): the two the issue named, and the third with the same shape in this segment. Each read one in play, so no outcome moved. The starshard refine keeps its multiplier, which Arch upgrades feed.
 
 Audited 2026-11-21, for what issue #53 changed. Parades now bring prisms in proportion to the Rainbow Arches built (SIM-UNI-001, SIM-UNI-017), the supply the ladder's prism column was sized against. Four ladder prices and the Sky Arch's drift moved to fit it (SIM-UNI-005), and three properties hold the result. The reference clowder buys each step within ten days and the whole ladder in three to seven weeks (SIM-UNI-018). The top of the ladder refines four echoes a day (SIM-UNI-019). No upgrade asks more stardust than four Star Basins store (SIM-UNI-020). The pacing is timed by a model that steps between Parades on the sim's own rates. A calibration test holds that model to a day of real ticks, and before the change it agreed with a release-build real-tick climb to within a day per step. On the old content the same model stalls the ladder at its fifth step, the failure the issue reported. The three properties are decided by the ladder's price table, which carries their annotation. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-21, for what issue #54 changed. A Parade's prisms are scaled by the Prism Sight ratio where that tradition is held (SIM-UNI-001, SIM-MOVE-015), and a test holds the prisms brightened and the rainbows unchanged. The pacing properties (SIM-UNI-018, SIM-UNI-019) are held for a reference clowder with no traditions, so they did not move. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 
