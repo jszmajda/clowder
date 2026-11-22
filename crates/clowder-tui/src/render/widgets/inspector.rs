@@ -27,7 +27,7 @@ use ratatui::{
 
 use crate::nav::rows::{rows, Row, RowKey, RowKind};
 use crate::nav::{CountPrompt, Section, ViewState};
-use crate::render::{fmt, line_from_pieces, pieces_text, Piece};
+use crate::render::{fmt, line_from_pieces, pieces_text, Mark, Piece};
 use crate::theme::Role;
 
 /// The section a frame draws when the view state has not chosen one yet —
@@ -654,34 +654,21 @@ fn wait_text(seconds: f64) -> String {
 }
 
 /// One component of a next cost: what it needs and what the player has, in
-/// each's exact form, marked only as the core's lock reason reports it — short
-/// by the amount a shortfall names, covered where a shortfall leaves it out or
-/// the core reports no reason, unmarked where another reason holds the item
-/// back. @spec TUI-NAV-078
-fn component_line(
-    state: &GameState,
-    r: ResourceId,
-    need: f64,
-    reason: &Option<LockReason>,
-) -> Vec<Pieces> {
+/// each's exact form, marked only as the core reports it — short by the amount
+/// it names, with the wait or the note its store's cap and rate call for;
+/// covered where it names none; unmarked where another reason holds the item
+/// back. The one builder for every next cost. @spec TUI-NAV-078, TUI-NAV-218
+fn component_line(state: &GameState, r: ResourceId, need: f64, mark: Mark) -> Vec<Pieces> {
     let mut comes_from = None;
     let have = state.stock(r);
     let name = resource_label(r);
     let chars = name.chars().count();
     let mut line = format!(": need {}, have {}", fmt::exact(need), fmt::exact(have));
 
-    let short_amount = match reason {
-        Some(LockReason::ShortBy { missing }) => {
-            missing.iter().find(|(mr, _)| *mr == r).map(|(_, amt)| *amt)
-        }
-        _ => None,
-    };
-    let other_reason = matches!(reason, Some(x) if !matches!(x, LockReason::ShortBy { .. }));
-
-    if other_reason {
+    if mark == Mark::Unmarked {
         // Unmarked: another reason holds the item back, so stock marks
         // nothing.
-    } else if let Some(amount) = short_amount {
+    } else if let Mark::Short(amount) = mark {
         line.push_str(&format!(", short by {}", fmt::exact(amount)));
         let cap = state.cap(r);
         if need > cap {
@@ -783,34 +770,14 @@ fn comes_from_line(state: &GameState, r: ResourceId) -> Option<Pieces> {
     Some(line)
 }
 
-/// The next cost lines for a content item that takes one: the core's price for
-/// one more, per component with need and have, marked by the core's lock
-/// reason. @spec TUI-NAV-078
-fn cost_lines(state: &GameState, id: ContentId, reason: &Option<LockReason>) -> Vec<Pieces> {
-    let cost = state.cost_of_next(id, 1);
-    cost.iter()
-        .flat_map(|(r, need)| component_line(state, *r, *need, reason))
-        .collect()
-}
-
-/// The next cost for a Pounce or Trade row: the one-unit price the core
-/// reports, per component. The core reports no lock reason for these rows, so
-/// need and have stand unmarked and no wait is stated beside them.
-/// @spec TUI-NAV-073
-fn unit_cost_lines(state: &GameState, unit: &[(ResourceId, f64)]) -> Vec<Pieces> {
-    unit.iter()
-        .map(|(r, need)| {
-            let name = resource_label(*r);
-            let chars = name.chars().count();
-            vec![
-                Piece::name(*r, name, chars),
-                Piece::plain(format!(
-                    ": need {}, have {}",
-                    fmt::exact(*need),
-                    fmt::exact(state.stock(*r))
-                )),
-            ]
-        })
+/// A row's next cost lines, from the one reading of its price and marks the
+/// list's cost field takes too: per component with need and have, marked as
+/// the core reports it. @spec TUI-NAV-078, TUI-NAV-218
+fn cost_lines(state: &GameState, row: &Row) -> Vec<Pieces> {
+    crate::render::row_price(state, row)
+        .unwrap_or_default()
+        .into_iter()
+        .flat_map(|(r, need, mark)| component_line(state, r, need, mark))
         .collect()
 }
 
@@ -883,8 +850,8 @@ fn content_lines(
         out.push(crate::render::count_prompt_preview_pieces(
             state, row, &p.digits,
         ));
-    } else if reason != Some(LockReason::AlreadyYours) {
-        out.extend(cost_lines(state, id, &reason));
+    } else {
+        out.extend(cost_lines(state, row));
     }
     if let Some(r) = &reason {
         out.push(lock_reason_pieces(r));
@@ -1284,30 +1251,26 @@ fn draw_body(
                 lines.push(crate::render::count_prompt_preview_pieces(
                     state, &row, &p.digits,
                 ));
-            } else if let RowKey::Colony(c, "penpal") = &row.key {
-                // The next letter's price, then what the letters have done.
-                // @spec TUI-NAV-171, TUI-NAV-172
-                if let Some(report) = state.pen_pal(*c) {
-                    lines.push(Vec::new());
-                    lines.extend(unit_cost_lines(state, &[(ResourceId::Charm, report.price)]));
-                    lines.push(Vec::new());
-                    lines.extend(pen_pal_lines(*c, &report));
-                }
             } else if let RowKind::Act { command, .. } = &row.kind {
-                // @spec TUI-NAV-073, TUI-NAV-207
-                let price = state
-                    .unit_price(command)
-                    .or_else(|| state.act_price(command));
-                if let Some(price) = price {
+                // The row's next cost — a letter's, a promotion's shinies, a
+                // one-unit price, or a fixed act's — marked and waited for as
+                // every next cost is. @spec TUI-NAV-073, TUI-NAV-207, TUI-NAV-218
+                let price = cost_lines(state, &row);
+                if !price.is_empty() {
                     lines.push(Vec::new());
-                    lines.extend(unit_cost_lines(state, &price));
+                    lines.extend(price);
                 }
-                // A kitten's next rank: the shinies as a next cost, and the
-                // kitten's own exp beside them. @spec TUI-NAV-208
+                // Then what the letters have done. @spec TUI-NAV-171, TUI-NAV-172
+                if let RowKey::Colony(c, "penpal") = &row.key {
+                    if let Some(report) = state.pen_pal(*c) {
+                        lines.push(Vec::new());
+                        lines.extend(pen_pal_lines(*c, &report));
+                    }
+                }
+                // A kitten's own exp beside the shinies, unmarked: it is not a
+                // store and the core reports no rate for it. @spec TUI-NAV-208
                 if let Command::Promote(ix) = command {
                     if let Some(p) = state.promotion_price(*ix) {
-                        lines.push(Vec::new());
-                        lines.extend(unit_cost_lines(state, &[(ResourceId::Shinies, p.shinies)]));
                         lines.push(plain(format!(
                             "Experience: need {}, has {}",
                             fmt::exact(p.exp),

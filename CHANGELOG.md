@@ -10,6 +10,7 @@ What changed in each release of Clowder, written so it spoils nothing: what chan
 - **What appeared while you were away is marked too.** Things that appeared during an absence or a long nap get the same `★` marks and tab badges as ones that appear while you play. The away report in the journal now lists them.
 - **Everything that opens up is marked.** When something you do opens up new options in a tab you already have, they get the same `★` as anything else new, and the ticker says where to find them.
 - **A kitten's next step up says what it takes.** The info pane now shows what promoting a kitten will cost, and a promotion short of the kitten's own experience says so.
+- **Every price says how long you'll wait.** Actions that spend from your stores now mark what's short in the info pane and say how long until you can afford it, as things you build do. When the stores can't hold that much yet, or nothing is making it, they say that instead.
 - **Rows that spend now say what they cost.** Actions that take from your stores show their price in the list and the info pane, as everything else you can buy does.
 - **You can take back something you built.** Pressing `-` on a structure's row offers to take one down and says what you'd get back. Confirm with `Enter`. You get back part of its price, and nobody who lives or works there is turned out.
 - **A trip that finds everyone asleep may still bring a little something.** Now and then, a small gift comes home where before there was nothing, and the info pane says how often.

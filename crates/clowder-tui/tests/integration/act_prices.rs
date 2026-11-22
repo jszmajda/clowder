@@ -263,3 +263,210 @@ fn a_refusal_for_short_exp_names_it() {
         "{words}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// TUI-NAV-218 — an action row's next cost is marked and waited for
+// ---------------------------------------------------------------------------
+
+/// The price an action row's inspector states, as the core reports it: a
+/// letter's, a promotion's shinies, a count-taking row's one unit, or a fixed
+/// act's.
+fn stated_price(s: &GameState, row: &Row, command: &Command) -> Option<Vec<(ResourceId, f64)>> {
+    match (&row.key, command) {
+        (RowKey::Colony(c, "penpal"), _) => Some(vec![(ResourceId::Charm, s.pen_pal(*c)?.price)]),
+        (_, Command::Promote(ix)) => {
+            Some(vec![(ResourceId::Shinies, s.promotion_price(*ix)?.shinies)])
+        }
+        _ => s.unit_price(command).or_else(|| s.act_price(command)),
+    }
+}
+
+/// The inspector's line for one component of a next cost.
+fn component_line<'a>(text: &'a str, r: ResourceId) -> &'a str {
+    let head = format!("{}: need", store(r));
+    text.lines()
+        .find(|l| l.contains(&head))
+        .unwrap_or_else(|| panic!("no next-cost line for {r:?}:\n{text}"))
+}
+
+/// What a wait states, in seconds, and the length of the unit it is stated in.
+fn stated_wait(line: &str) -> Option<(f64, f64)> {
+    let rest = &line[line.find("— wait ")? + "— wait ".len()..];
+    let mut words = rest.split_whitespace();
+    let n: f64 = words.next()?.parse().ok()?;
+    let unit = match words.next()?.trim_end_matches('.') {
+        "seconds" | "second" => 1.0,
+        "minutes" | "minute" => 60.0,
+        "hours" | "hour" => 3_600.0,
+        "days" | "day" => 86_400.0,
+        _ => return None,
+    };
+    Some((n * unit, unit))
+}
+
+/// Every priced action row marks each component of its next cost as the
+/// core's shortfall reports it: with one component in turn a quarter of its
+/// need and the rest in plenty, that one is short by what it lacks and carries
+/// the note its store's cap and rate call for, a where-it-comes-from line
+/// beneath it where nothing makes it, and every other component is covered.
+///
+/// @spec TUI-NAV-218, TUI-NAV-163
+#[test]
+fn every_priced_action_row_marks_its_next_cost_and_waits_as_a_content_row_does() {
+    let base = rich();
+    let (mut waited, mut stalled, mut capped) = (0, 0, 0);
+    for (section, row, command) in action_rows(&base) {
+        if matches!(row.key, RowKey::Content(..)) {
+            continue;
+        }
+        let Some(price) = stated_price(&base, &row, &command) else {
+            continue;
+        };
+        if matches!(command, Command::Bask) {
+            continue; // Priced at the whole store it spends: always covered.
+        }
+        for (r, need) in &price {
+            let mut s = base.clone();
+            for (other, n) in &price {
+                s.resources[other.ix()] = n * 2.0;
+            }
+            s.resources[r.ix()] = need * 0.25;
+            let shown = pane(&s, &looking_at(section, &row.key));
+            let line = component_line(&shown, *r);
+            let short = need - s.stock(*r);
+            assert!(
+                line.contains(&format!("short by {}", fmt::exact(short))),
+                "{:?}: {r:?} is short by {}:\n{shown}",
+                row.key,
+                fmt::exact(short)
+            );
+            if *need > s.cap(*r) {
+                capped += 1;
+                assert!(
+                    line.contains("the stores cannot hold that much yet"),
+                    "{line}"
+                );
+                assert!(stated_wait(line).is_none(), "no wait above the cap: {line}");
+            } else if s.net_rate(*r) <= 0.0 {
+                stalled += 1;
+                assert!(line.contains("the stock is not growing"), "{line}");
+                assert!(
+                    stated_wait(line).is_none(),
+                    "no wait while not growing: {line}"
+                );
+                let made = s.flows(*r).iter().any(|(_, rate)| *rate > 0.0);
+                if !made && !s.sources_of(*r).is_empty() {
+                    assert!(
+                        shown.contains("Comes from: "),
+                        "{:?}: nothing makes {r:?}, so the inspector says where it comes from:\n{shown}",
+                        row.key
+                    );
+                }
+            } else {
+                waited += 1;
+                assert!(
+                    stated_wait(line).is_some(),
+                    "{:?}: {r:?} grows, so it waits: {line}",
+                    row.key
+                );
+            }
+            for (other, _) in price.iter().filter(|(o, _)| o != r) {
+                assert!(
+                    component_line(&shown, *other).contains(", covered"),
+                    "{:?}: {other:?} is in plenty:\n{shown}",
+                    row.key
+                );
+            }
+        }
+    }
+    assert!(
+        waited > 3 && stalled + capped > 0,
+        "fixture: action rows whose short stores grow, and some that do not ({waited}, {stalled}, {capped})"
+    );
+}
+
+/// An action row's wait is the shortfall over the core's net rate and the
+/// current speed, in real time: never stated sooner than the rate gives and
+/// within one unit of its rounding, at the slowest speed and the fastest.
+///
+/// @spec TUI-NAV-218
+#[test]
+fn an_action_rows_wait_is_its_shortfall_over_the_rate_and_the_speed() {
+    let base = rich();
+    let mut seen = 0;
+    for (section, row, command) in action_rows(&base) {
+        let Some(price) = stated_price(&base, &row, &command) else {
+            continue;
+        };
+        if matches!(row.key, RowKey::Content(..)) || matches!(command, Command::Bask) {
+            continue;
+        }
+        let (r, need) = price[0];
+        let mut s = base.clone();
+        for (other, n) in &price {
+            s.resources[other.ix()] = n * 2.0;
+        }
+        s.resources[r.ix()] = need * 0.25;
+        let rate = s.net_rate(r);
+        if need > s.cap(r) || rate <= 0.0 {
+            continue;
+        }
+        seen += 1;
+        let short = need - s.stock(r);
+        for speed in [0.25, 8.0] {
+            s.speed = speed;
+            let shown = pane(&s, &looking_at(section, &row.key));
+            let line = component_line(&shown, r).to_string();
+            let (seconds, unit) = stated_wait(&line)
+                .unwrap_or_else(|| panic!("{:?}: a wait in plain units: {line}", row.key));
+            let expected = short / (rate * speed);
+            assert!(
+                seconds >= expected * (1.0 - 1e-9),
+                "never sooner: {expected}s vs {line}"
+            );
+            assert!(
+                seconds < expected + unit,
+                "within one unit of rounding: {expected}s vs {line}"
+            );
+        }
+    }
+    assert!(
+        seen > 3,
+        "fixture: rows whose first component grows ({seen})"
+    );
+}
+
+/// A kitten's next rank marks its shinies as any next cost, and its exp stands
+/// with need and has, unmarked and with no wait.
+///
+/// @spec TUI-NAV-208, TUI-NAV-218
+#[test]
+fn a_promotions_shinies_are_marked_and_its_exp_is_not() {
+    let mut s = rich();
+    s.kittens[0].exp = 120.0;
+    let price = s.promotion_price(0).expect("a kitten stands at 0");
+    s.resources[ResourceId::Shinies.ix()] = price.shinies * 0.25;
+    let (section, row, _) = action_rows(&s)
+        .into_iter()
+        .find(|(_, r, _)| matches!(r.key, RowKey::Kitten(0, _)))
+        .expect("fixture: the kitten's row is listed");
+    let text = pane(&s, &looking_at(section, &row.key));
+    let shinies = component_line(&text, ResourceId::Shinies);
+    assert!(
+        shinies.contains("short by"),
+        "the shinies are marked: {shinies}"
+    );
+    let exp = text
+        .lines()
+        .find(|l| l.contains("Experience: need"))
+        .expect("the exp line is stated");
+    assert_eq!(
+        exp.trim(),
+        format!(
+            "Experience: need {}, has {}",
+            fmt::exact(price.exp),
+            fmt::exact(120.0)
+        ),
+        "the exp stands unmarked"
+    );
+}

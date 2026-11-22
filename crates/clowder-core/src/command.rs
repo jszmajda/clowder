@@ -1555,26 +1555,37 @@ impl GameState {
         Ok(vec![Event::DreamLoomBought { id }])
     }
 
-    /// All-or-nothing spend with epsilon-tolerant affordability.
-    // @spec SIM-ECO-022
-    fn spend(&mut self, costs: &[(ResourceId, f64)]) -> Result<(), CommandError> {
-        // A cost list may name the same component twice (a colony that buys
-        // in the same resource its trade fee already spends, say) — checked
+    /// What the stores fall short of for a price: each resource it names, its
+    /// components combined, whose stock falls below the combined amount by
+    /// more than the spend's tolerance, with what it lacks, in the order the
+    /// price first names each. The spend refuses exactly this, so a caller
+    /// marking a price from it never disagrees with the command it prices.
+    /// @spec SIM-ENG-089
+    pub fn price_shortfall(&self, price: &[(ResourceId, f64)]) -> Vec<(ResourceId, f64)> {
+        // A price may name the same component twice (a colony that buys in
+        // the same resource its trade fee already spends, say) — checked
         // against the combined total, never against each entry alone, or a
         // stock short of the true total could slip past two individually
         // satisfied checks.
         let mut totals: Vec<(ResourceId, f64)> = Vec::new();
-        for (r, amount) in costs {
+        for (r, amount) in price {
             match totals.iter_mut().find(|(tr, _)| tr == r) {
                 Some((_, total)) => *total += amount,
                 None => totals.push((*r, *amount)),
             }
         }
-        let missing: Vec<(ResourceId, f64)> = totals
-            .iter()
+        totals
+            .into_iter()
             .filter(|(r, amount)| self.stock(*r) + EPSILON < *amount)
-            .map(|(r, amount)| (*r, amount - self.stock(*r)))
-            .collect();
+            .map(|(r, amount)| (r, amount - self.stock(r)))
+            .collect()
+    }
+
+    /// All-or-nothing spend with epsilon-tolerant affordability, refusing
+    /// exactly what `price_shortfall` reports.
+    // @spec SIM-ECO-022, SIM-ENG-089
+    fn spend(&mut self, costs: &[(ResourceId, f64)]) -> Result<(), CommandError> {
+        let missing = self.price_shortfall(costs);
         if !missing.is_empty() {
             return Err(CommandError::InsufficientResources { missing });
         }

@@ -231,3 +231,96 @@ fn every_other_command_is_not_priced() {
         assert_eq!(s.act_price(&c), None, "{c:?}");
     }
 }
+
+// ---------------------------------------------------------------------------
+// SIM-ENG-089 — what a price is short of
+// ---------------------------------------------------------------------------
+
+/// A price's components combine per resource before they are compared, each
+/// resource short by what its stock lacks of the combined amount, in the order
+/// the price first names it; a hair's shortfall within the spend's tolerance
+/// is no shortfall at all.
+///
+/// @spec SIM-ENG-089
+#[test]
+fn a_price_is_short_of_what_the_stores_lack_of_each_combined_component() {
+    let mut s = GameState::new(89);
+    s.resources[ResourceId::Pep.ix()] = 30.0;
+    s.resources[ResourceId::Shinies.ix()] = 5.0;
+    s.resources[ResourceId::Catnip.ix()] = 100.0;
+    let price = [
+        (ResourceId::Shinies, 4.0),
+        (ResourceId::Pep, 20.0),
+        (ResourceId::Catnip, 50.0),
+        (ResourceId::Pep, 20.0),
+        (ResourceId::Shinies, 4.0),
+    ];
+    assert_eq!(
+        s.price_shortfall(&price),
+        vec![(ResourceId::Shinies, 3.0), (ResourceId::Pep, 10.0)],
+        "each resource combined, in the order the price first names it"
+    );
+    s.resources[ResourceId::Catnip.ix()] = 50.0 - 1e-12;
+    assert!(
+        s.price_shortfall(&[(ResourceId::Catnip, 50.0)]).is_empty(),
+        "within the spend's tolerance nothing is short"
+    );
+    assert!(
+        s.price_shortfall(&[]).is_empty(),
+        "an empty price is short of nothing"
+    );
+}
+
+/// Every command the core prices refuses its price exactly where the query
+/// reports a shortfall, naming what it reports: each fixed act and each
+/// count-taking command's one unit, with every component in turn left a
+/// quarter short and the rest in plenty.
+///
+/// @spec SIM-ENG-089
+#[test]
+fn every_priced_command_refuses_exactly_what_the_shortfall_reports() {
+    let base = rich();
+    let mut commands = fixed_acts();
+    commands.push(Command::Pounce(1));
+    commands.extend(ColonyId::ALL.into_iter().map(|c| Command::Trade(c, 1)));
+    let mut checked = 0;
+    for cmd in commands {
+        let Some(price) = base.act_price(&cmd).or_else(|| base.unit_price(&cmd)) else {
+            continue;
+        };
+        if matches!(cmd, Command::Bask) {
+            continue; // Priced at the whole store it spends: never short.
+        }
+        for (r, need) in &price {
+            let mut s = base.clone();
+            for (other, n) in &price {
+                s.resources[other.ix()] = n * 2.0;
+            }
+            s.resources[r.ix()] = need * 0.75;
+            let reported = s.price_shortfall(&price);
+            assert!(!reported.is_empty(), "{cmd:?} is short of {r:?}");
+            match s.clone().apply(cmd) {
+                Err(CommandError::InsufficientResources { missing }) => {
+                    assert_eq!(
+                        missing, reported,
+                        "{cmd:?}: the spend names what the query reports"
+                    )
+                }
+                other => panic!("{cmd:?} short of {r:?} must be refused for it, not {other:?}"),
+            }
+            checked += 1;
+        }
+        let mut plenty = base.clone();
+        for (r, need) in &price {
+            plenty.resources[r.ix()] = need * 2.0;
+        }
+        assert!(
+            plenty.price_shortfall(&price).is_empty(),
+            "{cmd:?} in plenty is short of nothing"
+        );
+    }
+    assert!(
+        checked >= 15,
+        "fixture: priced commands were read ({checked})"
+    );
+}

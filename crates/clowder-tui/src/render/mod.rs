@@ -329,28 +329,104 @@ fn stated_count(state: &GameState, row: &Row) -> Option<u64> {
     }
 }
 
-/// The next cost the inspector states for a row, if it states one: the
-/// core's price for one more on a row that takes a content item — none on a
-/// tinkerer row, where the item is already the player's, or where the price
-/// names no component — the one-unit price on a Pounce or Trade row, and a fixed
-/// act's price. @spec TUI-NAV-078, TUI-NAV-073, TUI-NAV-207
-fn stated_cost(state: &GameState, row: &Row) -> Option<Vec<(ResourceId, f64)>> {
-    let cost = match (&row.key, &row.kind) {
+/// How one component of a next cost is marked, as the core reports it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum Mark {
+    /// Short by this much.
+    Short(f64),
+    /// What the stores hold covers it.
+    Covered,
+    /// Another reason holds the item back, so stock marks nothing.
+    Unmarked,
+}
+
+/// One component of a row's next cost: its resource, what it needs, and its
+/// mark.
+pub(crate) type PricedComponent = (ResourceId, f64, Mark);
+
+/// A row's next cost and the mark on each component — the one reading of a
+/// row's price that the list's cost field and the inspector both take, so a
+/// kind of row that is priced at all gets its marks and its wait with its
+/// price. A row that takes a content item states the core's price for one more,
+/// marked by the core's lock reason: none on a tinkerer row, where the item is
+/// already the player's, or where the price names no component. An action row
+/// the core prices states that price — a letter's, a promotion's shinies, a
+/// count-taking row's one unit, or a fixed act's — marked by the core's
+/// shortfall for it. Every other row states none.
+/// @spec TUI-NAV-078, TUI-NAV-073, TUI-NAV-207, TUI-NAV-171, TUI-NAV-208
+/// @spec TUI-NAV-218
+pub(crate) fn row_price(state: &GameState, row: &Row) -> Option<Vec<PricedComponent>> {
+    let marked: Vec<PricedComponent> = match (&row.key, &row.kind) {
         (RowKey::Content(_, "tinker"), _) => return None,
-        // A letter's price is the core's Pen Pal query's. @spec TUI-NAV-171
-        (RowKey::Colony(c, "penpal"), _) => vec![(ResourceId::Charm, state.pen_pal(*c)?.price)],
         (RowKey::Content(id, _), _) => {
-            if state.lock_reason(*id) == Some(LockReason::AlreadyYours) {
+            let reason = state.lock_reason(*id);
+            if reason == Some(LockReason::AlreadyYours) {
                 return None;
             }
-            state.cost_of_next(*id, 1)
+            state
+                .cost_of_next(*id, 1)
+                .into_iter()
+                .map(|(r, need)| {
+                    let mark = match &reason {
+                        Some(LockReason::ShortBy { missing }) => missing
+                            .iter()
+                            .find(|(m, _)| *m == r)
+                            .map_or(Mark::Covered, |(_, amount)| Mark::Short(*amount)),
+                        None => Mark::Covered,
+                        Some(_) => Mark::Unmarked,
+                    };
+                    (r, need, mark)
+                })
+                .collect()
         }
-        (_, RowKind::Act { command, .. }) => state
-            .unit_price(command)
-            .or_else(|| state.act_price(command))?,
+        (key, RowKind::Act { command, .. }) => {
+            let price = match (key, command) {
+                (RowKey::Colony(c, "penpal"), _) => {
+                    vec![(ResourceId::Charm, state.pen_pal(*c)?.price)]
+                }
+                (_, Command::Promote(ix)) => {
+                    vec![(ResourceId::Shinies, state.promotion_price(*ix)?.shinies)]
+                }
+                _ => state
+                    .unit_price(command)
+                    .or_else(|| state.act_price(command))?,
+            };
+            let short = state.price_shortfall(&price);
+            price
+                .into_iter()
+                .map(|(r, need)| {
+                    let mark = short
+                        .iter()
+                        .find(|(m, _)| *m == r)
+                        .map_or(Mark::Covered, |(_, amount)| Mark::Short(*amount));
+                    (r, need, mark)
+                })
+                .collect()
+        }
         _ => return None,
     };
-    (!cost.is_empty()).then_some(cost)
+    (!marked.is_empty()).then_some(marked)
+}
+
+/// The next cost the list's cost field states for a row: the row's price,
+/// save on a kitten's row, which states no next cost in the list.
+/// @spec TUI-NAV-078, TUI-NAV-073, TUI-NAV-207, TUI-NAV-171
+fn stated_cost(state: &GameState, row: &Row) -> Option<Vec<(ResourceId, f64)>> {
+    if matches!(
+        row.kind,
+        RowKind::Act {
+            command: Command::Promote(_),
+            ..
+        }
+    ) {
+        return None;
+    }
+    Some(
+        row_price(state, row)?
+            .into_iter()
+            .map(|(r, need, _)| (r, need))
+            .collect(),
+    )
 }
 
 /// The count field as TUI-RENDER-020 draws it: `×` joined to a compact

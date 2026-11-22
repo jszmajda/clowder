@@ -1795,36 +1795,14 @@ fn a_unit_price_line_wears_its_components_coat_on_its_name() {
     assert!(seen > 2, "fixture: the Pounce row and the trade rows");
 }
 
-/// A drawing with every number replaced by one placeholder and whitespace
-/// collapsed: two drawings that mask alike said the same things about
-/// different amounts.
-fn masked(s: &str) -> String {
-    let mut out = String::new();
-    let mut in_number = false;
-    for c in s.chars() {
-        if c.is_ascii_digit() || (in_number && c == '.') {
-            if !in_number {
-                out.push('#');
-                in_number = true;
-            }
-        } else {
-            in_number = false;
-            out.push(c);
-        }
-    }
-    out.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-/// The core reports no lock reason for a Pounce or Trade row, and only a lock
-/// reason marks components, so the one-unit price's need and have stand
-/// unmarked and no wait stands beside them: the row reads the same whether the
-/// stock covers the unit or falls short, and the game speed — which would move
-/// any real-time wait — changes nothing on it. Quantified over the Pounce row
-/// and every colony's trade row.
+/// A Pounce or Trade row's one-unit price is marked by the core's shortfall for
+/// it: short and covered read differently, and where a short component grows,
+/// the game speed moves its wait. Quantified over the Pounce row and every
+/// colony's trade row.
 ///
-/// @spec TUI-NAV-078
+/// @spec TUI-NAV-218
 #[test]
-fn a_per_unit_priced_rows_components_stand_unmarked_with_no_wait() {
+fn a_per_unit_priced_rows_components_are_marked_and_waited_for() {
     let base = rich();
     let mut seen = 0;
     let mut growing = 0;
@@ -1845,29 +1823,35 @@ fn a_per_unit_priced_rows_components_stand_unmarked_with_no_wait() {
             short.resources[r.ix()] = need * 0.25;
             enough.resources[r.ix()] = need + 100.5;
         }
-        if unit.iter().any(|(r, _)| short.net_rate(*r) > 0.0) {
-            growing += 1;
-        }
         let view = focused(section, row.key.clone());
         let a = pane_text(&short, &view);
         let b = pane_text(&enough, &view);
-        assert_eq!(
-            masked(&a),
-            masked(&b),
-            "{:?}: stock marks nothing on a one-unit price, so short and covered must read alike but \
-             for their figures.\nshort:\n{a}\ncovered:\n{b}",
+        assert!(
+            a.contains("short by"),
+            "{:?}: short components are marked:\n{a}",
             row.key
         );
-        let mut fast = short.clone();
-        fast.speed = 8.0;
-        let mut slow = short.clone();
-        slow.speed = 0.25;
-        assert_eq!(
-            pane_text(&fast, &view),
-            pane_text(&slow, &view),
-            "{:?}: no wait stands beside a one-unit price, so the speed changes nothing on the row",
+        assert!(
+            !b.contains("short by") && b.contains("covered"),
+            "{:?}: covered:\n{b}",
             row.key
         );
+        if unit
+            .iter()
+            .any(|(r, need)| short.net_rate(*r) > 0.0 && *need <= short.cap(*r))
+        {
+            growing += 1;
+            let mut fast = short.clone();
+            fast.speed = 8.0;
+            let mut slow = short.clone();
+            slow.speed = 0.25;
+            assert_ne!(
+                pane_text(&fast, &view),
+                pane_text(&slow, &view),
+                "{:?}: a short component that grows waits, so the speed moves the row",
+                row.key
+            );
+        }
     }
     assert!(
         seen > 1,
@@ -1875,7 +1859,7 @@ fn a_per_unit_priced_rows_components_stand_unmarked_with_no_wait() {
     );
     assert!(
         growing > 0,
-        "fixture: on some of these rows a component is growing, so a wait would have something to say"
+        "fixture: on some of these rows a short component is growing"
     );
 }
 
