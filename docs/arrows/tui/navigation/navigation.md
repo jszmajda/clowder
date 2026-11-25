@@ -4,7 +4,7 @@ This leaf owns how a human drives clowder from a keyboard: the key model, sectio
 
 ## Status
 
-**OK** — last audited 2026-11-21 (commit `6ecb1964855f`). 218 of 218 active specs implemented, each cited by a test.
+**OK** — last audited 2026-11-25 (commit `4f544d3b61ad`). 218 of 218 active specs implemented, each cited by a test.
 
 ## References
 
@@ -126,6 +126,8 @@ Audited 2026-11-21, for what issue #53 changed. A structure's statement in the i
 Audited 2026-11-21, for what issue #56 changed. The report queue and the active report read the journal's away-report through its box; what they show did not change. No spec changed. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 Audited 2026-11-21, for what issue #57 changed. Every priced action row now marks its next cost from the core's shortfall for the price it states, and states the wait, the storage note, or the not-growing note with its where-it-comes-from line, as a content row does (TUI-NAV-218, with TUI-NAV-207, TUI-NAV-208 and TUI-NAV-163 edited to match). A row's price and marks are read once for the list's cost field and the inspector alike, through one line builder. A promotion's exp stays unmarked, with the reason in Decisions & Alternatives. The design's stale sentence saying other action rows state no price now says what they state. The test that pinned unmarked one-unit prices was rewritten to pin them marked. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
+
+Audited 2026-11-25, for what issue #55 changed. Every action that spends from the stores and can run again as soon as it is done is now tagged repeat-N (TUI-NAV-031): eleven commands, each read in its handler. Free acts, acts that spend a whole store or run one at a time, ideas, rules, declarations, and heavy rows stay single, with the reason in Decisions & Alternatives. A count on such a row previews the count alone (TUI-NAV-067). The hint bar names `Enter` as building only on a build row. The tag table test, the preview tests, and a hint test hold it, and two fixtures that assumed the old set now say what they read. Every spec marked implemented has a test citing it and no `@spec` names a spec that does not exist, by source scan. Hand-read by the agent that made these changes, with no second reader.
 
 ## Work Required
 

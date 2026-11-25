@@ -192,9 +192,9 @@ arrows:
   navigation:
     status: OK
     parent: tui
-    sampled: 2026-11-21
-    audited: 2026-11-21
-    audited_sha: 6ecb1964855ff664ba6fc4182bc1a51f27583a2c
+    sampled: 2026-11-25
+    audited: 2026-11-25
+    audited_sha: 4f544d3b61ad25458d5475b8ab33eb6bc65b7c5f
     blocks: [render, runtime]
     blockedBy: [engine]
     detail: tui/navigation/navigation.md
