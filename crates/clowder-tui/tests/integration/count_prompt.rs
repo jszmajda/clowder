@@ -370,9 +370,10 @@ fn assert_count_alone(state: &GameState, section: Section, row: &Row, what: &str
 // TUI-NAV-067 — the preview
 // ===========================================================================
 
-/// On a repeat-N row the prompt previews the core's total for taking the count
-/// from current state, escalation included, per component — or the count alone
-/// where that total names no resource. Quantified over every repeat-N row.
+/// On a repeat-N row that takes a content item the prompt previews the core's
+/// total for taking the count from current state, escalation included, per
+/// component — or the count alone where that total names no resource.
+/// Quantified over every such row.
 ///
 /// @spec TUI-NAV-067
 #[test]
@@ -389,13 +390,12 @@ fn a_repeat_n_count_previews_the_cores_total_for_taking_it() {
         ) {
             continue;
         }
-        seen += 1;
+        // A repeatable action takes no content item, and its preview is the
+        // count alone (a_repeatable_actions_count_previews_the_count_alone).
         let RowKey::Content(id, _) = row.key else {
-            panic!(
-                "fixture: the repeat-N row {:?} is not a content item",
-                row.key
-            );
+            continue;
         };
+        seen += 1;
         let total = state.cost_of_next(id, 7);
         if total.is_empty() {
             assert_count_alone(&state, section, &row, "the unpriced repeat-N row");
@@ -502,6 +502,35 @@ fn the_heavy_count_taking_and_count_rows_preview_the_count_alone() {
     }
     assert!(nap > 0, "fixture: the DeepNap row is not listed");
     assert!(counts > 0, "fixture: no count row is listed");
+}
+
+/// On a repeat-N row that takes no content item — a repeatable action — the core
+/// reports no total for a run, so the preview is the count alone. Quantified
+/// over every such row.
+///
+/// @spec TUI-NAV-067
+#[test]
+fn a_repeatable_actions_count_previews_the_count_alone() {
+    let state = rich();
+    let mut seen = 0;
+    for (section, row) in prompt_rows(&state) {
+        let RowKind::Act {
+            semantics: CountSemantics::RepeatN,
+            ..
+        } = row.kind
+        else {
+            continue;
+        };
+        if matches!(row.key, RowKey::Content(..)) {
+            continue;
+        }
+        seen += 1;
+        assert_count_alone(&state, section, &row, "a repeatable action's row");
+    }
+    assert!(
+        seen > 3,
+        "fixture: repeatable action rows are listed ({seen})"
+    );
 }
 
 /// An empty or zero count previews nothing, on every row the prompt opens on;
@@ -611,8 +640,10 @@ fn swapped_prompt_on(section: Section, row: &Row, digits: &str, state: &GameStat
 /// @spec TUI-NAV-035
 #[test]
 fn the_swapped_inspector_shows_an_open_prompts_count_and_preview() {
-    const N: &str = "37";
-    const COUNT: u32 = 37;
+    // Above every roster number the fixture's kittens are named by, so a
+    // kitten's own row never shows it before the prompt does.
+    const N: &str = "97";
+    const COUNT: u32 = 97;
     let state = rich();
     let rows_seen = prompt_rows(&state);
     assert!(!rows_seen.is_empty(), "fixture: no row takes a count");

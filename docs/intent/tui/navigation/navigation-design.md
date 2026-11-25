@@ -410,8 +410,8 @@ The only possible actions teach the backbone, which leads the line; the one lett
 - buildable focused: `Enter build · x amount · X max · Space details`
 - any other repeat-N row focused — a recipe, a buy, a repeatable action: `Enter do · x amount · X max · Space details`
 - job row focused: `+ assign · - unassign · x amount · X max`
-- a kitten's row focused: `Enter do · n appoint Elder · Space details`
-- the Elder's own row focused: `Enter do · Space details`
+- a kitten's row focused: `Enter do · n appoint Elder · x amount · X max · Space details`
+- the Elder's own row focused: `Enter do · x amount · X max · Space details`
 - a research row focused, finished rows folded below: `↑↓ choose · Enter do · Space details · Tab next · d show done`
 - armed row: `Enter yes, truly · Esc not today`
 - count prompt: `digits amount · Enter go · Esc never mind`

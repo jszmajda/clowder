@@ -280,7 +280,7 @@ fn meadow_rows(state: &GameState) -> Vec<Row> {
         },
         Row {
             key: RowKey::Fixed("Forage"),
-            kind: act(Command::Forage, CountSemantics::Single),
+            kind: act(Command::Forage, CountSemantics::RepeatN),
             heavy: false,
         },
     ];
@@ -395,7 +395,7 @@ fn clowder_rows(state: &GameState) -> Vec<Row> {
     for (ix, _k) in state.kittens.iter().enumerate() {
         kittens.push(Row {
             key: RowKey::Kitten(ix, ""),
-            kind: act(Command::Promote(ix), CountSemantics::Single),
+            kind: act(Command::Promote(ix), CountSemantics::RepeatN),
             heavy: false,
         });
     }
@@ -583,7 +583,7 @@ fn sunbeams_rows(state: &GameState) -> Vec<Row> {
             },
             Row {
                 key: RowKey::Fixed("Enlighten"),
-                kind: act(Command::Enlighten, CountSemantics::Single),
+                kind: act(Command::Enlighten, CountSemantics::RepeatN),
                 heavy: false,
             },
         ],
@@ -611,27 +611,27 @@ fn wonders_rows(state: &GameState) -> Vec<Row> {
         vec![
             Row {
                 key: RowKey::Fixed("HoldParade"),
-                kind: act(Command::HoldParade, CountSemantics::Single),
+                kind: act(Command::HoldParade, CountSemantics::RepeatN),
                 heavy: false,
             },
             Row {
                 key: RowKey::Fixed("RefineStarshard"),
-                kind: act(Command::RefineStarshard, CountSemantics::Single),
+                kind: act(Command::RefineStarshard, CountSemantics::RepeatN),
                 heavy: false,
             },
             Row {
                 key: RowKey::Fixed("RefineEcho"),
-                kind: act(Command::RefineEcho, CountSemantics::Single),
+                kind: act(Command::RefineEcho, CountSemantics::RepeatN),
                 heavy: false,
             },
             Row {
                 key: RowKey::Fixed("CondenseJar"),
-                kind: act(Command::CondenseJar, CountSemantics::Single),
+                kind: act(Command::CondenseJar, CountSemantics::RepeatN),
                 heavy: false,
             },
             Row {
                 key: RowKey::Fixed("MakePromise"),
-                kind: act(Command::MakePromise, CountSemantics::Single),
+                kind: act(Command::MakePromise, CountSemantics::RepeatN),
                 heavy: false,
             },
         ],
@@ -665,7 +665,7 @@ fn friends_rows(state: &GameState) -> Vec<Row> {
         });
         colonies.push(Row {
             key: RowKey::Colony(c, "penpal"),
-            kind: act(Command::SendPenPal(c), CountSemantics::Single),
+            kind: act(Command::SendPenPal(c), CountSemantics::RepeatN),
             heavy: false,
         });
     }
@@ -676,7 +676,7 @@ fn friends_rows(state: &GameState) -> Vec<Row> {
         "things to do",
         vec![Row {
             key: RowKey::Fixed("ScoutPicnic"),
-            kind: act(Command::ScoutPicnic, CountSemantics::Single),
+            kind: act(Command::ScoutPicnic, CountSemantics::RepeatN),
             heavy: false,
         }],
     ));
@@ -704,7 +704,7 @@ fn sky_rows(state: &GameState) -> Vec<Row> {
     if state.whale_visit_years > 0 {
         verbs.push(Row {
             key: RowKey::Fixed("FeedWhale"),
-            kind: act(Command::FeedWhale, CountSemantics::Single),
+            kind: act(Command::FeedWhale, CountSemantics::RepeatN),
             heavy: false,
         });
     }

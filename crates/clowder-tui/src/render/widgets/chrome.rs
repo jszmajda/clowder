@@ -724,13 +724,20 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState, sto
                     plain
                 } else {
                     match &row.kind {
-                        RowKind::Act { semantics, .. } => {
+                        RowKind::Act { semantics, command } => {
                             use crate::nav::CountSemantics;
+                            // Enter builds only on a row that builds; every
+                            // other row does its act. @spec TUI-NAV-023
+                            let enter = if matches!(command, clowder_core::Command::Build(_)) {
+                                "Enter build"
+                            } else {
+                                "Enter do"
+                            };
                             match semantics {
                                 CountSemantics::Single => plain,
                                 CountSemantics::RepeatN if row.heavy => {
                                     vec![
-                                        "Enter build",
+                                        enter,
                                         "x amount",
                                         "Space details",
                                         "↑↓ choose",
@@ -740,7 +747,7 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState, sto
                                 CountSemantics::RepeatN if copies_standing(state, &row) => {
                                     // @spec TUI-NAV-206
                                     vec![
-                                        "Enter build",
+                                        enter,
                                         "x amount",
                                         "X max",
                                         "- take down",
@@ -751,7 +758,7 @@ pub fn hints(f: &mut Frame, area: Rect, state: &GameState, view: &ViewState, sto
                                 }
                                 CountSemantics::RepeatN => {
                                     vec![
-                                        "Enter build",
+                                        enter,
                                         "x amount",
                                         "X max",
                                         "Space details",

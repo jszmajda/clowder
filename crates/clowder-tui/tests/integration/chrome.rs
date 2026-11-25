@@ -4452,6 +4452,53 @@ fn the_hint_bar_names_the_keys_the_focused_row_actually_offers() {
     );
 }
 
+/// `Enter` is named as building only on a row that builds: every other repeat-N
+/// row — a recipe, a buy, a repeatable action, a kitten's promotion — names it
+/// as doing. Quantified over every repeat-N row the game lists.
+///
+/// @spec TUI-NAV-023
+#[test]
+fn enter_is_named_build_only_on_a_row_that_builds() {
+    let mut state = every_section_revealed();
+    state.arches_bought.insert(ArchId::EverdreamArch);
+    let (mut builds, mut others) = (0, 0);
+    for section in Section::ALL {
+        for row in rows(&state, section).into_iter().filter(|r| r.selectable()) {
+            let RowKind::Act {
+                command,
+                semantics: CountSemantics::RepeatN,
+            } = row.kind
+            else {
+                continue;
+            };
+            if row.heavy {
+                continue;
+            }
+            if let RowKey::Content(id, _) = &row.key {
+                if state.lock_reason(*id) == Some(LockReason::AlreadyYours) {
+                    continue;
+                }
+            }
+            let line = hint_line(&state, &focus_on(&state, section, row.key.clone()), WIDE_W);
+            if matches!(command, Command::Build(_)) {
+                builds += 1;
+                assert!(line.contains("Enter build"), "{:?}: {line:?}", row.key);
+            } else {
+                others += 1;
+                assert!(
+                    line.contains("Enter do") && !line.contains("Enter build"),
+                    "{:?} builds nothing, so Enter is named as doing: {line:?}",
+                    row.key
+                );
+            }
+        }
+    }
+    assert!(
+        builds > 0 && others > 3,
+        "fixture: both kinds listed ({builds}, {others})"
+    );
+}
+
 /// The count key is named exactly beside the rows `x` opens the count prompt
 /// on — every row tagged count-taking or repeat-N and every count row, unless
 /// the core reports its item as already the player's — and beside no other,

@@ -689,8 +689,9 @@ fn a_command_carries_the_same_count_tag_wherever_it_appears() {
 }
 
 /// The tag the spec names for a command: count-taking for the three whose
-/// count is an argument, repeat-N for building, crafting, and every buy
-/// command, and single for every other command.
+/// count is an argument, repeat-N for building, crafting, every buy command,
+/// and every action that spends from the stores and can run again as soon as
+/// it is done, and single for every other command.
 fn tag_the_spec_names(command: &Command) -> CountSemantics {
     match command {
         Command::Pounce(_) | Command::Trade(_, _) | Command::DeepNap(_) => {
@@ -702,7 +703,18 @@ fn tag_the_spec_names(command: &Command) -> CountSemantics {
         | Command::BuyRite(_)
         | Command::BuyArch(_)
         | Command::BuyDreamLoom(_)
-        | Command::BuyTradition(_) => CountSemantics::RepeatN,
+        | Command::BuyTradition(_)
+        | Command::Forage
+        | Command::Promote(_)
+        | Command::Enlighten
+        | Command::HoldParade
+        | Command::RefineStarshard
+        | Command::RefineEcho
+        | Command::CondenseJar
+        | Command::MakePromise
+        | Command::SendPenPal(_)
+        | Command::ScoutPicnic
+        | Command::FeedWhale => CountSemantics::RepeatN,
         _ => CountSemantics::Single,
     }
 }
@@ -730,6 +742,17 @@ fn every_action_row_carries_exactly_the_tag_the_spec_names_for_its_command() {
         "BuyArch",
         "BuyDreamLoom",
         "BuyTradition",
+        "Forage",
+        "Promote",
+        "Enlighten",
+        "HoldParade",
+        "RefineStarshard",
+        "RefineEcho",
+        "CondenseJar",
+        "MakePromise",
+        "SendPenPal",
+        "ScoutPicnic",
+        "FeedWhale",
     ]);
     let mut seen: HashSet<&str> = HashSet::new();
     let mut singles = 0;
